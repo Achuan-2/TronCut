@@ -1,0 +1,1288 @@
+import { useEffect, useRef, useState } from "react";
+import {
+  FolderOpen,
+  Type,
+  Captions,
+  Sparkles,
+  AudioLines,
+  Shapes,
+  Settings2,
+  Plus,
+  Film,
+  Music2,
+  Image,
+  Upload,
+  WandSparkles,
+  Diamond,
+  AlignCenter,
+  Check,
+  FileJson,
+  ArrowRight,
+  Play,
+} from "lucide-react";
+import {
+  type Clip,
+  textPresets,
+  uid,
+  defaultTransform,
+  newText,
+} from "../shared/model";
+import {
+  animation,
+  changeSpeed,
+  setTransform,
+  transformAt,
+} from "../shared/editor";
+import type { Cue } from "../shared/subtitles";
+import type { Capabilities } from "../shared/bridge";
+import type { Editor } from "./useEditor";
+import { timeLabel } from "./Preview";
+import type { SpeechEngine } from "../shared/asr";
+import { defaultCrop, defaultEffects, effectPresets } from "../shared/effects";
+import { MediaThumbnail } from "./MediaThumbnail";
+import { defaultCursorStyle } from "../shared/cursor";
+
+export type Tab =
+  | "media"
+  | "text"
+  | "captions"
+  | "animations"
+  | "audio"
+  | "shapes"
+  | "settings";
+const tabs = [
+  { id: "media", name: "媒体", icon: FolderOpen },
+  { id: "text", name: "文本", icon: Type },
+  { id: "captions", name: "字幕", icon: Captions },
+  { id: "animations", name: "动画", icon: Sparkles },
+  { id: "audio", name: "音频", icon: AudioLines },
+  { id: "shapes", name: "标注", icon: Shapes },
+  { id: "settings", name: "设置", icon: Settings2 },
+] as const;
+interface Props {
+  editor: Editor;
+  tab: Tab;
+  setTab: (tab: Tab) => void;
+  importMedia: () => void;
+  importCamtasia: () => void;
+  capabilities?: Capabilities;
+  run: (fn: () => Promise<unknown>) => void;
+  toast: (text: string) => void;
+  refreshCapabilities: () => void;
+}
+export function addCues(editor: Editor, cues: Cue[], selected?: Clip) {
+  const project = editor.project;
+  const track = project.tracks.find((t) => t.name === "字幕" && !t.locked) ?? {
+    id: uid(),
+    name: "字幕",
+    kind: "visual" as const,
+    hidden: false,
+    muted: false,
+    locked: false,
+  };
+  const clips = cues.flatMap((cue) => {
+    let start = cue.start,
+      end = cue.end;
+    if (selected) {
+      const sourceEnd = selected.sourceIn + selected.duration * selected.speed;
+      start = Math.max(cue.start, selected.sourceIn);
+      end = Math.min(cue.end, sourceEnd);
+      if (end <= start) return [];
+      start = selected.start + (start - selected.sourceIn) / selected.speed;
+      end = selected.start + (end - selected.sourceIn) / selected.speed;
+    }
+    const c = newText(track.id, start, 0, cue.text);
+    c.duration = end - start;
+    c.caption = true;
+    c.transform.y = 0.85;
+    c.style!.fontSize = 56;
+    return [c];
+  });
+  editor.apply((p) => ({
+    ...p,
+    tracks: p.tracks.some((t) => t.id === track.id)
+      ? p.tracks
+      : [track, ...p.tracks],
+    clips: [...p.clips, ...clips],
+  }));
+}
+export default function Panels(props: Props) {
+  const { editor, tab, setTab, run, toast } = props,
+    { project, selected, updateClip } = editor;
+  const [query, setQuery] = useState(""),
+    [engine, setEngine] = useState<SpeechEngine>("faster-whisper"),
+    [language, setLanguage] = useState("auto");
+  const [device, setDevice] = useState<"auto" | "cpu" | "cuda">("auto");
+  const bridge = () => {
+    if (!window.framecraft)
+      throw new Error("此功能需要运行桌面版，请使用 pnpm dev");
+    return window.framecraft;
+  };
+  const audition = useRef<HTMLAudioElement | null>(null);
+  useEffect(
+    () => () => {
+      audition.current?.pause();
+    },
+    [],
+  );
+  return (
+    <aside className="library">
+      <nav className="tool-rail">
+        {tabs.map((t) => (
+          <button
+            key={t.id}
+            className={tab === t.id ? "selected" : ""}
+            onClick={() => setTab(t.id)}
+          >
+            <t.icon size={21} />
+            <span>{t.name}</span>
+          </button>
+        ))}
+      </nav>
+      <div className="library-content">
+        <div className="library-heading">
+          <h2>
+            {tabs.find((t) => t.id === tab)?.name === "媒体"
+              ? "素材库"
+              : tabs.find((t) => t.id === tab)?.name}
+          </h2>
+          <span>
+            {tab === "media"
+              ? `${project.assets.length} 个素材`
+              : "为表达加一点灵感"}
+          </span>
+        </div>
+        {tab === "media" && (
+          <>
+            <button
+              className="wide-button import-button"
+              onClick={props.importMedia}
+            >
+              <Plus size={17} />
+              导入媒体
+            </button>
+            <input
+              className="search-input"
+              placeholder="搜索素材…"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+            />
+            {!project.assets.length ? (
+              <div className="library-empty">
+                <div className="empty-icon">
+                  <Film size={30} />
+                </div>
+                <b>好作品，从素材开始</b>
+                <p>
+                  导入视频、音频或图片
+                  <br />
+                  双击素材即可加入时间线
+                </p>
+                <button className="plain-link" onClick={props.importCamtasia}>
+                  <FileJson size={14} />
+                  导入 Camtasia 工程
+                  <ArrowRight size={13} />
+                </button>
+              </div>
+            ) : (
+              <div className="asset-grid">
+                {project.assets
+                  .filter((a) =>
+                    a.name.toLowerCase().includes(query.toLowerCase()),
+                  )
+                  .map((asset) => (
+                    <button
+                      className={`asset-card ${asset.missing ? "missing" : ""}`}
+                      key={asset.id}
+                      draggable
+                      onDragStart={(event) =>
+                        event.dataTransfer.setData("framecraft-asset", asset.id)
+                      }
+                      onDoubleClick={() => {
+                        if (!asset.missing) {
+                          editor.addAssets([asset], true);
+                          return;
+                        }
+                        run(async () => {
+                          const consumed = Math.max(
+                            0,
+                            ...project.clips
+                              .filter((c) => c.assetId === asset.id)
+                              .map((c) => c.sourceIn + c.duration * c.speed),
+                          );
+                          const replacement = await bridge().relinkMedia(
+                            asset.id,
+                            consumed,
+                          );
+                          if (!replacement) return;
+                          editor.apply((p) => ({
+                            ...p,
+                            assets: p.assets.map((a) =>
+                              a.id === asset.id ? replacement : a,
+                            ),
+                          }));
+                          toast("素材已重新链接，片段与动画保持原位置");
+                        });
+                      }}
+                      title={`${asset.name}\n${asset.missing ? "双击重新链接素材" : "双击添加到时间线"}`}
+                    >
+                      <div className={`asset-thumbnail ${asset.kind}`}>
+                        <MediaThumbnail
+                          asset={asset}
+                          waveform={asset.kind === "audio"}
+                        />
+                        {asset.kind === "video" ? (
+                          <Film size={28} />
+                        ) : asset.kind === "audio" ? (
+                          <Music2 size={28} />
+                        ) : (
+                          <Image size={28} />
+                        )}
+                        <span>
+                          {asset.missing
+                            ? "素材离线"
+                            : asset.kind === "image"
+                              ? "图片"
+                              : timeLabel(asset.duration)}
+                        </span>
+                      </div>
+                      <span className="asset-name">{asset.name}</span>
+                    </button>
+                  ))}
+              </div>
+            )}
+            <div className="library-bottom-note">
+              <FileJson size={15} />
+              <span>
+                保存工程时，素材自动归档
+                <br />
+                JSON 工程，随时看得懂
+              </span>
+            </div>
+          </>
+        )}
+        {tab === "text" && (
+          <>
+            <p className="panel-intro">
+              点击模板，在播放头处直接添加。
+              <br />
+              也可以用时间线旁的「添加文本」。
+            </p>
+            <div className="text-presets">
+              {textPresets.map((preset, i) => (
+                <button
+                  key={preset.name}
+                  className="preset-card"
+                  onClick={() => editor.addText(i)}
+                >
+                  <span
+                    style={{
+                      color: preset.style.color,
+                      WebkitTextStroke: `${preset.style.outlineWidth / 2}px ${preset.style.outline}`,
+                      paintOrder: "stroke fill",
+                    }}
+                  >
+                    映作花字
+                  </span>
+                  <small>{preset.name}</small>
+                  <Plus size={14} />
+                </button>
+              ))}
+            </div>
+            <p className="small-note">所有文字都可编辑，样式随工程保存。</p>
+          </>
+        )}
+        {tab === "captions" && (
+          <>
+            <p className="panel-intro">
+              字幕也是文本图层。
+              <br />
+              放在底部、居中，或任何你想的位置。
+            </p>
+            <label className="field vertical">
+              识别引擎
+              <select
+                value={engine}
+                onChange={(e) => {
+                  setEngine(e.target.value as SpeechEngine);
+                  if (e.target.value !== "sensevoice" && language === "yue")
+                    setLanguage("auto");
+                }}
+              >
+                <option value="sensevoice">
+                  SenseVoiceSmall · 中文 / 快速识别
+                </option>
+                <option value="faster-whisper">
+                  Faster Whisper · 本地识别
+                </option>
+                <option value="whisper-cpp">
+                  VideoCaptioner · Whisper.cpp
+                </option>
+              </select>
+            </label>
+            <label className="field">
+              语言
+              <select
+                value={language}
+                onChange={(e) => setLanguage(e.target.value)}
+              >
+                <option value="auto">自动识别</option>
+                <option value="zh">中文</option>
+                <option value="en">英语</option>
+                <option value="ja">日语</option>
+                <option value="ko">韩语</option>
+                {engine === "sensevoice" && <option value="yue">粤语</option>}
+              </select>
+            </label>
+            {engine === "sensevoice" && (
+              <label className="field">
+                计算设备
+                <select
+                  value={device}
+                  onChange={(e) => setDevice(e.target.value as typeof device)}
+                >
+                  <option value="auto">自动 · CUDA / CPU</option>
+                  <option value="cpu">CPU</option>
+                  <option value="cuda">CUDA GPU</option>
+                </select>
+              </label>
+            )}
+            <button
+              className="wide-button primary"
+              onClick={() =>
+                run(async () => {
+                  if (!selected?.assetId)
+                    throw new Error("请先选中有声音的音视频片段");
+                  const target = selected;
+                  const cues = await bridge().transcribe(
+                    selected.assetId,
+                    engine,
+                    language,
+                    {
+                      device,
+                      sourceIn: target.sourceIn,
+                      sourceDuration: target.duration * target.speed,
+                    },
+                  );
+                  addCues(editor, cues, target);
+                  toast(
+                    `已生成 ${cues.length} 条字幕，按选中片段的裁剪与速度对齐`,
+                  );
+                })
+              }
+            >
+              <WandSparkles size={16} />
+              从选中片段生成字幕
+            </button>
+            <p className="small-note">
+              {engine === "sensevoice"
+                ? "SenseVoiceSmall 使用本地 FunASR + 语音分段，需安装 uv，首次运行会下载依赖与模型。支持词级时间戳时自动细分字幕，否则保留真实语音区间；CUDA 模式需匹配的运行环境。"
+                : engine === "faster-whisper"
+                  ? "Faster Whisper 需要 uv，首次识别会下载依赖与 medium 模型；音频在本地处理。"
+                  : "Whisper.cpp 需在设置中配置 VideoCaptioner 可执行文件。"}
+            </p>
+            <div className="two-buttons">
+              <button
+                onClick={() =>
+                  run(async () => {
+                    const cues = await bridge().importSubtitles();
+                    if (cues) addCues(editor, cues);
+                  })
+                }
+              >
+                <Upload size={14} />
+                导入 SRT
+              </button>
+              <button
+                onClick={() =>
+                  run(async () => {
+                    const cues = project.clips
+                      .filter((c) => c.caption)
+                      .map((c) => ({
+                        start: c.start,
+                        end: c.start + c.duration,
+                        text: c.text ?? "",
+                      }));
+                    if (!cues.length) throw new Error("没有可导出的字幕");
+                    const file = await bridge().exportSubtitles(cues);
+                    if (file) toast("字幕已导出");
+                  })
+                }
+              >
+                导出 SRT
+              </button>
+            </div>
+            <button
+              className="wide-button"
+              onClick={() =>
+                editor.apply((p) => ({
+                  ...p,
+                  clips: p.clips.map((c) =>
+                    c.caption &&
+                    !p.tracks.find((t) => t.id === c.trackId)?.locked
+                      ? {
+                          ...c,
+                          transform: { ...c.transform, x: 0.5, y: 0.5 },
+                          keyframes: [],
+                        }
+                      : c,
+                  ),
+                }))
+              }
+            >
+              <AlignCenter size={15} />
+              全部字幕居中
+            </button>
+            <div className="caption-list">
+              {project.clips
+                .filter((c) => c.caption)
+                .sort((a, b) => a.start - b.start)
+                .map((c) => (
+                  <button
+                    key={c.id}
+                    className={selected?.id === c.id ? "active" : ""}
+                    onClick={() => {
+                      editor.select(c.id);
+                      editor.seek(c.start);
+                    }}
+                  >
+                    <small>{timeLabel(c.start)}</small>
+                    <span>{c.text}</span>
+                  </button>
+                ))}
+            </div>
+          </>
+        )}
+        {tab === "animations" && (
+          <>
+            <p className="panel-intro">
+              选中片段，点击即添加。
+              <br />
+              也可以在时间线上右键添加动画。
+            </p>
+            <div className="animation-presets">
+              {(["fade", "zoom", "slide"] as const).map((type, i) => (
+                <button
+                  key={type}
+                  onClick={() => {
+                    if (!selected) {
+                      toast("请先选中片段");
+                      return;
+                    }
+                    updateClip(selected.id, (c) =>
+                      animation(c, type, editor.playhead - c.start),
+                    );
+                  }}
+                >
+                  <div className={`animation-demo ${type}`}>
+                    <span />
+                  </div>
+                  <span>{["轻柔淡入", "平滑缩放", "侧边滑入"][i]}</span>
+                  <small>0.6 秒 · 平滑曲线</small>
+                </button>
+              ))}
+            </div>
+            <div className="tip-card">
+              <Diamond size={19} />
+              <b>开启自动动画</b>
+              <p>
+                移动播放头，再修改右侧属性。映作会自动记录位置、缩放和不透明度，无需拖拽动画箭头。
+              </p>
+              <button
+                onClick={() => editor.setAutoAnimate(!editor.autoAnimate)}
+              >
+                {editor.autoAnimate ? "已开启" : "开启自动动画"}
+                {editor.autoAnimate && <Check size={14} />}
+              </button>
+            </div>
+          </>
+        )}
+        {tab === "audio" && (
+          <>
+            <div className="audio-hero">
+              <AudioLines size={38} />
+              <h3>让旁白更好听</h3>
+              <p>降噪 · 均衡 · 压缩 · 响度归一</p>
+            </div>
+            <button
+              className="wide-button primary"
+              onClick={() => {
+                if (
+                  !selected?.assetId ||
+                  !project.assets.find((a) => a.id === selected.assetId)
+                    ?.hasAudio
+                ) {
+                  toast("请选中有声音的片段");
+                  return;
+                }
+                updateClip(selected.id, { podcast: !selected.podcast });
+              }}
+            >
+              {selected?.podcast ? (
+                <Check size={17} />
+              ) : (
+                <WandSparkles size={17} />
+              )}
+              {selected?.podcast ? "播客人声已启用" : "应用播客人声"}
+            </button>
+            <button
+              className="wide-button"
+              onClick={() =>
+                run(async () => {
+                  if (!selected) throw new Error("请选中有声音的片段");
+                  audition.current?.pause();
+                  editor.setPlaying(false);
+                  const url = await bridge().previewAudio(project, selected.id);
+                  audition.current = new Audio(url);
+                  await audition.current.play();
+                  toast("正在试听处理后的音频（最多 15 秒）");
+                })
+              }
+            >
+              <Play size={15} />
+              处理后试听
+            </button>
+            <button
+              className="wide-button"
+              onClick={() => audition.current?.pause()}
+            >
+              停止试听
+            </button>
+            <p className="small-note">
+              导出时应用高通、FFT 降噪、存在感均衡、动态压缩和 −16 LUFS
+              响度处理。画布实时预览播放原音，可用「处理后试听」对比效果。这是
+              DSP 预设，尚未接入 AI 人声重建。
+            </p>
+            <div className="tip-card">
+              <h3>加速，也保留音调</h3>
+              <p>
+                {props.capabilities?.rubberband
+                  ? "导出引擎已支持 Rubber Band 变速，保持原始音调。"
+                  : "当前导出使用 FFmpeg atempo 保持音调。安装含 Rubber Band 的 FFmpeg 后将自动使用该引擎。"}
+              </p>
+              <p className="small-note">
+                实际听感取决于素材与倍率，需要通过 A/B 试听调校。
+              </p>
+            </div>
+          </>
+        )}
+        {tab === "shapes" && (
+          <>
+            <p className="panel-intro">轻量标注，让重点更直观。</p>
+            <div className="shape-presets">
+              {(["rectangle", "ellipse", "arrow"] as const).map((shape, i) => (
+                <button
+                  key={shape}
+                  onClick={() => {
+                    const track = project.tracks.find(
+                      (t) => t.kind === "visual" && !t.locked,
+                    );
+                    if (!track) return;
+                    const clip: Clip = {
+                      id: uid(),
+                      trackId: track.id,
+                      kind: "shape",
+                      shape,
+                      fill: "#71e6b5",
+                      name: ["圆角矩形", "椭圆", "箭头"][i],
+                      start: editor.playhead,
+                      duration: 5,
+                      sourceIn: 0,
+                      speed: 1,
+                      volume: 1,
+                      podcast: false,
+                      transform: { ...defaultTransform },
+                      keyframes: [],
+                    };
+                    editor.apply((p) => ({ ...p, clips: [...p.clips, clip] }));
+                    editor.select(clip.id);
+                  }}
+                >
+                  <svg
+                    width="100"
+                    height="54"
+                    viewBox="0 0 120 60"
+                    fill="currentColor"
+                  >
+                    {shape === "rectangle" ? (
+                      <rect x="15" y="9" width="90" height="42" rx="7" />
+                    ) : shape === "ellipse" ? (
+                      <ellipse cx="60" cy="30" rx="42" ry="22" />
+                    ) : (
+                      <path d="M10 22H76V8L110 30L76 52V38H10Z" />
+                    )}
+                  </svg>
+                  <span>{["圆角矩形", "椭圆", "箭头"][i]}</span>
+                </button>
+              ))}
+            </div>
+          </>
+        )}
+        {tab === "settings" && (
+          <>
+            <h3 className="section-title">工程画布</h3>
+            <label className="field">
+              分辨率
+              <select
+                value={`${project.canvas.width}x${project.canvas.height}`}
+                onChange={(e) => {
+                  const [width, height] = e.target.value.split("x").map(Number);
+                  editor.apply((p) => ({
+                    ...p,
+                    canvas: { ...p.canvas, width, height },
+                  }));
+                }}
+              >
+                <option
+                  value={`${project.canvas.width}x${project.canvas.height}`}
+                >
+                  {project.canvas.width} × {project.canvas.height}
+                </option>
+                <option value="1920x1080">1920 × 1080 · 横屏</option>
+                <option value="1080x1920">1080 × 1920 · 竖屏</option>
+                <option value="1080x1080">1080 × 1080 · 方形</option>
+                <option value="1280x720">1280 × 720 · 轻量</option>
+                <option value="3840x2160">3840 × 2160 · 4K</option>
+              </select>
+            </label>
+            <label className="field">
+              帧率
+              <select
+                value={project.canvas.fps}
+                onChange={(e) =>
+                  editor.apply((p) => ({
+                    ...p,
+                    canvas: { ...p.canvas, fps: Number(e.target.value) },
+                  }))
+                }
+              >
+                {[24, 25, 30, 60].map((f) => (
+                  <option key={f} value={f}>
+                    {f} fps
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="field">
+              背景
+              <input
+                type="color"
+                value={project.canvas.background}
+                onChange={(e) =>
+                  editor.apply((p) => ({
+                    ...p,
+                    canvas: { ...p.canvas, background: e.target.value },
+                  }))
+                }
+              />
+            </label>
+            <label className="field">
+              视频编码
+              <select
+                value={project.exportSettings?.encoder ?? "auto"}
+                onChange={(e) =>
+                  editor.apply((p) => ({
+                    ...p,
+                    exportSettings: {
+                      encoder: e.target.value as "auto" | "software",
+                    },
+                  }))
+                }
+              >
+                <option value="auto">优先硬件 · 自动回退</option>
+                <option value="software">CPU · 软件编码</option>
+              </select>
+            </label>
+            <h3 className="section-title">媒体引擎</h3>
+            <div className="engine-status">
+              <i className={props.capabilities?.ffmpeg ? "online" : ""} />
+              {props.capabilities?.ffmpeg
+                ? "FFmpeg / FFprobe 可用"
+                : "请配置 FFmpeg / FFprobe"}
+            </div>
+            {(["ffmpeg", "ffprobe", "videocaptioner"] as const).map((name) => (
+              <button
+                className="wide-button"
+                key={name}
+                onClick={() =>
+                  run(async () => {
+                    await bridge().selectBinary(name);
+                    props.refreshCapabilities();
+                  })
+                }
+              >
+                <Settings2 size={14} />
+                配置 {name}
+              </button>
+            ))}
+            <p className="small-note">
+              开发版可从 PATH 查找引擎。安装包的媒体引擎放在 resources/bin。
+            </p>
+            <h3 className="section-title">映作 FrameCraft 0.1</h3>
+            <p className="small-note">
+              本地工程 · 自由表达
+              <br />
+              参考 OpenScreen / Recordly
+              的录制流程。当前基础录屏仍会包含系统鼠标；可编辑光标、原生 GPU
+              捕获、TREC 和完整 Camtasia 特效兼容尚在开发计划中。
+            </p>
+          </>
+        )}
+      </div>
+    </aside>
+  );
+}
+export function Inspector({ editor }: { editor: Editor }) {
+  const c = editor.selected,
+    locked = editor.project.tracks.find((t) => t.id === c?.trackId)?.locked;
+  const value = c
+    ? transformAt(c, editor.playhead - c.start)
+    : defaultTransform;
+  const update = (patch: Partial<Clip>) => {
+    if (c && !locked) editor.updateClip(c.id, patch);
+  };
+  const transform = (key: keyof typeof value, v: number) => {
+    if (c && !locked && Number.isFinite(v))
+      editor.updateClip(c.id, (clip) =>
+        setTransform(
+          clip,
+          { [key]: v },
+          editor.playhead - clip.start,
+          editor.autoAnimate,
+        ),
+      );
+  };
+  const numberField = (
+    label: string,
+    current: number,
+    change: (value: number) => void,
+    min?: number,
+    max?: number,
+    step = 1,
+  ) => (
+    <label className="field">
+      {label}
+      <input
+        type="number"
+        value={Number(current.toFixed(3))}
+        min={min}
+        max={max}
+        step={step}
+        onChange={(e) => {
+          const v = Number(e.target.value);
+          if (
+            Number.isFinite(v) &&
+            (min === undefined || v >= min) &&
+            (max === undefined || v <= max)
+          )
+            change(v);
+        }}
+      />
+    </label>
+  );
+  return (
+    <aside className="inspector">
+      <div className="panel-heading">
+        <span>属性</span>
+        <Settings2 size={15} />
+      </div>
+      {!c ? (
+        <div className="inspector-empty">
+          <Settings2 size={28} />
+          <b>选择一个片段</b>
+          <p>
+            编辑文字、位置、动画和声音
+            <br />
+            每一步，都在你的掌控之中。
+          </p>
+        </div>
+      ) : (
+        <fieldset disabled={!!locked}>
+          <div className="inspector-selection">
+            <span className={`selection-icon ${c.kind}`}>
+              {c.kind === "text" ? (
+                <Type size={20} />
+              ) : c.kind === "audio" ? (
+                <AudioLines size={20} />
+              ) : (
+                <Film size={20} />
+              )}
+            </span>
+            <div>
+              <b>{c.name}</b>
+              <small>
+                {locked
+                  ? "轨道已锁定"
+                  : c.kind === "text"
+                    ? c.caption
+                      ? "字幕文本"
+                      : "文本图层"
+                    : c.kind === "shape"
+                      ? "标注图层"
+                      : "媒体片段"}
+              </small>
+            </div>
+          </div>
+          {c.kind === "text" && (
+            <>
+              <h3 className="section-title">文本内容</h3>
+              <textarea
+                aria-label="文本内容"
+                value={c.text ?? ""}
+                onChange={(e) =>
+                  update({
+                    text: e.target.value,
+                    name: e.target.value.slice(0, 24) || "文本",
+                  })
+                }
+              />
+              <label className="field">
+                花字模板
+                <select
+                  value=""
+                  onChange={(e) =>
+                    update({
+                      style: { ...textPresets[Number(e.target.value)].style },
+                    })
+                  }
+                >
+                  <option value="" disabled>
+                    选择模板
+                  </option>
+                  {textPresets.map((p, i) => (
+                    <option key={p.name} value={i}>
+                      {p.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              {numberField(
+                "字号",
+                c.style?.fontSize ?? 68,
+                (fontSize) => update({ style: { ...c.style!, fontSize } }),
+                8,
+                300,
+              )}
+              <label className="field">
+                文字颜色
+                <input
+                  type="color"
+                  value={c.style?.color ?? "#ffffff"}
+                  onChange={(e) =>
+                    update({ style: { ...c.style!, color: e.target.value } })
+                  }
+                />
+              </label>
+              <label className="field">
+                描边颜色
+                <input
+                  type="color"
+                  value={c.style?.outline ?? "#111111"}
+                  onChange={(e) =>
+                    update({ style: { ...c.style!, outline: e.target.value } })
+                  }
+                />
+              </label>
+              {numberField(
+                "描边宽度",
+                c.style?.outlineWidth ?? 4,
+                (outlineWidth) =>
+                  update({ style: { ...c.style!, outlineWidth } }),
+                0,
+                20,
+              )}
+              <label className="field">
+                字体
+                <input
+                  value={c.style?.fontFamily ?? "Microsoft YaHei"}
+                  onChange={(e) =>
+                    update({
+                      style: { ...c.style!, fontFamily: e.target.value },
+                    })
+                  }
+                />
+              </label>
+            </>
+          )}
+          {c.kind === "shape" && (
+            <label className="field">
+              填充
+              <input
+                type="color"
+                value={c.fill ?? "#71e6b5"}
+                onChange={(e) => update({ fill: e.target.value })}
+              />
+            </label>
+          )}
+          {c.kind !== "audio" && (
+            <>
+              <h3 className="section-title">
+                变换
+                {editor.autoAnimate && (
+                  <span className="auto-badge">
+                    <Diamond size={10} />
+                    自动记录
+                  </span>
+                )}
+              </h3>
+              {numberField(
+                "位置 X (%)",
+                value.x * 100,
+                (x) => transform("x", x / 100),
+                -400,
+                400,
+                1,
+              )}
+              {numberField(
+                "位置 Y (%)",
+                value.y * 100,
+                (y) => transform("y", y / 100),
+                -400,
+                400,
+                1,
+              )}
+              {numberField(
+                "缩放 (%)",
+                value.scale * 100,
+                (scale) => transform("scale", scale / 100),
+                5,
+                800,
+                1,
+              )}
+              {numberField(
+                "旋转 (度)",
+                c.rotation ?? 0,
+                (rotation) => update({ rotation }),
+                -3600,
+                3600,
+              )}
+              <label className="field">
+                不透明度
+                <input
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.01"
+                  value={value.opacity}
+                  onChange={(e) => transform("opacity", Number(e.target.value))}
+                />
+                <span className="range-value">
+                  {Math.round(value.opacity * 100)}%
+                </span>
+              </label>
+              <button
+                className="wide-button"
+                onClick={() => {
+                  if (!c) return;
+                  editor.updateClip(c.id, (clip) =>
+                    setTransform(
+                      clip,
+                      { x: 0.5, y: 0.5 },
+                      editor.playhead - c.start,
+                      editor.autoAnimate,
+                    ),
+                  );
+                }}
+              >
+                <AlignCenter size={14} />
+                画布居中
+              </button>
+              <h3 className="section-title">画面效果</h3>
+              <label className="field">
+                效果预设
+                <select
+                  aria-label="效果预设"
+                  value=""
+                  onChange={(e) =>
+                    update({
+                      effects: {
+                        ...effectPresets[Number(e.target.value)].effects,
+                      },
+                    })
+                  }
+                >
+                  <option value="" disabled>
+                    选择效果
+                  </option>
+                  {effectPresets.map((p, i) => (
+                    <option key={p.name} value={i}>
+                      {p.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              {(["brightness", "contrast", "saturation", "blur"] as const).map(
+                (key, index) => (
+                  <div key={key}>
+                    {numberField(
+                      ["亮度", "对比度", "饱和度", "模糊半径"][index],
+                      (c.effects ?? defaultEffects)[key],
+                      (v) =>
+                        update({
+                          effects: {
+                            ...(c.effects ?? defaultEffects),
+                            [key]: v,
+                          },
+                        }),
+                      0,
+                      key === "blur" ? 20 : key === "saturation" ? 3 : 2,
+                      0.1,
+                    )}
+                  </div>
+                ),
+              )}
+              {(["flipX", "flipY"] as const).map((key, index) => (
+                <label className="check-field" key={key}>
+                  <input
+                    type="checkbox"
+                    checked={(c.effects ?? defaultEffects)[key]}
+                    onChange={(e) =>
+                      update({
+                        effects: {
+                          ...(c.effects ?? defaultEffects),
+                          [key]: e.target.checked,
+                        },
+                      })
+                    }
+                  />
+                  {["水平翻转", "垂直翻转"][index]}
+                </label>
+              ))}
+              {["video", "image"].includes(c.kind) && (
+                <>
+                  <h3 className="section-title">裁切（源画面百分比）</h3>
+                  {(["left", "top", "right", "bottom"] as const).map(
+                    (key, index) => (
+                      <div key={key}>
+                        {numberField(
+                          [
+                            "裁切左侧 (%)",
+                            "裁切顶部 (%)",
+                            "裁切右侧 (%)",
+                            "裁切底部 (%)",
+                          ][index],
+                          (c.crop ?? defaultCrop)[key] * 100,
+                          (v) => {
+                            const crop = {
+                              ...(c.crop ?? defaultCrop),
+                              [key]: v / 100,
+                            };
+                            if (
+                              crop.left + crop.right < 0.99 &&
+                              crop.top + crop.bottom < 0.99
+                            )
+                              update({ crop });
+                          },
+                          0,
+                          95,
+                          1,
+                        )}
+                      </div>
+                    ),
+                  )}
+                </>
+              )}
+            </>
+          )}
+          <h3 className="section-title">淡入淡出</h3>
+          {numberField(
+            "淡入 (秒)",
+            c.fadeIn ?? 0,
+            (fadeIn) => update({ fadeIn }),
+            0,
+            c.duration,
+            0.1,
+          )}
+          {numberField(
+            "淡出 (秒)",
+            c.fadeOut ?? 0,
+            (fadeOut) => update({ fadeOut }),
+            0,
+            c.duration,
+            0.1,
+          )}
+          {editor.project.assets.find((a) => a.id === c.assetId)?.cursor && (
+            <>
+              <h3 className="section-title">录制鼠标</h3>
+              <label className="field">
+                鼠标样式
+                <select
+                  aria-label="鼠标样式"
+                  value={(c.cursorStyle ?? defaultCursorStyle).style}
+                  onChange={(e) =>
+                    update({
+                      cursorStyle: {
+                        ...(c.cursorStyle ?? defaultCursorStyle),
+                        style: e.target.value as NonNullable<
+                          Clip["cursorStyle"]
+                        >["style"],
+                      },
+                    })
+                  }
+                >
+                  <option value="arrow">箭头</option>
+                  <option value="circle">圆形</option>
+                  <option value="cross">十字</option>
+                  <option value="hidden">隐藏鼠标</option>
+                </select>
+              </label>
+              {numberField(
+                "鼠标大小",
+                (c.cursorStyle ?? defaultCursorStyle).size,
+                (size) =>
+                  update({
+                    cursorStyle: {
+                      ...(c.cursorStyle ?? defaultCursorStyle),
+                      size,
+                    },
+                  }),
+                8,
+                160,
+              )}
+              <label className="field">
+                鼠标颜色
+                <input
+                  type="color"
+                  value={(c.cursorStyle ?? defaultCursorStyle).color}
+                  onChange={(e) =>
+                    update({
+                      cursorStyle: {
+                        ...(c.cursorStyle ?? defaultCursorStyle),
+                        color: e.target.value,
+                      },
+                    })
+                  }
+                />
+              </label>
+              {(["clicks", "smooth"] as const).map((key, index) => (
+                <label className="check-field" key={key}>
+                  <input
+                    type="checkbox"
+                    checked={(c.cursorStyle ?? defaultCursorStyle)[key]}
+                    onChange={(e) =>
+                      update({
+                        cursorStyle: {
+                          ...(c.cursorStyle ?? defaultCursorStyle),
+                          [key]: e.target.checked,
+                        },
+                      })
+                    }
+                  />
+                  {["点击高亮", "平滑鼠标移动"][index]}
+                </label>
+              ))}
+            </>
+          )}
+          <h3 className="section-title">时间</h3>
+          {numberField(
+            "开始 (秒)",
+            c.start,
+            (start) => update({ start }),
+            0,
+            86400,
+            0.1,
+          )}
+          {numberField(
+            "时长 (秒)",
+            c.duration,
+            (duration) => {
+              const asset = editor.project.assets.find(
+                (a) => a.id === c.assetId,
+              );
+              if (
+                asset &&
+                ["video", "audio"].includes(c.kind) &&
+                duration * c.speed + c.sourceIn > asset.duration + 0.01
+              )
+                return;
+              update({ duration });
+            },
+            1 / editor.project.canvas.fps,
+            86400,
+            0.1,
+          )}
+          {["video", "audio"].includes(c.kind) && (
+            <>
+              {numberField(
+                "播放速度",
+                c.speed,
+                (speed) =>
+                  editor.updateClip(c.id, (clip) => changeSpeed(clip, speed)),
+                0.25,
+                8,
+                0.25,
+              )}
+              <p className="small-note">保持音调 · 速度修改同步调整片段时长</p>
+            </>
+          )}
+          {c.assetId &&
+            editor.project.assets.find((a) => a.id === c.assetId)?.hasAudio && (
+              <>
+                <h3 className="section-title">声音</h3>
+                <label className="field">
+                  音量
+                  <input
+                    type="range"
+                    min="0"
+                    max="2"
+                    step="0.01"
+                    value={c.volume}
+                    onChange={(e) => update({ volume: Number(e.target.value) })}
+                  />
+                  <span className="range-value">
+                    {Math.round(c.volume * 100)}%
+                  </span>
+                </label>
+                <label className="check-field">
+                  <input
+                    type="checkbox"
+                    checked={c.podcast}
+                    onChange={(e) => update({ podcast: e.target.checked })}
+                  />
+                  播客人声增强（导出）
+                </label>
+              </>
+            )}
+          <h3 className="section-title">
+            关键帧 <span className="subtle">{c.keyframes.length}</span>
+          </h3>
+          <div className="keyframe-list">
+            {c.keyframes.map((k, i) => (
+              <div key={i}>
+                <button
+                  onClick={() =>
+                    editor.seek(
+                      Math.max(
+                        c.start,
+                        Math.min(
+                          c.start + c.duration,
+                          c.start + k.time - (c.animationOffset ?? 0),
+                        ),
+                      ),
+                    )
+                  }
+                >
+                  <Diamond size={12} fill="currentColor" />
+                  {timeLabel(k.time - (c.animationOffset ?? 0))}
+                </button>
+                <button
+                  title="删除关键帧"
+                  onClick={() =>
+                    update({
+                      keyframes: c.keyframes.filter((_, index) => index !== i),
+                    })
+                  }
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+          </div>
+          {!c.keyframes.length && (
+            <p className="small-note">开启自动动画，或右键添加动画。</p>
+          )}
+        </fieldset>
+      )}
+    </aside>
+  );
+}

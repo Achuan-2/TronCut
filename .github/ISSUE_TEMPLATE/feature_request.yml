@@ -1,0 +1,16 @@
+name: Feature request / 功能建议
+description: Propose one improvement / 提出一个改进建议
+title: "[Feature] "
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem are you trying to solve? / 希望解决什么问题？
+    validations:
+      required: true
+  - type: textarea
+    id: behavior
+    attributes:
+      label: Expected behavior / 期望的行为
+    validations:
+      required: true

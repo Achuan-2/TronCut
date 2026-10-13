@@ -1,0 +1,15 @@
+[project]
+name = "framecraft-asr"
+version = "0.1.0"
+requires-python = ">=3.11,<3.13"
+dependencies = []
+
+[project.optional-dependencies]
+whisper = ["faster-whisper>=1.1.1,<2"]
+sensevoice = [
+    "funasr==1.4.16",
+    "modelscope>=1.31,<2",
+    "torch==2.9.1",
+    "torchaudio==2.9.1",
+    "soundfile>=0.13,<1",
+]

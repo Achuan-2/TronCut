@@ -1,0 +1,16 @@
+{
+  "format": "framecraft",
+  "version": 1,
+  "id": "example-text-video",
+  "name": "文字也能成为主角",
+  "canvas": { "width": 1920, "height": 1080, "fps": 30, "background": "#142821" },
+  "assets": [],
+  "tracks": [{ "id": "titles", "name": "居中文字", "kind": "visual", "hidden": false, "muted": false, "locked": false }],
+  "clips": [
+    { "id": "text-1", "trackId": "titles", "kind": "text", "name": "把想法，变成作品。", "text": "把想法，变成作品。", "caption": true, "start": 0, "duration": 3, "sourceIn": 0, "speed": 1, "volume": 1, "podcast": false, "transform": { "x": 0.5, "y": 0.5, "scale": 1, "opacity": 1 }, "keyframes": [{ "time": 0, "value": { "x": 0.5, "y": 0.54, "scale": 1, "opacity": 0 } }, { "time": 0.6, "value": { "x": 0.5, "y": 0.5, "scale": 1, "opacity": 1 } }], "style": { "fontSize": 90, "color": "#ffffff", "outline": "#111111", "outlineWidth": 4, "fontFamily": "Microsoft YaHei" } },
+    { "id": "text-2", "trackId": "titles", "kind": "text", "name": "字幕，可以放在中央。", "text": "字幕，可以放在中央。", "caption": true, "start": 3, "duration": 3, "sourceIn": 0, "speed": 1, "volume": 1, "podcast": false, "transform": { "x": 0.5, "y": 0.5, "scale": 1, "opacity": 1 }, "keyframes": [{ "time": 0, "value": { "x": 0.5, "y": 0.5, "scale": 0.8, "opacity": 1 } }, { "time": 0.6, "value": { "x": 0.5, "y": 0.5, "scale": 1, "opacity": 1 } }], "style": { "fontSize": 82, "color": "#ffe465", "outline": "#111111", "outlineWidth": 5, "fontFamily": "Microsoft YaHei" } },
+    { "id": "text-3", "trackId": "titles", "kind": "text", "name": "让表达，自在发生。", "text": "让表达，自在发生。", "caption": true, "start": 6, "duration": 3, "sourceIn": 0, "speed": 1, "volume": 1, "podcast": false, "transform": { "x": 0.5, "y": 0.5, "scale": 1, "opacity": 1 }, "keyframes": [], "style": { "fontSize": 90, "color": "#71e6b5", "outline": "#122e26", "outlineWidth": 4, "fontFamily": "Microsoft YaHei" } }
+  ],
+  "markers": [],
+  "exportSettings": { "encoder": "auto" }
+}

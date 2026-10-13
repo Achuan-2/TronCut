@@ -1,0 +1,30 @@
+name: Bug report / 问题反馈
+description: Report one reproducible problem / 报告一个可复现的问题
+title: "[Bug] "
+body:
+  - type: input
+    id: version
+    attributes:
+      label: App version / 软件版本
+      placeholder: v0.2.0
+    validations:
+      required: true
+  - type: input
+    id: system
+    attributes:
+      label: OS and hardware / 系统与硬件
+      placeholder: Windows 11, CPU, GPU, microphone/camera when relevant
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Reproduction steps / 复现步骤
+      description: Include expected and actual results / 包含预期和实际结果
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence / 证据
+      description: Logs, import reports, media formats and screenshots; remove private information / 日志、导入报告、媒体格式与截图，请移除私人信息

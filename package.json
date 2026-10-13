@@ -1,0 +1,125 @@
+{
+  "name": "troncut",
+  "productName": "TronCut",
+  "version": "0.2.0",
+  "private": true,
+  "license": "AGPL-3.0-only",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Achuan-2/TronCut.git"
+  },
+  "homepage": "https://github.com/Achuan-2/TronCut",
+  "bugs": "https://github.com/Achuan-2/TronCut/issues",
+  "description": "跨平台录屏与非线性视频编辑器",
+  "author": "TronCut contributors",
+  "main": "dist-electron/main.cjs",
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "build": "tsc --noEmit && vite build && node scripts/build-electron.mjs",
+    "start": "node scripts/start.mjs",
+    "test": "vitest run",
+    "test:smoke": "node scripts/smoke.mjs",
+    "dist:win": "pnpm build && node scripts/check-packaging.mjs && electron-builder --win nsis",
+    "dist:mac": "pnpm build && node scripts/check-packaging.mjs && electron-builder --mac dmg",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "lucide-react": "^0.468.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "sharp": "^0.34.0",
+    "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.64.0",
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^4.5.0",
+    "electron": "^40.0.0",
+    "electron-builder": "^26.0.0",
+    "esbuild": "^0.25.0",
+    "prettier": "^3.9.10",
+    "typescript": "^5.8.0",
+    "vite": "^6.3.0",
+    "vitest": "^3.2.0"
+  },
+  "build": {
+    "appId": "studio.troncut.editor",
+    "directories": {
+      "output": "release",
+      "buildResources": "resources"
+    },
+    "files": [
+      "dist/**/*",
+      "dist-electron/**/*",
+      "package.json"
+    ],
+    "asarUnpack": [
+      "node_modules/sharp/**/*",
+      "node_modules/@img/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "LICENSE",
+        "to": "TronCut-LICENSE.txt"
+      },
+      {
+        "from": "THIRD_PARTY_NOTICES.md",
+        "to": "THIRD_PARTY_NOTICES.md"
+      },
+      {
+        "from": "resources/bin",
+        "to": "bin",
+        "filter": [
+          "**/*",
+          "!README.md",
+          "!.gitkeep"
+        ]
+      },
+      {
+        "from": "resources/icon.ico",
+        "to": "project.ico"
+      },
+      {
+        "from": "workers",
+        "to": "workers",
+        "filter": [
+          "*.py",
+          "*.toml",
+          "uv.lock"
+        ]
+      }
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "resources/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    },
+    "mac": {
+      "target": "dmg",
+      "category": "public.app-category.video",
+      "icon": "resources/icon.png",
+      "extendInfo": {
+        "NSMicrophoneUsageDescription": "录制旁白与麦克风音频",
+        "NSCameraUsageDescription": "录制摄像头画面",
+        "NSScreenCaptureUsageDescription": "录制屏幕与应用窗口"
+      }
+    },
+    "fileAssociations": [
+      {
+        "ext": "troncut",
+        "name": "TronCut 工程",
+        "role": "Editor"
+      },
+      {
+        "ext": "framecraft",
+        "name": "TronCut 旧版工程",
+        "role": "Editor"
+      }
+    ]
+  }
+}

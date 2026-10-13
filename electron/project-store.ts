@@ -1,0 +1,137 @@
+import fs from "node:fs/promises";
+import path from "node:path";
+import {
+  type Project,
+  validateProject,
+  cursorRecordingSchema,
+} from "../shared/model";
+
+export function resolveContained(root: string, relative: string): string {
+  if (path.isAbsolute(relative))
+    throw new Error("TronCut 工程素材必须使用相对路径");
+  const resolved = path.resolve(root, relative),
+    rel = path.relative(root, resolved);
+  if (rel === ".." || rel.startsWith(`..${path.sep}`) || path.isAbsolute(rel))
+    throw new Error(`工程素材越出了工程目录：${relative}`);
+  return resolved;
+}
+export async function openProject(file: string): Promise<Project> {
+  const project = validateProject(JSON.parse(await fs.readFile(file, "utf8")));
+  const root = path.dirname(file);
+  project.assets = await Promise.all(
+    project.assets.map(async (asset) => {
+      const full = resolveContained(root, asset.path);
+      const realRoot = await fs.realpath(root);
+      try {
+        resolveContained(
+          realRoot,
+          path.relative(realRoot, await fs.realpath(full)),
+        );
+      } catch (err) {
+        if ((err as NodeJS.ErrnoException).code !== "ENOENT") throw err;
+      }
+      let cursor = asset.cursor;
+      if (asset.cursorPath) {
+        const cursorFile = resolveContained(root, asset.cursorPath);
+        try {
+          resolveContained(
+            realRoot,
+            path.relative(realRoot, await fs.realpath(cursorFile)),
+          );
+          cursor = cursorRecordingSchema.parse(
+            JSON.parse(await fs.readFile(cursorFile, "utf8")),
+          );
+        } catch (err) {
+          if ((err as NodeJS.ErrnoException).code !== "ENOENT") throw err;
+        }
+      }
+      return {
+        ...asset,
+        path: full,
+        cursor,
+        missing: !(await fs.access(full).then(
+          () => true,
+          () => false,
+        )),
+      };
+    }),
+  );
+  return project;
+}
+export async function saveProject(
+  project: Project,
+  file: string,
+  iconPath?: string,
+): Promise<Project> {
+  const valid = validateProject(project),
+    root = path.dirname(file);
+  await fs.mkdir(path.join(root, "media"), { recursive: true });
+  const realRoot = await fs.realpath(root),
+    realMedia = await fs.realpath(path.join(root, "media"));
+  resolveContained(realRoot, path.relative(realRoot, realMedia));
+  const serialized = structuredClone(valid);
+  serialized.format = "troncut";
+  for (const asset of serialized.assets) {
+    const original = valid.assets.find((a) => a.id === asset.id)!;
+    const safeName = original.name
+      .replace(/[<>:"/\\|?*\x00-\x1f]/g, "_")
+      .slice(-120);
+    const target = path.join(root, "media", `${asset.id}-${safeName}`);
+    if ((await fs.lstat(target).catch(() => null))?.isSymbolicLink())
+      throw new Error("素材目标不能是符号链接");
+    if (path.resolve(original.path) !== path.resolve(target)) {
+      await fs.copyFile(original.path, target);
+    } else await fs.access(target);
+    asset.path = `media/${path.basename(target)}`;
+    if (asset.cursor) {
+      asset.cursorPath = `media/${asset.id}-cursor.json`;
+      const cursorTarget = resolveContained(root, asset.cursorPath);
+      if ((await fs.lstat(cursorTarget).catch(() => null))?.isSymbolicLink())
+        throw new Error("鼠标数据目标不能是符号链接");
+      await fs.writeFile(`${cursorTarget}.tmp`, JSON.stringify(asset.cursor));
+      await fs.rename(`${cursorTarget}.tmp`, cursorTarget);
+      delete asset.cursor;
+    }
+    delete asset.missing;
+  }
+  // Replace only after all media has been collected. A failed copy leaves the last good JSON intact.
+  const temporary = `${file}.${process.pid}.tmp`;
+  await fs.writeFile(
+    temporary,
+    JSON.stringify(serialized, null, 2) + "\n",
+    "utf8",
+  );
+  await fs.rename(temporary, file);
+  if (process.platform === "win32" && iconPath) {
+    await fs.copyFile(iconPath, path.join(root, "project.ico")).catch(() => {});
+    // Windows refuses CREATE_ALWAYS on a hidden/system file. Create it once;
+    // repeated saves must neither fail nor overwrite an existing folder customization.
+    const desktopIni = path.join(root, "desktop.ini");
+    if (
+      !(await fs.access(desktopIni).then(
+        () => true,
+        () => false,
+      ))
+    )
+      await fs.writeFile(
+        desktopIni,
+        "\uFEFF[.ShellClassInfo]\r\nIconResource=project.ico,0\r\n",
+        "utf16le",
+      );
+    const { runProcess } = await import("./process");
+    await runProcess("attrib", ["+r", root]).catch(() => {});
+    await runProcess("attrib", [
+      "+s",
+      "+h",
+      path.join(root, "desktop.ini"),
+    ]).catch(() => {});
+  }
+  return {
+    ...valid,
+    assets: serialized.assets.map((a) => ({
+      ...a,
+      path: resolveContained(root, a.path),
+      cursor: valid.assets.find((original) => original.id === a.id)?.cursor,
+    })),
+  };
+}
