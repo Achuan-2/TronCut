@@ -105,7 +105,10 @@ jobs:
         run: node ../ci/scripts/check-packaging.mjs
       - name: Test and build
         run: |
-          pnpm test
+          New-Item -ItemType Directory -Path .cache -Force | Out-Null
+          Copy-Item -LiteralPath ../ci/scripts/ci-test.config.mjs -Destination .cache/ci-test.config.mjs
+          Copy-Item -LiteralPath ../ci/scripts/ci-process-trace.mjs -Destination .cache/ci-process-trace.mjs
+          pnpm exec vitest run --config .cache/ci-test.config.mjs
           if ($LASTEXITCODE -ne 0) { throw 'Tests failed' }
           pnpm build
           if ($LASTEXITCODE -ne 0) { throw 'Build failed' }
@@ -126,6 +129,14 @@ jobs:
           if-no-files-found: error
           compression-level: 0
           retention-days: 14
+      - name: Retain failed media test diagnostics
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: diagnostics-${{ needs.resolve.outputs.tag }}
+          path: app/test-output
+          if-no-files-found: ignore
+          retention-days: 7
 
   upload:
     needs: [resolve, windows]
