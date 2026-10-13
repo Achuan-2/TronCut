@@ -5,45 +5,47 @@ import {
   type Transform,
   uid,
   defaultTransform,
+  newTrack,
+  numberTracks,
 } from "./model";
+
+export function availableTrack(
+  project: Pick<Project, "tracks" | "clips">,
+  start: number,
+  duration: number,
+) {
+  return project.tracks.find(
+    (track) =>
+      !track.locked &&
+      !track.hidden &&
+      !project.clips.some(
+        (clip) =>
+          clip.trackId === track.id &&
+          clip.start < start + duration &&
+          clip.start + clip.duration > start,
+      ),
+  );
+}
 
 export function addMediaAssets(
   project: Project,
   assets: Asset[],
   start: number,
   toTimeline = false,
+  options: { newTrackForImages?: boolean } = {},
 ): Project {
   const tracks = [...project.tracks],
     clips = [...project.clips];
   if (toTimeline)
     for (const asset of assets) {
-      const duration = asset.duration || 5,
-        kind = asset.kind === "audio" ? "audio" : "visual";
-      const available = (track: Project["tracks"][number]) =>
-        track.kind === kind &&
-        !track.locked &&
-        !track.hidden &&
-        !clips.some(
-          (c) =>
-            c.trackId === track.id &&
-            c.start < start + duration &&
-            c.start + c.duration > start,
-        );
+      const duration = asset.duration || 5;
       let track =
-        tracks.find(
-          (t) =>
-            t.id === (kind === "audio" ? "audio" : "video") && available(t),
-        ) ?? tracks.find(available);
+        options.newTrackForImages && asset.kind === "image"
+          ? undefined
+          : availableTrack({ tracks, clips }, start, duration);
       if (!track) {
-        track = {
-          id: uid(),
-          name: kind === "audio" ? "声音" : "画面",
-          kind,
-          hidden: false,
-          muted: false,
-          locked: false,
-        };
-        tracks.push(track);
+        track = newTrack(tracks.length);
+        tracks.unshift(track);
       }
       clips.push({
         id: uid(),
@@ -64,7 +66,7 @@ export function addMediaAssets(
   const known = new Set(project.assets.map((a) => a.id));
   return {
     ...project,
-    tracks,
+    tracks: numberTracks(tracks),
     clips,
     assets: [...project.assets, ...assets.filter((a) => !known.has(a.id))],
   };

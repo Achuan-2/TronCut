@@ -44,41 +44,7 @@ Download from **[GitHub Releases](https://github.com/Achuan-2/TronCut/releases/t
 
 Windows packages include the media engine, native recording helpers, and the speech environment manager. End users do not need to install Node.js, FFmpeg, or uv. **The first speech-caption task needs internet access to download Python, dependencies, and models**; speech recognition then runs locally. The current Windows build is unsigned.
 
-1. Choose a screen or window with “录制” (Record), or add video, audio, and images with “导入媒体” (Import media).
-2. Double-click media to add it to the timeline. Use “添加文本” (Add text), animations, and the inspector to refine the video.
-3. Save the project to collect its media into one folder. Use “导出视频” (Export video) to create an MP4.
-
-Try the [text-based video example](examples/文字视频.framecraft). TronCut also reads legacy `.framecraft` projects.
-
-## Common operations
-
-Hold Ctrl/⌘ or Shift and click clips to select multiple items. Grouped clips are selected and moved together; copy/paste preserves relative positions. Ripple deletion closes only the deleted time that no remaining clip occupies. Locked tracks keep their positions. Double-click missing media in the library to relink it while preserving clip and animation placement.
-
-| Shortcut                    | Action                             |
-| --------------------------- | ---------------------------------- |
-| Space / Left or Right arrow | Play/pause / step one frame        |
-| S / Delete / Shift + Delete | Split / delete / ripple delete     |
-| Ctrl/⌘ + A / G / Shift + G  | Select all / group / ungroup       |
-| Ctrl/⌘ + C / V              | Copy / paste clips                 |
-| Ctrl/⌘ + Z / Shift + Z      | Undo / redo                        |
-| Ctrl/⌘ + S / Shift + S      | Save / save as                     |
-| Ctrl/⌘ + O / I / E          | Open / import media / export video |
-| Ctrl/⌘ + Shift + F9         | Stop recording globally            |
-
-## Project files
-
-On the first save, choose a parent directory. TronCut creates a separate project folder and collects its media. Copy or move the entire folder; media paths are relative and duplicate names receive a suffix.
-
-```text
-My video/
-├── My video.troncut       # Readable JSON: canvas, tracks, clips, animation
-├── media/
-│   ├── <ID>-screen.mp4
-│   ├── <ID>-voice.wav
-│   └── <ID>-cursor.json   # Independent cursor data
-├── project.ico           # Windows folder icon
-└── desktop.ini
-```
+See the [user documentation](docs/README.md) for media, recording cursors, timeline editing, text, canvas animation, and project management. Start with [Getting started](docs/GETTING-STARTED.md). These guides currently use Chinese to match the application UI.
 
 ## Compatibility
 
@@ -114,6 +80,7 @@ pnpm test:smoke     # Electron desktop regression; run build and test first
 
 ## Documentation and contributing
 
+- [User documentation and modules](docs/README.md) · [Getting started](docs/GETTING-STARTED.md)
 - [Feature checklist and roadmap](docs/FEATURES.md) · [Architecture and project format](docs/ARCHITECTURE.md)
 - [Building and releases](docs/BUILDING.md) · [Validation record](docs/VALIDATION.md)
 - [SenseVoice measurements](docs/SENSEVOICE.md) · [Real Camtasia project test](docs/CAMTASIA-REAL-PROJECT-TEST.md)

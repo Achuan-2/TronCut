@@ -1206,6 +1206,29 @@ fieldset:disabled {
 .section-title .subtle {
   margin-left: auto;
 }
+.size-ratio {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 5px;
+  font-size: 9px;
+  color: var(--muted);
+}
+#inspector-video .section-title {
+  margin: 14px 0 8px;
+}
+#inspector-video .field {
+  margin: 7px 0;
+}
+#inspector-video .center-layer {
+  margin-left: auto;
+  padding: 2px 5px;
+}
+.flip-controls {
+  display: flex;
+  gap: 18px;
+  margin-top: 14px;
+}
 .auto-badge {
   font-size: 9px;
   display: inline-flex;
@@ -1409,15 +1432,9 @@ fieldset:disabled {
   font-size: 10px;
   color: #aec2b5;
 }
-.track-number {
-  font:
-    9px Consolas,
-    monospace;
-  color: #617d6a;
-}
 .track-controls {
   display: flex;
-  margin-left: 23px;
+  margin-left: 0;
   gap: 9px;
 }
 .track-controls button {
@@ -1551,12 +1568,84 @@ fieldset:disabled {
   text-overflow: ellipsis;
   pointer-events: none;
 }
-.keyframe {
+.timeline-clip.has-animation .clip-detail {
+  display: none;
+}
+.clip-animations {
   position: absolute;
-  bottom: 2px;
-  color: #f3e5bd;
+  inset: auto 0 3px;
+  height: 20px;
   pointer-events: none;
-  transform: translateX(-5px);
+  z-index: 6;
+}
+.clip-animation {
+  position: absolute;
+  height: 20px;
+  top: 0;
+}
+.animation-arrow {
+  display: block;
+  width: 100%;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  pointer-events: auto;
+  cursor: grab;
+}
+.animation-arrow svg {
+  display: block;
+  overflow: visible;
+  fill: #239b8d99;
+  stroke: #32b9aa;
+  stroke-width: 1;
+}
+.animation-arrow:hover svg {
+  fill: #32b9aacc;
+}
+.animation-arrow:hover {
+  background: transparent;
+}
+.animation-point {
+  position: absolute;
+  top: 50%;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: #bdcdd0;
+  transform: translate(-50%, -50%);
+  pointer-events: auto;
+  cursor: ew-resize;
+  z-index: 1;
+}
+.animation-point.start {
+  left: 0;
+  width: 5px;
+  height: 5px;
+}
+.animation-point.end {
+  left: 100%;
+  width: 10px;
+  height: 10px;
+}
+.animation-point.end.active {
+  background: #f26068;
+}
+.animation-point:hover {
+  background: #bdcdd0;
+  box-shadow: 0 0 0 3px #ffffff30;
+}
+.animation-arrow:focus-visible,
+.animation-point:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.clip-animations.dragging .animation-arrow {
+  cursor: grabbing;
+}
+.clip-animations.locked button {
+  cursor: default;
 }
 .trim-handle {
   position: absolute;

@@ -65,13 +65,14 @@ try {
   await page.getByLabel("配音模型").selectOption("kokoro");
   await page.getByRole("button", { name: "媒体", exact: true }).click();
   await page.getByRole("button", { name: "自动动画", exact: true }).click();
+  await page.getByRole("tab", { name: "画面", exact: true }).click();
   const ruler = await page.locator(".ruler").boundingBox();
   await page.mouse.click(ruler.x + 65 * 3, ruler.y + 12);
   await page.getByLabel("位置 X (%)").fill("70");
-  await expect(page.locator(".keyframe-list > div")).toHaveCount(2);
+  await expect(page.locator(".timeline-clip.selected .clip-animation")).toHaveCount(1);
   await page.locator(".timeline-clip.selected").click({ button: "right" });
   await page.getByRole("button", { name: "添加缩放动画", exact: true }).click();
-  await expect(page.locator(".keyframe-list > div")).toHaveCount(3);
+  await expect(page.locator(".timeline-clip.selected .clip-animation")).toHaveCount(2);
   await app.evaluate(({ dialog }, file) => {
     dialog.showOpenDialog = async () => ({
       canceled: false,
@@ -91,9 +92,10 @@ try {
   await page.getByRole("button", { name: "组合", exact: true }).click();
   await page.getByTitle("撤销 Ctrl+Z").click();
   await page.locator(".timeline-clip.video").click();
-  await page.getByLabel("裁切左侧 (%)").fill("10");
+  await expect(page.getByLabel("裁切左侧 (%)")).toHaveCount(0);
   await page.getByLabel("旋转 (度)").fill("15");
-  await page.getByLabel("效果预设").selectOption("2");
+  await expect(page.getByLabel("效果预设")).toHaveCount(0);
+  await page.getByLabel("水平翻转", { exact: true }).check();
   await expect(
     page.locator(".asset-thumbnail img.thumbnail-image"),
   ).toHaveCount(1, { timeout: 20000 });

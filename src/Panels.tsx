@@ -22,6 +22,8 @@ import {
   Mic,
   MousePointer2,
   Scan,
+  Clock3,
+  Link2,
 } from "lucide-react";
 import {
   type Clip,
@@ -29,6 +31,7 @@ import {
   uid,
   defaultTransform,
   newText,
+  newTrack,
 } from "../shared/model";
 import {
   animation,
@@ -41,7 +44,8 @@ import type { Capabilities } from "../shared/bridge";
 import type { Editor } from "./useEditor";
 import { timeLabel } from "./Preview";
 import type { SpeechEngine } from "../shared/asr";
-import { defaultCrop, defaultEffects, effectPresets } from "../shared/effects";
+import { defaultCrop, defaultEffects } from "../shared/effects";
+import { textBoxFor } from "./text";
 import { MediaThumbnail } from "./MediaThumbnail";
 import { defaultCursorStyle } from "../shared/cursor";
 import NarrationPanel from "./NarrationPanel";
@@ -82,14 +86,13 @@ interface Props {
 }
 export function addCues(editor: Editor, cues: Cue[], selected?: Clip) {
   const project = editor.project;
-  const track = project.tracks.find((t) => t.name === "字幕" && !t.locked) ?? {
-    id: uid(),
-    name: "字幕",
-    kind: "visual" as const,
-    hidden: false,
-    muted: false,
-    locked: false,
-  };
+  const track =
+    project.tracks.find(
+      (track) =>
+        !track.locked &&
+        !track.hidden &&
+        project.clips.some((clip) => clip.trackId === track.id && clip.caption),
+    ) ?? newTrack(project.tracks.length);
   const clips = cues.flatMap((cue) => {
     let start = cue.start,
       end = cue.end;
@@ -591,7 +594,7 @@ export default function Panels(props: Props) {
                   key={shape}
                   onClick={() => {
                     const track = project.tracks.find(
-                      (t) => t.kind === "visual" && !t.locked,
+                      (t) => !t.locked && !t.hidden,
                     );
                     if (!track) return;
                     const clip: Clip = {
@@ -818,11 +821,31 @@ export function Inspector({ editor }: { editor: Editor }) {
   const hasCursor =
     c?.kind === "video" &&
     !!editor.project.assets.find((asset) => asset.id === c.assetId)?.cursor;
-  const cursorActive =
-    hasCursor && tab.clipId === c?.id && tab.name === "cursor";
   const hasText = c?.kind === "text";
-  const textActive = hasText && (tab.clipId !== c.id || tab.name === "text");
-  const specialActive = cursorActive || textActive;
+  const tabs = [
+    ...(c?.kind !== "audio"
+      ? [{ name: "video", label: hasCursor ? "视频" : "画面", icon: Film }]
+      : []),
+    ...(hasCursor
+      ? [{ name: "cursor", label: "鼠标", icon: MousePointer2 }]
+      : []),
+    ...(hasText ? [{ name: "text", label: "文本", icon: Type }] : []),
+    {
+      name: "clip",
+      label: c?.kind === "audio" ? "声音" : "片段",
+      icon: Clock3,
+    },
+  ];
+  const activeTab =
+    tab.clipId === c?.id && tabs.some((item) => item.name === tab.name)
+      ? tab.name
+      : hasText
+        ? "text"
+        : c?.kind === "audio"
+          ? "clip"
+          : "video";
+  const cursorActive = activeTab === "cursor";
+  const textActive = activeTab === "text";
   const value = c
     ? transformAt(c, editor.playhead - c.start)
     : defaultTransform;
@@ -839,6 +862,34 @@ export function Inspector({ editor }: { editor: Editor }) {
           editor.autoAnimate,
         ),
       );
+  };
+  const asset = editor.project.assets.find((asset) => asset.id === c?.assetId);
+  const fit = asset
+    ? Math.min(
+        editor.project.canvas.width / Math.max(1, asset.width),
+        editor.project.canvas.height / Math.max(1, asset.height),
+      )
+    : 1;
+  const crop = c?.crop ?? defaultCrop;
+  const size =
+    c?.kind === "text"
+      ? textBoxFor(c)
+      : asset
+        ? {
+            width: asset.width * fit * (1 - crop.left - crop.right),
+            height: asset.height * fit * (1 - crop.top - crop.bottom),
+          }
+        : { width: 600, height: 300 };
+  const resize = (axis: "width" | "height", pixels: number) => {
+    if (!c || locked) return;
+    if (c.kind === "text") {
+      const dimension = pixels / value.scale;
+      if (dimension >= 16 && dimension <= 32768)
+        update({ textBox: { ...size, [axis]: dimension } });
+    } else {
+      const scale = pixels / size[axis];
+      if (scale >= 0.05 && scale <= 8) transform("scale", scale);
+    }
   };
   const numberField = (
     label: string,
@@ -876,56 +927,46 @@ export function Inspector({ editor }: { editor: Editor }) {
         <span>属性</span>
         <Settings2 size={15} />
       </div>
-      {(hasCursor || hasText) && c && (
+      {c && (
         <div
           className="inspector-tabs"
           role="tablist"
-          aria-label={hasText ? "文本属性" : "录屏属性"}
+          aria-label="片段属性"
           onKeyDown={(event) => {
             if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key))
               return;
             event.preventDefault();
-            const cursor =
+            const current = tabs.findIndex((item) => item.name === activeTab);
+            const index =
               event.key === "Home"
-                ? false
+                ? 0
                 : event.key === "End"
-                  ? true
-                  : !specialActive;
-            setTab({
-              clipId: c.id,
-              name: cursor ? (hasText ? "text" : "cursor") : "video",
-            });
+                  ? tabs.length - 1
+                  : (current +
+                      (event.key === "ArrowRight" ? 1 : -1) +
+                      tabs.length) %
+                    tabs.length;
+            setTab({ clipId: c.id, name: tabs[index].name });
             event.currentTarget
               .querySelectorAll<HTMLButtonElement>("button")
-              [cursor ? 1 : 0]?.focus();
+              [index]?.focus();
           }}
         >
-          <button
-            type="button"
-            role="tab"
-            id="inspector-video-tab"
-            aria-controls="inspector-video"
-            aria-selected={!specialActive}
-            tabIndex={specialActive ? -1 : 0}
-            onClick={() => setTab({ clipId: c.id, name: "video" })}
-          >
-            <Film size={18} />
-            {hasText ? "画面" : "视频"}
-          </button>
-          <button
-            type="button"
-            role="tab"
-            id={hasText ? "inspector-text-tab" : "inspector-cursor-tab"}
-            aria-controls={hasText ? "inspector-text" : "inspector-cursor"}
-            aria-selected={specialActive}
-            tabIndex={specialActive ? 0 : -1}
-            onClick={() =>
-              setTab({ clipId: c.id, name: hasText ? "text" : "cursor" })
-            }
-          >
-            {hasText ? <Type size={18} /> : <MousePointer2 size={18} />}
-            {hasText ? "文本" : "鼠标"}
-          </button>
+          {tabs.map(({ name, label, icon: Icon }) => (
+            <button
+              key={name}
+              type="button"
+              role="tab"
+              id={`inspector-${name}-tab`}
+              aria-controls={`inspector-${name}`}
+              aria-selected={activeTab === name}
+              tabIndex={activeTab === name ? 0 : -1}
+              onClick={() => setTab({ clipId: c.id, name })}
+            >
+              <Icon size={18} />
+              {label}
+            </button>
+          ))}
         </div>
       )}
       <div className="inspector-body">
@@ -1085,11 +1126,9 @@ export function Inspector({ editor }: { editor: Editor }) {
             )}
             <div
               id="inspector-video"
-              role={hasCursor || hasText ? "tabpanel" : undefined}
-              aria-labelledby={
-                hasCursor || hasText ? "inspector-video-tab" : undefined
-              }
-              hidden={specialActive}
+              role="tabpanel"
+              aria-labelledby="inspector-video-tab"
+              hidden={activeTab !== "video"}
             >
               {c.kind === "shape" && (
                 <label className="field">
@@ -1103,45 +1142,13 @@ export function Inspector({ editor }: { editor: Editor }) {
               )}
               {c.kind !== "audio" && (
                 <>
-                  <h3 className="section-title">
-                    变换
-                    {editor.autoAnimate && (
-                      <span className="auto-badge">
-                        <Diamond size={10} />
-                        自动记录
-                      </span>
-                    )}
-                  </h3>
-                  {numberField(
-                    "位置 X (%)",
-                    value.x * 100,
-                    (x) => transform("x", x / 100),
-                    -400,
-                    400,
-                    1,
-                  )}
-                  {numberField(
-                    "位置 Y (%)",
-                    value.y * 100,
-                    (y) => transform("y", y / 100),
-                    -400,
-                    400,
-                    1,
-                  )}
+                  <h3 className="section-title">变换</h3>
                   {numberField(
                     "缩放 (%)",
                     value.scale * 100,
                     (scale) => transform("scale", scale / 100),
                     5,
                     800,
-                    1,
-                  )}
-                  {numberField(
-                    "旋转 (度)",
-                    c.rotation ?? 0,
-                    (rotation) => update({ rotation }),
-                    -3600,
-                    3600,
                   )}
                   <label className="field">
                     不透明度
@@ -1159,67 +1166,72 @@ export function Inspector({ editor }: { editor: Editor }) {
                       {Math.round(value.opacity * 100)}%
                     </span>
                   </label>
-                  <button
-                    className="wide-button"
-                    onClick={() => {
-                      if (!c) return;
-                      editor.updateClip(c.id, (clip) =>
-                        setTransform(
-                          clip,
-                          { x: 0.5, y: 0.5 },
-                          editor.playhead - c.start,
-                          editor.autoAnimate,
-                        ),
-                      );
-                    }}
-                  >
-                    <AlignCenter size={14} />
-                    画布居中
-                  </button>
-                  <h3 className="section-title">画面效果</h3>
-                  <label className="field">
-                    效果预设
-                    <select
-                      aria-label="效果预设"
-                      value=""
-                      onChange={(e) =>
-                        update({
-                          effects: {
-                            ...effectPresets[Number(e.target.value)].effects,
-                          },
-                        })
+                  <h3 className="section-title">
+                    旋转与位置
+                    <button
+                      type="button"
+                      className="center-layer"
+                      title="画布居中"
+                      aria-label="画布居中"
+                      onClick={() =>
+                        editor.updateClip(c.id, (clip) =>
+                          setTransform(
+                            clip,
+                            { x: 0.5, y: 0.5 },
+                            editor.playhead - c.start,
+                            editor.autoAnimate,
+                          ),
+                        )
                       }
                     >
-                      <option value="" disabled>
-                        选择效果
-                      </option>
-                      {effectPresets.map((p, i) => (
-                        <option key={p.name} value={i}>
-                          {p.name}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  {(
-                    ["brightness", "contrast", "saturation", "blur"] as const
-                  ).map((key, index) => (
-                    <div key={key}>
-                      {numberField(
-                        ["亮度", "对比度", "饱和度", "模糊半径"][index],
-                        (c.effects ?? defaultEffects)[key],
-                        (v) =>
-                          update({
-                            effects: {
-                              ...(c.effects ?? defaultEffects),
-                              [key]: v,
-                            },
-                          }),
-                        0,
-                        key === "blur" ? 20 : key === "saturation" ? 3 : 2,
-                        0.1,
-                      )}
-                    </div>
-                  ))}
+                      <AlignCenter size={14} />
+                    </button>
+                  </h3>
+                  {numberField(
+                    "旋转 (度)",
+                    c.rotation ?? 0,
+                    (rotation) => update({ rotation }),
+                    -3600,
+                    3600,
+                  )}
+                  {numberField(
+                    "位置 X (%)",
+                    value.x * 100,
+                    (x) => transform("x", x / 100),
+                    -400,
+                    400,
+                  )}
+                  {numberField(
+                    "位置 Y (%)",
+                    value.y * 100,
+                    (y) => transform("y", y / 100),
+                    -400,
+                    400,
+                  )}
+                  <h3 className="section-title">尺寸</h3>
+                  {size.width > 0 &&
+                    numberField(
+                      "宽度 (px)",
+                      size.width * value.scale,
+                      (pixels) => resize("width", pixels),
+                      1,
+                      262144,
+                    )}
+                  {size.height > 0 &&
+                    numberField(
+                      "高度 (px)",
+                      size.height * value.scale,
+                      (pixels) => resize("height", pixels),
+                      1,
+                      262144,
+                    )}
+                  {c.kind !== "text" && (
+                    <p className="size-ratio">
+                      <Link2 size={12} />
+                      宽高保持比例
+                    </p>
+                  )}
+                  <div className="flip-controls">
                   {(["flipX", "flipY"] as const).map((key, index) => (
                     <label className="check-field" key={key}>
                       <input
@@ -1237,59 +1249,16 @@ export function Inspector({ editor }: { editor: Editor }) {
                       {["水平翻转", "垂直翻转"][index]}
                     </label>
                   ))}
-                  {["video", "image"].includes(c.kind) && (
-                    <>
-                      <h3 className="section-title">裁切（源画面百分比）</h3>
-                      {(["left", "top", "right", "bottom"] as const).map(
-                        (key, index) => (
-                          <div key={key}>
-                            {numberField(
-                              [
-                                "裁切左侧 (%)",
-                                "裁切顶部 (%)",
-                                "裁切右侧 (%)",
-                                "裁切底部 (%)",
-                              ][index],
-                              (c.crop ?? defaultCrop)[key] * 100,
-                              (v) => {
-                                const crop = {
-                                  ...(c.crop ?? defaultCrop),
-                                  [key]: v / 100,
-                                };
-                                if (
-                                  crop.left + crop.right < 0.99 &&
-                                  crop.top + crop.bottom < 0.99
-                                )
-                                  update({ crop });
-                              },
-                              0,
-                              95,
-                              1,
-                            )}
-                          </div>
-                        ),
-                      )}
-                    </>
-                  )}
+                  </div>
                 </>
               )}
-              <h3 className="section-title">淡入淡出</h3>
-              {numberField(
-                "淡入 (秒)",
-                c.fadeIn ?? 0,
-                (fadeIn) => update({ fadeIn }),
-                0,
-                c.duration,
-                0.1,
-              )}
-              {numberField(
-                "淡出 (秒)",
-                c.fadeOut ?? 0,
-                (fadeOut) => update({ fadeOut }),
-                0,
-                c.duration,
-                0.1,
-              )}
+            </div>
+            <div
+              id="inspector-clip"
+              role="tabpanel"
+              aria-labelledby="inspector-clip-tab"
+              hidden={activeTab !== "clip"}
+            >
               <h3 className="section-title">时间</h3>
               {numberField(
                 "开始 (秒)",
@@ -1367,46 +1336,6 @@ export function Inspector({ editor }: { editor: Editor }) {
                     </label>
                   </>
                 )}
-              <h3 className="section-title">
-                关键帧 <span className="subtle">{c.keyframes.length}</span>
-              </h3>
-              <div className="keyframe-list">
-                {c.keyframes.map((k, i) => (
-                  <div key={i}>
-                    <button
-                      onClick={() =>
-                        editor.seek(
-                          Math.max(
-                            c.start,
-                            Math.min(
-                              c.start + c.duration,
-                              c.start + k.time - (c.animationOffset ?? 0),
-                            ),
-                          ),
-                        )
-                      }
-                    >
-                      <Diamond size={12} fill="currentColor" />
-                      {timeLabel(k.time - (c.animationOffset ?? 0))}
-                    </button>
-                    <button
-                      title="删除关键帧"
-                      onClick={() =>
-                        update({
-                          keyframes: c.keyframes.filter(
-                            (_, index) => index !== i,
-                          ),
-                        })
-                      }
-                    >
-                      ×
-                    </button>
-                  </div>
-                ))}
-              </div>
-              {!c.keyframes.length && (
-                <p className="small-note">开启自动动画，或右键添加动画。</p>
-              )}
             </div>
           </fieldset>
         )}

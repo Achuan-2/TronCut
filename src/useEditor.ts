@@ -4,12 +4,13 @@ import {
   type Project,
   type Clip,
   newText,
-  uid,
   defaultTransform,
   type Asset,
   type Transform,
+  newTrack,
+  numberTracks,
 } from "../shared/model";
-import { addMediaAssets } from "../shared/editor";
+import { addMediaAssets, availableTrack } from "../shared/editor";
 import { selectionWithGroups } from "../shared/timeline";
 import { setCameraTransform } from "../shared/canvas";
 import { fitUpdatedText } from "./text";
@@ -27,7 +28,6 @@ export function demoProject(): Project {
   project.tracks.unshift({
     id: "subtitle-demo",
     name: "副标题",
-    kind: "visual",
     hidden: false,
     muted: false,
     locked: false,
@@ -40,7 +40,7 @@ export function demoProject(): Project {
   subtitle.duration = 7.6;
   project.clips = [title, subtitle];
   project.canvas.background = "#142821";
-  return project;
+  return { ...project, tracks: numberTracks(project.tracks) };
 }
 export function useEditor() {
   const [project, setProject] = useState<Project>(demoProject);
@@ -76,7 +76,9 @@ export function useEditor() {
   const apply = useCallback(
     (next: Project | ((project: Project) => Project)) => {
       const before = current.current,
-        after = typeof next === "function" ? next(before) : next;
+        result = typeof next === "function" ? next(before) : next;
+      const tracks = numberTracks(result.tracks);
+      const after = tracks === result.tracks ? result : { ...result, tracks };
       if (after === before) return;
       past.current = [...past.current.slice(-99), before];
       future.current = [];
@@ -87,6 +89,7 @@ export function useEditor() {
     [],
   );
   const replace = useCallback((next: Project, unsaved = false) => {
+    next = { ...next, tracks: numberTracks(next.tracks) };
     past.current = [];
     future.current = [];
     current.current = next;
@@ -148,27 +151,15 @@ export function useEditor() {
   const addText = useCallback(
     (preset = 0, text?: string) => {
       const p = current.current;
-      let track =
-        p.tracks.find((t) => t.id === "titles" && !t.locked) ??
-        p.tracks.find((t) => t.kind === "visual" && !t.locked);
+      // Keep new text above existing visual layers when the top track is busy.
+      let track = availableTrack(
+        { tracks: p.tracks.slice(0, 1), clips: p.clips },
+        playhead,
+        5,
+      );
       const tracks = [...p.tracks];
-      if (
-        !track ||
-        p.clips.some(
-          (c) =>
-            c.trackId === track!.id &&
-            c.start < playhead + 5 &&
-            c.start + c.duration > playhead,
-        )
-      ) {
-        track = {
-          id: uid(),
-          name: "文本与字幕",
-          kind: "visual",
-          hidden: false,
-          muted: false,
-          locked: false,
-        };
+      if (!track) {
+        track = newTrack(tracks.length);
         tracks.unshift(track);
       }
       const clip = newText(track.id, playhead, preset, text);
@@ -178,8 +169,25 @@ export function useEditor() {
     [apply, playhead],
   );
   const addAssets = useCallback(
-    (assets: Asset[], toTimeline = false) => {
-      apply((p) => addMediaAssets(p, assets, playhead, toTimeline));
+    (
+      assets: Asset[],
+      toTimeline = false,
+      options: { newTrackForImages?: boolean } = {},
+    ) => {
+      const before = current.current;
+      const next = addMediaAssets(
+        before,
+        assets,
+        playhead,
+        toTimeline,
+        options,
+      );
+      apply(next);
+      if (toTimeline && options.newTrackForImages) {
+        selectMany(
+          next.clips.slice(before.clips.length).map((clip) => clip.id),
+        );
+      }
     },
     [apply, playhead],
   );

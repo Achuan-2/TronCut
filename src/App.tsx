@@ -18,6 +18,7 @@ import {
   type Clip,
   uid,
   defaultTransform,
+  newTrack,
 } from "../shared/model";
 import type { Capabilities, WindowState } from "../shared/bridge";
 import {
@@ -160,7 +161,7 @@ export default function App() {
         : { assets: [], clipToken: clipClipboardToken.current };
       if (result.assets.length) {
         editor.setPlaying(false);
-        editor.addAssets(result.assets, true);
+        editor.addAssets(result.assets, true, { newTrackForImages: true });
         setTab("media");
         toast(`已粘贴 ${result.assets.length} 个素材到时间线`);
       } else if (
@@ -363,20 +364,7 @@ export default function App() {
       const tracks = [...p.tracks],
         clips: Clip[] = [];
       for (const { asset, kind } of results) {
-        const track = {
-          id: uid(),
-          name:
-            kind === "screen"
-              ? "屏幕录制"
-              : kind === "camera"
-                ? "摄像头"
-                : "麦克风",
-          kind:
-            kind === "microphone" ? ("audio" as const) : ("visual" as const),
-          hidden: false,
-          muted: false,
-          locked: false,
-        };
+        const track = newTrack(tracks.length);
         if (kind === "camera") tracks.unshift(track);
         else tracks.push(track);
         clips.push({

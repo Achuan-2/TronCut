@@ -19,7 +19,13 @@ import {
   Copy,
   Flag,
 } from "lucide-react";
-import { type Clip, projectDuration, uid } from "../shared/model";
+import {
+  type Clip,
+  projectDuration,
+  uid,
+  newTrack,
+  trackName,
+} from "../shared/model";
 import { animation, snapTime, splitClip, transformAt } from "../shared/editor";
 import {
   deleteClips,
@@ -30,6 +36,8 @@ import {
   selectionWithGroups,
 } from "../shared/timeline";
 import { MediaThumbnail } from "./MediaThumbnail";
+import { TimelineAnimations } from "./TimelineAnimations";
+import { animationRanges } from "../shared/animation-ranges";
 import type { Editor } from "./useEditor";
 import { timeLabel } from "./Preview";
 
@@ -57,6 +65,17 @@ export default function Timeline({ editor }: { editor: Editor }) {
     duration = Math.max(20, projectDuration(project) + 5),
     width = duration * zoom;
   const headers = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const element = scroll.current;
+    const index = project.tracks.findIndex(
+      (track) => track.id === selected?.trackId,
+    );
+    if (!element || index < 0) return;
+    const top = 36 + index * 70;
+    if (top < element.scrollTop + 36) element.scrollTop = Math.max(0, top - 36);
+    else if (top + 70 > element.scrollTop + element.clientHeight)
+      element.scrollTop = top + 70 - element.clientHeight;
+  }, [selected?.trackId, project.tracks.length]);
   const [viewport, setViewport] = useState({ left: 0, width: 1600 });
   useEffect(() => {
     const element = scroll.current;
@@ -220,17 +239,7 @@ export default function Timeline({ editor }: { editor: Editor }) {
             onClick={() =>
               apply((p) => ({
                 ...p,
-                tracks: [
-                  {
-                    id: uid(),
-                    name: `轨道 ${p.tracks.length + 1}`,
-                    kind: "visual",
-                    hidden: false,
-                    muted: false,
-                    locked: false,
-                  },
-                  ...p.tracks,
-                ],
+                tracks: [newTrack(p.tracks.length), ...p.tracks],
               }))
             }
           >
@@ -309,10 +318,9 @@ export default function Timeline({ editor }: { editor: Editor }) {
               key={track.id}
             >
               <div>
-                <span className="track-number">
-                  {String(project.tracks.length - index).padStart(2, "0")}
+                <span className="track-name">
+                  {trackName(index, project.tracks.length)}
                 </span>
-                <span>{track.name}</span>
               </div>
               <div className="track-controls">
                 {(["hidden", "muted", "locked"] as const).map((key) => (
@@ -529,7 +537,7 @@ export default function Timeline({ editor }: { editor: Editor }) {
                     return (
                       <div
                         key={c.id}
-                        className={`timeline-clip ${c.kind} ${editor.selectedIds.includes(c.id) ? "selected" : ""} ${track.locked ? "locked" : ""}`}
+                        className={`timeline-clip ${c.kind} ${animationRanges(c).length ? "has-animation" : ""} ${editor.selectedIds.includes(c.id) ? "selected" : ""} ${track.locked ? "locked" : ""}`}
                         style={{
                           left: c.start * zoom,
                           width: Math.max(4, c.duration * zoom),
@@ -663,18 +671,26 @@ export default function Timeline({ editor }: { editor: Editor }) {
                               </div>
                             );
                           })()}
-                        {c.keyframes.map((frame, i) => (
-                          <Diamond
-                            key={i}
-                            className="keyframe"
-                            size={10}
-                            fill="currentColor"
-                            style={{
-                              left:
-                                (frame.time - (c.animationOffset ?? 0)) * zoom,
-                            }}
-                          />
-                        ))}
+                        <TimelineAnimations
+                          clip={c}
+                          zoom={zoom}
+                          playhead={playhead}
+                          fps={project.canvas.fps}
+                          selected={editor.selectedIds.includes(c.id)}
+                          locked={track.locked}
+                          commit={(clip) =>
+                            editor.updateClip(c.id, (current) => ({
+                              ...current,
+                              transform: clip.transform,
+                              keyframes: clip.keyframes,
+                            }))
+                          }
+                          locate={(time) => {
+                            editor.setPlaying(false);
+                            select(c.id);
+                            seek(time);
+                          }}
+                        />
                         <span className="trim-handle right" data-trim="right" />
                       </div>
                     );

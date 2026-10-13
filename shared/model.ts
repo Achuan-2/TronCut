@@ -87,7 +87,6 @@ export const projectSchema = z.object({
       z.object({
         id: identifier,
         name: z.string(),
-        kind: z.enum(["visual", "audio"]),
         hidden: z.boolean(),
         muted: z.boolean(),
         locked: z.boolean(),
@@ -175,6 +174,30 @@ export type Clip = Project["clips"][number];
 export type Asset = Project["assets"][number];
 export type Transform = z.infer<typeof transformSchema>;
 export type TextStyle = z.infer<typeof styleSchema>;
+export function trackName(index: number, count: number): string {
+  return `轨道${count - index}`;
+}
+export function newTrack(count: number): Project["tracks"][number] {
+  return {
+    id: uid(),
+    name: `轨道${count + 1}`,
+    hidden: false,
+    muted: false,
+    locked: false,
+  };
+}
+export function numberTracks(tracks: Project["tracks"]): Project["tracks"] {
+  if (
+    tracks.every(
+      (track, index) => track.name === trackName(index, tracks.length),
+    )
+  )
+    return tracks;
+  return tracks.map((track, index) => ({
+    ...track,
+    name: trackName(index, tracks.length),
+  }));
+}
 export const uid = () => crypto.randomUUID();
 export const defaultTransform: Transform = {
   x: 0.5,
@@ -255,24 +278,21 @@ export function createProject(name = "未命名工程"): Project {
     tracks: [
       {
         id: "titles",
-        name: "文本与字幕",
-        kind: "visual",
+        name: "轨道3",
         hidden: false,
         muted: false,
         locked: false,
       },
       {
         id: "video",
-        name: "画面",
-        kind: "visual",
+        name: "轨道2",
         hidden: false,
         muted: false,
         locked: false,
       },
       {
         id: "audio",
-        name: "声音",
-        kind: "audio",
+        name: "轨道1",
         hidden: false,
         muted: false,
         locked: false,
@@ -284,6 +304,9 @@ export function createProject(name = "未命名工程"): Project {
 }
 export function validateProject(data: unknown): Project {
   const project = projectSchema.parse(data);
+  // Legacy track kinds are ignored by the schema. Keep IDs/order and all clip
+  // references while migrating names to the common numbered-track layout.
+  project.tracks = numberTracks(project.tracks);
   for (const [name, items] of [
     ["素材", project.assets],
     ["轨道", project.tracks],

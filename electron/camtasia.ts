@@ -134,7 +134,6 @@ export function importCamtasia(data: unknown, file: string): Project {
         project.tracks.unshift({
           id: trackId,
           name: track.name || `轨道 ${index + 1}`,
-          kind: "visual",
           hidden: false,
           muted: false,
           locked: false,

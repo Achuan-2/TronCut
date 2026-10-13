@@ -13,7 +13,7 @@ import { parseSrt, toSrt } from "../shared/subtitles";
 import { audioFilters, expression } from "../electron/export";
 
 describe("编辑操作保留素材和动画时间", () => {
-  it("双击视频优先画面轨，重复加入时避开已占用的文本和媒体区间", () => {
+  it("双击素材选择空闲通用轨道，重复加入时避开已占用的文本和媒体区间", () => {
     const p = createProject();
     p.clips = [newText("titles", 0)];
     const asset = {

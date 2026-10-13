@@ -107,7 +107,7 @@ describe("本地配音", () => {
       kind: "audio",
       start: 4,
       duration: 2,
-      trackId: "audio",
+      trackId: "titles",
     });
     const projectFile = path.join(userData, "saved-project", "配音.troncut");
     await saveProject(withClip, projectFile);

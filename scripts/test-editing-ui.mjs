@@ -110,9 +110,18 @@ const app = await electron.launch({
 });
 try {
   const page = await app.firstWindow();
+  if (packaged) {
+    const builtHtml = await fs.readFile(path.resolve("dist/index.html"), "utf8");
+    const script = builtHtml.match(/src="([^"]+\.js)"/)?.[1];
+    expect(script).toBeTruthy();
+    await expect(page.locator('script[type="module"]')).toHaveAttribute("src", script);
+  }
   const errors = [];
   page.on("pageerror", (error) => errors.push(error.message));
   await expect(page.locator(".track-header")).toHaveCount(14);
+  expect(await page.locator(".track-name").allTextContents()).toEqual(
+    Array.from({ length: 14 }, (_, index) => `轨道${14 - index}`),
+  );
   await app.evaluate(({ BrowserWindow }) =>
     BrowserWindow.getAllWindows()[0].setSize(1280, 900),
   );
@@ -219,6 +228,20 @@ try {
   await expect(page.getByLabel("鼠标大小")).toHaveValue("48");
   await page.getByRole("tab", { name: "视频", exact: true }).click();
   const canvasVideo = page.locator(".preview-panel .preview-layer.video");
+  await expect(page.getByLabel("效果预设", { exact: true })).toHaveCount(0);
+  await expect(page.getByLabel("裁切左侧 (%)", { exact: true })).toHaveCount(0);
+  await expect(page.getByLabel("淡入 (秒)", { exact: true })).toHaveCount(0);
+  await expect(page.getByLabel("淡出 (秒)", { exact: true })).toHaveCount(0);
+  await expect(page.locator(".inspector .keyframe-list")).toHaveCount(0);
+  await expect(page.getByLabel("开始 (秒)", { exact: true })).toBeHidden();
+  await page.getByLabel("宽度 (px)", { exact: true }).fill("960");
+  await expect(page.getByLabel("缩放 (%)", { exact: true })).toHaveValue("50");
+  await expect(page.getByLabel("高度 (px)", { exact: true })).toHaveValue("540");
+  await page.getByLabel("水平翻转", { exact: true }).check();
+  await page.getByLabel("垂直翻转", { exact: true }).check();
+  await expect(canvasVideo.locator(":scope > div").first()).toHaveCSS("transform", "matrix(-1, 0, 0, -1, 0, 0)");
+  await page.getByLabel("水平翻转", { exact: true }).uncheck();
+  await page.getByLabel("垂直翻转", { exact: true }).uncheck();
   await page.getByLabel("缩放 (%)", { exact: true }).fill("50");
   const videoHandle = canvasVideo.locator(".resize-handle.se");
   await videoHandle.hover();
@@ -294,10 +317,37 @@ try {
   await expect(page.locator(".timeline-clip.video")).toHaveCount(3);
   await expect(page.locator(".timeline-clip.image")).toHaveCount(1);
   await expect(page.locator(".asset-card")).toHaveCount(3);
+  await expect(page.locator(".track-header")).toHaveCount(15);
+  await expect(page.locator(".track-name").first()).toHaveText("轨道15");
+  expect(await page.locator(".timeline-clip.image").evaluate((element) =>
+    element.closest(".track-lane").dataset.track,
+  )).toBe(await page.locator(".track-lane").first().getAttribute("data-track"));
+  const originalImageTrack = await page.locator(".timeline-clip.image").evaluate((element) =>
+    element.closest(".track-lane").dataset.track,
+  );
+  await app.evaluate((_, assets) => {
+    globalThis.editingClipboard = { assets: assets.filter((asset) => asset.kind === "image"), clipToken: null };
+  }, assets);
+  await page.keyboard.press("Control+v");
+  await expect(page.locator(".timeline-clip.image")).toHaveCount(2);
+  await expect(page.locator(".track-header")).toHaveCount(16);
+  const pastedImageTracks = await page.locator(".timeline-clip.image").evaluateAll((elements) =>
+    elements.map((element) => element.closest(".track-lane").dataset.track),
+  );
+  expect(new Set(pastedImageTracks).size).toBe(2);
+  expect(pastedImageTracks).toContain(originalImageTrack);
+  await page.screenshot({ path: path.join(root, "pasted-image-tracks.png") });
+  await page.getByTitle("撤销 Ctrl+Z", { exact: true }).click();
+  await expect(page.locator(".timeline-clip.image")).toHaveCount(1);
+  await expect(page.locator(".track-header")).toHaveCount(15);
+  await app.evaluate((_, assets) => {
+    globalThis.editingClipboard = { assets, clipToken: null };
+  }, assets);
   await page.locator(".timeline-clip.image").click();
   await expect(
     page.getByRole("tab", { name: "鼠标", exact: true }),
   ).toHaveCount(0);
+  await page.getByRole("tab", { name: "片段", exact: true }).click();
   await page.getByLabel("开始 (秒)").fill("6");
   await page.keyboard.press("Control+v");
   // Native paste may validly change a number input using the user's clipboard.
@@ -305,6 +355,7 @@ try {
   await page.getByLabel("开始 (秒)").fill("6");
   await expect(page.locator(".timeline-clip.image")).toHaveCSS("left", "390px");
   await expect(page.locator(".timeline-clip.image")).toHaveCount(1);
+  await page.getByRole("tab", { name: "画面", exact: true }).click();
   const seek = async (time) => {
     await page.locator(".timeline-scroll").evaluate((element) => {
       element.scrollLeft = 0;
@@ -340,7 +391,41 @@ try {
   await page.getByRole("button", { name: "自动动画", exact: true }).click();
   await seek(8);
   await dragHandle(canvasImage.locator(".resize-handle.se"), 20, 16, 1);
-  await expect(page.locator(".inspector .keyframe-list > div")).toHaveCount(2);
+  await expect(page.locator(".timeline-clip.image .clip-animation")).toHaveCount(1);
+  const imageClip = page.locator(".timeline-clip.image");
+  const imageArrow = imageClip.locator(".clip-animation");
+  await expect(imageArrow).toHaveCount(1);
+  await expect(imageClip.locator(".keyframe")).toHaveCount(0);
+  const animationStart = Number(await imageArrow.getAttribute("data-start"));
+  const animationEnd = Number(await imageArrow.getAttribute("data-end"));
+  expect((await imageArrow.boundingBox()).width).toBeCloseTo((animationEnd - animationStart) * 65, 0);
+  const imageClipLeft = (await imageClip.boundingBox()).x;
+  await imageArrow.locator(".animation-point.start").click();
+  await expect(imageArrow.locator(".animation-point.end")).not.toHaveClass(/active/);
+  await expect(imageClip).toHaveClass(/selected/);
+  await expect(page.getByLabel("位置 X (%)", { exact: true })).toBeVisible();
+  await imageArrow.locator(".animation-point.end").click();
+  await expect(imageArrow.locator(".animation-point.end")).toHaveClass(/active/);
+  expect((await imageClip.boundingBox()).x).toBeCloseTo(imageClipLeft, 0);
+  await imageArrow.locator(".animation-arrow").click();
+  await expect(imageArrow.locator(".animation-point.end")).toHaveClass(/active/);
+  await dragHandle(imageArrow.locator(".animation-point.start"), 32.5, 0, 1);
+  await expect.poll(async () => Number(await imageArrow.getAttribute("data-start"))).toBeCloseTo(animationStart + 0.5, 2);
+  expect(Number(await imageArrow.getAttribute("data-end"))).toBeCloseTo(animationEnd, 2);
+  await dragHandle(imageArrow.locator(".animation-point.end"), 32.5, 0, 1);
+  await expect.poll(async () => Number(await imageArrow.getAttribute("data-end"))).toBeCloseTo(animationEnd + 0.5, 2);
+  const animationWidth = (await imageArrow.boundingBox()).width;
+  await dragHandle(imageArrow.locator(".animation-arrow"), 65, 0, 1);
+  await expect.poll(async () => Number(await imageArrow.getAttribute("data-start"))).toBeCloseTo(animationStart + 1.5, 2);
+  expect(Number(await imageArrow.getAttribute("data-end"))).toBeCloseTo(animationEnd + 1.5, 2);
+  expect((await imageArrow.boundingBox()).width).toBeCloseTo(animationWidth, 0);
+  expect((await imageClip.boundingBox()).x).toBeCloseTo(imageClipLeft, 0);
+  for (let i = 0; i < 3; i++) await page.getByTitle("撤销 Ctrl+Z", { exact: true }).click();
+  await expect.poll(async () => Number(await imageArrow.getAttribute("data-start"))).toBeCloseTo(animationStart, 2);
+  expect(Number(await imageArrow.getAttribute("data-end"))).toBeCloseTo(animationEnd, 2);
+  await imageArrow.locator(".animation-point.end").click();
+  await expect(imageArrow.locator(".animation-point.end")).toHaveClass(/active/);
+  await page.screenshot({ path: path.join(root, "animation-arrows.png") });
   const trackLock = async (clip) => {
     await page.locator(".timeline-scroll").evaluate((element) => {
       element.scrollTop = 0;
@@ -358,6 +443,9 @@ try {
   const imageLock = await trackLock(page.locator(".timeline-clip.image"));
   await imageLock.click();
   await expect(canvasImage.locator(".resize-handle")).toHaveCount(0);
+  await dragHandle(imageArrow.locator(".animation-arrow"), 65, 0, 1);
+  expect(Number(await imageArrow.getAttribute("data-start"))).toBeCloseTo(animationStart, 2);
+  expect(Number(await imageArrow.getAttribute("data-end"))).toBeCloseTo(animationEnd, 2);
   await imageLock.click();
 
   await page.getByRole("button", { name: "添加文本", exact: true }).click();
@@ -467,6 +555,10 @@ try {
     await fs.readFile(path.join(root, "界面测试", "界面测试.troncut"), "utf8"),
   );
   expect(saved.camera.keyframes).toHaveLength(3);
+  expect(saved.tracks.map((track) => track.name)).toEqual(
+    Array.from({ length: saved.tracks.length }, (_, index) => `轨道${saved.tracks.length - index}`),
+  );
+  expect(saved.tracks.every((track) => !("kind" in track))).toBe(true);
   expect(saved.clips.find((clip) => clip.kind === "text").text).toBe(
     "中文第一行\n第二行\n第三行",
   );
