@@ -114,6 +114,37 @@ function PreviewLayer({
 }) {
   const transform = transformAt(clip, editor.playhead - clip.start),
     asset = project.assets.find((a) => a.id === clip.assetId);
+  const editing = editor.editingTextId === clip.id;
+  const textInput = useRef<HTMLTextAreaElement>(null);
+  const track = project.tracks.find((t) => t.id === clip.trackId);
+  useEffect(() => {
+    if (editing) {
+      textInput.current?.focus();
+      textInput.current?.select();
+    }
+  }, [editing]);
+  useEffect(() => {
+    if (
+      editing &&
+      (track?.locked ||
+        track?.hidden ||
+        editor.selectedId !== clip.id ||
+        editor.playing)
+    )
+      editor.endTextEdit(clip.id);
+  }, [
+    editing,
+    track?.locked,
+    track?.hidden,
+    editor.selectedId,
+    editor.playing,
+    editor.endTextEdit,
+    clip.id,
+  ]);
+  useEffect(
+    () => () => editor.endTextEdit(clip.id),
+    [editor.endTextEdit, clip.id],
+  );
   const [drag, setDrag] = useState<{
     x: number;
     y: number;
@@ -123,13 +154,13 @@ function PreviewLayer({
   const style: CSSProperties = {
     left: `${transform.x * 100}%`,
     top: `${transform.y * 100}%`,
-    opacity:
-      transform.opacity * fadeOpacity(clip, editor.playhead - clip.start),
+    opacity: editing
+      ? 1
+      : transform.opacity * fadeOpacity(clip, editor.playhead - clip.start),
     transform: `translate(-50%, -50%) rotate(${clip.rotation ?? 0}deg) scale(${transform.scale})`,
     "--canvas-scale": scale,
   } as CSSProperties;
   if (drag) style.translate = `${drag.dx}px ${drag.dy}px`;
-  const track = project.tracks.find((t) => t.id === clip.trackId);
   let mediaWidth = 0,
     mediaHeight = 0;
   const crop = clip.crop ?? defaultCrop,
@@ -162,10 +193,20 @@ function PreviewLayer({
   const selectable = !track?.locked && clip.kind !== "audio";
   return (
     <div
-      className={`preview-layer ${clip.kind} ${editor.selectedIds.includes(clip.id) ? "selected" : ""}`}
+      className={`preview-layer ${clip.kind} ${editor.selectedIds.includes(clip.id) ? "selected" : ""} ${editing ? "editing" : ""}`}
       style={style}
       onClick={(event) => event.stopPropagation()}
+      onDoubleClick={(event) => {
+        if (clip.kind !== "text" || editing || !selectable) return;
+        event.stopPropagation();
+        setDrag(null);
+        editor.beginTextEdit(clip.id);
+      }}
       onPointerDown={(event) => {
+        if (editing) {
+          event.stopPropagation();
+          return;
+        }
         if (!selectable || event.button !== 0) return;
         event.stopPropagation();
         editor.select(
@@ -289,7 +330,38 @@ function PreviewLayer({
             textAlign: "center",
           }}
         >
-          {clip.text || " "}
+          {editing ? (
+            <textarea
+              ref={textInput}
+              className="preview-text-editor"
+              aria-label="画布文本内容"
+              value={clip.text ?? ""}
+              rows={1}
+              wrap="off"
+              maxLength={10000}
+              spellCheck={false}
+              onChange={(event) =>
+                editor.updateClip(clip.id, {
+                  text: event.target.value,
+                  name: event.target.value.slice(0, 24) || "文本",
+                })
+              }
+              onBlur={() => editor.endTextEdit(clip.id)}
+              onKeyDown={(event) => {
+                if (event.nativeEvent.isComposing) return;
+                if (
+                  event.key === "Escape" ||
+                  (event.key === "Enter" && (event.ctrlKey || event.metaKey))
+                ) {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  editor.endTextEdit(clip.id);
+                }
+              }}
+            />
+          ) : (
+            clip.text || " "
+          )}
         </div>
       ) : (
         <svg

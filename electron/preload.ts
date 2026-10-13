@@ -3,7 +3,20 @@ import type { FrameCraftBridge } from "../shared/bridge";
 
 const bridge: FrameCraftBridge = {
   platform: process.platform,
+  windowState: () => ipcRenderer.invoke("window:state"),
+  minimizeWindow: () => ipcRenderer.invoke("window:minimize"),
+  toggleMaximizeWindow: () => ipcRenderer.invoke("window:maximize"),
+  closeWindow: () => ipcRenderer.invoke("window:close"),
+  showWindowMenu: (menu, x, y) => ipcRenderer.invoke("window:menu", menu, x, y),
+  onWindowState: (callback) => {
+    const fn = (_: unknown, state: Parameters<typeof callback>[0]) =>
+      callback(state);
+    ipcRenderer.on("window:state", fn);
+    return () => ipcRenderer.removeListener("window:state", fn);
+  },
   importMedia: () => ipcRenderer.invoke("media:import"),
+  copyClipClipboard: (token) => ipcRenderer.invoke("clipboard:clips", token),
+  importClipboardMedia: () => ipcRenderer.invoke("media:clipboard"),
   relinkMedia: (id, duration) =>
     ipcRenderer.invoke("media:relink", id, duration),
   mediaThumbnail: (id, waveform) =>

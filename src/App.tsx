@@ -8,8 +8,10 @@ import {
   Save,
   X,
   Check,
-  Monitor,
   Plus,
+  Minus,
+  Square,
+  Copy,
 } from "lucide-react";
 import {
   createProject,
@@ -17,7 +19,7 @@ import {
   uid,
   defaultTransform,
 } from "../shared/model";
-import type { Capabilities } from "../shared/bridge";
+import type { Capabilities, WindowState } from "../shared/bridge";
 import {
   deleteClips,
   splitSelection,
@@ -42,12 +44,17 @@ export default function App() {
       label: string;
     } | null>(null),
     [menu, setMenu] = useState(false),
+    [windowState, setWindowState] = useState<WindowState>({
+      maximized: false,
+      fullscreen: false,
+    }),
     [file, setFile] = useState(""),
     [importReport, setImportReport] = useState<string[] | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
       undefined,
     ),
-    clipClipboard = useRef<Clip[]>([]);
+    clipClipboard = useRef<Clip[]>([]),
+    clipClipboardToken = useRef("");
   const initialized = useRef(false);
   const toast = useCallback((message: string) => {
     setToast(message);
@@ -72,6 +79,26 @@ export default function App() {
     if (!window.framecraft)
       throw new Error("此功能需要桌面版，请运行 pnpm dev");
     return window.framecraft;
+  };
+  useEffect(() => {
+    const desktop = window.framecraft;
+    void desktop
+      ?.windowState()
+      .then(setWindowState)
+      .catch((error) => toast(String(error)));
+    return desktop?.onWindowState(setWindowState);
+  }, [toast]);
+  useEffect(() => {
+    document.title = `${editor.project.name}${editor.dirty ? " *" : ""} — TronCut`;
+  }, [editor.project.name, editor.dirty]);
+  const showWindowMenu = (
+    name: "edit" | "view",
+    element: HTMLButtonElement,
+  ) => {
+    const bounds = element.getBoundingClientRect();
+    void window.framecraft
+      ?.showWindowMenu(name, bounds.left, bounds.bottom)
+      .catch((error) => toast(String(error)));
   };
   const refreshCapabilities = useCallback(() => {
     window.framecraft
@@ -126,6 +153,50 @@ export default function App() {
         setImportReport(project.importReport ?? []);
       }
     });
+  const paste = () =>
+    run(async () => {
+      const result = window.framecraft
+        ? await window.framecraft.importClipboardMedia()
+        : { assets: [], clipToken: clipClipboardToken.current };
+      if (result.assets.length) {
+        editor.setPlaying(false);
+        editor.addAssets(result.assets, true);
+        setTab("media");
+        toast(`已粘贴 ${result.assets.length} 个素材到时间线`);
+      } else if (
+        result.clipToken &&
+        result.clipToken === clipClipboardToken.current &&
+        clipClipboard.current.length
+      ) {
+        const pasted = pasteClips(
+          editor.project,
+          clipClipboard.current,
+          editor.playhead,
+        );
+        editor.apply(pasted.project);
+        editor.selectMany(pasted.ids);
+      } else {
+        toast("剪贴板中没有可粘贴的图片、视频或片段");
+      }
+    });
+  const pasteHandler = useRef<(event: ClipboardEvent) => void>(() => {});
+  pasteHandler.current = (event) => {
+    if (
+      (event.target as HTMLElement).closest(
+        'input, textarea, select, [contenteditable="true"]',
+      ) ||
+      busy ||
+      recording
+    )
+      return;
+    event.preventDefault();
+    void paste();
+  };
+  useEffect(() => {
+    const listener = (event: ClipboardEvent) => pasteHandler.current(event);
+    window.addEventListener("paste", listener);
+    return () => window.removeEventListener("paste", listener);
+  }, []);
   const newProject = () => {
     if (editor.dirty && !confirm("当前工程有未保存修改，确定新建工程？"))
       return;
@@ -233,20 +304,17 @@ export default function App() {
       clipClipboard.current = structuredClone(
         editor.project.clips.filter((c) => editor.selectedIds.includes(c.id)),
       );
+      clipClipboardToken.current = uid();
+      void window.framecraft
+        ?.copyClipClipboard(clipClipboardToken.current)
+        .catch((error) => toast(String(error)));
       toast(`已复制 ${clipClipboard.current.length} 个片段`);
     } else if (
       (event.ctrlKey || event.metaKey) &&
-      event.key.toLowerCase() === "v" &&
-      clipClipboard.current.length
+      event.key.toLowerCase() === "v"
     ) {
       event.preventDefault();
-      const result = pasteClips(
-        editor.project,
-        clipClipboard.current,
-        editor.playhead,
-      );
-      editor.apply(result.project);
-      editor.selectMany(result.ids);
+      void paste();
     } else if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
       event.preventDefault();
       editor.setPlaying(false);
@@ -345,22 +413,94 @@ export default function App() {
           <div className="brand-mark">
             <span />
           </div>
-          <div>
-            <b>TronCut</b>
-            <small>让表达，自在发生</small>
-          </div>
+          <b>TronCut</b>
         </div>
+        <nav className="header-menus" aria-label="主菜单">
+          <button
+            className="project-menu-trigger"
+            disabled={busy || recording}
+            aria-expanded={menu}
+            onClick={(event) => {
+              event.stopPropagation();
+              setMenu(!menu);
+            }}
+          >
+            工程
+            <ChevronDown size={11} />
+          </button>
+          {window.framecraft && (
+            <>
+              <button
+                disabled={busy || recording}
+                onClick={(event) => showWindowMenu("edit", event.currentTarget)}
+              >
+                编辑
+              </button>
+              <button
+                disabled={busy || recording}
+                onClick={(event) => showWindowMenu("view", event.currentTarget)}
+              >
+                视图
+              </button>
+            </>
+          )}
+          {menu && !busy && !recording && (
+            <div className="project-menu" onClick={() => setMenu(false)}>
+              <button onClick={newProject}>
+                <Plus size={15} />
+                新建工程
+              </button>
+              <button onClick={() => void open()}>
+                <FolderOpen size={15} />
+                打开工程
+              </button>
+              <button onClick={() => void save(true)}>
+                <Save size={15} />
+                另存为
+              </button>
+              <button onClick={() => void importCamtasia()}>
+                <FileJson size={15} />
+                导入 Camtasia 工程
+              </button>
+            </div>
+          )}
+        </nav>
         <div className="project-title">
           <input
             aria-label="工程名称"
+            disabled={busy || recording}
             value={editor.project.name}
             onChange={(e) => {
               if (e.target.value.trim())
                 editor.apply((p) => ({ ...p, name: e.target.value }));
             }}
           />
-          <span>{editor.dirty ? "未保存" : file ? "已保存" : "起始工程"}</span>
+          <span
+            className="project-save-state"
+            title={editor.dirty ? "未保存" : file ? "已保存" : "起始工程"}
+          >
+            {editor.dirty ? "*" : ""}
+          </span>
         </div>
+        <span
+          className="workspace-status"
+          title={
+            caps?.ffmpeg
+              ? "媒体引擎就绪"
+              : window.framecraft
+                ? "媒体引擎待配置"
+                : "浏览器预览 · 文件与录屏请用桌面版"
+          }
+        >
+          <i className={caps?.ffmpeg ? "ready" : "pending"} />
+          <span className="engine-label">
+            {caps?.ffmpeg
+              ? "媒体引擎就绪"
+              : window.framecraft
+                ? "媒体引擎待配置"
+                : "浏览器预览"}
+          </span>
+        </span>
         <div className="header-actions">
           <button
             className="record-button"
@@ -384,62 +524,54 @@ export default function App() {
           </button>
           <button
             className="export-button"
+            aria-label="导出视频"
+            title="导出视频 Ctrl+E"
             disabled={busy || recording}
             onClick={() => void exportVideo()}
           >
-            导出视频
+            导出
             <ArrowUpRight size={17} />
           </button>
         </div>
-      </header>
-      <div className="workspace-bar">
-        <div className="workspace-tabs">
-          <button className="active">
-            <Monitor size={14} />
-            编辑工作区
-          </button>
-          <button
-            className="project-menu-trigger"
-            onClick={(e) => {
-              e.stopPropagation();
-              setMenu(!menu);
-            }}
-          >
-            <FileJson size={14} />
-            工程
-            <ChevronDown size={12} />
-          </button>
-        </div>
-        <span className="workspace-status">
-          <i />
-          {caps?.ffmpeg
-            ? "媒体引擎就绪"
-            : window.framecraft
-              ? "媒体引擎待配置"
-              : "浏览器预览 · 文件与录屏请用桌面版"}
-          <span className="separator-dot">·</span>本地创作
-        </span>
-        {menu && (
-          <div className="project-menu" onClick={() => setMenu(false)}>
-            <button onClick={newProject}>
-              <Plus size={15} />
-              新建工程
+        {window.framecraft && (
+          <div className="window-controls" aria-label="窗口控制">
+            <button
+              aria-label="最小化"
+              title="最小化"
+              onClick={() => void bridge().minimizeWindow()}
+            >
+              <Minus size={16} />
             </button>
-            <button onClick={() => void open()}>
-              <FolderOpen size={15} />
-              打开工程
+            <button
+              aria-label={
+                windowState.maximized || windowState.fullscreen
+                  ? "还原窗口"
+                  : "最大化"
+              }
+              title={
+                windowState.maximized || windowState.fullscreen
+                  ? "还原窗口"
+                  : "最大化"
+              }
+              onClick={() => void bridge().toggleMaximizeWindow()}
+            >
+              {windowState.maximized || windowState.fullscreen ? (
+                <Copy size={13} />
+              ) : (
+                <Square size={13} />
+              )}
             </button>
-            <button onClick={() => void save(true)}>
-              <Save size={15} />
-              另存为
-            </button>
-            <button onClick={() => void importCamtasia()}>
-              <FileJson size={15} />
-              导入 Camtasia 工程
+            <button
+              className="window-close"
+              aria-label="关闭窗口"
+              title="关闭窗口"
+              onClick={() => void bridge().closeWindow()}
+            >
+              <X size={17} />
             </button>
           </div>
         )}
-      </div>
+      </header>
       <div className="editor-workspace">
         <Panels
           editor={editor}

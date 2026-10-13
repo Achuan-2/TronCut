@@ -175,6 +175,7 @@ try {
     );
     if (native) {
       await page.locator(".timeline-clip.video").last().click();
+      await page.getByRole("tab", { name: "鼠标", exact: true }).click();
       await expect(page.getByLabel("鼠标样式")).toBeVisible();
       await page.getByLabel("鼠标样式").selectOption("circle");
       await page.getByRole("button", { name: "保存", exact: true }).click();

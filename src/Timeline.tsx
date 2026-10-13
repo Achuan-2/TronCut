@@ -427,6 +427,9 @@ export default function Timeline({ editor }: { editor: Editor }) {
                   <Flag size={12} fill="currentColor" />
                 </button>
               ))}
+              <div className="ruler-playhead" style={{ left: playhead * zoom }}>
+                <span />
+              </div>
             </div>
             {project.tracks.map((track) => (
               <div
@@ -585,6 +588,12 @@ export default function Timeline({ editor }: { editor: Editor }) {
                           setDrag(null);
                         }}
                         onPointerCancel={() => setDrag(null)}
+                        onDoubleClick={(event) => {
+                          if (c.kind !== "text" || track.locked) return;
+                          event.stopPropagation();
+                          setDrag(null);
+                          editor.beginTextEdit(c.id);
+                        }}
                         onContextMenu={(event) => {
                           event.preventDefault();
                           if (!editor.selectedIds.includes(c.id)) select(c.id);
@@ -657,7 +666,6 @@ export default function Timeline({ editor }: { editor: Editor }) {
               </div>
             ))}
             <div className="playhead" style={{ left: playhead * zoom }}>
-              <span />
               <i />
             </div>
           </div>

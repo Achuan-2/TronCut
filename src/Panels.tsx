@@ -20,6 +20,7 @@ import {
   ArrowRight,
   Play,
   Mic,
+  MousePointer2,
 } from "lucide-react";
 import {
   type Clip,
@@ -287,7 +288,7 @@ export default function Panels(props: Props) {
                       paintOrder: "stroke fill",
                     }}
                   >
-                    映作花字
+                    花字
                   </span>
                   <small>{preset.name}</small>
                   <Plus size={14} />
@@ -495,7 +496,8 @@ export default function Panels(props: Props) {
               <Diamond size={19} />
               <b>开启自动动画</b>
               <p>
-                移动播放头，再修改右侧属性。映作会自动记录位置、缩放和不透明度，无需拖拽动画箭头。
+                移动播放头，再修改右侧属性。TronCut
+                会自动记录位置、缩放和不透明度，无需拖拽动画箭头。
               </p>
               <button
                 onClick={() => editor.setAutoAnimate(!editor.autoAnimate)}
@@ -727,7 +729,7 @@ export default function Panels(props: Props) {
             <p className="small-note">
               开发版可从 PATH 查找引擎。安装包的媒体引擎放在 resources/bin。
             </p>
-            <h3 className="section-title">映作 FrameCraft 0.1</h3>
+            <h3 className="section-title">TronCut</h3>
             <p className="small-note">
               本地工程 · 自由表达
               <br />
@@ -741,9 +743,78 @@ export default function Panels(props: Props) {
     </aside>
   );
 }
+function CursorProperties({
+  clip,
+  update,
+}: {
+  clip: Clip;
+  update: (patch: Partial<Clip>) => void;
+}) {
+  const style = clip.cursorStyle ?? defaultCursorStyle;
+  const change = (patch: Partial<typeof style>) =>
+    update({ cursorStyle: { ...style, ...patch } });
+  return (
+    <>
+      <h3 className="section-title">鼠标</h3>
+      <label className="field">
+        鼠标样式
+        <select
+          value={style.style}
+          onChange={(event) =>
+            change({ style: event.target.value as typeof style.style })
+          }
+        >
+          <option value="arrow">箭头</option>
+          <option value="circle">圆形</option>
+          <option value="cross">十字</option>
+          <option value="hidden">隐藏鼠标</option>
+        </select>
+      </label>
+      <label className="field">
+        鼠标大小
+        <input
+          type="number"
+          min={8}
+          max={160}
+          value={style.size}
+          onChange={(event) => {
+            const size = Number(event.target.value);
+            if (Number.isFinite(size) && size >= 8 && size <= 160)
+              change({ size });
+          }}
+        />
+      </label>
+      <label className="field">
+        鼠标颜色
+        <input
+          type="color"
+          value={style.color}
+          onChange={(event) => change({ color: event.target.value })}
+        />
+      </label>
+      {(["clicks", "smooth"] as const).map((key, index) => (
+        <label className="check-field" key={key}>
+          <input
+            type="checkbox"
+            checked={style[key]}
+            onChange={(event) => change({ [key]: event.target.checked })}
+          />
+          {["点击高亮", "平滑鼠标移动"][index]}
+        </label>
+      ))}
+    </>
+  );
+}
+
 export function Inspector({ editor }: { editor: Editor }) {
   const c = editor.selected,
     locked = editor.project.tracks.find((t) => t.id === c?.trackId)?.locked;
+  const [tab, setTab] = useState({ clipId: "", name: "video" });
+  const hasCursor =
+    c?.kind === "video" &&
+    !!editor.project.assets.find((asset) => asset.id === c.assetId)?.cursor;
+  const cursorActive =
+    hasCursor && tab.clipId === c?.id && tab.name === "cursor";
   const value = c
     ? transformAt(c, editor.playhead - c.start)
     : defaultTransform;
@@ -795,503 +866,514 @@ export function Inspector({ editor }: { editor: Editor }) {
         <span>属性</span>
         <Settings2 size={15} />
       </div>
-      {!c ? (
-        <div className="inspector-empty">
-          <Settings2 size={28} />
-          <b>选择一个片段</b>
-          <p>
-            编辑文字、位置、动画和声音
-            <br />
-            每一步，都在你的掌控之中。
-          </p>
+      {hasCursor && c && (
+        <div
+          className="inspector-tabs"
+          role="tablist"
+          aria-label="录屏属性"
+          onKeyDown={(event) => {
+            if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key))
+              return;
+            event.preventDefault();
+            const cursor =
+              event.key === "Home"
+                ? false
+                : event.key === "End"
+                  ? true
+                  : !cursorActive;
+            setTab({ clipId: c.id, name: cursor ? "cursor" : "video" });
+            event.currentTarget
+              .querySelectorAll<HTMLButtonElement>("button")
+              [cursor ? 1 : 0]?.focus();
+          }}
+        >
+          <button
+            type="button"
+            role="tab"
+            id="inspector-video-tab"
+            aria-controls="inspector-video"
+            aria-selected={!cursorActive}
+            tabIndex={cursorActive ? -1 : 0}
+            onClick={() => setTab({ clipId: c.id, name: "video" })}
+          >
+            <Film size={18} />
+            视频
+          </button>
+          <button
+            type="button"
+            role="tab"
+            id="inspector-cursor-tab"
+            aria-controls="inspector-cursor"
+            aria-selected={cursorActive}
+            tabIndex={cursorActive ? 0 : -1}
+            onClick={() => setTab({ clipId: c.id, name: "cursor" })}
+          >
+            <MousePointer2 size={18} />
+            鼠标
+          </button>
         </div>
-      ) : (
-        <fieldset disabled={!!locked}>
-          <div className="inspector-selection">
-            <span className={`selection-icon ${c.kind}`}>
-              {c.kind === "text" ? (
-                <Type size={20} />
-              ) : c.kind === "audio" ? (
-                <AudioLines size={20} />
-              ) : (
-                <Film size={20} />
-              )}
-            </span>
-            <div>
-              <b>{c.name}</b>
-              <small>
-                {locked
-                  ? "轨道已锁定"
-                  : c.kind === "text"
-                    ? c.caption
-                      ? "字幕文本"
-                      : "文本图层"
-                    : c.kind === "shape"
-                      ? "标注图层"
-                      : "媒体片段"}
-              </small>
-            </div>
+      )}
+      <div className="inspector-body">
+        {!c ? (
+          <div className="inspector-empty">
+            <Settings2 size={28} />
+            <b>选择一个片段</b>
+            <p>
+              编辑文字、位置、动画和声音
+              <br />
+              每一步，都在你的掌控之中。
+            </p>
           </div>
-          {c.kind === "text" && (
-            <>
-              <h3 className="section-title">文本内容</h3>
-              <textarea
-                aria-label="文本内容"
-                value={c.text ?? ""}
-                onChange={(e) =>
-                  update({
-                    text: e.target.value,
-                    name: e.target.value.slice(0, 24) || "文本",
-                  })
-                }
-              />
-              <label className="field">
-                花字模板
-                <select
-                  value=""
-                  onChange={(e) =>
-                    update({
-                      style: { ...textPresets[Number(e.target.value)].style },
-                    })
-                  }
-                >
-                  <option value="" disabled>
-                    选择模板
-                  </option>
-                  {textPresets.map((p, i) => (
-                    <option key={p.name} value={i}>
-                      {p.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              {numberField(
-                "字号",
-                c.style?.fontSize ?? 68,
-                (fontSize) => update({ style: { ...c.style!, fontSize } }),
-                8,
-                300,
-              )}
-              <label className="field">
-                文字颜色
-                <input
-                  type="color"
-                  value={c.style?.color ?? "#ffffff"}
-                  onChange={(e) =>
-                    update({ style: { ...c.style!, color: e.target.value } })
-                  }
-                />
-              </label>
-              <label className="field">
-                描边颜色
-                <input
-                  type="color"
-                  value={c.style?.outline ?? "#111111"}
-                  onChange={(e) =>
-                    update({ style: { ...c.style!, outline: e.target.value } })
-                  }
-                />
-              </label>
-              {numberField(
-                "描边宽度",
-                c.style?.outlineWidth ?? 4,
-                (outlineWidth) =>
-                  update({ style: { ...c.style!, outlineWidth } }),
-                0,
-                20,
-              )}
-              <label className="field">
-                字体
-                <input
-                  value={c.style?.fontFamily ?? "Microsoft YaHei"}
-                  onChange={(e) =>
-                    update({
-                      style: { ...c.style!, fontFamily: e.target.value },
-                    })
-                  }
-                />
-              </label>
-            </>
-          )}
-          {c.kind === "shape" && (
-            <label className="field">
-              填充
-              <input
-                type="color"
-                value={c.fill ?? "#71e6b5"}
-                onChange={(e) => update({ fill: e.target.value })}
-              />
-            </label>
-          )}
-          {c.kind !== "audio" && (
-            <>
-              <h3 className="section-title">
-                变换
-                {editor.autoAnimate && (
-                  <span className="auto-badge">
-                    <Diamond size={10} />
-                    自动记录
-                  </span>
+        ) : (
+          <fieldset disabled={!!locked}>
+            <div className="inspector-selection">
+              <span className={`selection-icon ${c.kind}`}>
+                {c.kind === "text" ? (
+                  <Type size={20} />
+                ) : c.kind === "audio" ? (
+                  <AudioLines size={20} />
+                ) : (
+                  <Film size={20} />
                 )}
-              </h3>
-              {numberField(
-                "位置 X (%)",
-                value.x * 100,
-                (x) => transform("x", x / 100),
-                -400,
-                400,
-                1,
-              )}
-              {numberField(
-                "位置 Y (%)",
-                value.y * 100,
-                (y) => transform("y", y / 100),
-                -400,
-                400,
-                1,
-              )}
-              {numberField(
-                "缩放 (%)",
-                value.scale * 100,
-                (scale) => transform("scale", scale / 100),
-                5,
-                800,
-                1,
-              )}
-              {numberField(
-                "旋转 (度)",
-                c.rotation ?? 0,
-                (rotation) => update({ rotation }),
-                -3600,
-                3600,
-              )}
-              <label className="field">
-                不透明度
-                <input
-                  type="range"
-                  min="0"
-                  max="1"
-                  step="0.01"
-                  value={value.opacity}
-                  onChange={(e) => transform("opacity", Number(e.target.value))}
-                />
-                <span className="range-value">
-                  {Math.round(value.opacity * 100)}%
-                </span>
-              </label>
-              <button
-                className="wide-button"
-                onClick={() => {
-                  if (!c) return;
-                  editor.updateClip(c.id, (clip) =>
-                    setTransform(
-                      clip,
-                      { x: 0.5, y: 0.5 },
-                      editor.playhead - c.start,
-                      editor.autoAnimate,
-                    ),
-                  );
-                }}
+              </span>
+              <div>
+                <b>{c.name}</b>
+                <small>
+                  {locked
+                    ? "轨道已锁定"
+                    : c.kind === "text"
+                      ? c.caption
+                        ? "字幕文本"
+                        : "文本图层"
+                      : c.kind === "shape"
+                        ? "标注图层"
+                        : "媒体片段"}
+                </small>
+              </div>
+            </div>
+            {hasCursor && (
+              <div
+                id="inspector-cursor"
+                role="tabpanel"
+                aria-labelledby="inspector-cursor-tab"
+                hidden={!cursorActive}
               >
-                <AlignCenter size={14} />
-                画布居中
-              </button>
-              <h3 className="section-title">画面效果</h3>
-              <label className="field">
-                效果预设
-                <select
-                  aria-label="效果预设"
-                  value=""
-                  onChange={(e) =>
-                    update({
-                      effects: {
-                        ...effectPresets[Number(e.target.value)].effects,
-                      },
-                    })
-                  }
-                >
-                  <option value="" disabled>
-                    选择效果
-                  </option>
-                  {effectPresets.map((p, i) => (
-                    <option key={p.name} value={i}>
-                      {p.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              {(["brightness", "contrast", "saturation", "blur"] as const).map(
-                (key, index) => (
-                  <div key={key}>
-                    {numberField(
-                      ["亮度", "对比度", "饱和度", "模糊半径"][index],
-                      (c.effects ?? defaultEffects)[key],
-                      (v) =>
-                        update({
-                          effects: {
-                            ...(c.effects ?? defaultEffects),
-                            [key]: v,
-                          },
-                        }),
-                      0,
-                      key === "blur" ? 20 : key === "saturation" ? 3 : 2,
-                      0.1,
-                    )}
-                  </div>
-                ),
-              )}
-              {(["flipX", "flipY"] as const).map((key, index) => (
-                <label className="check-field" key={key}>
-                  <input
-                    type="checkbox"
-                    checked={(c.effects ?? defaultEffects)[key]}
+                <CursorProperties clip={c} update={update} />
+              </div>
+            )}
+            <div
+              id="inspector-video"
+              role={hasCursor ? "tabpanel" : undefined}
+              aria-labelledby={hasCursor ? "inspector-video-tab" : undefined}
+              hidden={cursorActive}
+            >
+              {c.kind === "text" && (
+                <>
+                  <h3 className="section-title">文本内容</h3>
+                  <textarea
+                    aria-label="文本内容"
+                    value={c.text ?? ""}
                     onChange={(e) =>
                       update({
-                        effects: {
-                          ...(c.effects ?? defaultEffects),
-                          [key]: e.target.checked,
-                        },
+                        text: e.target.value,
+                        name: e.target.value.slice(0, 24) || "文本",
                       })
                     }
                   />
-                  {["水平翻转", "垂直翻转"][index]}
-                </label>
-              ))}
-              {["video", "image"].includes(c.kind) && (
-                <>
-                  <h3 className="section-title">裁切（源画面百分比）</h3>
-                  {(["left", "top", "right", "bottom"] as const).map(
-                    (key, index) => (
-                      <div key={key}>
-                        {numberField(
-                          [
-                            "裁切左侧 (%)",
-                            "裁切顶部 (%)",
-                            "裁切右侧 (%)",
-                            "裁切底部 (%)",
-                          ][index],
-                          (c.crop ?? defaultCrop)[key] * 100,
-                          (v) => {
-                            const crop = {
-                              ...(c.crop ?? defaultCrop),
-                              [key]: v / 100,
-                            };
-                            if (
-                              crop.left + crop.right < 0.99 &&
-                              crop.top + crop.bottom < 0.99
-                            )
-                              update({ crop });
+                  <label className="field">
+                    花字
+                    <select
+                      value=""
+                      onChange={(e) =>
+                        update({
+                          style: {
+                            ...textPresets[Number(e.target.value)].style,
                           },
-                          0,
-                          95,
-                          1,
-                        )}
-                      </div>
-                    ),
+                        })
+                      }
+                    >
+                      <option value="" disabled>
+                        选择模板
+                      </option>
+                      {textPresets.map((p, i) => (
+                        <option key={p.name} value={i}>
+                          {p.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  {numberField(
+                    "字号",
+                    c.style?.fontSize ?? 68,
+                    (fontSize) => update({ style: { ...c.style!, fontSize } }),
+                    8,
+                    300,
+                  )}
+                  <label className="field">
+                    文字颜色
+                    <input
+                      type="color"
+                      value={c.style?.color ?? "#ffffff"}
+                      onChange={(e) =>
+                        update({
+                          style: { ...c.style!, color: e.target.value },
+                        })
+                      }
+                    />
+                  </label>
+                  <label className="field">
+                    描边颜色
+                    <input
+                      type="color"
+                      value={c.style?.outline ?? "#111111"}
+                      onChange={(e) =>
+                        update({
+                          style: { ...c.style!, outline: e.target.value },
+                        })
+                      }
+                    />
+                  </label>
+                  {numberField(
+                    "描边宽度",
+                    c.style?.outlineWidth ?? 4,
+                    (outlineWidth) =>
+                      update({ style: { ...c.style!, outlineWidth } }),
+                    0,
+                    20,
+                  )}
+                  <label className="field">
+                    字体
+                    <input
+                      value={c.style?.fontFamily ?? "Microsoft YaHei"}
+                      onChange={(e) =>
+                        update({
+                          style: { ...c.style!, fontFamily: e.target.value },
+                        })
+                      }
+                    />
+                  </label>
+                </>
+              )}
+              {c.kind === "shape" && (
+                <label className="field">
+                  填充
+                  <input
+                    type="color"
+                    value={c.fill ?? "#71e6b5"}
+                    onChange={(e) => update({ fill: e.target.value })}
+                  />
+                </label>
+              )}
+              {c.kind !== "audio" && (
+                <>
+                  <h3 className="section-title">
+                    变换
+                    {editor.autoAnimate && (
+                      <span className="auto-badge">
+                        <Diamond size={10} />
+                        自动记录
+                      </span>
+                    )}
+                  </h3>
+                  {numberField(
+                    "位置 X (%)",
+                    value.x * 100,
+                    (x) => transform("x", x / 100),
+                    -400,
+                    400,
+                    1,
+                  )}
+                  {numberField(
+                    "位置 Y (%)",
+                    value.y * 100,
+                    (y) => transform("y", y / 100),
+                    -400,
+                    400,
+                    1,
+                  )}
+                  {numberField(
+                    "缩放 (%)",
+                    value.scale * 100,
+                    (scale) => transform("scale", scale / 100),
+                    5,
+                    800,
+                    1,
+                  )}
+                  {numberField(
+                    "旋转 (度)",
+                    c.rotation ?? 0,
+                    (rotation) => update({ rotation }),
+                    -3600,
+                    3600,
+                  )}
+                  <label className="field">
+                    不透明度
+                    <input
+                      type="range"
+                      min="0"
+                      max="1"
+                      step="0.01"
+                      value={value.opacity}
+                      onChange={(e) =>
+                        transform("opacity", Number(e.target.value))
+                      }
+                    />
+                    <span className="range-value">
+                      {Math.round(value.opacity * 100)}%
+                    </span>
+                  </label>
+                  <button
+                    className="wide-button"
+                    onClick={() => {
+                      if (!c) return;
+                      editor.updateClip(c.id, (clip) =>
+                        setTransform(
+                          clip,
+                          { x: 0.5, y: 0.5 },
+                          editor.playhead - c.start,
+                          editor.autoAnimate,
+                        ),
+                      );
+                    }}
+                  >
+                    <AlignCenter size={14} />
+                    画布居中
+                  </button>
+                  <h3 className="section-title">画面效果</h3>
+                  <label className="field">
+                    效果预设
+                    <select
+                      aria-label="效果预设"
+                      value=""
+                      onChange={(e) =>
+                        update({
+                          effects: {
+                            ...effectPresets[Number(e.target.value)].effects,
+                          },
+                        })
+                      }
+                    >
+                      <option value="" disabled>
+                        选择效果
+                      </option>
+                      {effectPresets.map((p, i) => (
+                        <option key={p.name} value={i}>
+                          {p.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  {(
+                    ["brightness", "contrast", "saturation", "blur"] as const
+                  ).map((key, index) => (
+                    <div key={key}>
+                      {numberField(
+                        ["亮度", "对比度", "饱和度", "模糊半径"][index],
+                        (c.effects ?? defaultEffects)[key],
+                        (v) =>
+                          update({
+                            effects: {
+                              ...(c.effects ?? defaultEffects),
+                              [key]: v,
+                            },
+                          }),
+                        0,
+                        key === "blur" ? 20 : key === "saturation" ? 3 : 2,
+                        0.1,
+                      )}
+                    </div>
+                  ))}
+                  {(["flipX", "flipY"] as const).map((key, index) => (
+                    <label className="check-field" key={key}>
+                      <input
+                        type="checkbox"
+                        checked={(c.effects ?? defaultEffects)[key]}
+                        onChange={(e) =>
+                          update({
+                            effects: {
+                              ...(c.effects ?? defaultEffects),
+                              [key]: e.target.checked,
+                            },
+                          })
+                        }
+                      />
+                      {["水平翻转", "垂直翻转"][index]}
+                    </label>
+                  ))}
+                  {["video", "image"].includes(c.kind) && (
+                    <>
+                      <h3 className="section-title">裁切（源画面百分比）</h3>
+                      {(["left", "top", "right", "bottom"] as const).map(
+                        (key, index) => (
+                          <div key={key}>
+                            {numberField(
+                              [
+                                "裁切左侧 (%)",
+                                "裁切顶部 (%)",
+                                "裁切右侧 (%)",
+                                "裁切底部 (%)",
+                              ][index],
+                              (c.crop ?? defaultCrop)[key] * 100,
+                              (v) => {
+                                const crop = {
+                                  ...(c.crop ?? defaultCrop),
+                                  [key]: v / 100,
+                                };
+                                if (
+                                  crop.left + crop.right < 0.99 &&
+                                  crop.top + crop.bottom < 0.99
+                                )
+                                  update({ crop });
+                              },
+                              0,
+                              95,
+                              1,
+                            )}
+                          </div>
+                        ),
+                      )}
+                    </>
                   )}
                 </>
               )}
-            </>
-          )}
-          <h3 className="section-title">淡入淡出</h3>
-          {numberField(
-            "淡入 (秒)",
-            c.fadeIn ?? 0,
-            (fadeIn) => update({ fadeIn }),
-            0,
-            c.duration,
-            0.1,
-          )}
-          {numberField(
-            "淡出 (秒)",
-            c.fadeOut ?? 0,
-            (fadeOut) => update({ fadeOut }),
-            0,
-            c.duration,
-            0.1,
-          )}
-          {editor.project.assets.find((a) => a.id === c.assetId)?.cursor && (
-            <>
-              <h3 className="section-title">录制鼠标</h3>
-              <label className="field">
-                鼠标样式
-                <select
-                  aria-label="鼠标样式"
-                  value={(c.cursorStyle ?? defaultCursorStyle).style}
-                  onChange={(e) =>
-                    update({
-                      cursorStyle: {
-                        ...(c.cursorStyle ?? defaultCursorStyle),
-                        style: e.target.value as NonNullable<
-                          Clip["cursorStyle"]
-                        >["style"],
-                      },
-                    })
-                  }
-                >
-                  <option value="arrow">箭头</option>
-                  <option value="circle">圆形</option>
-                  <option value="cross">十字</option>
-                  <option value="hidden">隐藏鼠标</option>
-                </select>
-              </label>
+              <h3 className="section-title">淡入淡出</h3>
               {numberField(
-                "鼠标大小",
-                (c.cursorStyle ?? defaultCursorStyle).size,
-                (size) =>
-                  update({
-                    cursorStyle: {
-                      ...(c.cursorStyle ?? defaultCursorStyle),
-                      size,
-                    },
-                  }),
-                8,
-                160,
+                "淡入 (秒)",
+                c.fadeIn ?? 0,
+                (fadeIn) => update({ fadeIn }),
+                0,
+                c.duration,
+                0.1,
               )}
-              <label className="field">
-                鼠标颜色
-                <input
-                  type="color"
-                  value={(c.cursorStyle ?? defaultCursorStyle).color}
-                  onChange={(e) =>
-                    update({
-                      cursorStyle: {
-                        ...(c.cursorStyle ?? defaultCursorStyle),
-                        color: e.target.value,
-                      },
-                    })
-                  }
-                />
-              </label>
-              {(["clicks", "smooth"] as const).map((key, index) => (
-                <label className="check-field" key={key}>
-                  <input
-                    type="checkbox"
-                    checked={(c.cursorStyle ?? defaultCursorStyle)[key]}
-                    onChange={(e) =>
-                      update({
-                        cursorStyle: {
-                          ...(c.cursorStyle ?? defaultCursorStyle),
-                          [key]: e.target.checked,
-                        },
-                      })
-                    }
-                  />
-                  {["点击高亮", "平滑鼠标移动"][index]}
-                </label>
-              ))}
-            </>
-          )}
-          <h3 className="section-title">时间</h3>
-          {numberField(
-            "开始 (秒)",
-            c.start,
-            (start) => update({ start }),
-            0,
-            86400,
-            0.1,
-          )}
-          {numberField(
-            "时长 (秒)",
-            c.duration,
-            (duration) => {
-              const asset = editor.project.assets.find(
-                (a) => a.id === c.assetId,
-              );
-              if (
-                asset &&
-                ["video", "audio"].includes(c.kind) &&
-                duration * c.speed + c.sourceIn > asset.duration + 0.01
-              )
-                return;
-              update({ duration });
-            },
-            1 / editor.project.canvas.fps,
-            86400,
-            0.1,
-          )}
-          {["video", "audio"].includes(c.kind) && (
-            <>
               {numberField(
-                "播放速度",
-                c.speed,
-                (speed) =>
-                  editor.updateClip(c.id, (clip) => changeSpeed(clip, speed)),
-                0.25,
-                8,
-                0.25,
+                "淡出 (秒)",
+                c.fadeOut ?? 0,
+                (fadeOut) => update({ fadeOut }),
+                0,
+                c.duration,
+                0.1,
               )}
-              <p className="small-note">保持音调 · 速度修改同步调整片段时长</p>
-            </>
-          )}
-          {c.assetId &&
-            editor.project.assets.find((a) => a.id === c.assetId)?.hasAudio && (
-              <>
-                <h3 className="section-title">声音</h3>
-                <label className="field">
-                  音量
-                  <input
-                    type="range"
-                    min="0"
-                    max="2"
-                    step="0.01"
-                    value={c.volume}
-                    onChange={(e) => update({ volume: Number(e.target.value) })}
-                  />
-                  <span className="range-value">
-                    {Math.round(c.volume * 100)}%
-                  </span>
-                </label>
-                <label className="check-field">
-                  <input
-                    type="checkbox"
-                    checked={c.podcast}
-                    onChange={(e) => update({ podcast: e.target.checked })}
-                  />
-                  播客人声增强（导出）
-                </label>
-              </>
-            )}
-          <h3 className="section-title">
-            关键帧 <span className="subtle">{c.keyframes.length}</span>
-          </h3>
-          <div className="keyframe-list">
-            {c.keyframes.map((k, i) => (
-              <div key={i}>
-                <button
-                  onClick={() =>
-                    editor.seek(
-                      Math.max(
-                        c.start,
-                        Math.min(
-                          c.start + c.duration,
-                          c.start + k.time - (c.animationOffset ?? 0),
-                        ),
+              <h3 className="section-title">时间</h3>
+              {numberField(
+                "开始 (秒)",
+                c.start,
+                (start) => update({ start }),
+                0,
+                86400,
+                0.1,
+              )}
+              {numberField(
+                "时长 (秒)",
+                c.duration,
+                (duration) => {
+                  const asset = editor.project.assets.find(
+                    (a) => a.id === c.assetId,
+                  );
+                  if (
+                    asset &&
+                    ["video", "audio"].includes(c.kind) &&
+                    duration * c.speed + c.sourceIn > asset.duration + 0.01
+                  )
+                    return;
+                  update({ duration });
+                },
+                1 / editor.project.canvas.fps,
+                86400,
+                0.1,
+              )}
+              {["video", "audio"].includes(c.kind) && (
+                <>
+                  {numberField(
+                    "播放速度",
+                    c.speed,
+                    (speed) =>
+                      editor.updateClip(c.id, (clip) =>
+                        changeSpeed(clip, speed),
                       ),
-                    )
-                  }
-                >
-                  <Diamond size={12} fill="currentColor" />
-                  {timeLabel(k.time - (c.animationOffset ?? 0))}
-                </button>
-                <button
-                  title="删除关键帧"
-                  onClick={() =>
-                    update({
-                      keyframes: c.keyframes.filter((_, index) => index !== i),
-                    })
-                  }
-                >
-                  ×
-                </button>
+                    0.25,
+                    8,
+                    0.25,
+                  )}
+                  <p className="small-note">
+                    保持音调 · 速度修改同步调整片段时长
+                  </p>
+                </>
+              )}
+              {c.assetId &&
+                editor.project.assets.find((a) => a.id === c.assetId)
+                  ?.hasAudio && (
+                  <>
+                    <h3 className="section-title">声音</h3>
+                    <label className="field">
+                      音量
+                      <input
+                        type="range"
+                        min="0"
+                        max="2"
+                        step="0.01"
+                        value={c.volume}
+                        onChange={(e) =>
+                          update({ volume: Number(e.target.value) })
+                        }
+                      />
+                      <span className="range-value">
+                        {Math.round(c.volume * 100)}%
+                      </span>
+                    </label>
+                    <label className="check-field">
+                      <input
+                        type="checkbox"
+                        checked={c.podcast}
+                        onChange={(e) => update({ podcast: e.target.checked })}
+                      />
+                      播客人声增强（导出）
+                    </label>
+                  </>
+                )}
+              <h3 className="section-title">
+                关键帧 <span className="subtle">{c.keyframes.length}</span>
+              </h3>
+              <div className="keyframe-list">
+                {c.keyframes.map((k, i) => (
+                  <div key={i}>
+                    <button
+                      onClick={() =>
+                        editor.seek(
+                          Math.max(
+                            c.start,
+                            Math.min(
+                              c.start + c.duration,
+                              c.start + k.time - (c.animationOffset ?? 0),
+                            ),
+                          ),
+                        )
+                      }
+                    >
+                      <Diamond size={12} fill="currentColor" />
+                      {timeLabel(k.time - (c.animationOffset ?? 0))}
+                    </button>
+                    <button
+                      title="删除关键帧"
+                      onClick={() =>
+                        update({
+                          keyframes: c.keyframes.filter(
+                            (_, index) => index !== i,
+                          ),
+                        })
+                      }
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-          {!c.keyframes.length && (
-            <p className="small-note">开启自动动画，或右键添加动画。</p>
-          )}
-        </fieldset>
-      )}
+              {!c.keyframes.length && (
+                <p className="small-note">开启自动动画，或右键添加动画。</p>
+              )}
+            </div>
+          </fieldset>
+        )}
+      </div>
     </aside>
   );
 }

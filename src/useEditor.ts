@@ -41,6 +41,7 @@ export function demoProject(): Project {
 }
 export function useEditor() {
   const [project, setProject] = useState<Project>(demoProject);
+  const [editingTextId, setEditingTextId] = useState<string | null>(null);
   const [selection, selectMany] = useState<string[]>([]);
   const selectedIds = selection.filter((id) =>
     project.clips.some((c) => c.id === id),
@@ -86,6 +87,7 @@ export function useEditor() {
     future.current = [];
     current.current = next;
     setProject(next);
+    setEditingTextId(null);
     select(null);
     seek(0);
     setPlaying(false);
@@ -173,6 +175,27 @@ export function useEditor() {
     },
     [apply, playhead],
   );
+  const beginTextEdit = useCallback(
+    (id: string) => {
+      const project = current.current;
+      const clip = project.clips.find((clip) => clip.id === id);
+      const track = project.tracks.find((track) => track.id === clip?.trackId);
+      if (!clip || clip.kind !== "text" || track?.locked || track?.hidden)
+        return;
+      select(id);
+      setPlaying(false);
+      seek((time) =>
+        time >= clip.start && time < clip.start + clip.duration
+          ? time
+          : clip.start,
+      );
+      setEditingTextId(id);
+    },
+    [select],
+  );
+  const endTextEdit = useCallback((id: string) => {
+    setEditingTextId((current) => (current === id ? null : current));
+  }, []);
   const selected = project.clips.find((c) => c.id === selectedId);
   return {
     project,
@@ -195,6 +218,9 @@ export function useEditor() {
     updateClip,
     addText,
     addAssets,
+    editingTextId,
+    beginTextEdit,
+    endTextEdit,
     autoAnimate,
     setAutoAnimate,
   };

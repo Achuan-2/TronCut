@@ -2,6 +2,7 @@ node_modules/
 dist/
 dist-electron/
 release/
+release-local/
 test-output/
 *.log
 .DS_Store

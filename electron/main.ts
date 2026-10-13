@@ -34,6 +34,7 @@ import { synthesizeSpeech } from "./synthesis";
 import { ttsOptionsSchema } from "../shared/tts";
 import { mediaThumbnail } from "./thumbnails";
 import { NativeRecording } from "./native-recording";
+import { copyClipClipboard, importClipboardMedia } from "./clipboard-media";
 
 protocol.registerSchemesAsPrivileged([
   {
@@ -52,6 +53,10 @@ if (!app.isPackaged || process.env.FRAMECRAFT_SMOKE)
     path.resolve(process.env.FRAMECRAFT_USER_DATA || ".framecraft-dev"),
   );
 let window: BrowserWindow;
+const windowState = () => ({
+  maximized: window.isMaximized(),
+  fullscreen: window.isFullScreen(),
+});
 let projectFile: string | null = null;
 let projectDirty = false;
 let pendingProject =
@@ -121,6 +126,34 @@ async function chooseFile(
   return result.canceled ? null : result.filePaths[0];
 }
 function installHandlers() {
+  handle("window:state", windowState);
+  handle("window:minimize", () => window.minimize());
+  handle("window:maximize", () => {
+    if (window.isFullScreen()) window.setFullScreen(false);
+    else if (window.isMaximized()) window.unmaximize();
+    else window.maximize();
+  });
+  // Use the normal close event so dirty projects and active recordings still
+  // receive the same exit confirmation as the system close button.
+  handle("window:close", () => window.close());
+  handle("window:menu", (input: unknown, inputX: unknown, inputY: unknown) => {
+    const name = z.enum(["edit", "view"]).parse(input);
+    const bounds = window.getContentBounds();
+    const x = Math.round(Math.min(bounds.width, Math.max(0, z.number().finite().parse(inputX))));
+    const y = Math.round(Math.min(bounds.height, Math.max(0, z.number().finite().parse(inputY))));
+    const label = name === "edit" ? "编辑" : "视图";
+    Menu.getApplicationMenu()?.items.find((item) => item.label === label)?.submenu?.popup({ window, x, y });
+  });
+  handle("clipboard:clips", (token: unknown) =>
+    copyClipClipboard(z.string().uuid().parse(token)),
+  );
+  handle("media:clipboard", async () => {
+    const result = await importClipboardMedia(
+      path.join(app.getPath("userData"), "pasted-media"),
+      process.resourcesPath,
+    );
+    return { ...result, assets: result.assets.map(register) };
+  });
   handle(
     "capture:native:available",
     async () =>
@@ -678,6 +711,7 @@ async function createWindow() {
     minHeight: 720,
     backgroundColor: "#151719",
     title: "TronCut",
+    frame: false,
     icon: app.isPackaged
       ? path.join(process.resourcesPath, "project.ico")
       : path.resolve("resources/icon.png"),
@@ -688,6 +722,11 @@ async function createWindow() {
       sandbox: true,
     },
   });
+  const notifyWindowState = () => window.webContents.send("window:state", windowState());
+  window.on("maximize", notifyWindowState);
+  window.on("unmaximize", notifyWindowState);
+  window.on("enter-full-screen", notifyWindowState);
+  window.on("leave-full-screen", notifyWindowState);
   window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
   window.webContents.on("will-navigate", (event, url) => {
     const current = window.webContents.getURL();
@@ -786,6 +825,7 @@ async function createWindow() {
       },
     ]),
   );
+  window.setMenuBarVisibility(false);
   const devUrl = process.env.FRAMECRAFT_DEV_URL;
   if (devUrl) await window.loadURL(devUrl);
   else await window.loadFile(path.join(__dirname, "../dist/index.html"));

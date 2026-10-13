@@ -13,9 +13,24 @@ export interface Capabilities {
   podcast: boolean;
   error: string;
 }
+export interface WindowState {
+  maximized: boolean;
+  fullscreen: boolean;
+}
 export interface FrameCraftBridge {
   platform: string;
+  windowState(): Promise<WindowState>;
+  minimizeWindow(): Promise<void>;
+  toggleMaximizeWindow(): Promise<void>;
+  closeWindow(): Promise<void>;
+  showWindowMenu(menu: "edit" | "view", x: number, y: number): Promise<void>;
+  onWindowState(callback: (state: WindowState) => void): () => void;
   importMedia(): Promise<Asset[]>;
+  copyClipClipboard(token: string): Promise<void>;
+  importClipboardMedia(): Promise<{
+    assets: Asset[];
+    clipToken: string | null;
+  }>;
   relinkMedia(assetId: string, requiredDuration: number): Promise<Asset | null>;
   mediaThumbnail(assetId: string, waveform: boolean): Promise<string | null>;
   mediaUrl(assetId: string): Promise<string>;
