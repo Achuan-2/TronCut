@@ -1,0 +1,154 @@
+name: Build release
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing release tag, e.g. v0.2.0
+        required: true
+        type: string
+      upload:
+        description: Upload packages to the existing Release (disable for build only)
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.event.release.tag_name || inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  resolve:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.release.outputs.tag }}
+      source: ${{ steps.release.outputs.source }}
+    steps:
+      - name: Resolve immutable release source
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.event.release.tag_name || inputs.tag }}
+          UPLOAD: ${{ github.event_name == 'release' || inputs.upload }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]] || {
+            echo 'Expected a version tag such as v0.2.0'; exit 1;
+          }
+          if [[ "$UPLOAD" == 'true' ]]; then
+            gh release view "$RELEASE_TAG" --json tagName >/dev/null
+          fi
+          source=$(gh api "repos/$GH_REPO/commits/$RELEASE_TAG" --jq .sha)
+          echo "tag=$RELEASE_TAG" >> "$GITHUB_OUTPUT"
+          echo "source=$source" >> "$GITHUB_OUTPUT"
+
+  windows:
+    needs: resolve
+    runs-on: windows-2022
+    timeout-minutes: 60
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: "false"
+      TRONCUT_RELEASE_TAG: ${{ needs.resolve.outputs.tag }}
+      TRONCUT_BUILD_TOOLS_SHA: ${{ github.sha }}
+    defaults:
+      run:
+        shell: pwsh
+        working-directory: app
+    steps:
+      - name: Checkout workflow tooling
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ github.sha }}
+          path: ci
+          persist-credentials: false
+      - name: Checkout release source
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ needs.resolve.outputs.source }}
+          path: app
+          persist-credentials: false
+      - name: Check version and restore the omitted v0.2.0 entry
+        run: |
+          $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          if ("v$version" -ne $env:TRONCUT_RELEASE_TAG) {
+            throw 'Release tag must match package.json version'
+          }
+          if (-not (Test-Path -LiteralPath index.html)) {
+            if ($env:TRONCUT_RELEASE_TAG -ne 'v0.2.0') {
+              throw 'Release source is missing index.html'
+            }
+            Copy-Item -LiteralPath ../ci/index.html -Destination index.html
+            'TRONCUT_SOURCE_ENTRY_RESTORED=1' >> $env:GITHUB_ENV
+          }
+      - uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
+        with:
+          version: 12.4.2
+          run_install: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: "22"
+          cache: pnpm
+          cache-dependency-path: app/pnpm-lock.yaml
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Download and verify pinned engines
+        run: "& ../ci/scripts/prepare-windows-ci.ps1"
+      - name: Compile native recording helpers
+        run: "& ./scripts/build-native.ps1"
+      - name: Verify engines and licenses
+        run: node ../ci/scripts/check-packaging.mjs
+      - name: Test and build
+        run: |
+          pnpm test
+          if ($LASTEXITCODE -ne 0) { throw 'Tests failed' }
+          pnpm build
+          if ($LASTEXITCODE -ne 0) { throw 'Build failed' }
+      - name: Package Windows x64
+        run: pnpm exec electron-builder --win nsis --x64 --publish never
+      - name: Prepare portable ZIP, sources and checksums
+        run: node ../ci/scripts/prepare-release.mjs
+      - name: Retain packages even when release upload fails
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: windows-x64-${{ needs.resolve.outputs.tag }}
+          path: |
+            app/release/publish/${{ needs.resolve.outputs.tag }}/*.exe
+            app/release/publish/${{ needs.resolve.outputs.tag }}/*.zip
+            app/release/publish/${{ needs.resolve.outputs.tag }}/*.tar.gz
+            app/release/publish/${{ needs.resolve.outputs.tag }}/SHA256SUMS.txt
+            app/release/publish/${{ needs.resolve.outputs.tag }}/TronCut-*-build-info.json
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 14
+
+  upload:
+    needs: [resolve, windows]
+    if: github.event_name == 'release' || inputs.upload
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: windows-x64-${{ needs.resolve.outputs.tag }}
+          path: assets
+      - name: Check and upload to the existing Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ needs.resolve.outputs.tag }}
+        shell: bash
+        working-directory: assets
+        run: |
+          set -euo pipefail
+          sha256sum --check SHA256SUMS.txt
+          gh release upload "$RELEASE_TAG" ./* --clobber
+          gh release view "$RELEASE_TAG" --json url,assets
+          echo "Packages uploaded to Release $RELEASE_TAG" >> "$GITHUB_STEP_SUMMARY"

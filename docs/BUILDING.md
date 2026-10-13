@@ -43,6 +43,14 @@ Build on a Mac with the matching Electron architecture, runnable FFmpeg/FFprobe 
 
 ## Publishing / 发布
 
-Release steps are manual. Check the version, licenses, source contents, and validation record; commit with `gitmoji + description`, tag `v<version>`, then publish a GitHub prerelease for preview builds. Upload the Windows installer, complete portable archive, source archive, third-party source information, and SHA256SUMS.txt. Verify the uploaded assets and remote tag after publishing.
+The [Build release workflow](../.github/workflows/release.yml) runs when a GitHub Release is published, including prereleases. It checks that `v<version>` matches `package.json`, checks out the exact tag commit, downloads SHA256-verified FFmpeg 9.0.2 and uv 0.6.5, compiles the Windows capture helpers, runs tests and builds, then uploads the Windows x64 installer, complete portable ZIP, source archives, build provenance, and `SHA256SUMS.txt` to that Release. Upload permissions are limited to the final job. No extra secret or personal access token is required.
 
-发布不会由普通提交自动触发。未完成签名、Mac 或完整 Camtasia 导入的版本应在 Release 中明确标记为预发布，并与双语 README 的兼容说明保持一致。
+发布正式 Release 或预发布后，GitHub Actions 会自动构建并上传 Windows x64 安装包、免安装 ZIP、源码、构建记录和 SHA256 校验文件，无需本地打包或手动上传。先修改 `package.json` 版本并提交，推送对应 `v<version>` 标签，再在 GitHub 发布该标签的 Release。预览版本继续勾选预发布；普通提交或仅推送标签不会触发发版。
+
+To rebuild an existing release, open **Actions → Build release → Run workflow**, select `main`, and enter the existing tag. Upload replaces assets with the same names and regenerates checksums; the Release description, visibility, and prerelease state are preserved. Uncheck **Upload packages** to build only: packages remain available as Actions artifacts for 14 days. A failed build does not run the upload job, and a failed upload can be retried without rebuilding by rerunning the failed job. This workflow does not create commits, tags, or Releases.
+
+已有版本补包：在 **Actions → Build release → Run workflow** 中选择 `main`，输入标签即可。取消 **Upload packages** 可只构建而不发附件，保留明确的“不发版”入口。工作流不会创建或修改提交、标签、Release 文案或预发布状态。同名附件会被替换，校验文件会同步更新；上传过程失败可能留下部分附件，重跑失败任务可以继续上传。
+
+The first `v0.2.0` tag omitted `index.html`. Only this tag may restore that existing entry from the workflow commit; the source ZIP and build-info JSON record the repair and both commit IDs. Subsequent tags must contain their complete source. macOS automatic distribution is not enabled until matching standalone engines and real-device validation are available. Windows CI builds remain unsigned; CI success does not replace capture, installation, or performance acceptance on actual devices.
+
+首次 `v0.2.0` 标签漏收了 `index.html`，仅该版本补包允许从工作流提交恢复现有入口，源码 ZIP 和构建记录会标明修复、入口校验值及源码与工具提交。后续版本缺少入口会直接报错。当前工作流仅自动发布 Windows x64；Mac 引擎分发和真机验收仍待完成，Windows 包也尚未配置代码签名。
