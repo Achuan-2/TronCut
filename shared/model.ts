@@ -31,6 +31,20 @@ export const transformSchema = z.object({
   scale: finite.min(0.05).max(8),
   opacity: finite.min(0).max(1),
 });
+const cameraTransformSchema = transformSchema.extend({
+  x: finite.min(0).max(1),
+  y: finite.min(0).max(1),
+  scale: finite.min(1).max(8),
+  opacity: z.literal(1),
+});
+export const cameraSchema = z.object({
+  transform: cameraTransformSchema,
+  keyframes: z
+    .array(
+      z.object({ time: finite.nonnegative(), value: cameraTransformSchema }),
+    )
+    .max(10000),
+});
 export const styleSchema = z.object({
   fontSize: finite.min(8).max(300),
   color: z.string().regex(/^#[\da-f]{6}$/i),
@@ -49,6 +63,7 @@ export const projectSchema = z.object({
     fps: z.number().int().min(1).max(120),
     background: z.string().regex(/^#[\da-f]{6}$/i),
   }),
+  camera: cameraSchema.optional(),
   assets: z
     .array(
       z.object({

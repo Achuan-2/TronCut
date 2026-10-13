@@ -7,9 +7,11 @@ import {
   uid,
   defaultTransform,
   type Asset,
+  type Transform,
 } from "../shared/model";
 import { addMediaAssets } from "../shared/editor";
 import { selectionWithGroups } from "../shared/timeline";
+import { setCameraTransform } from "../shared/canvas";
 
 export function demoProject(): Project {
   const project = createProject("我的第一个视频");
@@ -42,6 +44,7 @@ export function demoProject(): Project {
 export function useEditor() {
   const [project, setProject] = useState<Project>(demoProject);
   const [editingTextId, setEditingTextId] = useState<string | null>(null);
+  const [cameraDraft, setCameraDraft] = useState<Transform | null>(null);
   const [selection, selectMany] = useState<string[]>([]);
   const selectedIds = selection.filter((id) =>
     project.clips.some((c) => c.id === id),
@@ -88,6 +91,7 @@ export function useEditor() {
     current.current = next;
     setProject(next);
     setEditingTextId(null);
+    setCameraDraft(null);
     select(null);
     seek(0);
     setPlaying(false);
@@ -196,6 +200,13 @@ export function useEditor() {
   const endTextEdit = useCallback((id: string) => {
     setEditingTextId((current) => (current === id ? null : current));
   }, []);
+  const updateCamera = useCallback(
+    (patch: Partial<Transform>, time = playhead) => {
+      setPlaying(false);
+      apply((project) => setCameraTransform(project, patch, time));
+    },
+    [apply, playhead],
+  );
   const selected = project.clips.find((c) => c.id === selectedId);
   return {
     project,
@@ -221,6 +232,9 @@ export function useEditor() {
     editingTextId,
     beginTextEdit,
     endTextEdit,
+    cameraDraft,
+    setCameraDraft,
+    updateCamera,
     autoAnimate,
     setAutoAnimate,
   };

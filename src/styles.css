@@ -321,6 +321,8 @@ fieldset:disabled {
   min-height: 0;
 }
 .tool-rail {
+  overflow-y: auto;
+  overflow-x: hidden;
   width: 65px;
   flex-shrink: 0;
   background: #181b1d;
@@ -343,6 +345,9 @@ fieldset:disabled {
 .tool-rail button.selected {
   color: #93edc7;
   background: #2b3b32;
+}
+.tool-rail .zoom-pan-tab {
+  font-size: 9px;
 }
 .tool-rail button.selected:before {
   content: "";
@@ -839,6 +844,87 @@ fieldset:disabled {
   overflow: hidden;
   box-shadow: 0 8px 40px #0005;
   flex-shrink: 0;
+}
+.canvas-scene {
+  position: absolute;
+  inset: 0;
+}
+.resize-handle {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  min-width: 0;
+  padding: 0;
+  border: 1px solid #26382c;
+  border-radius: 50%;
+  background: #e0ffeb;
+  z-index: 20;
+  touch-action: none;
+}
+.resize-handle:hover {
+  background: #76e5b5;
+}
+.resize-handle.nw,
+.resize-handle.se {
+  cursor: nwse-resize;
+}
+.resize-handle.ne,
+.resize-handle.sw {
+  cursor: nesw-resize;
+}
+.resize-handle.n,
+.resize-handle.s {
+  cursor: ns-resize;
+}
+.resize-handle.e,
+.resize-handle.w {
+  cursor: ew-resize;
+}
+.zoom-pan-overview {
+  position: relative;
+  width: 100%;
+  margin: 16px 0 10px;
+  border: 1px solid #414b46;
+  overflow: hidden;
+  touch-action: none;
+}
+.zoom-pan-overview .canvas-scene {
+  pointer-events: none;
+}
+.camera-viewport {
+  position: absolute;
+  border: 1px solid #effff5;
+  box-shadow: 0 0 0 1000px #0007;
+  cursor: move;
+}
+.camera-handle {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  border: 1px solid #25372c;
+  border-radius: 50%;
+  background: #fff;
+  transform: translate(-50%, -50%);
+}
+.camera-handle.nw,
+.camera-handle.se {
+  cursor: nwse-resize;
+}
+.camera-handle.ne,
+.camera-handle.sw {
+  cursor: nesw-resize;
+}
+.library-content .field.camera-zoom-field input[type="number"] {
+  width: 56px;
+  padding: 5px;
+}
+.camera-keyframe {
+  position: absolute;
+  top: 1px;
+  transform: translateX(-5px);
+  padding: 0;
+  color: #b7a2e5;
+  z-index: 2;
 }
 .canvas-zoom {
   position: absolute;

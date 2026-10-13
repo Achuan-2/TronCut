@@ -24,7 +24,7 @@ const xml = (s: string) =>
       })[c]!,
   );
 export function expression(
-  clip: Clip,
+  clip: Pick<Clip, "transform" | "keyframes" | "start" | "animationOffset">,
   key: keyof Transform,
   clock = "t",
 ): string {
@@ -358,6 +358,16 @@ export async function exportVideo(
   filters.push(
     `${audioLabels.join("")}amix=inputs=${audioLabels.length}:duration=longest:normalize=0,alimiter=limit=0.95,atrim=duration=${duration}[audio]`,
   );
+  if (project.camera) {
+    const camera = { ...project.camera, start: 0 };
+    const clock = `on/${fps}`;
+    // Apply the camera to the composed scene, including captions and recorded
+    // cursors. zoompan crops at source resolution instead of scaling huge frames.
+    filters.push(
+      `[${base}]zoompan=z='${expression(camera, "scale", clock)}':x='iw*(${expression(camera, "x", clock)})-iw/zoom/2':y='ih*(${expression(camera, "y", clock)})-ih/zoom/2':d=1:s=${width}x${height}:fps=${fps}[camera]`,
+    );
+    base = "camera";
+  }
   const graph = path.join(workDir, "graph.txt");
   await fs.writeFile(graph, filters.join(";\n"));
   await fs.appendFile(graph, `;\n[${base}]format=yuv420p[video]`);

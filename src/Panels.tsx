@@ -21,6 +21,7 @@ import {
   Play,
   Mic,
   MousePointer2,
+  Scan,
 } from "lucide-react";
 import {
   type Clip,
@@ -44,12 +45,14 @@ import { defaultCrop, defaultEffects, effectPresets } from "../shared/effects";
 import { MediaThumbnail } from "./MediaThumbnail";
 import { defaultCursorStyle } from "../shared/cursor";
 import NarrationPanel from "./NarrationPanel";
+import ZoomPanPanel from "./ZoomPanPanel";
 
 export type Tab =
   | "media"
   | "text"
   | "captions"
   | "animations"
+  | "zoompan"
   | "audio"
   | "narration"
   | "shapes"
@@ -59,6 +62,7 @@ const tabs = [
   { id: "text", name: "文本", icon: Type },
   { id: "captions", name: "字幕", icon: Captions },
   { id: "animations", name: "动画", icon: Sparkles },
+  { id: "zoompan", name: "缩放与平移", icon: Scan },
   { id: "audio", name: "音频", icon: AudioLines },
   { id: "narration", name: "配音", icon: Mic },
   { id: "shapes", name: "标注", icon: Shapes },
@@ -137,7 +141,7 @@ export default function Panels(props: Props) {
         {tabs.map((t) => (
           <button
             key={t.id}
-            className={tab === t.id ? "selected" : ""}
+            className={`${tab === t.id ? "selected" : ""} ${t.id === "zoompan" ? "zoom-pan-tab" : ""}`}
             onClick={() => setTab(t.id)}
           >
             <t.icon size={21} />
@@ -463,6 +467,7 @@ export default function Panels(props: Props) {
             </div>
           </>
         )}
+        {tab === "zoompan" && <ZoomPanPanel editor={editor} />}
         {tab === "animations" && (
           <>
             <p className="panel-intro">

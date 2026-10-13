@@ -4,6 +4,7 @@ import {
   type Asset,
   type Clip,
   type Project,
+  type Transform,
   projectDuration,
 } from "../shared/model";
 import { transformAt, setTransform } from "../shared/editor";
@@ -14,6 +15,7 @@ import {
   previewFilter,
 } from "../shared/effects";
 import { cursorAt, cursorSvg, defaultCursorStyle } from "../shared/cursor";
+import { cameraAt, resizeHandles, resizeTransform } from "../shared/canvas";
 import type { Editor } from "./useEditor";
 
 export function timeLabel(t: number): string {
@@ -105,16 +107,20 @@ function PreviewLayer({
   editor,
   scale,
   muted,
+  interactive = true,
+  cameraScale = 1,
 }: {
   clip: Clip;
   project: Project;
   editor: Editor;
   scale: number;
   muted: boolean;
+  interactive?: boolean;
+  cameraScale?: number;
 }) {
   const transform = transformAt(clip, editor.playhead - clip.start),
     asset = project.assets.find((a) => a.id === clip.assetId);
-  const editing = editor.editingTextId === clip.id;
+  const editing = interactive && editor.editingTextId === clip.id;
   const textInput = useRef<HTMLTextAreaElement>(null);
   const track = project.tracks.find((t) => t.id === clip.trackId);
   useEffect(() => {
@@ -142,25 +148,36 @@ function PreviewLayer({
     clip.id,
   ]);
   useEffect(
-    () => () => editor.endTextEdit(clip.id),
-    [editor.endTextEdit, clip.id],
+    () => () => {
+      if (interactive) editor.endTextEdit(clip.id);
+    },
+    [editor.endTextEdit, clip.id, interactive],
   );
   const [drag, setDrag] = useState<{
     x: number;
     y: number;
-    dx: number;
-    dy: number;
+    mode: "move" | "resize";
+    handle?: { x: number; y: number };
+    original: Transform;
+    value: Transform;
   } | null>(null);
+  const dragRef = useRef<typeof drag>(null);
+  const setGesture = (value: typeof drag) => {
+    // Pointer-up can arrive before React renders the latest pointer-move. Keep
+    // the live gesture in a ref so a fast drag still commits its final position.
+    dragRef.current = value;
+    setDrag(value);
+  };
+  const displayed = drag?.value ?? transform;
   const style: CSSProperties = {
-    left: `${transform.x * 100}%`,
-    top: `${transform.y * 100}%`,
+    left: `${displayed.x * 100}%`,
+    top: `${displayed.y * 100}%`,
     opacity: editing
       ? 1
-      : transform.opacity * fadeOpacity(clip, editor.playhead - clip.start),
-    transform: `translate(-50%, -50%) rotate(${clip.rotation ?? 0}deg) scale(${transform.scale})`,
+      : displayed.opacity * fadeOpacity(clip, editor.playhead - clip.start),
+    transform: `translate(-50%, -50%) rotate(${clip.rotation ?? 0}deg) scale(${displayed.scale})`,
     "--canvas-scale": scale,
   } as CSSProperties;
-  if (drag) style.translate = `${drag.dx}px ${drag.dy}px`;
   let mediaWidth = 0,
     mediaHeight = 0;
   const crop = clip.crop ?? defaultCrop,
@@ -190,16 +207,16 @@ function PreviewLayer({
     style.width = mediaWidth * (1 - crop.left - crop.right);
     style.height = mediaHeight * (1 - crop.top - crop.bottom);
   }
-  const selectable = !track?.locked && clip.kind !== "audio";
+  const selectable = interactive && !track?.locked && clip.kind !== "audio";
   return (
     <div
-      className={`preview-layer ${clip.kind} ${editor.selectedIds.includes(clip.id) ? "selected" : ""} ${editing ? "editing" : ""}`}
+      className={`preview-layer ${clip.kind} ${interactive && editor.selectedIds.includes(clip.id) ? "selected" : ""} ${editing ? "editing" : ""}`}
       style={style}
       onClick={(event) => event.stopPropagation()}
       onDoubleClick={(event) => {
         if (clip.kind !== "text" || editing || !selectable) return;
         event.stopPropagation();
-        setDrag(null);
+        setGesture(null);
         editor.beginTextEdit(clip.id);
       }}
       onPointerDown={(event) => {
@@ -209,49 +226,83 @@ function PreviewLayer({
         }
         if (!selectable || event.button !== 0) return;
         event.stopPropagation();
+        editor.setPlaying(false);
         editor.select(
           clip.id,
           event.ctrlKey || event.metaKey || event.shiftKey,
         );
         event.currentTarget.setPointerCapture(event.pointerId);
-        setDrag({ x: event.clientX, y: event.clientY, dx: 0, dy: 0 });
+        setGesture({
+          x: event.clientX,
+          y: event.clientY,
+          mode: "move",
+          original: transform,
+          value: transform,
+        });
       }}
       onPointerMove={(event) => {
-        if (drag)
-          setDrag({
-            ...drag,
-            dx: event.clientX - drag.x,
-            dy: event.clientY - drag.y,
-          });
-      }}
-      onPointerUp={() => {
-        if (drag && (drag.dx || drag.dy))
-          editor.updateClip(clip.id, (c) =>
-            setTransform(
-              c,
-              {
+        const gesture = dragRef.current;
+        if (!gesture) return;
+        const delta = {
+          x: (event.clientX - gesture.x) / (scale * cameraScale),
+          y: (event.clientY - gesture.y) / (scale * cameraScale),
+        };
+        const value =
+          gesture.mode === "resize"
+            ? resizeTransform(
+                gesture.original,
+                delta,
+                gesture.handle!,
+                {
+                  width: (mediaWidth * (1 - crop.left - crop.right)) / scale,
+                  height: (mediaHeight * (1 - crop.top - crop.bottom)) / scale,
+                },
+                project.canvas,
+                clip.rotation,
+              )
+            : {
+                ...gesture.original,
                 x: Math.max(
                   -4,
                   Math.min(
                     4,
-                    transform.x + drag.dx / (project.canvas.width * scale),
+                    gesture.original.x + delta.x / project.canvas.width,
                   ),
                 ),
                 y: Math.max(
                   -4,
                   Math.min(
                     4,
-                    transform.y + drag.dy / (project.canvas.height * scale),
+                    gesture.original.y + delta.y / project.canvas.height,
                   ),
                 ),
+              };
+        setGesture({ ...gesture, value });
+      }}
+      onPointerUp={() => {
+        const drag = dragRef.current;
+        if (
+          drag &&
+          (drag.original.x !== drag.value.x ||
+            drag.original.y !== drag.value.y ||
+            drag.original.scale !== drag.value.scale)
+        )
+          editor.updateClip(clip.id, (c) =>
+            setTransform(
+              c,
+              {
+                x: drag.value.x,
+                y: drag.value.y,
+                ...(drag.mode === "resize" ? { scale: drag.value.scale } : {}),
               },
               editor.playhead - clip.start,
               editor.autoAnimate,
             ),
           );
-        setDrag(null);
+        setGesture(null);
       }}
-      onPointerCancel={() => setDrag(null)}
+      onPointerCancel={() => setGesture(null)}
+      onLostPointerCapture={() => setGesture(null)}
     >
       {asset ? (
         <div
@@ -379,6 +430,90 @@ function PreviewLayer({
           )}
         </svg>
       )}
+      {selectable &&
+        asset &&
+        ["image", "video"].includes(clip.kind) &&
+        editor.selectedIds.includes(clip.id) &&
+        resizeHandles.map((handle) => (
+          <button
+            key={handle.name}
+            className={`resize-handle ${handle.name}`}
+            aria-label={`调整尺寸 ${handle.name}`}
+            title="拖动调整尺寸（保持比例）"
+            style={{
+              left: `${(handle.x + 1) * 50}%`,
+              top: `${(handle.y + 1) * 50}%`,
+              transform: `translate(-50%, -50%) scale(${1 / (displayed.scale * cameraScale)})`,
+            }}
+            onPointerDown={(event) => {
+              if (event.button !== 0) return;
+              event.preventDefault();
+              event.stopPropagation();
+              editor.setPlaying(false);
+              event.currentTarget.setPointerCapture(event.pointerId);
+              setGesture({
+                x: event.clientX,
+                y: event.clientY,
+                mode: "resize",
+                handle,
+                original: transform,
+                value: transform,
+              });
+            }}
+          />
+        ))}
+    </div>
+  );
+}
+export function ScenePreview({
+  editor,
+  scale,
+  interactive = true,
+  applyCamera = true,
+}: {
+  editor: Editor;
+  scale: number;
+  interactive?: boolean;
+  applyCamera?: boolean;
+}) {
+  const { project, playhead } = editor;
+  const camera = applyCamera
+    ? (editor.cameraDraft ?? cameraAt(project, playhead))
+    : null;
+  const active = project.clips.filter(
+    (clip) => playhead >= clip.start && playhead < clip.start + clip.duration,
+  );
+  return (
+    <div
+      className="canvas-scene"
+      style={
+        camera
+          ? {
+              transformOrigin: "0 0",
+              transform: `translate(${(0.5 - camera.x * camera.scale) * 100}%, ${(0.5 - camera.y * camera.scale) * 100}%) scale(${camera.scale})`,
+            }
+          : undefined
+      }
+    >
+      {[...project.tracks]
+        .reverse()
+        .filter((track) => !track.hidden)
+        .flatMap((track) =>
+          active
+            .filter((clip) => clip.trackId === track.id)
+            .map((clip) => (
+              <PreviewLayer
+                key={clip.id}
+                clip={clip}
+                project={project}
+                editor={editor}
+                scale={scale}
+                muted={!interactive || track.muted}
+                interactive={interactive}
+                cameraScale={camera?.scale ?? 1}
+              />
+            )),
+        )}
     </div>
   );
 }
@@ -424,9 +559,6 @@ export default function Preview({ editor }: { editor: Editor }) {
       size.height / project.canvas.height,
     ),
   );
-  const active = project.clips.filter(
-    (c) => playhead >= c.start && playhead < c.start + c.duration,
-  );
   return (
     <section className="preview-panel">
       <div className="panel-heading">
@@ -450,23 +582,7 @@ export default function Preview({ editor }: { editor: Editor }) {
             background: project.canvas.background,
           }}
         >
-          {[...project.tracks]
-            .reverse()
-            .filter((t) => !t.hidden)
-            .flatMap((t) =>
-              active
-                .filter((c) => c.trackId === t.id)
-                .map((c) => (
-                  <PreviewLayer
-                    key={c.id}
-                    clip={c}
-                    project={project}
-                    editor={editor}
-                    scale={scale}
-                    muted={t.muted}
-                  />
-                )),
-            )}
+          <ScenePreview editor={editor} scale={scale} />
           {!project.clips.length && (
             <div className="canvas-empty">
               <span className="empty-symbol">T</span>

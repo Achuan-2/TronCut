@@ -70,7 +70,10 @@ export function addMediaAssets(
   };
 }
 
-export function transformAt(clip: Clip, localTime: number): Transform {
+export function transformAt(
+  clip: Pick<Clip, "transform" | "keyframes" | "animationOffset">,
+  localTime: number,
+): Transform {
   localTime += clip.animationOffset ?? 0;
   const frames = [...clip.keyframes].sort((a, b) => a.time - b.time);
   if (!frames.length) return clip.transform;
@@ -98,12 +101,12 @@ export function transformAt(clip: Clip, localTime: number): Transform {
   }
   return points.at(-1)!.value;
 }
-export function setTransform(
-  clip: Clip,
-  patch: Partial<Transform>,
-  localTime: number,
-  auto: boolean,
-): Clip {
+export function setTransform<
+  T extends Pick<
+    Clip,
+    "transform" | "keyframes" | "animationOffset" | "duration"
+  >,
+>(clip: T, patch: Partial<Transform>, localTime: number, auto: boolean): T {
   if (!auto)
     return {
       ...clip,
