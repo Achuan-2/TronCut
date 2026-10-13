@@ -16,6 +16,8 @@ import {
 } from "../shared/effects";
 import { cursorAt, cursorSvg, defaultCursorStyle } from "../shared/cursor";
 import { cameraAt, resizeHandles, resizeTransform } from "../shared/canvas";
+import { resizeTextBox, textLineHeight, type TextBox } from "../shared/text";
+import { textBoxFor, fittedTextFont } from "./text";
 import type { Editor } from "./useEditor";
 
 export function timeLabel(t: number): string {
@@ -160,6 +162,9 @@ function PreviewLayer({
     handle?: { x: number; y: number };
     original: Transform;
     value: Transform;
+    originalBox?: TextBox;
+    box?: TextBox;
+    fontSize?: number;
   } | null>(null);
   const dragRef = useRef<typeof drag>(null);
   const setGesture = (value: typeof drag) => {
@@ -169,6 +174,7 @@ function PreviewLayer({
     setDrag(value);
   };
   const displayed = drag?.value ?? transform;
+  const textBox = clip.kind === "text" ? (drag?.box ?? textBoxFor(clip)) : null;
   const style: CSSProperties = {
     left: `${displayed.x * 100}%`,
     top: `${displayed.y * 100}%`,
@@ -178,6 +184,13 @@ function PreviewLayer({
     transform: `translate(-50%, -50%) rotate(${clip.rotation ?? 0}deg) scale(${displayed.scale})`,
     "--canvas-scale": scale,
   } as CSSProperties;
+  if (textBox) {
+    style.width = textBox.width * scale;
+    style.height = textBox.height * scale;
+    style.display = "flex";
+    style.alignItems = "center";
+    style.justifyContent = "center";
+  }
   let mediaWidth = 0,
     mediaHeight = 0;
   const crop = clip.crop ?? defaultCrop,
@@ -247,6 +260,25 @@ function PreviewLayer({
           x: (event.clientX - gesture.x) / (scale * cameraScale),
           y: (event.clientY - gesture.y) / (scale * cameraScale),
         };
+        if (gesture.mode === "resize" && gesture.originalBox) {
+          const resized = resizeTextBox(
+            gesture.original,
+            gesture.originalBox,
+            delta,
+            gesture.handle!,
+            project.canvas,
+            clip.rotation,
+          );
+          setGesture({
+            ...gesture,
+            value: resized.value,
+            box: resized.box,
+            fontSize: clip.autoResizeText
+              ? fittedTextFont(clip, resized.box)
+              : undefined,
+          });
+          return;
+        }
         const value =
           gesture.mode === "resize"
             ? resizeTransform(
@@ -285,15 +317,20 @@ function PreviewLayer({
           drag &&
           (drag.original.x !== drag.value.x ||
             drag.original.y !== drag.value.y ||
-            drag.original.scale !== drag.value.scale)
+            drag.original.scale !== drag.value.scale ||
+            (drag.box &&
+              (drag.box.width !== drag.originalBox?.width ||
+                drag.box.height !== drag.originalBox?.height)))
         )
           editor.updateClip(clip.id, (c) =>
             setTransform(
-              c,
+              drag.box ? { ...c, textBox: drag.box } : c,
               {
                 x: drag.value.x,
                 y: drag.value.y,
-                ...(drag.mode === "resize" ? { scale: drag.value.scale } : {}),
+                ...(drag.mode === "resize" && !drag.box
+                  ? { scale: drag.value.scale }
+                  : {}),
               },
               editor.playhead - clip.start,
               editor.autoAnimate,
@@ -306,6 +343,7 @@ function PreviewLayer({
     >
       {asset ? (
         <div
+          className="preview-text-content"
           style={{
             width: "100%",
             height: "100%",
@@ -372,11 +410,11 @@ function PreviewLayer({
           style={{
             fontFamily: `${clip.style?.fontFamily}, "PingFang SC", sans-serif`,
             fontWeight: 700,
-            fontSize: (clip.style?.fontSize ?? 68) * scale,
+            fontSize: (drag?.fontSize ?? clip.style?.fontSize ?? 68) * scale,
             color: clip.style?.color,
             WebkitTextStroke: `${(clip.style?.outlineWidth ?? 0) * scale}px ${clip.style?.outline}`,
             paintOrder: "stroke fill",
-            lineHeight: 1.25,
+            lineHeight: textLineHeight,
             whiteSpace: "pre",
             textAlign: "center",
           }}
@@ -431,15 +469,20 @@ function PreviewLayer({
         </svg>
       )}
       {selectable &&
-        asset &&
-        ["image", "video"].includes(clip.kind) &&
+        !editing &&
+        (clip.kind === "text" ||
+          (asset && ["image", "video"].includes(clip.kind))) &&
         editor.selectedIds.includes(clip.id) &&
         resizeHandles.map((handle) => (
           <button
             key={handle.name}
             className={`resize-handle ${handle.name}`}
             aria-label={`调整尺寸 ${handle.name}`}
-            title="拖动调整尺寸（保持比例）"
+            title={
+              clip.kind === "text"
+                ? "拖动调整文本框尺寸"
+                : "拖动调整尺寸（保持比例）"
+            }
             style={{
               left: `${(handle.x + 1) * 50}%`,
               top: `${(handle.y + 1) * 50}%`,
@@ -458,6 +501,7 @@ function PreviewLayer({
                 handle,
                 original: transform,
                 value: transform,
+                originalBox: textBox ?? undefined,
               });
             }}
           />

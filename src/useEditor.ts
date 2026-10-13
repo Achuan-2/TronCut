@@ -12,6 +12,7 @@ import {
 import { addMediaAssets } from "../shared/editor";
 import { selectionWithGroups } from "../shared/timeline";
 import { setCameraTransform } from "../shared/canvas";
+import { fitUpdatedText } from "./text";
 
 export function demoProject(): Project {
   const project = createProject("我的第一个视频");
@@ -132,9 +133,12 @@ export function useEditor() {
         ...p,
         clips: p.clips.map((c) =>
           c.id === id
-            ? typeof updater === "function"
-              ? updater(c)
-              : { ...c, ...updater }
+            ? fitUpdatedText(
+                c,
+                typeof updater === "function"
+                  ? updater(c)
+                  : { ...c, ...updater },
+              )
             : c,
         ),
       }));

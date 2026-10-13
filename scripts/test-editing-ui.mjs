@@ -393,6 +393,46 @@ try {
     "中文第一行\n第二行\n第三行",
   );
 
+  await page.getByRole("button", { name: "自动动画", exact: true }).click();
+  const textTab = page.getByRole("tab", { name: "文本", exact: true });
+  const pictureTab = page.getByRole("tab", { name: "画面", exact: true });
+  await expect(textTab).toHaveAttribute("aria-selected", "true");
+  await pictureTab.click();
+  await expect(page.getByLabel("文本内容", { exact: true })).toBeHidden();
+  await expect(page.getByLabel("位置 X (%)", { exact: true })).toBeVisible();
+  await pictureTab.press("ArrowRight");
+  await expect(textTab).toBeFocused();
+  const autoText = page.getByLabel("自动调整文本大小", { exact: true });
+  const fontSize = page.getByLabel("字号", { exact: true });
+  await expect(autoText).not.toBeChecked();
+  await fontSize.fill("50");
+  await expect(canvasText.locator(".resize-handle")).toHaveCount(8);
+  const beforeTextResize = await canvasText.boundingBox();
+  await dragHandle(canvasText.locator(".resize-handle.e"), 40, 0);
+  await expect.poll(async () => (await canvasText.boundingBox()).width)
+    .toBeGreaterThan(beforeTextResize.width + 35);
+  await expect(fontSize).toHaveValue("50");
+  expect((await canvasText.boundingBox()).height).toBeCloseTo(beforeTextResize.height, 0);
+  await autoText.check();
+  await expect(fontSize).toBeDisabled();
+  const initialFitFont = Number(await fontSize.inputValue());
+  const beforeFit = await canvasText.boundingBox();
+  await dragHandle(canvasText.locator(".resize-handle.se"), 30, 30, 1);
+  await expect.poll(async () => Number(await fontSize.inputValue())).toBeGreaterThan(initialFitFont);
+  const savedTextFont = Number(await fontSize.inputValue());
+  const afterFit = await canvasText.boundingBox();
+  expect(afterFit.x).toBeCloseTo(beforeFit.x, 0);
+  expect(afterFit.y).toBeCloseTo(beforeFit.y, 0);
+  await page.getByLabel("文本内容", { exact: true }).fill("中文第一行变得更长一些\n第二行\n第三行");
+  await expect.poll(async () => Number(await fontSize.inputValue())).toBeLessThan(savedTextFont);
+  await page.getByTitle("撤销 Ctrl+Z", { exact: true }).click();
+  expect(Number(await fontSize.inputValue())).toBeCloseTo(savedTextFont, 2);
+  await textLock.click();
+  await expect(autoText).toBeDisabled();
+  await expect(canvasText.locator(".resize-handle")).toHaveCount(0);
+  await textLock.click();
+  await page.screenshot({ path: path.join(root, "text-properties.png") });
+
   await page.getByRole("button", { name: "缩放与平移", exact: true }).click();
   await page.getByLabel("画布缩放百分比", { exact: true }).fill("200");
   await expect(page.locator(".camera-keyframe-list > div")).toHaveCount(2);
@@ -430,6 +470,11 @@ try {
   expect(saved.clips.find((clip) => clip.kind === "text").text).toBe(
     "中文第一行\n第二行\n第三行",
   );
+  const savedText = saved.clips.find((clip) => clip.kind === "text");
+  expect(savedText.autoResizeText).toBe(true);
+  expect(savedText.textBox.width).toBeGreaterThan(16);
+  expect(savedText.textBox.height).toBeGreaterThan(16);
+  expect(savedText.style.fontSize).toBeCloseTo(savedTextFont, 2);
   console.log(
     "画布图片等比缩放及自动关键帧、画布/时间线双击文本与多行编辑、整个画面缩放平移与运镜关键帧通过",
   );

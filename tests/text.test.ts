@@ -1,0 +1,76 @@
+import { describe, expect, it } from "vitest";
+import {
+  createProject,
+  defaultTransform,
+  newText,
+  validateProject,
+} from "../shared/model";
+import { fitTextFont, resizeTextBox } from "../shared/text";
+
+describe("文本框与自动字号", () => {
+  const canvas = { width: 1000, height: 500 };
+  it("独立拉宽文本框，保持字号所用的图层缩放和左边缘", () => {
+    const resized = resizeTextBox(
+      defaultTransform,
+      { width: 200, height: 100 },
+      { x: 100, y: 40 },
+      { x: 1, y: 0 },
+      canvas,
+    );
+    expect(resized.box).toEqual({ width: 300, height: 100 });
+    expect(resized.value.scale).toBe(1);
+    expect(resized.value.x * canvas.width - resized.box.width / 2).toBe(400);
+    expect(resized.value.y).toBe(0.5);
+  });
+  it("处理图层旋转、缩放和跨过对侧的尺寸限制", () => {
+    const result = resizeTextBox(
+      { ...defaultTransform, scale: 2 },
+      { width: 200, height: 100 },
+      { x: 0, y: 200 },
+      { x: 1, y: 0 },
+      canvas,
+      90,
+    );
+    expect(result.box).toEqual({ width: 300, height: 100 });
+    expect(result.value.x).toBeCloseTo(0.5);
+    expect(result.value.y * canvas.height - result.box.width).toBeCloseTo(50);
+    const small = resizeTextBox(
+      defaultTransform,
+      result.box,
+      { x: -10000, y: -10000 },
+      { x: 1, y: 1 },
+      canvas,
+    );
+    expect(small.box).toEqual({ width: 16, height: 16 });
+  });
+  it("字号取宽高共同容纳的最大值，支持多行和描边，并限制合法字号", () => {
+    const measure = (line: string) => line.length * 100;
+    expect(fitTextFont("中文", { width: 204, height: 200 }, 2, measure)).toBe(
+      100,
+    );
+    expect(
+      fitTextFont("第一行\n第二行", { width: 600, height: 104 }, 2, measure),
+    ).toBe(40);
+    expect(fitTextFont("大", { width: 30000, height: 30000 }, 0, measure)).toBe(
+      300,
+    );
+    expect(fitTextFont("小", { width: 16, height: 16 }, 20, measure)).toBe(8);
+  });
+  it("旧工程仍可打开，新增文本框及自动设置往返后保留", () => {
+    const project = createProject();
+    const text = newText("titles", 0);
+    project.clips = [text];
+    expect(validateProject(project).clips[0].autoResizeText).toBeUndefined();
+    text.textBox = { width: 320, height: 160 };
+    text.autoResizeText = true;
+    const parsed = validateProject(JSON.parse(JSON.stringify(project)));
+    expect(parsed.clips[0].textBox).toEqual(text.textBox);
+    expect(parsed.clips[0].autoResizeText).toBe(true);
+    expect(() =>
+      validateProject({
+        ...project,
+        clips: [{ ...text, textBox: { width: 0, height: 100 } }],
+      }),
+    ).toThrow();
+  });
+});

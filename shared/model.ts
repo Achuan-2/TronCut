@@ -116,6 +116,13 @@ export const projectSchema = z.object({
         text: z.string().max(10000).optional(),
         caption: z.boolean().optional(),
         style: styleSchema.optional(),
+        textBox: z
+          .object({
+            width: finite.min(16).max(32768),
+            height: finite.min(16).max(32768),
+          })
+          .optional(),
+        autoResizeText: z.boolean().optional(),
         volume: finite.min(0).max(4),
         podcast: z.boolean(),
         shape: z.enum(["rectangle", "ellipse", "arrow"]).optional(),

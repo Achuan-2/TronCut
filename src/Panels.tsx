@@ -820,6 +820,9 @@ export function Inspector({ editor }: { editor: Editor }) {
     !!editor.project.assets.find((asset) => asset.id === c.assetId)?.cursor;
   const cursorActive =
     hasCursor && tab.clipId === c?.id && tab.name === "cursor";
+  const hasText = c?.kind === "text";
+  const textActive = hasText && (tab.clipId !== c.id || tab.name === "text");
+  const specialActive = cursorActive || textActive;
   const value = c
     ? transformAt(c, editor.playhead - c.start)
     : defaultTransform;
@@ -844,6 +847,7 @@ export function Inspector({ editor }: { editor: Editor }) {
     min?: number,
     max?: number,
     step = 1,
+    disabled = false,
   ) => (
     <label className="field">
       {label}
@@ -853,6 +857,7 @@ export function Inspector({ editor }: { editor: Editor }) {
         min={min}
         max={max}
         step={step}
+        disabled={disabled}
         onChange={(e) => {
           const v = Number(e.target.value);
           if (
@@ -871,11 +876,11 @@ export function Inspector({ editor }: { editor: Editor }) {
         <span>属性</span>
         <Settings2 size={15} />
       </div>
-      {hasCursor && c && (
+      {(hasCursor || hasText) && c && (
         <div
           className="inspector-tabs"
           role="tablist"
-          aria-label="录屏属性"
+          aria-label={hasText ? "文本属性" : "录屏属性"}
           onKeyDown={(event) => {
             if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key))
               return;
@@ -885,8 +890,11 @@ export function Inspector({ editor }: { editor: Editor }) {
                 ? false
                 : event.key === "End"
                   ? true
-                  : !cursorActive;
-            setTab({ clipId: c.id, name: cursor ? "cursor" : "video" });
+                  : !specialActive;
+            setTab({
+              clipId: c.id,
+              name: cursor ? (hasText ? "text" : "cursor") : "video",
+            });
             event.currentTarget
               .querySelectorAll<HTMLButtonElement>("button")
               [cursor ? 1 : 0]?.focus();
@@ -897,24 +905,26 @@ export function Inspector({ editor }: { editor: Editor }) {
             role="tab"
             id="inspector-video-tab"
             aria-controls="inspector-video"
-            aria-selected={!cursorActive}
-            tabIndex={cursorActive ? -1 : 0}
+            aria-selected={!specialActive}
+            tabIndex={specialActive ? -1 : 0}
             onClick={() => setTab({ clipId: c.id, name: "video" })}
           >
             <Film size={18} />
-            视频
+            {hasText ? "画面" : "视频"}
           </button>
           <button
             type="button"
             role="tab"
-            id="inspector-cursor-tab"
-            aria-controls="inspector-cursor"
-            aria-selected={cursorActive}
-            tabIndex={cursorActive ? 0 : -1}
-            onClick={() => setTab({ clipId: c.id, name: "cursor" })}
+            id={hasText ? "inspector-text-tab" : "inspector-cursor-tab"}
+            aria-controls={hasText ? "inspector-text" : "inspector-cursor"}
+            aria-selected={specialActive}
+            tabIndex={specialActive ? 0 : -1}
+            onClick={() =>
+              setTab({ clipId: c.id, name: hasText ? "text" : "cursor" })
+            }
           >
-            <MousePointer2 size={18} />
-            鼠标
+            {hasText ? <Type size={18} /> : <MousePointer2 size={18} />}
+            {hasText ? "文本" : "鼠标"}
           </button>
         </div>
       )}
@@ -966,99 +976,121 @@ export function Inspector({ editor }: { editor: Editor }) {
                 <CursorProperties clip={c} update={update} />
               </div>
             )}
-            <div
-              id="inspector-video"
-              role={hasCursor ? "tabpanel" : undefined}
-              aria-labelledby={hasCursor ? "inspector-video-tab" : undefined}
-              hidden={cursorActive}
-            >
-              {c.kind === "text" && (
-                <>
-                  <h3 className="section-title">文本内容</h3>
-                  <textarea
-                    aria-label="文本内容"
-                    value={c.text ?? ""}
+            {c.kind === "text" && (
+              <div
+                id="inspector-text"
+                role="tabpanel"
+                aria-labelledby="inspector-text-tab"
+                hidden={!textActive}
+              >
+                <h3 className="section-title">文本内容</h3>
+                <textarea
+                  aria-label="文本内容"
+                  value={c.text ?? ""}
+                  onChange={(e) =>
+                    update({
+                      text: e.target.value,
+                      name: e.target.value.slice(0, 24) || "文本",
+                    })
+                  }
+                />
+                <label className="field">
+                  花字
+                  <select
+                    value=""
                     onChange={(e) =>
                       update({
-                        text: e.target.value,
-                        name: e.target.value.slice(0, 24) || "文本",
+                        style: {
+                          ...textPresets[Number(e.target.value)].style,
+                        },
+                      })
+                    }
+                  >
+                    <option value="" disabled>
+                      选择模板
+                    </option>
+                    {textPresets.map((p, i) => (
+                      <option key={p.name} value={i}>
+                        {p.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                {numberField(
+                  "字号",
+                  c.style?.fontSize ?? 68,
+                  (fontSize) => update({ style: { ...c.style!, fontSize } }),
+                  8,
+                  300,
+                  1,
+                  !!c.autoResizeText,
+                )}
+                <label className="field">
+                  文字颜色
+                  <input
+                    type="color"
+                    value={c.style?.color ?? "#ffffff"}
+                    onChange={(e) =>
+                      update({
+                        style: { ...c.style!, color: e.target.value },
                       })
                     }
                   />
-                  <label className="field">
-                    花字
-                    <select
-                      value=""
-                      onChange={(e) =>
-                        update({
-                          style: {
-                            ...textPresets[Number(e.target.value)].style,
-                          },
-                        })
-                      }
-                    >
-                      <option value="" disabled>
-                        选择模板
-                      </option>
-                      {textPresets.map((p, i) => (
-                        <option key={p.name} value={i}>
-                          {p.name}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  {numberField(
-                    "字号",
-                    c.style?.fontSize ?? 68,
-                    (fontSize) => update({ style: { ...c.style!, fontSize } }),
-                    8,
-                    300,
-                  )}
-                  <label className="field">
-                    文字颜色
-                    <input
-                      type="color"
-                      value={c.style?.color ?? "#ffffff"}
-                      onChange={(e) =>
-                        update({
-                          style: { ...c.style!, color: e.target.value },
-                        })
-                      }
-                    />
-                  </label>
-                  <label className="field">
-                    描边颜色
-                    <input
-                      type="color"
-                      value={c.style?.outline ?? "#111111"}
-                      onChange={(e) =>
-                        update({
-                          style: { ...c.style!, outline: e.target.value },
-                        })
-                      }
-                    />
-                  </label>
-                  {numberField(
-                    "描边宽度",
-                    c.style?.outlineWidth ?? 4,
-                    (outlineWidth) =>
-                      update({ style: { ...c.style!, outlineWidth } }),
-                    0,
-                    20,
-                  )}
-                  <label className="field">
-                    字体
-                    <input
-                      value={c.style?.fontFamily ?? "Microsoft YaHei"}
-                      onChange={(e) =>
-                        update({
-                          style: { ...c.style!, fontFamily: e.target.value },
-                        })
-                      }
-                    />
-                  </label>
-                </>
-              )}
+                </label>
+                <label className="field">
+                  描边颜色
+                  <input
+                    type="color"
+                    value={c.style?.outline ?? "#111111"}
+                    onChange={(e) =>
+                      update({
+                        style: { ...c.style!, outline: e.target.value },
+                      })
+                    }
+                  />
+                </label>
+                {numberField(
+                  "描边宽度",
+                  c.style?.outlineWidth ?? 4,
+                  (outlineWidth) =>
+                    update({ style: { ...c.style!, outlineWidth } }),
+                  0,
+                  20,
+                )}
+                <label className="field">
+                  字体
+                  <input
+                    value={c.style?.fontFamily ?? "Microsoft YaHei"}
+                    onChange={(e) =>
+                      update({
+                        style: { ...c.style!, fontFamily: e.target.value },
+                      })
+                    }
+                  />
+                </label>
+                <label className="check-field">
+                  <input
+                    type="checkbox"
+                    checked={!!c.autoResizeText}
+                    onChange={(event) =>
+                      update({ autoResizeText: event.target.checked })
+                    }
+                  />
+                  自动调整文本大小
+                </label>
+                <p className="field-help">
+                  拖动画布中的文本框手柄，按框的宽高调整字号。
+                </p>
+              </div>
+            )}
+            <div
+              id="inspector-video"
+              role={hasCursor || hasText ? "tabpanel" : undefined}
+              aria-labelledby={
+                hasCursor || hasText ? "inspector-video-tab" : undefined
+              }
+              hidden={specialActive}
+            >
               {c.kind === "shape" && (
                 <label className="field">
                   填充

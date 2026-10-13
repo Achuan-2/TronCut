@@ -954,6 +954,14 @@ fieldset:disabled {
   touch-action: auto;
   z-index: 10;
 }
+.preview-text-content {
+  flex: none;
+}
+.field-help {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
 .preview-text-editor {
   display: block;
   field-sizing: content;
