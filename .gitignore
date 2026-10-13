@@ -11,6 +11,7 @@ resources/bin/ffprobe
 references/*/
 electron-runtime.zip
 workers/.venv/
+workers/**/.venv*/
 workers/**/__pycache__/
 .cache/
 .framecraft-dev/

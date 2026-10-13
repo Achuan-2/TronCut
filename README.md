@@ -27,6 +27,7 @@ TronCut 将录屏、剪辑、文字、字幕和声音处理放在同一个工作
 | **文字就在时间线旁**   | 一键添加文本，使用黑边白字、白边黑字、黑边黄字等模板；字幕可以放在画布中央，制作纯文字视频。               |
 | **动画不必只靠拖拽**   | 右键或点击添加淡入、缩放、滑入动画；开启自动动画后，修改位置、缩放和透明度即可生成关键帧。                 |
 | **本地语音字幕**       | SenseVoiceSmall 支持普通话、粤语、英语、日语和韩语；使用真实词时间断句，并映射片段裁剪与变速。             |
+| **文字生成本地配音**   | Kokoro/Qwen3-TTS 提供预设音色，IndexTTS 2.5 用参考音频复刻音色；调节语速、试听并加入时间线。 |
 | **保调变速与播客声音** | 导出优先使用 Rubber Band 保持音调；提供降噪、均衡、压缩、响度处理与处理后试听。                            |
 | **工程透明、素材随行** | 可读 JSON 工程，媒体与鼠标轨迹归档到同一目录；相对路径方便迁移，Windows 工程文件夹带软件图标。             |
 
@@ -51,6 +52,8 @@ TronCut 将录屏、剪辑、文字、字幕和声音处理放在同一个工作
 纯文字视频示例：[examples/文字视频.framecraft](examples/文字视频.framecraft)。TronCut 同时支持读取旧 `.framecraft` 工程。
 
 ## 常用操作
+
+开发版新增“配音”面板：选择模型、音色和计算设备，点击“生成配音并加入时间线”。Kokoro 中文版适合 CPU；Qwen3-TTS 提供中英配音，1.7B 版支持语气指令；IndexTTS 2.5 用参考音频复刻音色，[配置说明](docs/INDEXTTS.md)。首次使用需要联网下载 Python、依赖和模型，文稿在本机合成；同一模型、设备和音色完成准备后可勾选“仅使用已下载的依赖和模型”。生成的 WAV 和配音参数随工程保存，已有配音片段可读取参数重新生成。此功能尚未包含在 v0.2.0 发布包中，详见[配音说明](docs/TTS.md)。
 
 按住 Ctrl/⌘ 或 Shift 点击片段进行多选。组合后的片段会一起选择与移动，复制粘贴保持相对位置。波纹删除只关闭删除区间中没有其他片段占用的时间，锁定轨道保持原位。素材离线时，在素材库双击重链接，保留原片段与动画的位置。
 
@@ -123,6 +126,6 @@ pnpm test:smoke     # Electron 桌面回归，先执行 build 和 test
 
 ## 许可与致谢
 
-TronCut 原创代码采用 **[AGPL-3.0](LICENSE)**。第三方源码、二进制与模型保留各自许可证，详见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。Camtasia 是 TechSmith 的产品名称；TronCut 是独立项目，与 TechSmith 无隶属或背书关系。
+TronCut 原创代码采用 **[AGPL-3.0](LICENSE)**。第三方源码、二进制与模型保留各自许可证，详见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
 
 感谢 [OpenScreen](https://github.com/getopenscreen/openscreen) 的 MIT 原生捕获组件，以及 [FFmpeg](https://ffmpeg.org/)、[Rubber Band](https://breakfastquay.com/rubberband/)、[SenseVoice](https://github.com/QwenAudio/SenseVoice)、[FunASR](https://github.com/modelscope/FunASR)、[uv](https://github.com/astral-sh/uv)、Electron、React 和 sharp。其他学习参考及固定提交见 [references/README.md](references/README.md)。

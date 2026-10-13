@@ -30,6 +30,8 @@ import { importCamtasia } from "./camtasia";
 import { audioFilters, exportVideo } from "./export";
 import { speechEngineSchema, speechOptionsSchema } from "../shared/asr";
 import { transcribeAsset } from "./transcription";
+import { synthesizeSpeech } from "./synthesis";
+import { ttsOptionsSchema } from "../shared/tts";
 import { mediaThumbnail } from "./thumbnails";
 import { NativeRecording } from "./native-recording";
 
@@ -481,6 +483,34 @@ function installHandlers() {
   });
   handle("task:cancel", () => {
     task?.abort();
+  });
+  handle("audio:synthesize", async (input: unknown) => {
+    if (task) throw new Error("已有后台任务正在执行");
+    const options = ttsOptionsSchema.parse(input);
+    const reference = options.engine === "indextts" ? assetById(options.referenceAssetId) : undefined;
+    if (reference && (reference.kind !== "audio" || !reference.hasAudio || reference.duration < 1 || reference.duration > 30))
+      throw new Error("请选择 1–30 秒的参考音频");
+    task = new AbortController();
+    try {
+      return register(await synthesizeSpeech(options, {
+        userData: app.getPath("userData"),
+        workers: app.isPackaged
+          ? path.join(process.resourcesPath, "workers", options.engine === "indextts" ? "indextts" : "tts")
+          : path.resolve(options.engine === "indextts" ? "workers/indextts" : "workers/tts"),
+        resources: process.resourcesPath,
+        referenceAudio: reference?.path,
+      }, task.signal, notify));
+    } finally {
+      task = null;
+    }
+  });
+  handle("audio:reference", async () => {
+    const file = await chooseFile("选择参考音频（1–30 秒）", ["wav", "mp3", "m4a", "flac", "ogg", "aac"]);
+    if (!file) return null;
+    const asset = await probeMedia(file, process.resourcesPath);
+    if (asset.kind !== "audio" || !asset.hasAudio || asset.duration < 1 || asset.duration > 30)
+      throw new Error("请选择 1–30 秒的参考音频");
+    return register(asset);
   });
   handle("app:capabilities", () => capabilities(process.resourcesPath));
   handle("app:selectBinary", async (value: unknown) => {

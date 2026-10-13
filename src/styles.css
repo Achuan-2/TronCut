@@ -538,6 +538,24 @@ fieldset:disabled {
   color: #8e9b93;
   margin-bottom: 19px;
 }
+.narration-panel textarea {
+  width: 100%;
+  resize: vertical;
+  min-height: 62px;
+  padding: 9px;
+  line-height: 1.6;
+}
+.narration-offline {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 12px 0;
+  font-size: 11px;
+  color: #b6c3bc;
+}
+.narration-result b {
+  overflow-wrap: anywhere;
+}
 .text-presets {
   display: grid;
   grid-template-columns: 1fr 1fr;

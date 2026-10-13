@@ -1,6 +1,7 @@
 import type { Asset, Project } from "./model";
 import type { Cue } from "./subtitles";
 import type { SpeechEngine, SpeechOptions } from "./asr";
+import type { TtsOptions } from "./tts";
 export interface CaptureSource {
   id: string;
   name: string;
@@ -33,6 +34,8 @@ export interface FrameCraftBridge {
   exportSubtitles(cues: Cue[]): Promise<string | null>;
   exportVideo(project: Project): Promise<string | null>;
   previewAudio(project: Project, clipId: string): Promise<string>;
+  synthesize(options: TtsOptions): Promise<Asset>;
+  selectNarrationReference(): Promise<Asset | null>;
   cancelTask(): Promise<void>;
   onProgress(
     callback: (event: { percent: number; label: string }) => void,

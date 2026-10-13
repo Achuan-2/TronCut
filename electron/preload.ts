@@ -24,6 +24,8 @@ const bridge: FrameCraftBridge = {
   exportVideo: (project) => ipcRenderer.invoke("video:export", project),
   previewAudio: (project, clipId) =>
     ipcRenderer.invoke("audio:preview", project, clipId),
+  synthesize: (options) => ipcRenderer.invoke("audio:synthesize", options),
+  selectNarrationReference: () => ipcRenderer.invoke("audio:reference"),
   cancelTask: () => ipcRenderer.invoke("task:cancel"),
   onProgress: (callback) => {
     const fn = (_: unknown, event: Parameters<typeof callback>[0]) =>

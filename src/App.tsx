@@ -451,6 +451,7 @@ export default function App() {
           toast={toast}
           capabilities={caps}
           refreshCapabilities={refreshCapabilities}
+          busy={busy}
         />
         <Preview editor={editor} />
         <Inspector editor={editor} />

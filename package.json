@@ -82,6 +82,16 @@
         "to": "project.ico"
       },
       {
+        "from": "workers/tts",
+        "to": "workers/tts",
+        "filter": ["*.py", "*.toml", "uv.lock"]
+      },
+      {
+        "from": "workers/indextts",
+        "to": "workers/indextts",
+        "filter": ["*.py", "*.toml", "uv.lock"]
+      },
+      {
         "from": "workers",
         "to": "workers",
         "filter": [

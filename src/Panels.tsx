@@ -19,6 +19,7 @@ import {
   FileJson,
   ArrowRight,
   Play,
+  Mic,
 } from "lucide-react";
 import {
   type Clip,
@@ -41,6 +42,7 @@ import type { SpeechEngine } from "../shared/asr";
 import { defaultCrop, defaultEffects, effectPresets } from "../shared/effects";
 import { MediaThumbnail } from "./MediaThumbnail";
 import { defaultCursorStyle } from "../shared/cursor";
+import NarrationPanel from "./NarrationPanel";
 
 export type Tab =
   | "media"
@@ -48,6 +50,7 @@ export type Tab =
   | "captions"
   | "animations"
   | "audio"
+  | "narration"
   | "shapes"
   | "settings";
 const tabs = [
@@ -56,6 +59,7 @@ const tabs = [
   { id: "captions", name: "字幕", icon: Captions },
   { id: "animations", name: "动画", icon: Sparkles },
   { id: "audio", name: "音频", icon: AudioLines },
+  { id: "narration", name: "配音", icon: Mic },
   { id: "shapes", name: "标注", icon: Shapes },
   { id: "settings", name: "设置", icon: Settings2 },
 ] as const;
@@ -69,6 +73,7 @@ interface Props {
   run: (fn: () => Promise<unknown>) => void;
   toast: (text: string) => void;
   refreshCapabilities: () => void;
+  busy: boolean;
 }
 export function addCues(editor: Editor, cues: Cue[], selected?: Clip) {
   const project = editor.project;
@@ -292,6 +297,10 @@ export default function Panels(props: Props) {
             <p className="small-note">所有文字都可编辑，样式随工程保存。</p>
           </>
         )}
+        <div hidden={tab !== "narration"}>
+          <NarrationPanel key={project.id} editor={editor} active={tab === "narration"}
+            busy={props.busy} run={run} toast={toast} />
+        </div>
         {tab === "captions" && (
           <>
             <p className="panel-intro">

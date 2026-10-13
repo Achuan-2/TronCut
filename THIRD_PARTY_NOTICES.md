@@ -29,12 +29,16 @@ Dependency versions are locked in `pnpm-lock.yaml`. Notable components include R
 
 ## Optional speech dependencies and models / 可选语音组件
 
-Speech environments are downloaded on demand and are not included in the Windows release. Versions are locked in `workers/uv.lock`; model weights are downloaded separately to application data.
+Speech environments are downloaded on demand and are not included in the Windows release. Versions are locked in `workers/uv.lock` (recognition) and `workers/tts/uv.lock` (synthesis); model weights are downloaded separately to application data.
 
 - [SenseVoice](https://github.com/QwenAudio/SenseVoice) and [FunASR](https://github.com/modelscope/FunASR): MIT code; model weights are subject to their model-card terms.
 - [SenseVoiceSmall model card](https://modelscope.cn/models/iic/SenseVoiceSmall) and [FSMN-VAD model card](https://modelscope.cn/models/iic/speech_fsmn_vad_zh-cn-16k-common-pytorch).
 - [Faster Whisper](https://github.com/SYSTRAN/faster-whisper): MIT; its dependencies and downloaded Whisper models retain their own notices.
 - [VideoCaptioner](https://github.com/WEIFENG2333/VideoCaptioner): optional user-configured external CLI, GPL-3.0; its code and binaries are not bundled.
+- [Kokoro](https://github.com/hexgrad/kokoro) and [Misaki](https://github.com/hexgrad/misaki): Apache-2.0 code; [Kokoro-82M-v1.1-zh](https://huggingface.co/hexgrad/Kokoro-82M-v1.1-zh) weights retain their model-card terms.
+- [Qwen3-TTS](https://github.com/QwenLM/Qwen3-TTS): Apache-2.0 code; the [0.6B](https://huggingface.co/Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice) and [1.7B](https://huggingface.co/Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice) CustomVoice models retain their model-card terms.
+- PyTorch, torchaudio, Transformers, soundfile and the spaCy English language model are optional downloaded dependencies; their own licenses remain applicable.
+- [IndexTTS](https://github.com/index-tts/index-tts), pinned at `d9e41aac89fd00b3d71497fddb287b7f24613712`: Bilibili IndexTTS license; [IndexTTS 2.5](https://huggingface.co/IndexTeam/IndexTTS-2.5) weights use the Bilibili model license. Its isolated dependency lock is `workers/indextts/uv.lock`. Auxiliary w2v-bert-2.0, CAMPPlus and BigVGAN weights keep their own model-card licenses; downloaded license files are retained where provided.
 
 ## Study references / 学习参考
 

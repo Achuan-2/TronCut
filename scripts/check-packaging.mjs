@@ -31,4 +31,12 @@ if (process.platform === "win32") {
       throw new Error(`安装包缺少第三方许可声明：${name}`);
   }
 }
-console.log("安装包媒体引擎检查通过");
+for (const name of ["pyproject.toml", "uv.lock", "synthesize.py", "tts_utils.py"]) {
+  if (!fs.existsSync(path.resolve("workers/tts", name)))
+    throw new Error(`安装包缺少配音 worker：${name}`);
+}
+for (const name of ["pyproject.toml", "uv.lock", "synthesize.py", "models.py"]) {
+  if (!fs.existsSync(path.resolve("workers/indextts", name)))
+    throw new Error(`安装包缺少 IndexTTS worker：${name}`);
+}
+console.log("安装包媒体引擎与配音 worker 检查通过");

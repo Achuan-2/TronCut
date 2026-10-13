@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { ttsOptionsSchema } from "./tts";
 
 const finite = z.number().finite();
 const identifier = z
@@ -62,6 +63,7 @@ export const projectSchema = z.object({
         missing: z.boolean().optional(),
         cursor: cursorRecordingSchema.optional(),
         cursorPath: z.string().optional(),
+        narration: ttsOptionsSchema.optional(),
       }),
     )
     .max(10000),

@@ -1,0 +1,38 @@
+[project]
+name = "troncut-indextts"
+version = "0.1.0"
+requires-python = ">=3.11,<3.12"
+dependencies = [
+    "indextts @ https://github.com/index-tts/index-tts/archive/d9e41aac89fd00b3d71497fddb287b7f24613712.zip",
+    "soundfile>=0.13,<1",
+    "huggingface-hub>=0.34,<1",
+    "torch==2.8.0",
+    "torchaudio==2.8.0",
+]
+
+[project.optional-dependencies]
+cpu = ["torch==2.8.0", "torchaudio==2.8.0"]
+cuda = ["torch==2.8.0", "torchaudio==2.8.0"]
+
+[tool.uv]
+conflicts = [[{ extra = "cpu" }, { extra = "cuda" }]]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[[tool.uv.index]]
+name = "pytorch-cuda"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true
+
+[tool.uv.sources]
+torch = [
+    { index = "pytorch-cpu", extra = "cpu", marker = "sys_platform == 'win32' or sys_platform == 'linux'" },
+    { index = "pytorch-cuda", extra = "cuda", marker = "sys_platform == 'win32' or sys_platform == 'linux'" },
+]
+torchaudio = [
+    { index = "pytorch-cpu", extra = "cpu", marker = "sys_platform == 'win32' or sys_platform == 'linux'" },
+    { index = "pytorch-cuda", extra = "cuda", marker = "sys_platform == 'win32' or sys_platform == 'linux'" },
+]
