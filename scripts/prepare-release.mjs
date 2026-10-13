@@ -109,6 +109,7 @@ await run("powershell.exe", [
   "-Command",
   [
     "$ErrorActionPreference = 'Stop'",
+    "Add-Type -AssemblyName System.IO.Compression",
     "Add-Type -AssemblyName System.IO.Compression.FileSystem",
     `$archive = [System.IO.Compression.ZipFile]::Open(${quote(path.join(root, source))}, [System.IO.Compression.ZipArchiveMode]::Update)`,
     "try {",
