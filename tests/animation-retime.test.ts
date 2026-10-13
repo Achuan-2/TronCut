@@ -126,4 +126,18 @@ describe("直接拖动动画时间", () => {
     expect(retimeAnimation(clip, range, "move", -1, 30)).toBe(clip);
     expect(retimeAnimation(clip, range, "move", NaN, 30)).toBe(clip);
   });
+  it("移动具有旧静态旋转和局部旋转帧的动画，不改变另一端的旋转", () => {
+    const clip = animated();
+    clip.rotation = 10;
+    clip.keyframes[0].value.rotation = 90;
+    const moved = retimeAnimation(
+      clip,
+      animationRanges(clip)[0],
+      "move",
+      1,
+      30,
+    );
+    expect(transformAt(moved, 0).rotation).toBe(90);
+    expect(transformAt(moved, 3).rotation).toBe(10);
+  });
 });

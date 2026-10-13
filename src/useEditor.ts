@@ -1,4 +1,10 @@
-import { useCallback, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type SetStateAction,
+} from "react";
 import {
   createProject,
   type Project,
@@ -10,7 +16,12 @@ import {
   newTrack,
   numberTracks,
 } from "../shared/model";
-import { addMediaAssets, availableTrack } from "../shared/editor";
+import {
+  addMediaAssets,
+  availableTrack,
+  setTransform,
+  setKeyframeTransform,
+} from "../shared/editor";
 import { selectionWithGroups } from "../shared/timeline";
 import { setCameraTransform } from "../shared/canvas";
 import { fitUpdatedText } from "./text";
@@ -46,12 +57,26 @@ export function useEditor() {
   const [project, setProject] = useState<Project>(demoProject);
   const [editingTextId, setEditingTextId] = useState<string | null>(null);
   const [cameraDraft, setCameraDraft] = useState<Transform | null>(null);
+  type KeyframeSelection = {
+    clipId: string;
+    time: number;
+    side: "start" | "end";
+  };
+  const [keyframeSelection, setKeyframeSelection] =
+    useState<KeyframeSelection | null>(null);
+  const keyframeRef = useRef<KeyframeSelection | null>(null);
+  const clearKeyframeEdit = useCallback(() => {
+    keyframeRef.current = null;
+    setKeyframeSelection(null);
+  }, []);
   const [selection, selectMany] = useState<string[]>([]);
   const selectedIds = selection.filter((id) =>
     project.clips.some((c) => c.id === id),
   );
   const selectedId = selectedIds.at(-1) ?? null;
   const select = useCallback((id: string | null, additive = false) => {
+    if (id && !additive && keyframeRef.current?.clipId === id) return;
+    clearKeyframeEdit();
     if (!id) {
       selectMany([]);
       return;
@@ -65,8 +90,22 @@ export function useEditor() {
         : group,
     );
   }, []);
-  const [playhead, seek] = useState(1.2);
-  const [playing, setPlaying] = useState(false);
+  const [playhead, setPlayhead] = useState(1.2);
+  const seek = useCallback(
+    (next: SetStateAction<number>) => {
+      clearKeyframeEdit();
+      setPlayhead(next);
+    },
+    [clearKeyframeEdit],
+  );
+  const [playing, setPlayingState] = useState(false);
+  const setPlaying = useCallback(
+    (next: boolean) => {
+      if (next) clearKeyframeEdit();
+      setPlayingState(next);
+    },
+    [clearKeyframeEdit],
+  );
   const [dirty, setDirty] = useState(false);
   const [autoAnimate, setAutoAnimate] = useState(false);
   const past = useRef<Project[]>([]),
@@ -148,6 +187,55 @@ export function useEditor() {
     },
     [apply],
   );
+  const editKeyframe = useCallback(
+    (clipId: string, localTime: number, side: "start" | "end") => {
+      const clip = current.current.clips.find((clip) => clip.id === clipId);
+      const track = current.current.tracks.find(
+        (track) => track.id === clip?.trackId,
+      );
+      if (
+        !clip ||
+        !track ||
+        track.locked ||
+        track.hidden ||
+        localTime < 0 ||
+        localTime > clip.duration
+      )
+        return;
+      const time = localTime + (clip.animationOffset ?? 0);
+      const frame = clip.keyframes.find(
+        (frame) => Math.abs(frame.time - time) < 1e-6,
+      );
+      if (
+        !frame &&
+        !(
+          time === 0 &&
+          clip.keyframes.length &&
+          clip.keyframes.every((frame) => frame.time > 0)
+        )
+      )
+        return;
+      const selection = { clipId, time: frame?.time ?? 0, side };
+      keyframeRef.current = selection;
+      setKeyframeSelection(selection);
+      selectMany([clipId]);
+      setPlayingState(false);
+      setPlayhead(clip.start + selection.time - (clip.animationOffset ?? 0));
+    },
+    [],
+  );
+  const updateTransform = useCallback(
+    (id: string, patch: Partial<Transform>, clipPatch: Partial<Clip> = {}) => {
+      const frame = keyframeRef.current;
+      updateClip(id, (clip) => {
+        const source = { ...clip, ...clipPatch };
+        return frame?.clipId === id
+          ? setKeyframeTransform(source, patch, frame.time)
+          : setTransform(source, patch, playhead - clip.start, autoAnimate);
+      });
+    },
+    [updateClip, playhead, autoAnimate],
+  );
   const addText = useCallback(
     (preset = 0, text?: string) => {
       const p = current.current;
@@ -220,6 +308,36 @@ export function useEditor() {
     [apply, playhead],
   );
   const selected = project.clips.find((c) => c.id === selectedId);
+  const editingTrack = project.tracks.find(
+    (track) => track.id === selected?.trackId,
+  );
+  const selectedKeyframe =
+    keyframeSelection &&
+    selected?.id === keyframeSelection.clipId &&
+    !playing &&
+    !editingTrack?.locked &&
+    !editingTrack?.hidden &&
+    keyframeSelection.time - (selected.animationOffset ?? 0) >= 0 &&
+    keyframeSelection.time - (selected.animationOffset ?? 0) <=
+      selected.duration &&
+    Math.abs(
+      playhead -
+        selected.start -
+        keyframeSelection.time +
+        (selected.animationOffset ?? 0),
+    ) < 1e-6 &&
+    (selected.keyframes.some(
+      (frame) => Math.abs(frame.time - keyframeSelection.time) < 1e-6,
+    ) ||
+      (keyframeSelection.time === 0 &&
+        selected.keyframes.length &&
+        selected.keyframes.every((frame) => frame.time > 0)))
+      ? keyframeSelection
+      : null;
+  keyframeRef.current = selectedKeyframe;
+  useEffect(() => {
+    if (keyframeSelection && !selectedKeyframe) clearKeyframeEdit();
+  }, [keyframeSelection, selectedKeyframe, clearKeyframeEdit]);
   return {
     project,
     apply,
@@ -239,6 +357,10 @@ export function useEditor() {
     undo,
     redo,
     updateClip,
+    updateTransform,
+    selectedKeyframe,
+    editKeyframe,
+    clearKeyframeEdit,
     addText,
     addAssets,
     editingTextId,

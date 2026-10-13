@@ -68,19 +68,35 @@ export function retimeAnimation(
   if (start === a.time && end === b.time) return clip;
   frames[index] = { ...a, time: start };
   frames[index + 1] = { ...b, time: end };
+  const rotation = clip.transform.rotation ?? clip.rotation ?? 0;
+  const hasRotation =
+    clip.rotation !== undefined ||
+    frames.some((frame) => frame.value.rotation !== undefined);
+  const normalized = hasRotation
+    ? frames.map((frame) => ({
+        ...frame,
+        value: {
+          ...frame.value,
+          rotation: frame.value.rotation ?? rotation,
+        },
+      }))
+    : frames;
   // Moving the first start away from zero should hold its original state before
   // the animation, rather than inventing a transition from the static transform.
   return {
     ...clip,
-    transform: index === 0 ? a.value : clip.transform,
-    keyframes: frames,
+    transform: index === 0 ? normalized[index].value : clip.transform,
+    keyframes: normalized,
   };
 }
 
 // Only changing values form an animation. Equal-value keyframes describe a
 // hold, so drawing a connecting arrow there would imply motion that never occurs.
 export function animationRanges(
-  clip: Pick<Clip, "transform" | "keyframes" | "animationOffset" | "duration">,
+  clip: Pick<
+    Clip,
+    "transform" | "keyframes" | "animationOffset" | "duration" | "rotation"
+  >,
 ): AnimationRange[] {
   const frames = [...clip.keyframes].sort((a, b) => a.time - b.time);
   if (frames[0]?.time > 0) frames.unshift({ time: 0, value: clip.transform });
@@ -89,13 +105,13 @@ export function animationRanges(
   for (let i = 1; i < frames.length; i++) {
     const a = frames[i - 1],
       b = frames[i];
-    if (
-      !(b.time > a.time) ||
+    const unchanged =
       (["x", "y", "scale", "opacity"] as const).every(
         (key) => a.value[key] === b.value[key],
-      )
-    )
-      continue;
+      ) &&
+      (a.value.rotation ?? clip.transform.rotation ?? clip.rotation ?? 0) ===
+        (b.value.rotation ?? clip.transform.rotation ?? clip.rotation ?? 0);
+    if (!(b.time > a.time) || unchanged) continue;
     const start = a.time - offset,
       end = b.time - offset;
     if (end <= 0 || start >= clip.duration) continue;

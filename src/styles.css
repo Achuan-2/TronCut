@@ -1632,6 +1632,28 @@ fieldset:disabled {
 .animation-point.end.active {
   background: #f26068;
 }
+.animation-point.start.selected-frame {
+  background: #ffd45b;
+  box-shadow: 0 0 0 2px #ffd45b44;
+}
+.animation-point.end.selected-frame {
+  background: #f26068;
+  box-shadow: 0 0 0 2px #f2606844;
+}
+.keyframe-edit-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 5px;
+  margin-top: 9px;
+  padding: 4px 0;
+  font-size: 10px;
+  color: #f3cb74;
+}
+.keyframe-edit-status button {
+  padding: 2px 5px;
+  font-size: 10px;
+}
 .animation-point:hover {
   background: #bdcdd0;
   box-shadow: 0 0 0 3px #ffffff30;

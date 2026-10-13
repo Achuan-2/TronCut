@@ -24,23 +24,29 @@ const xml = (s: string) =>
       })[c]!,
   );
 export function expression(
-  clip: Pick<Clip, "transform" | "keyframes" | "start" | "animationOffset">,
+  clip: Pick<
+    Clip,
+    "transform" | "keyframes" | "start" | "animationOffset" | "rotation"
+  >,
   key: keyof Transform,
   clock = "t",
 ): string {
   const frames = [...clip.keyframes].sort((a, b) => a.time - b.time);
-  if (!frames.length) return String(clip.transform[key]);
+  const baseValue =
+    clip.transform[key] ?? (key === "rotation" ? (clip.rotation ?? 0) : 0);
+  const frameValue = (value: Transform) => value[key] ?? baseValue;
+  if (!frames.length) return String(baseValue);
   if (frames[0].time > 0) frames.unshift({ time: 0, value: clip.transform });
   const origin = clip.start - (clip.animationOffset ?? 0);
-  let result = String(frames.at(-1)!.value[key]);
+  let result = String(frameValue(frames.at(-1)!.value));
   for (let i = frames.length - 1; i > 0; i--) {
     const a = frames[i - 1],
       b = frames[i],
       p = `clip((${clock}-${origin + a.time})/${Math.max(0.00001, b.time - a.time)},0,1)`;
     const ease = `((${p})*(${p})*(3-2*(${p})))`;
-    result = `if(lt(${clock},${origin + b.time}),${a.value[key]}+(${b.value[key] - a.value[key]})*${ease},${result})`;
+    result = `if(lt(${clock},${origin + b.time}),${frameValue(a.value)}+(${frameValue(b.value) - frameValue(a.value)})*${ease},${result})`;
   }
-  return `if(lt(${clock},${origin + frames[0].time}),${frames[0].value[key]},${result})`;
+  return `if(lt(${clock},${origin + frames[0].time}),${frameValue(frames[0].value)},${result})`;
 }
 export function audioFilters(clip: Clip, rubberband: boolean): string[] {
   const filters: string[] = [];
@@ -303,11 +309,19 @@ export async function exportVideo(
         intrinsicWidth,
         intrinsicHeight,
       );
-      const rotate = clip.rotation
+      const rotation = clip.transform.rotation ?? clip.rotation ?? 0;
+      const animatedRotation = clip.keyframes.some(
+        (frame) => (frame.value.rotation ?? rotation) !== rotation,
+      );
+      const rotate = animatedRotation
         ? [
-            `rotate=${(clip.rotation * Math.PI) / 180}:ow=rotw(${(clip.rotation * Math.PI) / 180}):oh=roth(${(clip.rotation * Math.PI) / 180}):c=none`,
+            `rotate=a='(${expression(clip, "rotation")})*PI/180':ow='ceil(sqrt(iw*iw+ih*ih)/2)*2':oh='ceil(sqrt(iw*iw+ih*ih)/2)*2':c=black@0`,
           ]
-        : [];
+        : rotation
+          ? [
+              `rotate=${(rotation * Math.PI) / 180}:ow=rotw(${(rotation * Math.PI) / 180}):oh=roth(${(rotation * Math.PI) / 180}):c=none`,
+            ]
+          : [];
       let source = `${index}:v`;
       if (asset?.cursor) {
         const cursor = await cursorFilters(

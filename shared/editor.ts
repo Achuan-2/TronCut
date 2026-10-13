@@ -73,17 +73,29 @@ export function addMediaAssets(
 }
 
 export function transformAt(
-  clip: Pick<Clip, "transform" | "keyframes" | "animationOffset">,
+  clip: Pick<Clip, "transform" | "keyframes" | "animationOffset" | "rotation">,
   localTime: number,
 ): Transform {
   localTime += clip.animationOffset ?? 0;
   const frames = [...clip.keyframes].sort((a, b) => a.time - b.time);
-  if (!frames.length) return clip.transform;
+  const hasRotation =
+    clip.rotation !== undefined ||
+    clip.transform.rotation !== undefined ||
+    frames.some((frame) => frame.value.rotation !== undefined);
+  const normalize = (value: Transform): Transform =>
+    hasRotation
+      ? {
+          ...value,
+          rotation:
+            value.rotation ?? clip.transform.rotation ?? clip.rotation ?? 0,
+        }
+      : value;
+  if (!frames.length) return normalize(clip.transform);
   const points =
     frames[0].time > 0
       ? [{ time: 0, value: clip.transform }, ...frames]
       : frames;
-  if (localTime <= points[0].time) return points[0].value;
+  if (localTime <= points[0].time) return normalize(points[0].value);
   for (let i = 1; i < points.length; i++) {
     const a = points[i - 1],
       b = points[i];
@@ -93,15 +105,19 @@ export function transformAt(
         Math.min(1, (localTime - a.time) / Math.max(0.00001, b.time - a.time)),
       );
       const ease = p * p * (3 - 2 * p);
+      const from = normalize(a.value),
+        to = normalize(b.value);
       return Object.fromEntries(
-        Object.keys(a.value).map((key) => {
+        Object.keys(from).map((key) => {
           const k = key as keyof Transform;
-          return [k, a.value[k] + (b.value[k] - a.value[k]) * ease];
+          const start = from[k] ?? 0,
+            end = to[k] ?? 0;
+          return [k, start + (end - start) * ease];
         }),
       ) as Transform;
     }
   }
-  return points.at(-1)!.value;
+  return normalize(points.at(-1)!.value);
 }
 export function setTransform<
   T extends Pick<
@@ -128,6 +144,38 @@ export function setTransform<
     keyframes.push({ time: 0, value: { ...clip.transform } });
   keyframes.push({ time, value });
   return { ...clip, keyframes: keyframes.sort((a, b) => a.time - b.time) };
+}
+// An explicitly selected endpoint edits one existing frame. It must never fall
+// through to setTransform(auto=false), which applies the patch to every frame.
+export function setKeyframeTransform(
+  clip: Clip,
+  patch: Partial<Transform>,
+  time: number,
+): Clip {
+  const index = clip.keyframes.findIndex(
+    (frame) => Math.abs(frame.time - time) < 1e-6,
+  );
+  if (index >= 0)
+    return {
+      ...clip,
+      keyframes: clip.keyframes.map((frame, i) =>
+        i === index ? { ...frame, value: { ...frame.value, ...patch } } : frame,
+      ),
+    };
+  if (
+    time === 0 &&
+    clip.keyframes.length &&
+    clip.keyframes.every((frame) => frame.time > 0)
+  ) {
+    return {
+      ...clip,
+      keyframes: [
+        { time: 0, value: { ...clip.transform, ...patch } },
+        ...clip.keyframes,
+      ],
+    };
+  }
+  return clip;
 }
 export function splitClip(
   project: Project,

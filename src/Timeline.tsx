@@ -549,6 +549,7 @@ export default function Timeline({ editor }: { editor: Editor }) {
                         onPointerDown={(event) => {
                           if (event.button !== 0 || track.locked) return;
                           event.stopPropagation();
+                          editor.clearKeyframeEdit();
                           if (
                             event.ctrlKey ||
                             event.metaKey ||
@@ -677,6 +678,7 @@ export default function Timeline({ editor }: { editor: Editor }) {
                           playhead={playhead}
                           fps={project.canvas.fps}
                           selected={editor.selectedIds.includes(c.id)}
+                          selectedFrame={editor.selectedKeyframe?.clipId === c.id ? editor.selectedKeyframe : null}
                           locked={track.locked}
                           commit={(clip) =>
                             editor.updateClip(c.id, (current) => ({
@@ -685,10 +687,12 @@ export default function Timeline({ editor }: { editor: Editor }) {
                               keyframes: clip.keyframes,
                             }))
                           }
-                          locate={(time) => {
-                            editor.setPlaying(false);
-                            select(c.id);
-                            seek(time);
+                          locate={(time, side) => {
+                            if (track.locked) {
+                              editor.setPlaying(false);
+                              select(c.id);
+                              seek(time);
+                            } else editor.editKeyframe(c.id, time - c.start, side);
                           }}
                         />
                         <span className="trim-handle right" data-trim="right" />

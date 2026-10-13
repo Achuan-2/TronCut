@@ -36,7 +36,6 @@ import {
 import {
   animation,
   changeSpeed,
-  setTransform,
   transformAt,
 } from "../shared/editor";
 import type { Cue } from "../shared/subtitles";
@@ -853,15 +852,7 @@ export function Inspector({ editor }: { editor: Editor }) {
     if (c && !locked) editor.updateClip(c.id, patch);
   };
   const transform = (key: keyof typeof value, v: number) => {
-    if (c && !locked && Number.isFinite(v))
-      editor.updateClip(c.id, (clip) =>
-        setTransform(
-          clip,
-          { [key]: v },
-          editor.playhead - clip.start,
-          editor.autoAnimate,
-        ),
-      );
+    if (c && !locked && Number.isFinite(v)) editor.updateTransform(c.id, { [key]: v });
   };
   const asset = editor.project.assets.find((asset) => asset.id === c?.assetId);
   const fit = asset
@@ -882,7 +873,7 @@ export function Inspector({ editor }: { editor: Editor }) {
         : { width: 600, height: 300 };
   const resize = (axis: "width" | "height", pixels: number) => {
     if (!c || locked) return;
-    if (c.kind === "text") {
+    if (c.kind === "text" && editor.selectedKeyframe?.clipId !== c.id) {
       const dimension = pixels / value.scale;
       if (dimension >= 16 && dimension <= 32768)
         update({ textBox: { ...size, [axis]: dimension } });
@@ -1007,6 +998,10 @@ export function Inspector({ editor }: { editor: Editor }) {
                 </small>
               </div>
             </div>
+            {editor.selectedKeyframe && <div className="keyframe-edit-status" role="status">
+              <span>编辑动画{editor.selectedKeyframe.side === "start" ? "起点" : "终点"} · {timeLabel(editor.playhead)}</span>
+              <button type="button" onClick={editor.clearKeyframeEdit}>退出</button>
+            </div>}
             {hasCursor && (
               <div
                 id="inspector-cursor"
@@ -1174,14 +1169,7 @@ export function Inspector({ editor }: { editor: Editor }) {
                       title="画布居中"
                       aria-label="画布居中"
                       onClick={() =>
-                        editor.updateClip(c.id, (clip) =>
-                          setTransform(
-                            clip,
-                            { x: 0.5, y: 0.5 },
-                            editor.playhead - c.start,
-                            editor.autoAnimate,
-                          ),
-                        )
+                        editor.updateTransform(c.id, { x: 0.5, y: 0.5 })
                       }
                     >
                       <AlignCenter size={14} />
@@ -1189,8 +1177,8 @@ export function Inspector({ editor }: { editor: Editor }) {
                   </h3>
                   {numberField(
                     "旋转 (度)",
-                    c.rotation ?? 0,
-                    (rotation) => update({ rotation }),
+                    value.rotation ?? c.rotation ?? 0,
+                    (rotation) => transform("rotation", rotation),
                     -3600,
                     3600,
                   )}

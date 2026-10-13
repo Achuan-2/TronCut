@@ -26,12 +26,13 @@ export const cursorStyleSchema = z.object({
   smooth: z.boolean(),
 });
 export const transformSchema = z.object({
+  rotation: finite.min(-3600).max(3600).optional(),
   x: finite.min(-4).max(4),
   y: finite.min(-4).max(4),
   scale: finite.min(0.05).max(8),
   opacity: finite.min(0).max(1),
 });
-const cameraTransformSchema = transformSchema.extend({
+const cameraTransformSchema = transformSchema.omit({ rotation: true }).extend({
   x: finite.min(0).max(1),
   y: finite.min(0).max(1),
   scale: finite.min(1).max(8),

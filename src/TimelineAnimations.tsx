@@ -7,6 +7,7 @@ import {
   type AnimationDragMode,
 } from "../shared/animation-ranges";
 import { timeLabel } from "./Preview";
+import { animationCursor } from "./animationCursor";
 
 export function TimelineAnimations({
   clip,
@@ -17,15 +18,17 @@ export function TimelineAnimations({
   locate,
   locked,
   commit,
+  selectedFrame,
 }: {
   clip: Clip;
   zoom: number;
   playhead: number;
   fps: number;
   selected: boolean;
-  locate: (time: number) => void;
+  locate: (time: number, side: "start" | "end") => void;
   locked: boolean;
   commit: (clip: Clip) => void;
+  selectedFrame: { time: number; side: "start" | "end" } | null;
 }) {
   type Gesture = {
     x: number;
@@ -51,7 +54,10 @@ export function TimelineAnimations({
     suppressClick.current = false;
     if (locked || event.button !== 0) return;
     event.preventDefault();
-    locate(clip.start + (mode === "start" ? range.start : range.end));
+    locate(
+      clip.start + (mode === "start" ? range.start : range.end),
+      mode === "start" ? "start" : "end",
+    );
     event.currentTarget.setPointerCapture(event.pointerId);
     setDrag({
       x: event.clientX,
@@ -62,13 +68,17 @@ export function TimelineAnimations({
       moved: false,
     });
   };
-  const click = (event: React.MouseEvent, time: number) => {
+  const click = (
+    event: React.MouseEvent,
+    time: number,
+    side: "start" | "end",
+  ) => {
     event.stopPropagation();
     if (suppressClick.current) {
       suppressClick.current = false;
       return;
     }
-    locate(time);
+    locate(time, side);
   };
   const displayed = gesture?.value ?? clip;
   return (
@@ -99,7 +109,19 @@ export function TimelineAnimations({
         if (!drag) return;
         event.stopPropagation();
         suppressClick.current = drag.moved;
-        if (!locked && drag.value !== drag.original) commit(drag.value);
+        if (!locked && drag.value !== drag.original) {
+          commit(drag.value);
+          const index = animationRanges(drag.original).findIndex(
+            (range) =>
+              range.start === drag.range.start && range.end === drag.range.end,
+          );
+          const range = animationRanges(drag.value)[index];
+          if (range)
+            locate(
+              clip.start + (drag.mode === "start" ? range.start : range.end),
+              drag.mode === "start" ? "start" : "end",
+            );
+        }
         setDrag(null);
       }}
       onPointerCancel={() => setDrag(null)}
@@ -111,6 +133,16 @@ export function TimelineAnimations({
         const width = (range.end - range.start) * zoom;
         const head = range.hasEnd ? Math.min(12, width * 0.4) : 0;
         const active = selected && Math.abs(playhead - end) <= 0.5 / fps;
+        const startSelected =
+          selectedFrame?.side === "start" &&
+          Math.abs(
+            selectedFrame.time - range.start - (clip.animationOffset ?? 0),
+          ) < 1e-6;
+        const endSelected =
+          selectedFrame?.side === "end" &&
+          Math.abs(
+            selectedFrame.time - range.end - (clip.animationOffset ?? 0),
+          ) < 1e-6;
         return (
           <div
             key={index}
@@ -125,7 +157,7 @@ export function TimelineAnimations({
               aria-label={`动画 ${timeLabel(start)} 至 ${timeLabel(end)}`}
               title={`${timeLabel(start)} → ${timeLabel(end)} · 持续 ${timeLabel(end - start)}`}
               onPointerDown={(event) => begin(event, range, "move")}
-              onClick={(event) => click(event, end)}
+              onClick={(event) => click(event, end, "end")}
             >
               <svg
                 width="100%"
@@ -142,21 +174,27 @@ export function TimelineAnimations({
             {range.hasStart && (
               <button
                 type="button"
-                className="animation-point start"
+                className={`animation-point start ${startSelected ? "selected-frame" : ""}`}
+                aria-pressed={startSelected}
+                style={
+                  locked ? undefined : { cursor: animationCursor("start") }
+                }
                 aria-label={`动画开始 ${timeLabel(start)}`}
                 title={`动画开始 ${timeLabel(start)}`}
                 onPointerDown={(event) => begin(event, range, "start")}
-                onClick={(event) => click(event, start)}
+                onClick={(event) => click(event, start, "start")}
               />
             )}
             {range.hasEnd && (
               <button
                 type="button"
-                className={`animation-point end ${active ? "active" : ""}`}
+                className={`animation-point end ${active ? "active" : ""} ${endSelected ? "selected-frame" : ""}`}
+                aria-pressed={endSelected}
+                style={locked ? undefined : { cursor: animationCursor("end") }}
                 aria-label={`动画结束 ${timeLabel(end)}`}
                 title={`动画结束 ${timeLabel(end)}`}
                 onPointerDown={(event) => begin(event, range, "end")}
-                onClick={(event) => click(event, end)}
+                onClick={(event) => click(event, end, "end")}
               />
             )}
           </div>

@@ -7,7 +7,7 @@ import {
   type Transform,
   projectDuration,
 } from "../shared/model";
-import { transformAt, setTransform } from "../shared/editor";
+import { transformAt } from "../shared/editor";
 import {
   defaultCrop,
   defaultEffects,
@@ -181,7 +181,7 @@ function PreviewLayer({
     opacity: editing
       ? 1
       : displayed.opacity * fadeOpacity(clip, editor.playhead - clip.start),
-    transform: `translate(-50%, -50%) rotate(${clip.rotation ?? 0}deg) scale(${displayed.scale})`,
+    transform: `translate(-50%, -50%) rotate(${displayed.rotation ?? clip.rotation ?? 0}deg) scale(${displayed.scale})`,
     "--canvas-scale": scale,
   } as CSSProperties;
   if (textBox) {
@@ -267,7 +267,7 @@ function PreviewLayer({
             delta,
             gesture.handle!,
             project.canvas,
-            clip.rotation,
+            gesture.original.rotation ?? clip.rotation,
           );
           setGesture({
             ...gesture,
@@ -286,11 +286,15 @@ function PreviewLayer({
                 delta,
                 gesture.handle!,
                 {
-                  width: (mediaWidth * (1 - crop.left - crop.right)) / scale,
-                  height: (mediaHeight * (1 - crop.top - crop.bottom)) / scale,
+                  width:
+                    textBox?.width ??
+                    (mediaWidth * (1 - crop.left - crop.right)) / scale,
+                  height:
+                    textBox?.height ??
+                    (mediaHeight * (1 - crop.top - crop.bottom)) / scale,
                 },
                 project.canvas,
-                clip.rotation,
+                gesture.original.rotation ?? clip.rotation,
               )
             : {
                 ...gesture.original,
@@ -322,19 +326,16 @@ function PreviewLayer({
               (drag.box.width !== drag.originalBox?.width ||
                 drag.box.height !== drag.originalBox?.height)))
         )
-          editor.updateClip(clip.id, (c) =>
-            setTransform(
-              drag.box ? { ...c, textBox: drag.box } : c,
-              {
-                x: drag.value.x,
-                y: drag.value.y,
-                ...(drag.mode === "resize" && !drag.box
-                  ? { scale: drag.value.scale }
-                  : {}),
-              },
-              editor.playhead - clip.start,
-              editor.autoAnimate,
-            ),
+          editor.updateTransform(
+            clip.id,
+            {
+              x: drag.value.x,
+              y: drag.value.y,
+              ...(drag.mode === "resize" && !drag.box
+                ? { scale: drag.value.scale }
+                : {}),
+            },
+            drag.box ? { textBox: drag.box } : {},
           );
         setGesture(null);
       }}
@@ -343,7 +344,6 @@ function PreviewLayer({
     >
       {asset ? (
         <div
-          className="preview-text-content"
           style={{
             width: "100%",
             height: "100%",
@@ -407,6 +407,7 @@ function PreviewLayer({
         </div>
       ) : clip.kind === "text" ? (
         <div
+          className="preview-text-content"
           style={{
             fontFamily: `${clip.style?.fontFamily}, "PingFang SC", sans-serif`,
             fontWeight: 700,
@@ -501,7 +502,10 @@ function PreviewLayer({
                 handle,
                 original: transform,
                 value: transform,
-                originalBox: textBox ?? undefined,
+                originalBox:
+                  editor.selectedKeyframe?.clipId === clip.id
+                    ? undefined
+                    : (textBox ?? undefined),
               });
             }}
           />
@@ -525,7 +529,11 @@ export function ScenePreview({
     ? (editor.cameraDraft ?? cameraAt(project, playhead))
     : null;
   const active = project.clips.filter(
-    (clip) => playhead >= clip.start && playhead < clip.start + clip.duration,
+    (clip) =>
+      playhead >= clip.start &&
+      (playhead < clip.start + clip.duration ||
+        (editor.selectedKeyframe?.clipId === clip.id &&
+          Math.abs(playhead - clip.start - clip.duration) < 1e-6)),
   );
   return (
     <div
