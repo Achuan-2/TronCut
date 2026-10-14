@@ -197,6 +197,7 @@ export function setKeyframeTransform<
     for (
       let i = position + 1;
       i < ordered.length &&
+      !ordered[i].animation &&
       sameTransform(target.value, ordered[i].value, rotation);
       i++
     )

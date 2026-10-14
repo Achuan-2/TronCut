@@ -32,6 +32,7 @@ import {
 } from "../shared/animation-ranges";
 import {
   snapshotAnimation,
+  addAnimationKeyframe,
   removeAnimation,
   pasteAnimation,
   type CopiedAnimation,
@@ -204,7 +205,12 @@ export function useEditor() {
     [apply],
   );
   const editKeyframe = useCallback(
-    (clipId: string, localTime: number, side: "start" | "end") => {
+    (
+      clipId: string,
+      localTime: number,
+      side: "start" | "end",
+      keepSelection = false,
+    ) => {
       const clip = current.current.clips.find((clip) => clip.id === clipId);
       const track = current.current.tracks.find(
         (track) => track.id === clip?.trackId,
@@ -239,7 +245,11 @@ export function useEditor() {
       const selection = { clipId, time: frame?.time ?? 0, side: target.side };
       keyframeRef.current = selection;
       setKeyframeSelection(selection);
-      selectMany([clipId]);
+      selectMany((previous) =>
+        keepSelection
+          ? [...previous.filter((id) => id !== clipId), clipId]
+          : [clipId],
+      );
       setPlayingState(false);
       setPlayhead(clip.start + selection.time - (clip.animationOffset ?? 0));
     },
@@ -262,6 +272,37 @@ export function useEditor() {
     },
     [updateClip, playhead, autoAnimate],
   );
+  const addSelectedKeyframe = useCallback(() => {
+    const project = current.current;
+    const results = project.clips
+      .filter(
+        (clip) =>
+          selectedIds.includes(clip.id) &&
+          !project.tracks.find((track) => track.id === clip.trackId)?.locked &&
+          !project.tracks.find((track) => track.id === clip.trackId)?.hidden,
+      )
+      .map((clip) =>
+        addAnimationKeyframe(clip, playhead - clip.start, project.canvas.fps),
+      )
+      .filter((result) => result !== null);
+    if (!results.length) return;
+    const changes = new Map(
+      results.map((result) => [result.clip.id, result.clip]),
+    );
+    if (
+      project.clips.some(
+        (clip) => changes.has(clip.id) && changes.get(clip.id) !== clip,
+      )
+    )
+      apply({
+        ...project,
+        clips: project.clips.map((clip) => changes.get(clip.id) ?? clip),
+      });
+    const focused =
+      results.find((result) => result.clip.id === selectedId) ??
+      results.at(-1)!;
+    editKeyframe(focused.clip.id, focused.time, "end", true);
+  }, [selectedIds, selectedId, playhead, apply, editKeyframe]);
   const addText = useCallback(
     (preset = 0, text?: string) => {
       const p = current.current;
@@ -443,6 +484,7 @@ export function useEditor() {
     redo,
     updateClip,
     updateTransform,
+    addSelectedKeyframe,
     selectedKeyframe,
     selectedAnimation,
     copyAnimation,

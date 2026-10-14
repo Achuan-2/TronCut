@@ -1316,7 +1316,8 @@ fieldset:disabled {
   align-items: center;
   gap: 4px;
 }
-.tool-group > button {
+.tool-group > button,
+.delete-control > button {
   color: #91a498;
   padding: 7px 8px;
 }
@@ -1334,6 +1335,25 @@ fieldset:disabled {
   padding: 7px 12px;
   margin-left: 4px;
   margin-right: 8px;
+}
+.delete-control {
+  position: relative;
+  display: flex;
+}
+.delete-control > button:first-child {
+  border-radius: 5px 0 0 5px;
+}
+.delete-control > .delete-dropdown {
+  padding-left: 3px;
+  padding-right: 3px;
+  border-radius: 0 5px 5px 0;
+}
+.toolbar-delete-menu {
+  position: fixed;
+  width: 235px;
+}
+.tool-group .keyframe-add {
+  gap: 5px;
 }
 .tool-group .auto-animation {
   font-size: 10px;

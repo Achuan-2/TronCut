@@ -115,6 +115,7 @@ export const projectSchema = z.object({
               time: finite.nonnegative(),
               value: transformSchema,
               easing: z.enum(animationEasings).optional(),
+              animation: z.literal(true).optional(),
               zoomPan: cameraTransformSchema.optional(),
             }),
           )

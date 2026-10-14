@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   Eye,
   EyeOff,
@@ -18,6 +19,7 @@ import {
   Trash2,
   Copy,
   Flag,
+  ChevronDown,
 } from "lucide-react";
 import {
   type Clip,
@@ -78,6 +80,49 @@ export default function Timeline({
     duration = Math.max(20, projectDuration(project) + 5),
     width = duration * zoom;
   const headers = useRef<HTMLDivElement>(null);
+  const deleteControl = useRef<HTMLDivElement>(null);
+  const deletePopup = useRef<HTMLDivElement>(null);
+  const [deleteMenu, setDeleteMenu] = useState(false);
+  const [deletePosition, setDeletePosition] = useState({ left: 0, top: 0 });
+  useEffect(() => {
+    if (!deleteMenu) return;
+    const outside = (event: PointerEvent) => {
+      if (
+        !deleteControl.current?.contains(event.target as Node) &&
+        !deletePopup.current?.contains(event.target as Node)
+      )
+        setDeleteMenu(false);
+    };
+    const escape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.stopPropagation();
+        setDeleteMenu(false);
+      }
+    };
+    window.addEventListener("pointerdown", outside);
+    window.addEventListener("keydown", escape, true);
+    return () => {
+      window.removeEventListener("pointerdown", outside);
+      window.removeEventListener("keydown", escape, true);
+    };
+  }, [deleteMenu]);
+  const editableSelection = project.clips.filter(
+    (clip) =>
+      editor.selectedIds.includes(clip.id) &&
+      !project.tracks.find((track) => track.id === clip.trackId)?.locked,
+  );
+  const canAddKeyframe = editableSelection.some(
+    (clip) =>
+      clip.kind !== "audio" &&
+      !project.tracks.find((track) => track.id === clip.trackId)?.hidden &&
+      playhead >= clip.start &&
+      playhead <= clip.start + clip.duration,
+  );
+  const deleteSelection = (ripple = false) => {
+    apply((project) => deleteClips(project, editor.selectedIds, ripple));
+    select(null);
+    setDeleteMenu(false);
+  };
   useEffect(() => {
     const element = scroll.current;
     const index = project.tracks.findIndex(
@@ -226,26 +271,77 @@ export default function Timeline({
           >
             <Scissors size={17} />
           </button>
-          <button
-            title="删除片段（Delete）"
-            disabled={!selected || !!locked}
-            onClick={() => selected && remove(selected.id)}
-          >
-            <Trash2 size={17} />
-          </button>
+          <div className="delete-control" ref={deleteControl}>
+            <button
+              title="删除片段（Delete）"
+              disabled={!editableSelection.length}
+              onClick={() => deleteSelection()}
+            >
+              <Trash2 size={17} />
+            </button>
+            <button
+              className="delete-dropdown"
+              aria-label="删除选项"
+              title="删除选项"
+              aria-haspopup="menu"
+              aria-expanded={deleteMenu}
+              disabled={!editableSelection.length}
+              onClick={(event) => {
+                const bounds = event.currentTarget.getBoundingClientRect();
+                setDeletePosition({
+                  left: Math.max(
+                    8,
+                    Math.min(bounds.left, window.innerWidth - 245),
+                  ),
+                  top: Math.min(bounds.bottom + 5, window.innerHeight - 110),
+                });
+                setDeleteMenu(!deleteMenu);
+              }}
+            >
+              <ChevronDown size={13} />
+            </button>
+            {deleteMenu &&
+              createPortal(
+                <div
+                  ref={deletePopup}
+                  className="context-menu toolbar-delete-menu"
+                  style={deletePosition}
+                  role="menu"
+                  aria-label="删除菜单"
+                  onPointerDown={(event) => event.stopPropagation()}
+                >
+                  <button
+                    role="menuitem"
+                    disabled={!editableSelection.length}
+                    onClick={() => deleteSelection()}
+                  >
+                    <Trash2 size={14} />
+                    删除<span className="menu-shortcut">Delete</span>
+                  </button>
+                  <button
+                    role="menuitem"
+                    disabled={!editableSelection.length}
+                    onClick={() => deleteSelection(true)}
+                  >
+                    <Trash2 size={14} />
+                    波纹删除<span className="menu-shortcut">Shift+Delete</span>
+                  </button>
+                </div>,
+                document.body,
+              )}
+          </div>
           <button className="text-add" onClick={() => editor.addText()}>
             <Type size={17} />
             添加文本
           </button>
           <button
-            title="波纹删除（Shift+Delete）：关闭删除后没有其他片段占用的间隙"
-            disabled={!editor.selectedIds.length}
-            onClick={() => {
-              apply((p) => deleteClips(p, editor.selectedIds, true));
-              select(null);
-            }}
+            className="keyframe-add"
+            title="为选中的对象添加默认1秒动画关键帧"
+            disabled={!canAddKeyframe}
+            onClick={editor.addSelectedKeyframe}
           >
-            波纹删除
+            <Diamond size={15} />
+            添加关键帧
           </button>
           <button
             title="组合（Ctrl+G）"

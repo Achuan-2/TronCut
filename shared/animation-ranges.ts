@@ -60,21 +60,27 @@ export function retimeAnimation(
   if (
     mode !== "end" &&
     index > 0 &&
-    !sameTransform(frames[index - 1].value, frames[index].value, rotationValue)
+    (frames[index].animation ||
+      !sameTransform(
+        frames[index - 1].value,
+        frames[index].value,
+        rotationValue,
+      ))
   ) {
-    frames.splice(index, 0, { ...frames[index] });
+    frames.splice(index + 1, 0, { ...frames[index], animation: undefined });
     index++;
   }
   if (
     mode !== "start" &&
     index + 2 < frames.length &&
-    !sameTransform(
-      frames[index + 1].value,
-      frames[index + 2].value,
-      rotationValue,
-    )
+    (frames[index + 2].animation ||
+      !sameTransform(
+        frames[index + 1].value,
+        frames[index + 2].value,
+        rotationValue,
+      ))
   ) {
-    frames.splice(index + 2, 0, { ...frames[index + 1] });
+    frames.splice(index + 2, 0, { ...frames[index + 1], animation: undefined });
   }
   const a = frames[index],
     b = frames[index + 1];
@@ -167,7 +173,7 @@ export function animationRanges(
       b.value,
       clip.transform.rotation ?? clip.rotation ?? 0,
     );
-    if (!(b.time > a.time) || unchanged) continue;
+    if (!(b.time > a.time) || (unchanged && !b.animation)) continue;
     const start = a.time - offset,
       end = b.time - offset;
     if (end <= 0 || start >= clip.duration) continue;

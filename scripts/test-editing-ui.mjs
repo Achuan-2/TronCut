@@ -213,6 +213,17 @@ try {
     }),
   ).toBe(true);
   await page.locator(".timeline-clip.video").click();
+  await expect(page.getByRole("button", { name: "波纹删除", exact: true })).toHaveCount(0);
+  await page.getByRole("button", { name: "删除选项", exact: true }).click();
+  await expect(page.getByRole("menu", { name: "删除菜单", exact: true })).toBeVisible();
+  await expect(page.getByRole("menuitem", { name: /^删除\s*Delete$/ })).toBeVisible();
+  await page.getByRole("menuitem", { name: /^波纹删除/ }).click();
+  await expect(page.locator(".timeline-clip")).toHaveCount(0);
+  await expect(page.getByRole("menu", { name: "删除菜单", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "添加关键帧", exact: true })).toBeDisabled();
+  await page.getByTitle("撤销 Ctrl+Z", { exact: true }).click();
+  await expect(page.locator(".timeline-clip.video")).toHaveCount(1);
+  await page.locator(".timeline-clip.video").click();
   await expect(
     page.getByRole("tab", { name: "视频", exact: true }),
   ).toHaveAttribute("aria-selected", "true");
@@ -390,6 +401,18 @@ try {
     beforeResize.width / beforeResize.height,
     2,
   );
+  const addKeyframe = page.getByRole("button", { name: "添加关键帧", exact: true });
+  const beforeKeyframeX = await page.getByLabel("位置 X (%)", { exact: true }).inputValue();
+  expect(await addKeyframe.evaluate((button) => button.previousElementSibling.textContent)).toContain("添加文本");
+  await seek(8);
+  await addKeyframe.click();
+  await expect(page.locator(".timeline-clip.image .clip-animation")).toHaveCount(1);
+  await expect(page.locator(".timeline-clip.image .animation-point.end")).toHaveClass(/selected-frame/);
+  await page.getByLabel("位置 X (%)", { exact: true }).fill("80");
+  await seek(7);
+  await expect(page.getByLabel("位置 X (%)", { exact: true })).toHaveValue(beforeKeyframeX);
+  for (let i = 0; i < 2; i++) await page.getByTitle("撤销 Ctrl+Z", { exact: true }).click();
+  await expect(page.locator(".timeline-clip.image .clip-animation")).toHaveCount(0);
   await page.getByRole("button", { name: "自动动画", exact: true }).click();
   await seek(8);
   await dragHandle(canvasImage.locator(".resize-handle.se"), 20, 16, 1);
@@ -561,6 +584,7 @@ try {
   const imageLock = await trackLock(page.locator(".timeline-clip.image"));
   await imageLock.click();
   await expect(canvasImage.locator(".resize-handle")).toHaveCount(0);
+  await expect(addKeyframe).toBeDisabled();
   await openAnimationMenu(imageArrow);
   await expect(page.getByRole("menuitem", { name: "剪切", exact: false })).toBeDisabled();
   await expect(page.getByRole("menuitem", { name: "删除", exact: false })).toBeDisabled();
@@ -650,6 +674,16 @@ try {
     await page.getByLabel("开始 (秒)", { exact: true }).fill("6");
     await page.getByLabel("播放速度", { exact: true }).fill("0.25");
   }
+  await seek(8);
+  await page.locator(".timeline-toolbar").click({ position: { x: 2, y: 2 } });
+  await page.keyboard.press("Control+a");
+  await page.getByRole("tab", { name: "画面", exact: true }).click();
+  await addKeyframe.click();
+  await expect(page.locator(".timeline-clip.selected")).toHaveCount(5);
+  await expect(page.locator(".timeline-clip.video .clip-animation")).toHaveCount(3);
+  await expect(page.locator(".keyframe-edit-status")).toContainText("编辑动画终点");
+  await page.getByTitle("撤销 Ctrl+Z", { exact: true }).click();
+  await expect(page.locator(".timeline-clip.video .clip-animation")).toHaveCount(0);
   await seek(8);
   await page.getByRole("button", { name: "缩放与平移", exact: true }).click();
   await expect(page.getByLabel("取景中心 X (%)")).toHaveCount(0);

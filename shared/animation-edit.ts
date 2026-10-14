@@ -14,6 +14,46 @@ export interface CopiedAnimation {
   easing?: AnimationEasing;
 }
 
+// An explicit animation can begin with identical states. Its end marker keeps
+// the arrow visible until the user edits it; ordinary equal frames remain holds.
+export function addAnimationKeyframe(
+  clip: Clip,
+  localTime: number,
+  fps: number,
+): { clip: Clip; time: number } | null {
+  if (
+    !Number.isFinite(localTime) ||
+    clip.kind === "audio" ||
+    localTime < 0 ||
+    localTime > clip.duration
+  )
+    return null;
+  const localEnd = localTime < 1 / fps ? Math.min(1, clip.duration) : localTime;
+  const offset = clip.animationOffset ?? 0;
+  const end = localEnd + offset;
+  const frames = [...clip.keyframes].sort((a, b) => a.time - b.time);
+  const existingRange = animationRanges(clip).find(
+    (range) => Math.abs(range.end - localEnd) < 1e-6,
+  );
+  if (existingRange) return { clip, time: localEnd };
+  const previous = frames.filter((frame) => frame.time < end).at(-1);
+  const start = Math.max(0, offset, end - 1, previous?.time ?? 0);
+  if (start >= end) return null;
+  if (!frames.some((frame) => Math.abs(frame.time - start) < 1e-6))
+    frames.push({ time: start, value: transformAt(clip, start - offset) });
+  const value = transformAt(clip, localEnd);
+  const endpoint = frames.find((frame) => Math.abs(frame.time - end) < 1e-6);
+  const keyframes = endpoint
+    ? frames.map((frame) =>
+        frame === endpoint ? { ...frame, animation: true as const } : frame,
+      )
+    : [...frames, { time: end, value, animation: true as const }];
+  return {
+    clip: { ...clip, keyframes: keyframes.sort((a, b) => a.time - b.time) },
+    time: localEnd,
+  };
+}
+
 function rangeFrames(clip: Clip, range: AnimationRange) {
   const frames = [...clip.keyframes].sort((a, b) => a.time - b.time);
   if (frames[0]?.time > 0) frames.unshift({ time: 0, value: clip.transform });
@@ -66,6 +106,7 @@ export function removeAnimation(clip: Clip, range: AnimationRange): Clip {
   for (
     let i = pair.index + 2;
     i < pair.frames.length &&
+    !pair.frames[i].animation &&
     sameTransform(
       pair.b.value,
       pair.frames[i].value,
@@ -84,6 +125,7 @@ export function removeAnimation(clip: Clip, range: AnimationRange): Clip {
             ...frame,
             value: { ...pair.a.value },
             easing: undefined,
+            animation: undefined,
             zoomPan: pair.a.zoomPan,
           }
         : frame,
@@ -147,7 +189,7 @@ export function pasteAnimation(
     });
   frames.push(
     { time: start, value: from },
-    { time: end, value: to, easing: copied.easing },
+    { time: end, value: to, easing: copied.easing, animation: true },
   );
   return { ...clip, keyframes: frames.sort((a, b) => a.time - b.time) };
 }
