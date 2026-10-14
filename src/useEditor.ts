@@ -23,7 +23,7 @@ import {
   setKeyframeTransform,
 } from "../shared/editor";
 import { selectionWithGroups } from "../shared/timeline";
-import { setCameraTransform } from "../shared/canvas";
+import { setVideoZoomPan } from "../shared/video-zoom-pan";
 import { fitUpdatedText } from "./text";
 import {
   animationEditTarget,
@@ -68,7 +68,7 @@ export function demoProject(): Project {
 export function useEditor() {
   const [project, setProject] = useState<Project>(demoProject);
   const [editingTextId, setEditingTextId] = useState<string | null>(null);
-  const [cameraDraft, setCameraDraft] = useState<Transform | null>(null);
+  const [zoomPanDraft, setZoomPanDraft] = useState<Transform | null>(null);
   type KeyframeSelection = {
     clipId: string;
     time: number;
@@ -150,7 +150,7 @@ export function useEditor() {
     current.current = next;
     setProject(next);
     setEditingTextId(null);
-    setCameraDraft(null);
+    setZoomPanDraft(null);
     select(null);
     seek(0);
     setPlaying(false);
@@ -326,10 +326,10 @@ export function useEditor() {
   const endTextEdit = useCallback((id: string) => {
     setEditingTextId((current) => (current === id ? null : current));
   }, []);
-  const updateCamera = useCallback(
+  const updateVideoZoomPan = useCallback(
     (patch: Partial<Transform>, time = playhead) => {
       setPlaying(false);
-      apply((project) => setCameraTransform(project, patch, time));
+      apply((project) => setVideoZoomPan(project, patch, time));
     },
     [apply, playhead],
   );
@@ -459,9 +459,9 @@ export function useEditor() {
     editingTextId,
     beginTextEdit,
     endTextEdit,
-    cameraDraft,
-    setCameraDraft,
-    updateCamera,
+    zoomPanDraft,
+    setZoomPanDraft,
+    updateVideoZoomPan,
     autoAnimate,
     setAutoAnimate,
   };

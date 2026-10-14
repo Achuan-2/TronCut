@@ -251,7 +251,9 @@ try {
     videoY = videoHandleBounds.y + videoHandleBounds.height / 2;
   await page.mouse.move(videoX, videoY);
   await page.mouse.down();
+  await page.evaluate(() => new Promise(requestAnimationFrame));
   await page.mouse.move(videoX + 36, videoY + 20, { steps: 1 });
+  await page.evaluate(() => new Promise(requestAnimationFrame));
   await page.mouse.up();
   await expect.poll(async () => (await canvasVideo.boundingBox()).width).toBeGreaterThan(videoBefore.width);
   const videoAfter = await canvasVideo.boundingBox();
@@ -409,6 +411,8 @@ try {
   await expect(page.locator(".keyframe-edit-status")).toContainText("编辑动画终点");
   await page.getByRole("button", { name: "自动动画", exact: true }).click();
   await page.getByLabel("位置 X (%)", { exact: true }).fill("80");
+  await expect.poll(async () => (await imageArrow.locator(".animation-point.end").boundingBox()).width).toBeGreaterThan(17);
+  await expect.poll(async () => (await imageArrow.locator(".animation-point.end").boundingBox()).width).toBeCloseTo(17, 1);
   await imageArrow.locator(".animation-point.start").click();
   await expect(imageArrow.locator(".animation-point.start")).toHaveAttribute("aria-pressed", "true");
   expect(await imageArrow.locator(".animation-point.start").evaluate((element) => getComputedStyle(element).cursor)).toContain("data:image/svg+xml");
@@ -459,9 +463,9 @@ try {
   await imageArrow.locator(".animation-point.end").click();
   await expect(imageArrow.locator(".animation-point.end")).toHaveClass(/active/);
   await page.screenshot({ path: path.join(root, "animation-arrows.png") });
-  expect((await imageArrow.locator(".animation-point.end").boundingBox()).width).toBeCloseTo(17, 1);
+  await expect.poll(async () => (await imageArrow.locator(".animation-point.end").boundingBox()).width).toBeCloseTo(17, 1);
   await seek(10);
-  expect((await imageArrow.locator(".animation-point.end").boundingBox()).width).toBeCloseTo(10, 1);
+  await expect.poll(async () => (await imageArrow.locator(".animation-point.end").boundingBox()).width).toBeCloseTo(10, 1);
   await page.getByLabel("位置 X (%)", { exact: true }).fill("65");
   const separatedArrows = imageClip.locator(".clip-animation");
   await expect(separatedArrows).toHaveCount(2);
@@ -640,22 +644,32 @@ try {
   await textLock.click();
   await page.screenshot({ path: path.join(root, "text-properties.png") });
 
+  for (let i = 0; i < 3; i++) {
+    await page.locator(".timeline-clip.video").nth(i).click();
+    await page.getByRole("tab", { name: "片段", exact: true }).click();
+    await page.getByLabel("开始 (秒)", { exact: true }).fill("6");
+    await page.getByLabel("播放速度", { exact: true }).fill("0.25");
+  }
+  await seek(8);
   await page.getByRole("button", { name: "缩放与平移", exact: true }).click();
+  await expect(page.getByLabel("取景中心 X (%)")).toHaveCount(0);
+  await expect(page.getByLabel("取景中心 Y (%)")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "添加当前位置关键帧", exact: true })).toHaveCount(0);
   await page.getByLabel("画布缩放百分比", { exact: true }).fill("200");
-  await expect(page.locator(".camera-keyframe-list > div")).toHaveCount(2);
+  await expect(page.locator(".camera-keyframe-list")).toHaveCount(0);
+  await expect(page.locator(".timeline-clip.video .clip-animation")).toHaveCount(3);
   const overviewBounds = await page.locator(".zoom-pan-overview").boundingBox();
+  const viewportLeft = (await page.locator(".camera-viewport").boundingBox()).x;
   await dragHandle(
     page.locator(".camera-viewport"),
     overviewBounds.width * 0.1,
     0,
   );
-  expect(
-    Number(await page.getByLabel("取景中心 X (%)").inputValue()),
-  ).toBeGreaterThan(55);
+  expect((await page.locator(".camera-viewport").boundingBox()).x).toBeGreaterThan(viewportLeft);
   await seek(9);
   await page.getByLabel("画布缩放百分比", { exact: true }).fill("300");
-  await expect(page.locator(".camera-keyframe-list > div")).toHaveCount(3);
-  await expect(page.locator(".ruler .camera-keyframe")).toHaveCount(3);
+  await expect(page.locator(".timeline-clip.video .clip-animation")).toHaveCount(6);
+  await expect(page.locator(".ruler .camera-keyframe")).toHaveCount(0);
   await page.getByRole("button", { name: "全画面", exact: true }).click();
   await expect(page.getByLabel("画布缩放百分比", { exact: true })).toHaveValue(
     "100",
@@ -673,7 +687,9 @@ try {
   const saved = JSON.parse(
     await fs.readFile(path.join(root, "界面测试", "界面测试.troncut"), "utf8"),
   );
-  expect(saved.camera.keyframes).toHaveLength(3);
+  expect(saved.camera).toBeUndefined();
+  expect(saved.clips.filter((clip) => clip.kind === "video").every((clip) => clip.keyframes.some((frame) => frame.zoomPan))).toBe(true);
+  expect(saved.clips.filter((clip) => clip.kind !== "video").every((clip) => clip.keyframes.every((frame) => !frame.zoomPan))).toBe(true);
   expect(saved.tracks.map((track) => track.name)).toEqual(
     Array.from({ length: saved.tracks.length }, (_, index) => `轨道${saved.tracks.length - index}`),
   );
@@ -687,7 +703,7 @@ try {
   expect(savedText.textBox.height).toBeGreaterThan(16);
   expect(savedText.style.fontSize).toBeCloseTo(savedTextFont, 2);
   console.log(
-    "画布图片等比缩放及自动关键帧、画布/时间线双击文本与多行编辑、整个画面缩放平移与运镜关键帧通过",
+    "画布图片等比缩放、端点放大回落动效、文本编辑、缩放平移同步三段视频动画且移除刻度尺关键帧通过",
   );
   expect(errors).toEqual([]);
   await page.screenshot({ path: path.join(root, "compact-titlebar.png") });

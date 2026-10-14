@@ -80,7 +80,12 @@ export function removeAnimation(clip: Clip, range: AnimationRange): Clip {
     ...clip,
     keyframes: clip.keyframes.map((frame) =>
       held.has(frame)
-        ? { ...frame, value: { ...pair.a.value }, easing: undefined }
+        ? {
+            ...frame,
+            value: { ...pair.a.value },
+            easing: undefined,
+            zoomPan: pair.a.zoomPan,
+          }
         : frame,
     ),
   };

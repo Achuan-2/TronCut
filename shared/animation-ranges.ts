@@ -3,8 +3,8 @@ import type { Clip, Transform } from "./model";
 export function sameTransform(a: Transform, b: Transform, rotation = 0) {
   return (
     (["x", "y", "scale", "opacity"] as const).every(
-      (key) => a[key] === b[key],
-    ) && (a.rotation ?? rotation) === (b.rotation ?? rotation)
+      (key) => Math.abs(a[key] - b[key]) < 1e-9,
+    ) && Math.abs((a.rotation ?? rotation) - (b.rotation ?? rotation)) < 1e-9
   );
 }
 

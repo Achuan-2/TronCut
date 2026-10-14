@@ -458,22 +458,6 @@ export default function Timeline({
               <div className="ruler-playhead" style={{ left: playhead * zoom }}>
                 <span />
               </div>
-              {project.camera?.keyframes.map((frame) => (
-                <button
-                  key={frame.time}
-                  className="camera-keyframe"
-                  style={{ left: frame.time * zoom }}
-                  title={`画布运镜 ${timeLabel(frame.time)}`}
-                  onPointerDown={(event) => event.stopPropagation()}
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    editor.setPlaying(false);
-                    seek(frame.time);
-                  }}
-                >
-                  <Diamond size={10} fill="currentColor" />
-                </button>
-              ))}
             </div>
             {project.tracks.map((track) => (
               <div

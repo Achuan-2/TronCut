@@ -1,5 +1,11 @@
 import type { Clip } from "../shared/model";
-import { useCallback, useRef, useState, type PointerEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type PointerEvent,
+} from "react";
 import {
   snapshotAnimation,
   setAnimationEasing,
@@ -56,6 +62,55 @@ export function TimelineAnimations({
   } | null>(null);
   const closeContext = useCallback(() => setContext(null), []);
   const suppressClick = useRef(false);
+  const points = useRef<HTMLDivElement>(null);
+  const pulse = useRef<{ point: HTMLElement; animation: Animation } | null>(
+    null,
+  );
+  const editedEnd =
+    selectedFrame?.side === "end"
+      ? clip.keyframes.find(
+          (frame) => Math.abs(frame.time - selectedFrame.time) < 1e-6,
+        )
+      : undefined;
+  useEffect(() => {
+    const point = points.current?.querySelector<HTMLElement>(
+      ".animation-point.end.selected-frame",
+    );
+    if (
+      !point ||
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    ) {
+      pulse.current?.animation.cancel();
+      pulse.current = null;
+      return;
+    }
+    // Let a pulse finish during continuous slider changes instead of restarting
+    // it every frame. A later change starts a fresh pulse on the same endpoint.
+    if (
+      pulse.current?.point === point &&
+      pulse.current.animation.playState === "running"
+    )
+      return;
+    pulse.current?.animation.cancel();
+    const animation = point.animate(
+      [
+        { transform: getComputedStyle(point).transform },
+        { transform: "translate(-50%, -50%) scale(2.25)", offset: 0.45 },
+        { transform: "translate(-50%, -50%) scale(1.7)" },
+      ],
+      { duration: 340, easing: "cubic-bezier(0.22, 0.61, 0.36, 1)" },
+    );
+    pulse.current = { point, animation };
+  }, [
+    selectedFrame?.time,
+    selectedFrame?.side,
+    editedEnd?.value.x,
+    editedEnd?.value.y,
+    editedEnd?.value.scale,
+    editedEnd?.value.opacity,
+    editedEnd?.value.rotation,
+  ]);
+  useEffect(() => () => pulse.current?.animation.cancel(), []);
   const setDrag = (next: Gesture | null) => {
     live.current = next;
     setGesture(next);
@@ -99,6 +154,7 @@ export function TimelineAnimations({
   return (
     <>
       <div
+        ref={points}
         className={`clip-animations ${locked ? "locked" : ""} ${gesture?.moved ? "dragging" : ""}`}
         onPointerDown={(event) => event.stopPropagation()}
         onDoubleClick={(event) => event.stopPropagation()}

@@ -1,14 +1,13 @@
 import { useEffect, useRef, useState } from "react";
-import { Diamond, Trash2 } from "lucide-react";
-import {
-  cameraAt,
-  clampCamera,
-  resizeHandles,
-  resizeTransform,
-} from "../shared/canvas";
+import { clampCamera, resizeHandles, resizeTransform } from "../shared/canvas";
 import type { Transform } from "../shared/model";
+import {
+  zoomPanAt,
+  zoomPanVideos,
+  clearVideoZoomPan,
+} from "../shared/video-zoom-pan";
 import type { Editor } from "./useEditor";
-import { ScenePreview, timeLabel } from "./Preview";
+import { ScenePreview } from "./Preview";
 
 export default function ZoomPanPanel({ editor }: { editor: Editor }) {
   const overview = useRef<HTMLDivElement>(null);
@@ -24,7 +23,8 @@ export default function ZoomPanPanel({ editor }: { editor: Editor }) {
     handle?: { x: number; y: number };
   } | null>(null);
   const camera =
-    editor.cameraDraft ?? cameraAt(editor.project, editor.playhead);
+    editor.zoomPanDraft ?? zoomPanAt(editor.project, editor.playhead);
+  const available = zoomPanVideos(editor.project, editor.playhead).length > 0;
   useEffect(() => {
     const element = overview.current;
     if (!element) return;
@@ -34,40 +34,13 @@ export default function ZoomPanPanel({ editor }: { editor: Editor }) {
     observer.observe(element);
     return () => {
       observer.disconnect();
-      editor.setCameraDraft(null);
+      editor.setZoomPanDraft(null);
     };
-  }, [editor.setCameraDraft]);
-  const removeFrame = (time: number) =>
-    editor.apply((project) => ({
-      ...project,
-      camera: project.camera && {
-        ...project.camera,
-        keyframes: project.camera.keyframes.filter(
-          (frame) => frame.time !== time,
-        ),
-      },
-    }));
-  const numberField = (name: string, key: "x" | "y") => (
-    <label className="field">
-      {name}
-      <input
-        type="number"
-        min={0}
-        max={100}
-        step={0.1}
-        value={Number((camera[key] * 100).toFixed(1))}
-        onChange={(event) => {
-          const value = Number(event.target.value);
-          if (Number.isFinite(value) && value >= 0 && value <= 100)
-            editor.updateCamera({ [key]: value / 100 });
-        }}
-      />
-    </label>
-  );
+  }, [editor.setZoomPanDraft]);
   return (
     <>
       <p className="panel-intro">
-        移动播放头，再拖动取景框或调整缩放，自动生成整个画面的运镜关键帧。
+        移动播放头，再拖动取景框或调整缩放，为当前时间的视频自动添加动画。
       </p>
       <div
         className="zoom-pan-overview"
@@ -78,7 +51,7 @@ export default function ZoomPanPanel({ editor }: { editor: Editor }) {
           background: editor.project.canvas.background,
         }}
         onPointerDown={(event) => {
-          if (event.button !== 0) return;
+          if (event.button !== 0 || !available) return;
           event.preventDefault();
           event.stopPropagation();
           editor.setPlaying(false);
@@ -108,7 +81,7 @@ export default function ZoomPanPanel({ editor }: { editor: Editor }) {
             value,
             handle,
           };
-          editor.setCameraDraft(value);
+          editor.setZoomPanDraft(value);
           event.currentTarget.setPointerCapture(event.pointerId);
         }}
         onPointerMove={(event) => {
@@ -136,17 +109,17 @@ export default function ZoomPanPanel({ editor }: { editor: Editor }) {
               y: current.original.y + dy,
             });
           current.value = value;
-          editor.setCameraDraft(value);
+          editor.setZoomPanDraft(value);
         }}
         onPointerUp={() => {
           if (drag.current)
-            editor.updateCamera(drag.current.value, drag.current.time);
+            editor.updateVideoZoomPan(drag.current.value, drag.current.time);
           drag.current = null;
-          editor.setCameraDraft(null);
+          editor.setZoomPanDraft(null);
         }}
         onPointerCancel={() => {
           drag.current = null;
-          editor.setCameraDraft(null);
+          editor.setZoomPanDraft(null);
         }}
       >
         <ScenePreview
@@ -154,6 +127,7 @@ export default function ZoomPanPanel({ editor }: { editor: Editor }) {
           scale={width / editor.project.canvas.width}
           interactive={false}
           applyCamera={false}
+          applyVideoZoomPan={false}
         />
         <div
           className="camera-viewport"
@@ -182,15 +156,26 @@ export default function ZoomPanPanel({ editor }: { editor: Editor }) {
       </div>
       <div className="two-buttons">
         <button
-          onClick={() => editor.updateCamera({ x: 0.5, y: 0.5, scale: 1 })}
+          disabled={!available}
+          onClick={() =>
+            editor.updateVideoZoomPan({ x: 0.5, y: 0.5, scale: 1 })
+          }
         >
           全画面
         </button>
         <button
-          disabled={!editor.project.camera}
-          onClick={() =>
-            editor.apply((project) => ({ ...project, camera: undefined }))
+          disabled={
+            !editor.project.camera &&
+            !editor.project.clips.some(
+              (clip) =>
+                clip.kind === "video" &&
+                clip.keyframes.some((frame) => frame.zoomPan) &&
+                !editor.project.tracks.find(
+                  (track) => track.id === clip.trackId,
+                )?.locked,
+            )
           }
+          onClick={() => editor.apply(clearVideoZoomPan)}
         >
           清除运镜
         </button>
@@ -199,17 +184,21 @@ export default function ZoomPanPanel({ editor }: { editor: Editor }) {
         缩放
         <input
           aria-label="画布缩放"
+          disabled={!available}
           type="range"
           min={100}
           max={800}
           step={1}
           value={Math.round(camera.scale * 100)}
           onChange={(event) =>
-            editor.updateCamera({ scale: Number(event.target.value) / 100 })
+            editor.updateVideoZoomPan({
+              scale: Number(event.target.value) / 100,
+            })
           }
         />
         <input
           aria-label="画布缩放百分比"
+          disabled={!available}
           type="number"
           min={100}
           max={800}
@@ -218,45 +207,11 @@ export default function ZoomPanPanel({ editor }: { editor: Editor }) {
           onChange={(event) => {
             const value = Number(event.target.value);
             if (Number.isFinite(value) && value >= 100 && value <= 800)
-              editor.updateCamera({ scale: value / 100 });
+              editor.updateVideoZoomPan({ scale: value / 100 });
           }}
         />
         <span>%</span>
       </label>
-      {numberField("取景中心 X (%)", "x")}
-      {numberField("取景中心 Y (%)", "y")}
-      <h3 className="section-title">
-        运镜关键帧{" "}
-        <span className="auto-badge">
-          <Diamond size={10} />
-          自动记录
-        </span>
-      </h3>
-      <button className="wide-button" onClick={() => editor.updateCamera({})}>
-        <Diamond size={13} />
-        添加当前位置关键帧
-      </button>
-      <div className="keyframe-list camera-keyframe-list">
-        {editor.project.camera?.keyframes.map((frame) => (
-          <div key={frame.time}>
-            <button
-              onClick={() => {
-                editor.setPlaying(false);
-                editor.seek(frame.time);
-              }}
-            >
-              <Diamond size={12} fill="currentColor" />
-              {timeLabel(frame.time)} · {Math.round(frame.value.scale * 100)}%
-            </button>
-            <button
-              title="删除运镜关键帧"
-              onClick={() => removeFrame(frame.time)}
-            >
-              <Trash2 size={12} />
-            </button>
-          </div>
-        ))}
-      </div>
     </>
   );
 }

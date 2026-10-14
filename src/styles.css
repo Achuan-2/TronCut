@@ -918,14 +918,6 @@ fieldset:disabled {
   width: 56px;
   padding: 5px;
 }
-.camera-keyframe {
-  position: absolute;
-  top: 1px;
-  transform: translateX(-5px);
-  padding: 0;
-  color: #b7a2e5;
-  z-index: 2;
-}
 .canvas-zoom {
   position: absolute;
   bottom: 17px;
@@ -1620,6 +1612,7 @@ fieldset:disabled {
   border-radius: 50%;
   background: #bdcdd0;
   transform: translate(-50%, -50%);
+  transition: transform 180ms ease-out, box-shadow 180ms ease-out;
   pointer-events: auto;
   cursor: ew-resize;
   z-index: 1;
@@ -1648,6 +1641,11 @@ fieldset:disabled {
 .animation-point.selected-frame {
   transform: translate(-50%, -50%) scale(1.7);
   z-index: 2;
+}
+@media (prefers-reduced-motion: reduce) {
+  .animation-point {
+    transition: none;
+  }
 }
 .keyframe-edit-status {
   display: flex;

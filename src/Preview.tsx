@@ -16,6 +16,7 @@ import {
 } from "../shared/effects";
 import { cursorAt, cursorSvg, defaultCursorStyle } from "../shared/cursor";
 import { cameraAt, resizeHandles, resizeTransform } from "../shared/canvas";
+import { setVideoZoomPan, unzoomVideoPreview } from "../shared/video-zoom-pan";
 import { resizeTextBox, textLineHeight, type TextBox } from "../shared/text";
 import { textBoxFor, fittedTextFont } from "./text";
 import type { Editor } from "./useEditor";
@@ -518,16 +519,21 @@ export function ScenePreview({
   scale,
   interactive = true,
   applyCamera = true,
+  applyVideoZoomPan = true,
 }: {
   editor: Editor;
   scale: number;
   interactive?: boolean;
   applyCamera?: boolean;
+  applyVideoZoomPan?: boolean;
 }) {
-  const { project, playhead } = editor;
-  const camera = applyCamera
-    ? (editor.cameraDraft ?? cameraAt(project, playhead))
-    : null;
+  const { playhead } = editor;
+  const project = !applyVideoZoomPan
+    ? unzoomVideoPreview(editor.project, playhead)
+    : editor.zoomPanDraft
+      ? setVideoZoomPan(editor.project, editor.zoomPanDraft, playhead)
+      : editor.project;
+  const camera = applyCamera ? cameraAt(project, playhead) : null;
   const active = project.clips.filter(
     (clip) =>
       playhead >= clip.start &&
