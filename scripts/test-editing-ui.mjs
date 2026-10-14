@@ -26,7 +26,7 @@ await promisify(execFile)(
     "-i",
     "color=c=blue:s=320x180:r=15",
     "-t",
-    "1",
+    "4",
     "-c:v",
     "libx264",
     "-pix_fmt",
@@ -48,7 +48,7 @@ const project = {
       name: "录屏",
       path: video,
       kind: "video",
-      duration: 1,
+      duration: 4,
       width: 320,
       height: 180,
       hasAudio: false,
@@ -540,12 +540,18 @@ try {
   await expect(
     page.getByRole("tab", { name: "鼠标", exact: true }),
   ).toHaveCount(0);
-  await page.getByRole("tab", { name: "片段", exact: true }).click();
-  await page.getByLabel("开始 (秒)").fill("6");
+  await expect(page.getByRole("tab", { name: "片段", exact: true })).toHaveCount(0);
+  const imageMove = await page.locator(".timeline-clip.image .clip-label").boundingBox();
+  await page.mouse.move(imageMove.x + 20, imageMove.y + 10);
+  await page.mouse.down();
+  await page.mouse.move(imageMove.x + 150, imageMove.y + 10, { steps: 4 });
+  await page.mouse.up();
+  const positionInput = page.getByLabel("位置 X (%)", { exact: true });
+  await positionInput.focus();
   await page.keyboard.press("Control+v");
   // Native paste may validly change a number input using the user's clipboard.
-  // Restore the fixture time before the canvas checks without modifying that clipboard.
-  await page.getByLabel("开始 (秒)").fill("6");
+  // Restore the fixture position without modifying that clipboard.
+  await positionInput.fill("50");
   await expect(page.locator(".timeline-clip.image")).toHaveCSS("left", "390px");
   await expect(page.locator(".timeline-clip.image")).toHaveCount(1);
   await page.getByRole("tab", { name: "画面", exact: true }).click();
@@ -647,9 +653,9 @@ try {
   for (let i = 0; i < 2; i++) await page.getByTitle("撤销 Ctrl+Z", { exact: true }).click();
   await page.getByRole("button", { name: "自动动画", exact: true }).click();
   await imageArrow.locator(".animation-point.end").click();
-  await page.getByRole("tab", { name: "片段", exact: true }).click();
-  await page.getByLabel("时长 (秒)", { exact: true }).fill("2");
-  await page.getByRole("tab", { name: "画面", exact: true }).click();
+  await dragHandle(imageClip.locator(".trim-handle.right"), -195, 0, 1);
+  await expect(imageClip).toHaveCSS("width", "130px");
+  await seek(7.5);
   await expect(canvasImage).toBeVisible();
   await page.getByTitle("撤销 Ctrl+Z", { exact: true }).click();
   expect((await imageClip.boundingBox()).x).toBeCloseTo(imageClipLeft, 0);
@@ -857,10 +863,14 @@ try {
   await page.screenshot({ path: path.join(root, "text-properties.png") });
 
   for (let i = 0; i < 3; i++) {
-    await page.locator(".timeline-clip.video").nth(i).click();
-    await page.getByRole("tab", { name: "片段", exact: true }).click();
-    await page.getByLabel("开始 (秒)", { exact: true }).fill("6");
-    await page.getByLabel("播放速度", { exact: true }).fill("0.25");
+    const clip = page.locator(".timeline-clip.video").nth(i);
+    await clip.click();
+    const width = (await clip.boundingBox()).width;
+    if (width < 260) await dragHandle(clip.locator(".trim-handle.right"), 260 - width, 0, 1);
+    const left = Number.parseFloat(await clip.evaluate(element => element.style.left));
+    await dragHandle(clip, 390 - left, 0, 1);
+    await expect(clip).toHaveCSS("left", "390px");
+    await expect(clip).toHaveCSS("width", "260px");
   }
   await seek(8);
   await page.locator(".timeline-toolbar").click({ position: { x: 2, y: 2 } });

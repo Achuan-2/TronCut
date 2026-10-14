@@ -28,7 +28,7 @@ import { capabilities, probeMedia } from "./media";
 import { findBinary, runProcess } from "./process";
 import { openProject, saveProject } from "./project-store";
 import { importCamtasia } from "./camtasia";
-import { audioFilters, exportVideo } from "./export";
+import { audioFilters, exportVideo, exportFrame } from "./export";
 import { speechEngineSchema, speechOptionsSchema } from "../shared/asr";
 import { transcribeAsset } from "./transcription";
 import { synthesizeSpeech } from "./synthesis";
@@ -523,6 +523,40 @@ function installHandlers() {
     if (result.canceled || !result.filePath) return null;
     await fs.writeFile(result.filePath, toSrt(cues), "utf8");
     return result.filePath;
+  });
+  handle("video:frame", async (input: unknown, at: unknown, endpoint: unknown) => {
+    if (task) throw new Error("已有后台任务正在执行");
+    const project = authorizedProject(input);
+    const time = z.number().finite().nonnegative().parse(at);
+    const endpointClipId = z.string().max(128).optional().parse(endpoint);
+    const folder = path.join(app.getPath("userData"), "frames");
+    await fs.mkdir(folder, { recursive: true });
+    const target = path.join(folder, `frame-${uid()}.png`);
+    const temp = await fs.mkdtemp(
+      path.join(app.getPath("temp"), "troncut-frame-"),
+    );
+    const controller = new AbortController();
+    task = controller;
+    try {
+      await exportFrame(
+        project,
+        time,
+        target,
+        temp,
+        controller.signal,
+        process.resourcesPath,
+        endpointClipId,
+      );
+      const asset = await probeMedia(target, process.resourcesPath);
+      asset.name = `当前帧 ${time.toFixed(2)}s.png`;
+      return register(asset);
+    } catch (error) {
+      await fs.rm(target, { force: true });
+      throw error;
+    } finally {
+      task = null;
+      await fs.rm(temp, { recursive: true, force: true });
+    }
   });
   handle("video:export", async (input: unknown) => {
     if (task) throw new Error("已有后台任务正在执行");

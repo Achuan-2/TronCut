@@ -43,6 +43,8 @@ const bridge: FrameCraftBridge = {
   importSubtitles: () => ipcRenderer.invoke("subtitles:import"),
   exportSubtitles: (cues) => ipcRenderer.invoke("subtitles:export", cues),
   exportVideo: (project) => ipcRenderer.invoke("video:export", project),
+  captureFrame: (project, time, endpointClipId) =>
+    ipcRenderer.invoke("video:frame", project, time, endpointClipId),
   previewAudio: (project, clipId) =>
     ipcRenderer.invoke("audio:preview", project, clipId),
   synthesize: (options) => ipcRenderer.invoke("audio:synthesize", options),

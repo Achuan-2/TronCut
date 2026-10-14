@@ -19,6 +19,7 @@ import {
   visualDefaults,
   visualKeys,
 } from "../shared/visual-state";
+import { frameSnapshot } from "../shared/frame-snapshot";
 
 // Avoid lookahead buffering in short, delayed overlay graphs. Hardware failure
 // fallback and explicitly requested software encoding use identical settings.
@@ -258,14 +259,57 @@ export async function exportVideo(
   progress: (percent: number) => void,
   resourcesPath?: string,
 ): Promise<void> {
-  const duration = projectDuration(project);
+  return renderProject(
+    project,
+    target,
+    workDir,
+    rubberband,
+    signal,
+    progress,
+    resourcesPath,
+  );
+}
+
+/** Render a single composition frame without encoding a temporary video. */
+export async function exportFrame(
+  project: Project,
+  time: number,
+  target: string,
+  workDir: string,
+  signal: AbortSignal,
+  resourcesPath?: string,
+  endpointClipId?: string,
+): Promise<void> {
+  return renderProject(
+    frameSnapshot(project, time, endpointClipId),
+    target,
+    workDir,
+    false,
+    signal,
+    () => {},
+    resourcesPath,
+    true,
+  );
+}
+
+async function renderProject(
+  project: Project,
+  target: string,
+  workDir: string,
+  rubberband: boolean,
+  signal: AbortSignal,
+  progress: (percent: number) => void,
+  resourcesPath?: string,
+  still = false,
+): Promise<void> {
+  const duration = still ? 1 / project.canvas.fps : projectDuration(project);
   if (duration <= 0) throw new Error("时间线为空");
-  if (project.canvas.width % 2 || project.canvas.height % 2)
+  if (!still && (project.canvas.width % 2 || project.canvas.height % 2))
     throw new Error("H.264 导出要求画布宽高为偶数");
   await fs.mkdir(workDir, { recursive: true });
   const partial = path.join(
     path.dirname(target),
-    `.framecraft-${Date.now()}.partial.mp4`,
+    `.framecraft-${Date.now()}.partial.${still ? "png" : "mp4"}`,
   );
   const { width, height, fps, background } = project.canvas;
   const args = [
@@ -276,16 +320,14 @@ export async function exportVideo(
     "-f",
     "lavfi",
     "-i",
-    `color=c=${background}:s=${width}x${height}:r=${fps}:d=${duration}`,
-    "-f",
-    "lavfi",
-    "-i",
-    `anullsrc=r=48000:cl=stereo:d=${duration}`,
+    `color=c=${background}:s=${width}x${height}:r=${fps}:d=${duration}${still ? ",format=rgba" : ""}`,
   ];
+  if (!still)
+    args.push("-f", "lavfi", "-i", `anullsrc=r=48000:cl=stereo:d=${duration}`);
   const filters: string[] = [],
-    audioLabels: string[] = ["[1:a]"];
+    audioLabels: string[] = still ? [] : ["[1:a]"];
   let base = "0:v",
-    input = 2,
+    input = still ? 1 : 2,
     layer = 0;
   const ordered = [...project.tracks]
     .reverse()
@@ -300,6 +342,46 @@ export async function exportVideo(
     const asset = project.assets.find((a) => a.id === clip.assetId);
     if (asset?.missing) throw new Error(`素材离线：${asset.name}`);
     const index = input++;
+    // Seeking the decoder directly makes a late-timeline capture fast. Image
+    // inputs start at zero; their source timestamp only matters to cursor data.
+    const sourceIn = still ? 0 : clip.sourceIn;
+    let sourceSeek = clip.sourceIn;
+    if (
+      still &&
+      clip.kind === "video" &&
+      asset &&
+      sourceSeek >= asset.duration
+    ) {
+      // An edited endpoint can be exactly at EOF. Use the last decoded source
+      // timestamp instead of assuming the video's frame rate equals the project.
+      const timestamps = await runProcess(
+        findBinary("ffprobe", resourcesPath),
+        [
+          "-v",
+          "error",
+          "-select_streams",
+          "v:0",
+          "-read_intervals",
+          `${Math.max(0, asset.duration - 1)}%`,
+          "-show_frames",
+          "-show_entries",
+          "frame=best_effort_timestamp_time",
+          "-of",
+          "csv=p=0",
+          asset.path,
+        ],
+        { signal, timeout: 30000 },
+      );
+      const last = timestamps
+        .trim()
+        .split(/\r?\n/)
+        .map((line) => Number.parseFloat(line))
+        .filter(Number.isFinite)
+        .at(-1);
+      if (last === undefined)
+        throw new Error(`无法读取视频末帧：${asset.name}`);
+      sourceSeek = last;
+    }
     let intrinsicWidth = asset?.width ?? 600,
       intrinsicHeight = asset?.height ?? 300;
     if (clip.kind === "text" || clip.kind === "shape") {
@@ -308,23 +390,26 @@ export async function exportVideo(
       intrinsicWidth = size.width;
       intrinsicHeight = size.height;
       args.push(
-        ...loopImageInput(
-          image,
-          fps,
-          clip.sourceIn + clip.duration * clip.speed,
-        ),
+        ...loopImageInput(image, fps, sourceIn + clip.duration * clip.speed),
       );
     } else if (clip.kind === "image")
       args.push(
         ...loopImageInput(
           asset!.path,
           fps,
-          clip.sourceIn + clip.duration * clip.speed,
+          sourceIn + clip.duration * clip.speed,
         ),
       );
     // Multiple retimed overlays can also stall frame-threaded video decoding.
     // Keep decoding deterministic; the output encoder still chooses its own threads.
-    else args.push("-threads", "1", "-i", asset!.path);
+    else
+      args.push(
+        "-threads",
+        "1",
+        ...(still ? ["-ss", String(sourceSeek)] : []),
+        "-i",
+        asset!.path,
+      );
     if (clip.kind !== "audio") {
       const visual = `v${layer}`,
         output = `mix${layer}`;
@@ -395,12 +480,13 @@ export async function exportVideo(
           workDir,
           input,
           signal,
+          still,
         );
         if (cursor) {
           args.push(...cursor.args);
           input += 2;
           filters.push(
-            `[${source}]trim=start=${clip.sourceIn}:duration=${clip.duration * clip.speed},setpts=(PTS-STARTPTS)/${clip.speed}+${clip.start}/TB,format=rgba,${cursor.filters[0]}`,
+            `[${source}]trim=start=${sourceIn}:duration=${clip.duration * clip.speed},setpts=(PTS-STARTPTS)/${clip.speed}+${clip.start}/TB,format=rgba,${cursor.filters[0]}`,
           );
           filters.push(...cursor.filters.slice(1));
           source = cursor.label;
@@ -408,17 +494,18 @@ export async function exportVideo(
       }
       const timing =
         source === `${index}:v`
-          ? `trim=start=${clip.sourceIn}:duration=${clip.duration * clip.speed},setpts=(PTS-STARTPTS)/${clip.speed}+${clip.start}/TB,`
+          ? `trim=start=${sourceIn}:duration=${clip.duration * clip.speed},setpts=(PTS-STARTPTS)/${clip.speed}+${clip.start}/TB,`
           : "";
       filters.push(
         `[${source}]${timing}format=rgba,${[...(animatedViewport ? animatedViewportFilters((key) => expression(clip, key, "T")) : contentFilters(clip)), ...visualEffects, transform, "setsar=1", ...rotate, alpha].join(",")}[${visual}]`,
       );
       filters.push(
-        `[${base}][${visual}]overlay=x='${width}*(${expression(clip, "x")})-overlay_w/2':y='${height}*(${expression(clip, "y")})-overlay_h/2':enable='gte(t,${clip.start})*lt(t,${clip.start + clip.duration})':eof_action=pass:repeatlast=0[${output}]`,
+        `[${base}][${visual}]overlay=x='${width}*(${expression(clip, "x")})-overlay_w/2':y='${height}*(${expression(clip, "y")})-overlay_h/2':enable='gte(t,${clip.start})*lt(t,${clip.start + clip.duration})':eof_action=pass:repeatlast=0${still ? ":format=auto" : ""}[${output}]`,
       );
       base = output;
     }
     if (
+      !still &&
       asset?.hasAudio &&
       clip.kind !== "image" &&
       !track.muted &&
@@ -432,9 +519,10 @@ export async function exportVideo(
     }
     layer++;
   }
-  filters.push(
-    `${audioLabels.join("")}amix=inputs=${audioLabels.length}:duration=longest:normalize=0,alimiter=limit=0.95,atrim=duration=${duration}[audio]`,
-  );
+  if (!still)
+    filters.push(
+      `${audioLabels.join("")}amix=inputs=${audioLabels.length}:duration=longest:normalize=0,alimiter=limit=0.95,atrim=duration=${duration}[audio]`,
+    );
   if (project.camera) {
     const camera = { ...project.camera, start: 0 };
     const clock = `on/${fps}`;
@@ -446,35 +534,40 @@ export async function exportVideo(
     base = "camera";
   }
   const graph = path.join(workDir, "graph.txt");
+  filters.push(`[${base}]format=${still ? "rgb24" : "yuv420p"}[video]`);
   await fs.writeFile(graph, filters.join(";\n"));
-  await fs.appendFile(graph, `;\n[${base}]format=yuv420p[video]`);
   const version = await runProcess(
     findBinary("ffmpeg", resourcesPath),
     ["-version"],
     { timeout: 10000 },
   );
   const major = Number(version.match(/ffmpeg version (?:n)?(\d+)\./)?.[1] ?? 7);
-  const encoder = await chooseEncoder(project, resourcesPath, signal);
+  const encoder = still
+    ? ["-c:v", "png"]
+    : await chooseEncoder(project, resourcesPath, signal);
   args.push(
     major >= 7 ? "-/filter_complex" : "-filter_complex_script",
     graph,
     "-map",
     "[video]",
-    "-map",
-    "[audio]",
+    ...(still ? [] : ["-map", "[audio]"]),
     "-t",
     String(duration),
     "-r",
     String(fps),
     ...encoder,
-    "-pix_fmt",
-    "yuv420p",
-    "-c:a",
-    "aac",
-    "-b:a",
-    "192k",
-    "-movflags",
-    "+faststart",
+    ...(still
+      ? ["-frames:v", "1", "-update", "1"]
+      : [
+          "-pix_fmt",
+          "yuv420p",
+          "-c:a",
+          "aac",
+          "-b:a",
+          "192k",
+          "-movflags",
+          "+faststart",
+        ]),
     "-progress",
     "pipe:1",
     partial,
@@ -497,7 +590,7 @@ export async function exportVideo(
         processOptions,
       );
     } catch (error) {
-      if (signal.aborted || encoder[1] === "libx264") throw error;
+      if (still || signal.aborted || encoder[1] === "libx264") throw error;
       const index = args.indexOf("-c:v");
       args.splice(index, encoder.length, ...softwareEncoder);
       progress(0);

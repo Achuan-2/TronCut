@@ -20,6 +20,7 @@ import {
   Copy,
   Flag,
   ChevronDown,
+  Camera,
 } from "lucide-react";
 import {
   type Clip,
@@ -59,6 +60,7 @@ export default function Timeline({
   editor,
   onCopyAnimation,
   onDropFiles,
+  onCaptureFrame,
   dropDisabled = false,
 }: {
   editor: Editor;
@@ -68,6 +70,7 @@ export default function Timeline({
     cut?: boolean,
   ) => void;
   onDropFiles: (files: File[], time: number, trackId?: string) => void;
+  onCaptureFrame: () => void;
   dropDisabled?: boolean;
 }) {
   const { project, apply, playhead, seek, selected, selectedId, select } =
@@ -352,11 +355,12 @@ export default function Timeline({
             添加关键帧
           </button>
           <button
-            title="组合（Ctrl+G）"
-            disabled={editor.selectedIds.length < 2}
-            onClick={() => apply((p) => groupSelection(p, editor.selectedIds))}
+            title="将当前画面截为图片并插入新轨道"
+            disabled={dropDisabled}
+            onClick={onCaptureFrame}
           >
-            组合
+            <Camera size={17} />
+            截取当前帧
           </button>
           <button
             title="添加轨道"

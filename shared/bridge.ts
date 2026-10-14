@@ -53,6 +53,11 @@ export interface FrameCraftBridge {
   importSubtitles(): Promise<Cue[] | null>;
   exportSubtitles(cues: Cue[]): Promise<string | null>;
   exportVideo(project: Project): Promise<string | null>;
+  captureFrame(
+    project: Project,
+    time: number,
+    endpointClipId?: string,
+  ): Promise<Asset>;
   previewAudio(project: Project, clipId: string): Promise<string>;
   synthesize(options: TtsOptions): Promise<Asset>;
   selectNarrationReference(): Promise<Asset | null>;

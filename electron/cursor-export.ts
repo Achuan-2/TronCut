@@ -14,6 +14,7 @@ export async function cursorFilters(
   workDir: string,
   input: number,
   signal: AbortSignal,
+  still = false,
 ) {
   const style = clip.cursorStyle ?? defaultCursorStyle;
   if (!asset.cursor?.samples.length || style.style === "hidden") return null;
@@ -36,7 +37,11 @@ export async function cursorFilters(
   let last = "",
     buffer = "";
   try {
-    for (let frame = 0; frame <= Math.ceil(clip.duration * fps); frame++) {
+    for (
+      let frame = 0;
+      !still && frame <= Math.ceil(clip.duration * fps);
+      frame++
+    ) {
       if (signal.aborted) throw new Error("任务已取消");
       // Commands run after painting this frame, setting the position for the next one.
       // Putting sendcmd upstream lets framesync read ahead and applies the final position to every frame.
@@ -90,6 +95,14 @@ export async function cursorFilters(
           (style.style === "arrow" ? style.size * 0.06 : style.size / 2),
       )
     : -10000;
+  const ringX =
+    still && first?.click && style.clicks
+      ? Math.round((first.clickX ?? first.x) * asset.width - diameter / 2)
+      : -10000;
+  const ringY =
+    still && first?.click && style.clicks
+      ? Math.round((first.clickY ?? first.y) * asset.height - diameter / 2)
+      : -10000;
   return {
     args: [
       ...loopImageInput(cursor, fps, clip.start + clip.duration),
@@ -97,8 +110,8 @@ export async function cursorFilters(
     ],
     filters: [
       `null[cursorclock${layer}]`,
-      `[cursorclock${layer}][${input + 1}:v]overlay@click${layer}=x=-10000:y=-10000:format=auto[clickvideo${layer}]`,
-      `[clickvideo${layer}][${input}:v]overlay@cursor${layer}=x=${firstX}:y=${firstY}:format=auto,sendcmd=f=${filename}[cursorvideo${layer}]`,
+      `[cursorclock${layer}][${input + 1}:v]overlay@click${layer}=x=${ringX}:y=${ringY}:format=auto[clickvideo${layer}]`,
+      `[clickvideo${layer}][${input}:v]overlay@cursor${layer}=x=${firstX}:y=${firstY}:format=auto${still ? "" : `,sendcmd=f=${filename}`}[cursorvideo${layer}]`,
     ],
     label: `cursorvideo${layer}`,
   };

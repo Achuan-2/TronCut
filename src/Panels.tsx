@@ -22,7 +22,6 @@ import {
   Mic,
   MousePointer2,
   Scan,
-  Clock3,
   Link2,
 } from "lucide-react";
 import {
@@ -834,11 +833,9 @@ export function Inspector({ editor }: { editor: Editor }) {
       ? [{ name: "cursor", label: "鼠标", icon: MousePointer2 }]
       : []),
     ...(hasText ? [{ name: "text", label: "文本", icon: Type }] : []),
-    {
-      name: "clip",
-      label: c?.kind === "audio" ? "声音" : "片段",
-      icon: Clock3,
-    },
+    ...(c?.kind === "audio"
+      ? [{ name: "audio", label: "声音", icon: Music2 }]
+      : []),
   ];
   const activeTab =
     tab.clipId === c?.id && tabs.some((item) => item.name === tab.name)
@@ -846,7 +843,7 @@ export function Inspector({ editor }: { editor: Editor }) {
       : hasText
         ? "text"
         : c?.kind === "audio"
-          ? "clip"
+          ? "audio"
           : "video";
   const cursorActive = activeTab === "cursor";
   const textActive = activeTab === "text";
@@ -1280,39 +1277,11 @@ export function Inspector({ editor }: { editor: Editor }) {
               )}
             </div>
             <div
-              id="inspector-clip"
+              id="inspector-audio"
               role="tabpanel"
-              aria-labelledby="inspector-clip-tab"
-              hidden={activeTab !== "clip"}
+              aria-labelledby="inspector-audio-tab"
+              hidden={activeTab !== "audio"}
             >
-              <h3 className="section-title">时间</h3>
-              {numberField(
-                "开始 (秒)",
-                c.start,
-                (start) => update({ start }),
-                0,
-                86400,
-                0.1,
-              )}
-              {numberField(
-                "时长 (秒)",
-                c.duration,
-                (duration) => {
-                  const asset = editor.project.assets.find(
-                    (a) => a.id === c.assetId,
-                  );
-                  if (
-                    asset &&
-                    ["video", "audio"].includes(c.kind) &&
-                    duration * c.speed + c.sourceIn > asset.duration + 0.01
-                  )
-                    return;
-                  update({ duration });
-                },
-                1 / editor.project.canvas.fps,
-                86400,
-                0.1,
-              )}
               {["video", "audio"].includes(c.kind) && (
                 <>
                   {numberField(

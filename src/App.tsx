@@ -280,6 +280,19 @@ export default function App() {
       setTab("media");
       toast(`已添加 ${assets.length} 个素材到时间线`);
     });
+  const captureFrame = () =>
+    importIntoTimeline(async () => {
+      editor.setPlaying(false);
+      const time = editor.playhead;
+      const asset = await bridge().captureFrame(
+        editor.project,
+        time,
+        editor.selectedKeyframe?.clipId,
+      );
+      editor.addAssets([asset], true, { time, newTrackForImages: true });
+      setTab("media");
+      toast("当前帧已作为图片插入新轨道");
+    });
   const pasteHandler = useRef<(event: ClipboardEvent) => void>(() => {});
   pasteHandler.current = (event) => {
     if (
@@ -783,6 +796,7 @@ export default function App() {
             editor={editor}
             onCopyAnimation={copyAnimation}
             onDropFiles={dropFiles}
+            onCaptureFrame={() => void captureFrame()}
             dropDisabled={busy || recording || mediaImporting}
           />
         </>
