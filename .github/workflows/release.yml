@@ -114,6 +114,13 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Build failed' }
       - name: Package Windows x64
         run: pnpm exec electron-builder --win nsis --x64 --publish never
+      - name: Verify packaged editing interactions
+        env:
+          FRAMECRAFT_PACKAGED_SMOKE: "1"
+          FRAMECRAFT_PACKAGED_APP: release/win-unpacked/TronCut.exe
+        run: |
+          node scripts/test-editing-ui.mjs
+          if ($LASTEXITCODE -ne 0) { throw 'Packaged editing regression failed' }
       - name: Prepare portable ZIP, sources and checksums
         run: node ../ci/scripts/prepare-release.mjs
       - name: Retain packages even when release upload fails

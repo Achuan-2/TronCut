@@ -10,14 +10,14 @@
     <img src="https://img.shields.io/badge/status-preview-orange" alt="Preview" />
   </p>
   <p><strong>简体中文</strong> · <a href="README.en.md">English</a></p>
-  <p><a href="https://github.com/Achuan-2/TronCut/releases/tag/v0.2.0">下载安装</a> · <a href="#亮点">功能亮点</a> · <a href="docs/FEATURES.md">开发进度</a> · <a href="https://github.com/Achuan-2/TronCut/issues">反馈问题</a></p>
+  <p><a href="https://github.com/Achuan-2/TronCut/releases/tag/v0.3.0">下载安装</a> · <a href="#亮点">功能亮点</a> · <a href="docs/FEATURES.md">开发进度</a> · <a href="https://github.com/Achuan-2/TronCut/issues">反馈问题</a></p>
 </div>
 
 ![TronCut Windows 编辑器](docs/images/editor.png)
 
 TronCut 将录屏、剪辑、文字、字幕和声音处理放在同一个工作区。素材库、画布、属性面板和多轨时间线采用熟悉的桌面剪辑布局，重点改善教程制作中的文字添加、动画操作、字幕定位和工程迁移。
 
-> **当前版本：v0.2.0 预发布。** Windows 已提供安装包并完成短时录屏、编辑、保存和导出的桌面测试。macOS 仍在开发，Camtasia 工程导入目前为有限转换。本版尚未实现完整 Camtasia 功能，详见[兼容范围](#兼容范围)。
+> **当前版本：v0.3.0 预发布。** Windows 已提供安装包并完成短时录屏、编辑、保存和导出的桌面测试。macOS 仍在开发，Camtasia 工程导入目前为有限转换。本版尚未实现完整 Camtasia 功能，详见[兼容范围](#兼容范围)。
 
 ## 亮点
 
@@ -35,12 +35,12 @@ TronCut 将录屏、剪辑、文字、字幕和声音处理放在同一个工作
 
 ## 下载与开始使用
 
-前往 **[GitHub Releases](https://github.com/Achuan-2/TronCut/releases/tag/v0.2.0)** 下载：
+前往 **[GitHub Releases](https://github.com/Achuan-2/TronCut/releases/tag/v0.3.0)** 下载：
 
 | 文件                                  | 用途                                     |
 | ------------------------------------- | ---------------------------------------- |
-| `TronCut-Setup-0.2.0-windows-x64.exe` | Windows x64 安装包，支持选择安装目录。   |
-| `TronCut-0.2.0-windows-x64.zip`       | 免安装版；完整解压后运行 `TronCut.exe`。 |
+| `TronCut-Setup-0.3.0-windows-x64.exe` | Windows x64 安装包，支持选择安装目录。   |
+| `TronCut-0.3.0-windows-x64.zip`       | 免安装版；完整解压后运行 `TronCut.exe`。 |
 | `SHA256SUMS.txt`                      | 发布文件的 SHA256 校验值。               |
 
 安装包包含媒体引擎、原生录屏组件和字幕环境管理器，使用者无需安装 Node.js、FFmpeg 或 uv。**首次生成语音字幕需要联网下载 Python、依赖和模型**，完成后语音识别在本地运行。当前 Windows 包未配置代码签名证书。
