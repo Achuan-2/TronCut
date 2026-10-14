@@ -1640,6 +1640,10 @@ fieldset:disabled {
   background: #f26068;
   box-shadow: 0 0 0 2px #f2606844;
 }
+.animation-point.selected-frame {
+  transform: translate(-50%, -50%) scale(1.7);
+  z-index: 2;
+}
 .keyframe-edit-status {
   display: flex;
   align-items: center;

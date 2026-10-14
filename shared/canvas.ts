@@ -87,6 +87,7 @@ export function setCameraTransform(
     value,
     time,
     true,
+    Infinity, // Canvas camera edits retain their existing continuous curve.
   );
   return {
     ...project,

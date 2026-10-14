@@ -85,7 +85,7 @@ it("真实合成可编辑鼠标且随移动改变像素，独立 JSON 鼠标数�
       kind: "video",
       assetId: asset.id,
       name: "录屏",
-      start: 0,
+      start: 0.5,
       duration: 1,
       sourceIn: 0,
       speed: 1,
@@ -108,14 +108,14 @@ it("真实合成可编辑鼠标且随移动改变像素，独立 JSON 鼠标数�
     out,
     path.join(root, "render"),
     false,
-    new AbortController().signal,
+    AbortSignal.timeout(20000),
     () => {},
   );
   const frame = path.join(root, "frame.png");
   await runProcess(findBinary("ffmpeg"), [
     "-y",
     "-ss",
-    "0.4",
+    "0.9",
     "-i",
     out,
     "-frames:v",

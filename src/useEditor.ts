@@ -25,6 +25,7 @@ import {
 import { selectionWithGroups } from "../shared/timeline";
 import { setCameraTransform } from "../shared/canvas";
 import { fitUpdatedText } from "./text";
+import { animationEditTarget } from "../shared/animation-ranges";
 
 export function demoProject(): Project {
   const project = createProject("我的第一个视频");
@@ -202,7 +203,12 @@ export function useEditor() {
         localTime > clip.duration
       )
         return;
-      const time = localTime + (clip.animationOffset ?? 0);
+      const target = animationEditTarget(
+        clip,
+        localTime + (clip.animationOffset ?? 0),
+        side,
+      );
+      const time = target.time;
       const frame = clip.keyframes.find(
         (frame) => Math.abs(frame.time - time) < 1e-6,
       );
@@ -215,7 +221,7 @@ export function useEditor() {
         )
       )
         return;
-      const selection = { clipId, time: frame?.time ?? 0, side };
+      const selection = { clipId, time: frame?.time ?? 0, side: target.side };
       keyframeRef.current = selection;
       setKeyframeSelection(selection);
       selectMany([clipId]);
@@ -230,7 +236,12 @@ export function useEditor() {
       updateClip(id, (clip) => {
         const source = { ...clip, ...clipPatch };
         return frame?.clipId === id
-          ? setKeyframeTransform(source, patch, frame.time)
+          ? setKeyframeTransform(
+              source,
+              patch,
+              frame.time,
+              frame.side === "start",
+            )
           : setTransform(source, patch, playhead - clip.start, autoAnimate);
       });
     },

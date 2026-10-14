@@ -430,7 +430,7 @@ try {
   await page.getByTitle("撤销 Ctrl+Z", { exact: true }).click();
   await seek(7);
   await expect(page.locator(".keyframe-edit-status")).toHaveCount(0);
-  expect(Number(await page.getByLabel("位置 X (%)", { exact: true }).inputValue())).toBeCloseTo(50, 1);
+  expect(Number(await page.getByLabel("位置 X (%)", { exact: true }).inputValue())).toBeCloseTo(20, 1);
   for (let i = 0; i < 2; i++) await page.getByTitle("撤销 Ctrl+Z", { exact: true }).click();
   await page.getByRole("button", { name: "自动动画", exact: true }).click();
   await imageArrow.locator(".animation-point.end").click();
@@ -459,6 +459,30 @@ try {
   await imageArrow.locator(".animation-point.end").click();
   await expect(imageArrow.locator(".animation-point.end")).toHaveClass(/active/);
   await page.screenshot({ path: path.join(root, "animation-arrows.png") });
+  expect((await imageArrow.locator(".animation-point.end").boundingBox()).width).toBeCloseTo(17, 1);
+  await seek(10);
+  expect((await imageArrow.locator(".animation-point.end").boundingBox()).width).toBeCloseTo(10, 1);
+  await page.getByLabel("位置 X (%)", { exact: true }).fill("65");
+  const separatedArrows = imageClip.locator(".clip-animation");
+  await expect(separatedArrows).toHaveCount(2);
+  expect(Number(await separatedArrows.nth(1).getAttribute("data-start"))).toBeCloseTo(9, 2);
+  expect(Number(await separatedArrows.nth(1).getAttribute("data-end"))).toBeCloseTo(10, 2);
+  await separatedArrows.nth(1).locator(".animation-point.start").click();
+  await expect(separatedArrows.nth(0).locator(".animation-point.end")).toHaveClass(/selected-frame/);
+  await expect(separatedArrows.nth(1).locator(".animation-point.start")).not.toHaveClass(/selected-frame/);
+  await page.getByLabel("位置 X (%)", { exact: true }).fill("70");
+  await seek(8.5);
+  await expect(page.getByLabel("位置 X (%)", { exact: true })).toHaveValue("70");
+  await expect(separatedArrows).toHaveCount(2);
+  await separatedArrows.nth(0).locator(".animation-point.start").click();
+  await page.getByLabel("位置 X (%)", { exact: true }).fill("20");
+  await seek(6.5);
+  await expect(page.getByLabel("位置 X (%)", { exact: true })).toHaveValue("20");
+  await expect(separatedArrows).toHaveCount(2);
+  await page.screenshot({ path: path.join(root, "separated-animation-arrows.png") });
+  for (let i = 0; i < 3; i++) await page.getByTitle("撤销 Ctrl+Z", { exact: true }).click();
+  await expect(imageArrow).toHaveCount(1);
+  await imageArrow.locator(".animation-point.end").click();
   const trackLock = async (clip) => {
     await page.locator(".timeline-scroll").evaluate((element) => {
       element.scrollTop = 0;

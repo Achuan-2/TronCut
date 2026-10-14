@@ -1,4 +1,29 @@
-import type { Clip } from "./model";
+import type { Clip, Transform } from "./model";
+
+export function sameTransform(a: Transform, b: Transform, rotation = 0) {
+  return (
+    (["x", "y", "scale", "opacity"] as const).every(
+      (key) => a[key] === b[key],
+    ) && (a.rotation ?? rotation) === (b.rotation ?? rotation)
+  );
+}
+
+// The start state belongs to the preceding animation's end, including across
+// a hold. With no preceding animation, it belongs to the initial state.
+export function animationEditTarget(
+  clip: Clip,
+  time: number,
+  side: "start" | "end",
+) {
+  if (side === "end") return { time, side };
+  const offset = clip.animationOffset ?? 0;
+  const previous = animationRanges(clip)
+    .filter((range) => range.hasEnd && range.end + offset <= time + 1e-6)
+    .at(-1);
+  return previous
+    ? { time: previous.end + offset, side: "end" as const }
+    : { time, side };
+}
 
 export interface AnimationRange {
   start: number;
@@ -22,13 +47,35 @@ export function retimeAnimation(
   const offset = clip.animationOffset ?? 0,
     minimum = 1 / fps;
   if (frames.length > 10000) return clip;
-  const index = frames.findIndex(
+  let index = frames.findIndex(
     (frame, i) =>
       i + 1 < frames.length &&
       Math.max(0, frame.time - offset) === range.start &&
       Math.min(clip.duration, frames[i + 1].time - offset) === range.end,
   );
   if (index < 0) return clip;
+  // Legacy animations can share a frame. Detach that boundary before retiming
+  // so dragging one arrow can create a hold without retiming its neighbour.
+  const rotationValue = clip.transform.rotation ?? clip.rotation ?? 0;
+  if (
+    mode !== "end" &&
+    index > 0 &&
+    !sameTransform(frames[index - 1].value, frames[index].value, rotationValue)
+  ) {
+    frames.splice(index, 0, { ...frames[index] });
+    index++;
+  }
+  if (
+    mode !== "start" &&
+    index + 2 < frames.length &&
+    !sameTransform(
+      frames[index + 1].value,
+      frames[index + 2].value,
+      rotationValue,
+    )
+  ) {
+    frames.splice(index + 2, 0, { ...frames[index + 1] });
+  }
   const a = frames[index],
     b = frames[index + 1];
   const previous = frames[index - 1],
@@ -44,24 +91,34 @@ export function retimeAnimation(
   if (mode === "move") {
     const low = Math.max(
       clipStart - a.time,
-      previous ? previous.time + minimum - a.time : -Infinity,
+      previous
+        ? previous.time + (previous.time === a.time ? 0 : minimum) - a.time
+        : -Infinity,
     );
     const high = Math.min(
       clipEnd - b.time,
-      next ? next.time - minimum - b.time : Infinity,
+      next
+        ? next.time - (next.time === b.time ? 0 : minimum) - b.time
+        : Infinity,
     );
     if (high < low) return clip;
     const shift = clamp(Math.round(delta * fps) / fps, low, high);
     start += shift;
     end += shift;
   } else if (mode === "start") {
-    const low = Math.max(clipStart, previous ? previous.time + minimum : 0);
+    const low = Math.max(
+      clipStart,
+      previous ? previous.time + (previous.time === a.time ? 0 : minimum) : 0,
+    );
     const high = Math.min(clipEnd, b.time - minimum);
     if (!range.hasStart || high < low) return clip;
     start = clamp(snap(a.time + delta), low, high);
   } else {
     const low = Math.max(clipStart, a.time + minimum);
-    const high = Math.min(clipEnd, next ? next.time - minimum : Infinity);
+    const high = Math.min(
+      clipEnd,
+      next ? next.time - (next.time === b.time ? 0 : minimum) : Infinity,
+    );
     if (!range.hasEnd || high < low) return clip;
     end = clamp(snap(b.time + delta), low, high);
   }
@@ -105,12 +162,11 @@ export function animationRanges(
   for (let i = 1; i < frames.length; i++) {
     const a = frames[i - 1],
       b = frames[i];
-    const unchanged =
-      (["x", "y", "scale", "opacity"] as const).every(
-        (key) => a.value[key] === b.value[key],
-      ) &&
-      (a.value.rotation ?? clip.transform.rotation ?? clip.rotation ?? 0) ===
-        (b.value.rotation ?? clip.transform.rotation ?? clip.rotation ?? 0);
+    const unchanged = sameTransform(
+      a.value,
+      b.value,
+      clip.transform.rotation ?? clip.rotation ?? 0,
+    );
     if (!(b.time > a.time) || unchanged) continue;
     const start = a.time - offset,
       end = b.time - offset;

@@ -71,7 +71,8 @@ describe("编辑操作保留素材和动画时间", () => {
     expect(movedAgain.keyframes).toHaveLength(2);
     expect(transformAt(movedAgain, 0)).toEqual(c.transform);
     expect(transformAt(movedAgain, 2)).toMatchObject({ x: 0.8, y: 0.2 });
-    expect(transformAt(movedAgain, 1).x).toBeCloseTo(0.65);
+    expect(transformAt(movedAgain, 1).x).toBeCloseTo(0.5);
+    expect(transformAt(movedAgain, 1.5).x).toBeCloseTo(0.65);
     expect(expression(movedAgain, "x")).toContain("clip(");
   });
   it("变速不改变消耗的源素材长度，并同步关键帧", () => {

@@ -10,6 +10,20 @@ import {
 import { findBinary, runProcess } from "./process";
 import { defaultCrop, fadeDurations, visualFilters } from "../shared/effects";
 import { cursorFilters } from "./cursor-export";
+import { loopImageInput } from "./loop-image";
+
+// Avoid lookahead buffering in short, delayed overlay graphs. Hardware failure
+// fallback and explicitly requested software encoding use identical settings.
+const softwareEncoder = [
+  "-c:v",
+  "libx264",
+  "-preset",
+  "fast",
+  "-crf",
+  "20",
+  "-tune",
+  "zerolatency",
+];
 
 const xml = (s: string) =>
   s.replace(
@@ -85,8 +99,7 @@ async function chooseEncoder(
   resourcesPath: string | undefined,
   signal: AbortSignal,
 ): Promise<string[]> {
-  const software = ["-c:v", "libx264", "-preset", "fast", "-crf", "20"];
-  if (project.exportSettings?.encoder === "software") return software;
+  if (project.exportSettings?.encoder === "software") return softwareEncoder;
   const candidates =
     process.platform === "darwin"
       ? [["-c:v", "h264_videotoolbox", "-b:v", "12M"]]
@@ -132,7 +145,7 @@ async function chooseEncoder(
       /* Try the next supported GPU; software is always available. */
     }
   }
-  return software;
+  return softwareEncoder;
 }
 async function rasterize(
   clip: Clip,
@@ -269,35 +282,24 @@ export async function exportVideo(
         size = await rasterize(clip, image);
       intrinsicWidth = size.width;
       intrinsicHeight = size.height;
-      // Finite sources avoid relying only on downstream trim to stop loops.
-      // Decode static images on one thread: FFmpeg 9 frame-threaded PNG inputs
-      // can stall in multi-overlay graphs with delayed/truncated sources.
       args.push(
-        "-loop",
-        "1",
-        "-framerate",
-        String(fps),
-        "-t",
-        String(clip.sourceIn + clip.duration * clip.speed),
-        "-threads",
-        "1",
-        "-i",
-        image,
+        ...loopImageInput(
+          image,
+          fps,
+          clip.sourceIn + clip.duration * clip.speed,
+        ),
       );
     } else if (clip.kind === "image")
       args.push(
-        "-loop",
-        "1",
-        "-framerate",
-        String(fps),
-        "-t",
-        String(clip.sourceIn + clip.duration * clip.speed),
-        "-threads",
-        "1",
-        "-i",
-        asset!.path,
+        ...loopImageInput(
+          asset!.path,
+          fps,
+          clip.sourceIn + clip.duration * clip.speed,
+        ),
       );
-    else args.push("-i", asset!.path);
+    // Multiple retimed overlays can also stall frame-threaded video decoding.
+    // Keep decoding deterministic; the output encoder still chooses its own threads.
+    else args.push("-threads", "1", "-i", asset!.path);
     if (clip.kind !== "audio") {
       const visual = `v${layer}`,
         output = `mix${layer}`;
@@ -461,16 +463,7 @@ export async function exportVideo(
     } catch (error) {
       if (signal.aborted || encoder[1] === "libx264") throw error;
       const index = args.indexOf("-c:v");
-      args.splice(
-        index,
-        encoder.length,
-        "-c:v",
-        "libx264",
-        "-preset",
-        "fast",
-        "-crf",
-        "20",
-      );
+      args.splice(index, encoder.length, ...softwareEncoder);
       progress(0);
       await runProcess(
         findBinary("ffmpeg", resourcesPath),

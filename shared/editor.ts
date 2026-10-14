@@ -8,6 +8,7 @@ import {
   newTrack,
   numberTracks,
 } from "./model";
+import { sameTransform } from "./animation-ranges";
 
 export function availableTrack(
   project: Pick<Project, "tracks" | "clips">,
@@ -124,7 +125,13 @@ export function setTransform<
     Clip,
     "transform" | "keyframes" | "animationOffset" | "duration"
   >,
->(clip: T, patch: Partial<Transform>, localTime: number, auto: boolean): T {
+>(
+  clip: T,
+  patch: Partial<Transform>,
+  localTime: number,
+  auto: boolean,
+  animationDuration = 1,
+): T {
   if (!auto)
     return {
       ...clip,
@@ -137,31 +144,70 @@ export function setTransform<
   const local = Math.max(0, Math.min(clip.duration, localTime));
   const time = Math.max(0, local + (clip.animationOffset ?? 0));
   const value = { ...transformAt(clip, local), ...patch };
+  const existing = clip.keyframes.find(
+    (frame) => Math.abs(frame.time - time) < 1e-6,
+  );
+  if (existing) return setKeyframeTransform(clip, patch, existing.time);
   const keyframes = clip.keyframes.filter(
     (k) => Math.abs(k.time - time) > 0.001,
   );
-  if (time > 0 && !keyframes.some((k) => k.time === 0))
-    keyframes.push({ time: 0, value: { ...clip.transform } });
+  // New automatic animations end at the playhead and last one second. A hold
+  // frame separates them from preceding motion; ongoing motion is not replaced.
+  const previous = keyframes
+    .filter((frame) => frame.time < time)
+    .sort((a, b) => a.time - b.time)
+    .at(-1);
+  const start = Math.max(
+    clip.animationOffset ?? 0,
+    time - animationDuration,
+    previous?.time ?? 0,
+  );
+  if (
+    start < time &&
+    !keyframes.some((frame) => Math.abs(frame.time - start) < 1e-6)
+  )
+    keyframes.push({
+      time: start,
+      value: transformAt(clip, start - (clip.animationOffset ?? 0)),
+    });
   keyframes.push({ time, value });
   return { ...clip, keyframes: keyframes.sort((a, b) => a.time - b.time) };
 }
 // An explicitly selected endpoint edits one existing frame. It must never fall
 // through to setTransform(auto=false), which applies the patch to every frame.
-export function setKeyframeTransform(
-  clip: Clip,
-  patch: Partial<Transform>,
-  time: number,
-): Clip {
+export function setKeyframeTransform<
+  T extends Pick<Clip, "transform" | "keyframes"> &
+    Partial<Pick<Clip, "rotation">>,
+>(clip: T, patch: Partial<Transform>, time: number, initialState = false): T {
   const index = clip.keyframes.findIndex(
     (frame) => Math.abs(frame.time - time) < 1e-6,
   );
-  if (index >= 0)
+  if (index >= 0) {
+    const ordered = [...clip.keyframes].sort((a, b) => a.time - b.time);
+    const target = clip.keyframes[index];
+    const position = ordered.indexOf(target);
+    const rotation = clip.transform.rotation ?? clip.rotation ?? 0;
+    const held = new Set([target]);
+    for (
+      let i = position + 1;
+      i < ordered.length &&
+      sameTransform(target.value, ordered[i].value, rotation);
+      i++
+    )
+      held.add(ordered[i]);
+    const initial = position === 0 || initialState;
+    if (initial)
+      for (const frame of ordered.slice(0, position)) held.add(frame);
     return {
       ...clip,
-      keyframes: clip.keyframes.map((frame, i) =>
-        i === index ? { ...frame, value: { ...frame.value, ...patch } } : frame,
+      transform: initial ? { ...clip.transform, ...patch } : clip.transform,
+      keyframes: clip.keyframes.map((frame) =>
+        held.has(frame)
+          ? { ...frame, value: { ...frame.value, ...patch } }
+          : frame,
       ),
     };
+  }
   if (
     time === 0 &&
     clip.keyframes.length &&
@@ -173,6 +219,7 @@ export function setKeyframeTransform(
         { time: 0, value: { ...clip.transform, ...patch } },
         ...clip.keyframes,
       ],
+      transform: { ...clip.transform, ...patch },
     };
   }
   return clip;

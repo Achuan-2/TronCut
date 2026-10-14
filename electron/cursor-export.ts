@@ -3,6 +3,7 @@ import path from "node:path";
 import sharp from "sharp";
 import type { Asset, Clip } from "../shared/model";
 import { cursorAt, cursorSvg, defaultCursorStyle } from "../shared/cursor";
+import { loopImageInput } from "./loop-image";
 
 /** sendcmd keeps long mouse paths in a file, avoiding deeply nested FFmpeg expressions. */
 export async function cursorFilters(
@@ -91,18 +92,8 @@ export async function cursorFilters(
     : -10000;
   return {
     args: [
-      "-loop",
-      "1",
-      "-framerate",
-      String(fps),
-      "-i",
-      cursor,
-      "-loop",
-      "1",
-      "-framerate",
-      String(fps),
-      "-i",
-      ring,
+      ...loopImageInput(cursor, fps, clip.start + clip.duration),
+      ...loopImageInput(ring, fps, clip.start + clip.duration),
     ],
     filters: [
       `null[cursorclock${layer}]`,
