@@ -26,6 +26,7 @@ export interface FrameCraftBridge {
   showWindowMenu(menu: "edit" | "view", x: number, y: number): Promise<void>;
   onWindowState(callback: (state: WindowState) => void): () => void;
   importMedia(): Promise<Asset[]>;
+  importDroppedMedia(files: File[]): Promise<Asset[]>;
   copyClipClipboard(token: string): Promise<void>;
   importClipboardMedia(): Promise<{
     assets: Asset[];

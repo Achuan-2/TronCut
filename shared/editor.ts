@@ -10,6 +10,7 @@ import {
 } from "./model";
 import { sameTransform } from "./animation-ranges";
 import { easeProgress } from "./easing";
+import { normalizeRotationAxes, rotationKeys } from "./rotation";
 
 export function availableTrack(
   project: Pick<Project, "tracks" | "clips">,
@@ -34,7 +35,7 @@ export function addMediaAssets(
   assets: Asset[],
   start: number,
   toTimeline = false,
-  options: { newTrackForImages?: boolean } = {},
+  options: { newTrackForImages?: boolean; trackId?: string } = {},
 ): Project {
   const tracks = [...project.tracks],
     clips = [...project.clips];
@@ -45,6 +46,8 @@ export function addMediaAssets(
         options.newTrackForImages && asset.kind === "image"
           ? undefined
           : availableTrack({ tracks, clips }, start, duration);
+      const target = tracks.find((track) => track.id === options.trackId && !track.locked && !track.hidden);
+      if (target && !clips.some((clip) => clip.trackId === target.id && clip.start < start + duration && clip.start + clip.duration > start)) track = target;
       if (!track) {
         track = newTrack(tracks.length);
         tracks.unshift(track);
@@ -84,14 +87,23 @@ export function transformAt(
     clip.rotation !== undefined ||
     clip.transform.rotation !== undefined ||
     frames.some((frame) => frame.value.rotation !== undefined);
-  const normalize = (value: Transform): Transform =>
-    hasRotation
+  const axes = (["rotationX", "rotationY"] as const).filter(
+    (key) =>
+      clip.transform[key] !== undefined ||
+      frames.some((frame) => frame.value[key] !== undefined),
+  );
+  const normalize = (value: Transform): Transform => ({
+    ...value,
+    ...(hasRotation
       ? {
-          ...value,
           rotation:
             value.rotation ?? clip.transform.rotation ?? clip.rotation ?? 0,
         }
-      : value;
+      : {}),
+    ...Object.fromEntries(
+      axes.map((key) => [key, value[key] ?? clip.transform[key] ?? 0]),
+    ),
+  });
   if (!frames.length) return normalize(clip.transform);
   const points =
     frames[0].time > 0
@@ -185,6 +197,7 @@ export function setKeyframeTransform<
   T extends Pick<Clip, "transform" | "keyframes"> &
     Partial<Pick<Clip, "rotation">>,
 >(clip: T, patch: Partial<Transform>, time: number, initialState = false): T {
+  const axes = rotationKeys.filter((key) => patch[key] !== undefined);
   const index = clip.keyframes.findIndex(
     (frame) => Math.abs(frame.time - time) < 1e-6,
   );
@@ -198,7 +211,7 @@ export function setKeyframeTransform<
       let i = position + 1;
       i < ordered.length &&
       !ordered[i].animation &&
-      sameTransform(target.value, ordered[i].value, rotation);
+      sameTransform(target.value, ordered[i].value, rotation, clip.transform);
       i++
     )
       held.add(ordered[i]);
@@ -211,7 +224,12 @@ export function setKeyframeTransform<
       keyframes: clip.keyframes.map((frame) =>
         held.has(frame)
           ? { ...frame, value: { ...frame.value, ...patch } }
-          : frame,
+          : initial && axes.length
+            ? {
+                ...frame,
+                value: normalizeRotationAxes(clip, frame.value, axes),
+              }
+            : frame,
       ),
     };
   }
@@ -224,7 +242,14 @@ export function setKeyframeTransform<
       ...clip,
       keyframes: [
         { time: 0, value: { ...clip.transform, ...patch } },
-        ...clip.keyframes,
+        ...clip.keyframes.map((frame) =>
+          axes.length
+            ? {
+                ...frame,
+                value: normalizeRotationAxes(clip, frame.value, axes),
+              }
+            : frame,
+        ),
       ],
       transform: { ...clip.transform, ...patch },
     };

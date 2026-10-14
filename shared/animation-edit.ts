@@ -111,6 +111,7 @@ export function removeAnimation(clip: Clip, range: AnimationRange): Clip {
       pair.b.value,
       pair.frames[i].value,
       clip.transform.rotation ?? clip.rotation ?? 0,
+      clip.transform,
     );
     i++
   )
@@ -162,12 +163,14 @@ export function pasteAnimation(
     scale: [0.05, 8],
     opacity: [0, 1],
     rotation: [-3600, 3600],
+    rotationX: [-3600, 3600],
+    rotationY: [-3600, 3600],
   };
   for (const key of Object.keys(bounds) as (keyof Transform)[]) {
     if (
-      key === "rotation" &&
-      copied.from.rotation === undefined &&
-      copied.to.rotation === undefined
+      ["rotation", "rotationX", "rotationY"].includes(key) &&
+      copied.from[key] === undefined &&
+      copied.to[key] === undefined
     )
       continue;
     const value =
@@ -181,7 +184,7 @@ export function pasteAnimation(
     .filter((frame) => frame.time < start || frame.time > end)
     .map((frame) => {
       if (frame.time <= end || !holding) return frame;
-      if (!sameTransform(frame.value, from, rotation)) {
+      if (!sameTransform(frame.value, from, rotation, clip.transform)) {
         holding = false;
         return frame;
       }

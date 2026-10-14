@@ -5,6 +5,7 @@ import path from "node:path";
 
 const mocks = vi.hoisted(() => ({
   readBuffer: vi.fn(),
+  availableFormats: vi.fn(),
   readImage: vi.fn(),
   writeBuffer: vi.fn(),
   runProcess: vi.fn(),
@@ -24,6 +25,7 @@ describe("粘贴媒体与内部片段剪贴板", () => {
     vi.resetAllMocks();
     storage = await fs.mkdtemp(path.join(os.tmpdir(), "troncut-clipboard-"));
     mocks.readBuffer.mockReturnValue(Buffer.alloc(0));
+    mocks.availableFormats.mockReturnValue([]);
     mocks.readImage.mockReturnValue({ isEmpty: () => true });
     mocks.runProcess.mockResolvedValue("[]");
     mocks.probeMedia.mockImplementation(async (file: string) => ({
@@ -56,10 +58,12 @@ describe("粘贴媒体与内部片段剪贴板", () => {
     expect(result.assets[0].path).toMatch(/粘贴图片-.*\.png$/);
     expect(await fs.readFile(result.assets[0].path)).toEqual(png);
     expect(result.clipToken).toBeNull();
+    expect(mocks.runProcess).not.toHaveBeenCalled();
   });
   it.skipIf(process.platform !== "win32")(
     "读取多选图片和视频文件，保留中文路径并过滤无关文件",
     async () => {
+      mocks.availableFormats.mockReturnValue(["FileNameW", "Shell IDList Array"]);
       mocks.runProcess.mockResolvedValue(
         JSON.stringify([
           "D:\\素材\\图片.PNG",

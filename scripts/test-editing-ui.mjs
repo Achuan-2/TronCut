@@ -213,12 +213,52 @@ try {
     }),
   ).toBe(true);
   await page.locator(".timeline-clip.video").click();
+  const playbackButtons = page.locator(".playback-buttons");
+  await expect(playbackButtons.locator("button")).toHaveCount(5);
+  expect(await playbackButtons.locator("button").evaluateAll((buttons) => buttons.map((button) => button.getAttribute("aria-label") ?? button.title))).toEqual([
+    "前一帧", "后一帧", "播放 / 暂停（空格）", "前一个媒体", "后一个媒体",
+  ]);
+  await expect(page.getByRole("button", { name: "前一帧", exact: true })).toBeDisabled();
+  await page.getByRole("button", { name: "后一帧", exact: true }).click();
+  await expect(page.locator(".timecode")).toContainText("00:00.03");
+  await page.getByRole("button", { name: "前一帧", exact: true }).click();
+  await expect(page.locator(".timecode")).toContainText("00:00.00");
+  await page.getByRole("button", { name: "后一个媒体", exact: true }).click();
+  await expect(page.locator(".timecode")).toContainText("00:01.00");
+  await expect(page.getByRole("button", { name: "后一帧", exact: true })).toBeDisabled();
+  await page.getByRole("button", { name: "前一个媒体", exact: true }).click();
+  await expect(page.locator(".timecode")).toContainText("00:00.00");
+  await page.locator(".play-button").click();
+  await expect(page.locator(".play-button .lucide-pause")).toHaveCount(1);
+  await page.getByRole("button", { name: "前一个媒体", exact: true }).click();
+  await expect(page.locator(".play-button .lucide-play")).toHaveCount(1);
+  await expect(page.locator(".timecode")).toContainText("00:00.00");
+  await page.getByRole("slider", { name: "播放进度", exact: true }).focus();
+  await page.keyboard.press("End");
+  await expect(page.locator(".timecode")).toContainText("00:01.00");
+  await page.keyboard.press("Home");
+  await expect(page.locator(".timecode")).toContainText("00:00.00");
+  await page.locator(".playback").click({ position: { x: 2, y: 2 } });
+  await page.keyboard.press("Control+ArrowRight");
+  await expect(page.locator(".timecode")).toContainText("00:01.00");
+  await page.keyboard.press("Control+ArrowLeft");
+  await expect(page.locator(".timecode")).toContainText("00:00.00");
+  await page.keyboard.press("ArrowRight");
+  await expect(page.locator(".timecode")).toContainText("00:00.03");
+  await page.keyboard.press("ArrowLeft");
+  await expect(page.locator(".timecode")).toContainText("00:00.00");
+  await page.screenshot({ path: path.join(root, "playback-controls.png") });
+  console.log("播放条逐帧、前后媒体、快捷键、进度滑条和定位暂停通过");
   await expect(page.getByRole("button", { name: "波纹删除", exact: true })).toHaveCount(0);
   await page.getByRole("button", { name: "删除选项", exact: true }).click();
   await expect(page.getByRole("menu", { name: "删除菜单", exact: true })).toBeVisible();
   await expect(page.getByRole("menuitem", { name: /^删除\s*Delete$/ })).toBeVisible();
   await page.getByRole("menuitem", { name: /^波纹删除/ }).click();
   await expect(page.locator(".timeline-clip")).toHaveCount(0);
+  for (const name of ["前一帧", "后一帧", "前一个媒体", "后一个媒体"]) {
+    await expect(page.getByRole("button", { name, exact: true })).toBeDisabled();
+  }
+  await expect(page.getByRole("slider", { name: "播放进度", exact: true })).toBeDisabled();
   await expect(page.getByRole("menu", { name: "删除菜单", exact: true })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "添加关键帧", exact: true })).toBeDisabled();
   await page.getByTitle("撤销 Ctrl+Z", { exact: true }).click();
@@ -247,6 +287,11 @@ try {
   await expect(page.getByLabel("开始 (秒)", { exact: true })).toBeHidden();
   await page.getByLabel("宽度 (px)", { exact: true }).fill("960");
   await expect(page.getByLabel("缩放 (%)", { exact: true })).toHaveValue("50");
+  const scaleSlider = page.getByRole("slider", { name: "缩放滑条", exact: true });
+  await scaleSlider.focus(); await page.keyboard.press("ArrowRight");
+  await expect(page.getByLabel("缩放 (%)", { exact: true })).toHaveValue("50.1");
+  await page.keyboard.press("ArrowLeft");
+  await expect(page.getByLabel("缩放 (%)", { exact: true })).toHaveValue("50");
   await expect(page.getByLabel("高度 (px)", { exact: true })).toHaveValue("540");
   await page.getByLabel("水平翻转", { exact: true }).check();
   await page.getByLabel("垂直翻转", { exact: true }).check();
@@ -270,6 +315,118 @@ try {
   const videoAfter = await canvasVideo.boundingBox();
   expect(videoAfter.width).toBeGreaterThan(videoBefore.width);
   expect(videoAfter.width / videoAfter.height).toBeCloseTo(16 / 9, 2);
+
+  // View zoom must not change media transforms or the project resolution.
+  const viewZoom = page.getByLabel("画布显示比例", { exact: true });
+  const mediaScale = await page.getByLabel("缩放 (%)", { exact: true }).inputValue();
+  const fittedWidth = (await page.locator(".canvas").boundingBox()).width;
+  await viewZoom.selectOption("1");
+  await expect(page.locator(".canvas")).toHaveCSS("width", "1920px");
+  expect(await page.locator(".canvas-holder").evaluate((element) => element.scrollWidth > element.clientWidth && element.scrollLeft > 0)).toBe(true);
+  await viewZoom.selectOption("20");
+  await expect(page.locator(".canvas")).toHaveCSS("width", "38400px");
+  await viewZoom.selectOption("fit");
+  await expect.poll(async () => (await page.locator(".canvas").boundingBox()).width).toBeCloseTo(fittedWidth, 0);
+  await expect(page.getByLabel("缩放 (%)", { exact: true })).toHaveValue(mediaScale);
+
+  // Crop is static even in automatic animation mode; retain the opposite edge.
+  await page.getByRole("button", { name: "自动动画", exact: true }).click();
+  await page.getByRole("button", { name: "裁剪模式", exact: true }).click();
+  await expect(page.getByRole("button", { name: "裁剪模式", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await expect(canvasVideo.locator(".crop-handle")).toHaveCount(8);
+  const cropBefore = await canvasVideo.boundingBox();
+  const cropHandle = await canvasVideo.locator(".crop-handle.w").boundingBox();
+  await page.mouse.move(cropHandle.x + cropHandle.width / 2, cropHandle.y + cropHandle.height / 2);
+  await page.mouse.down();
+  await page.evaluate(() => new Promise(requestAnimationFrame));
+  await page.mouse.move(cropHandle.x + cropHandle.width / 2 + 20, cropHandle.y + cropHandle.height / 2, { steps: 4 });
+  await page.evaluate(() => new Promise(requestAnimationFrame));
+  await page.mouse.up();
+  await expect.poll(async () => (await canvasVideo.boundingBox()).width).toBeLessThan(cropBefore.width - 15);
+  const cropAfter = await canvasVideo.boundingBox();
+  expect(cropAfter.x + cropAfter.width).toBeCloseTo(cropBefore.x + cropBefore.width, 0);
+  expect(cropAfter.height).toBeCloseTo(cropBefore.height, 0);
+  await expect(page.getByLabel("缩放 (%)", { exact: true })).toHaveValue("100");
+  await expect(page.locator(".timeline-clip.video .clip-animation")).toHaveCount(0);
+  await page.screenshot({ path: path.join(root, "canvas-crop.png") });
+  await page.getByRole("button", { name: "恢复裁剪", exact: true }).click();
+  await expect.poll(async () => (await canvasVideo.boundingBox()).width).toBeCloseTo(cropBefore.width, 0);
+  await page.getByTitle("撤销 Ctrl+Z", { exact: true }).click();
+  await expect.poll(async () => (await canvasVideo.boundingBox()).width).toBeCloseTo(cropAfter.width, 0);
+  await page.getByTitle("撤销 Ctrl+Z", { exact: true }).click();
+  // In crop mode, scale/pan the source inside the unchanged visible rectangle.
+  const fixedVideo = await canvasVideo.boundingBox();
+  const innerVideo = canvasVideo.locator(":scope > div > div").first();
+  const sourceWidth = Number(await innerVideo.evaluate((element) => element.style.width.slice(0, -2)));
+  await page.getByLabel("缩放 (%)", { exact: true }).fill("200");
+  await expect(page.getByRole("slider", { name: "缩放滑条", exact: true })).toHaveValue("200");
+  await expect.poll(async () => Number(await innerVideo.evaluate((element) => element.style.width.slice(0, -2)))).toBeCloseTo(sourceWidth * 2, 0);
+  await expect(page.getByLabel("宽度 (px)", { exact: true })).toBeDisabled();
+  await page.mouse.move(fixedVideo.x + fixedVideo.width / 2, fixedVideo.y + fixedVideo.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(fixedVideo.x + fixedVideo.width / 2 + 18, fixedVideo.y + fixedVideo.height / 2 - 12, { steps: 4 });
+  await page.mouse.up();
+  const pannedVideo = await canvasVideo.boundingBox();
+  for (const key of ["x", "y", "width", "height"]) expect(pannedVideo[key]).toBeCloseTo(fixedVideo[key], 0);
+  await expect.poll(async () => Number(await page.getByLabel("内容位置 X (%)", { exact: true }).inputValue())).toBeGreaterThan(0);
+  await expect.poll(async () => Number(await page.getByLabel("内容位置 Y (%)", { exact: true }).inputValue())).toBeLessThan(0);
+  await expect(page.locator(".timeline-clip.video .clip-animation")).toHaveCount(0);
+  await page.getByTitle("撤销 Ctrl+Z", { exact: true }).click();
+  await expect(page.getByLabel("内容位置 X (%)", { exact: true })).toHaveValue("0");
+  await page.getByTitle("重做 Ctrl+Shift+Z", { exact: true }).click();
+  await expect.poll(async () => Number(await page.getByLabel("内容位置 X (%)", { exact: true }).inputValue())).toBeGreaterThan(0);
+  const savedVideoContent = { scale: 2,
+    x: Number(await page.getByLabel("内容位置 X (%)", { exact: true }).inputValue()) / 100,
+    y: Number(await page.getByLabel("内容位置 Y (%)", { exact: true }).inputValue()) / 100 };
+  expect(savedVideoContent.x).toBeGreaterThan(0);
+  await page.screenshot({ path: path.join(root, "fixed-crop-content.png") });
+  await page.getByRole("button", { name: "选择模式", exact: true }).click();
+  await page.getByRole("button", { name: "自动动画", exact: true }).click();
+  await expect(canvasVideo.locator(".crop-handle")).toHaveCount(0);
+  await expect(page.getByLabel("缩放 (%)", { exact: true })).toHaveValue(mediaScale);
+  expect(Number(await page.getByRole("slider", { name: "缩放滑条", exact: true }).inputValue())).toBeCloseTo(Number(mediaScale), 1);
+  for (const axis of ["X", "Y", "Z"]) await expect(page.getByLabel(`旋转 ${axis} (度)`, { exact: true })).toBeVisible();
+  const axisBefore = await canvasVideo.boundingBox();
+  await page.getByLabel("旋转 X (度)", { exact: true }).fill("60");
+  await expect.poll(async () => (await canvasVideo.boundingBox()).height).toBeCloseTo(axisBefore.height / 2, 0);
+  await page.getByLabel("旋转 X (度)", { exact: true }).fill("0");
+  await page.getByLabel("旋转 Y (度)", { exact: true }).fill("60");
+  await expect.poll(async () => (await canvasVideo.boundingBox()).width).toBeCloseTo(axisBefore.width / 2, 0);
+  const yDial = page.getByRole("button", { name: "旋转 Y 拨盘", exact: true });
+  await yDial.scrollIntoViewIfNeeded();
+  const dialBounds = await yDial.boundingBox(), dialX = dialBounds.x + dialBounds.width / 2, dialY = dialBounds.y + dialBounds.height / 2;
+  await page.mouse.move(dialX, dialY - 10); await page.mouse.down();
+  await page.mouse.move(dialX + 10, dialY, { steps: 4 }); await page.mouse.up();
+  await expect.poll(async () => Number(await page.getByLabel("旋转 Y (度)", { exact: true }).inputValue())).toBeCloseTo(150, 0);
+  await yDial.dblclick();
+  await expect(page.getByLabel("旋转 Y (度)", { exact: true })).toHaveValue("0");
+  const zDial = page.getByRole("button", { name: "旋转 Z 拨盘", exact: true });
+  await zDial.focus(); await page.keyboard.press("ArrowRight");
+  await expect(page.getByLabel("旋转 Z (度)", { exact: true })).toHaveValue("1");
+  await page.keyboard.press("Home");
+  await expect(page.getByLabel("旋转 Z (度)", { exact: true })).toHaveValue("0");
+  await page.screenshot({ path: path.join(root, "scale-rotation-controls.png") });
+
+  await page.getByRole("button", { name: "画布大小设置", exact: true }).click();
+  const canvasSettings = page.getByRole("dialog", { name: "画布大小设置", exact: true });
+  await expect(canvasSettings).toBeVisible();
+  await canvasSettings.getByLabel("宽度（像素）", { exact: true }).fill("0");
+  await canvasSettings.getByRole("button", { name: "应用", exact: true }).click();
+  await expect(canvasSettings).toBeVisible();
+  await canvasSettings.getByLabel("预设尺寸", { exact: true }).selectOption("1");
+  await expect(canvasSettings.getByLabel("高度（像素）", { exact: true })).toHaveValue("1920");
+  await page.screenshot({ path: path.join(root, "canvas-settings.png") });
+  await canvasSettings.getByRole("button", { name: "应用", exact: true }).click();
+  await expect(canvasSettings).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "画布大小设置", exact: true })).toContainText("1080 × 1920");
+  await page.getByTitle("撤销 Ctrl+Z", { exact: true }).click();
+  await expect(page.getByRole("button", { name: "画布大小设置", exact: true })).toContainText("1920 × 1080");
+  await viewZoom.selectOption("settings");
+  await expect(canvasSettings).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(canvasSettings).toHaveCount(0);
+  await expect(viewZoom).toHaveValue("fit");
+  console.log("画布顶部模式切换、显示缩放/滚动、视频裁剪与恢复/撤销、画布预设及输入校验通过");
 
   const rulerBefore = await page.locator(".ruler").boundingBox();
   const labelBefore = await page.locator(".ruler-label").boundingBox();
@@ -390,6 +547,12 @@ try {
     await page.mouse.move(x + dx, y + dy, { steps });
     await page.mouse.up();
   };
+  const uncroppedImage = await canvasImage.boundingBox();
+  await page.getByRole("button", { name: "裁剪模式", exact: true }).click();
+  await dragHandle(canvasImage.locator(".crop-handle.s"), 0, -12);
+  await expect.poll(async () => (await canvasImage.boundingBox()).height).toBeLessThan(uncroppedImage.height - 8);
+  await page.getByTitle("撤销 Ctrl+Z", { exact: true }).click();
+  await page.getByRole("button", { name: "选择模式", exact: true }).click();
   const beforeResize = await canvasImage.boundingBox();
   await dragHandle(canvasImage.locator(".resize-handle.se"), 40, 32);
   await expect.poll(async () => (await canvasImage.boundingBox()).width).toBeGreaterThan(beforeResize.width);
@@ -449,11 +612,11 @@ try {
   await expect(page.getByLabel("位置 X (%)", { exact: true })).toHaveValue("20");
   await page.getByTitle("撤销 Ctrl+Z", { exact: true }).click();
   await imageArrow.locator(".animation-point.end").click();
-  await page.getByLabel("旋转 (度)", { exact: true }).fill("45");
+  await page.getByLabel("旋转 Z (度)", { exact: true }).fill("45");
   await imageArrow.locator(".animation-point.start").click();
-  await expect(page.getByLabel("旋转 (度)", { exact: true })).toHaveValue("0");
+  await expect(page.getByLabel("旋转 Z (度)", { exact: true })).toHaveValue("0");
   await imageArrow.locator(".animation-point.end").click();
-  await expect(page.getByLabel("旋转 (度)", { exact: true })).toHaveValue("45");
+  await expect(page.getByLabel("旋转 Z (度)", { exact: true })).toHaveValue("45");
   await page.getByTitle("撤销 Ctrl+Z", { exact: true }).click();
   await seek(7);
   await expect(page.locator(".keyframe-edit-status")).toHaveCount(0);
@@ -584,6 +747,8 @@ try {
   const imageLock = await trackLock(page.locator(".timeline-clip.image"));
   await imageLock.click();
   await expect(canvasImage.locator(".resize-handle")).toHaveCount(0);
+  await expect(scaleSlider).toBeDisabled();
+  await expect(page.getByRole("button", { name: "旋转 X 拨盘", exact: true })).toBeDisabled();
   await expect(addKeyframe).toBeDisabled();
   await openAnimationMenu(imageArrow);
   await expect(page.getByRole("menuitem", { name: "剪切", exact: false })).toBeDisabled();
@@ -708,6 +873,10 @@ try {
   await expect(page.getByLabel("画布缩放百分比", { exact: true })).toHaveValue(
     "100",
   );
+  await page.getByRole("button", { name: "画布大小设置", exact: true }).click();
+  await canvasSettings.getByLabel("宽度（像素）", { exact: true }).fill("1300");
+  await canvasSettings.getByLabel("高度（像素）", { exact: true }).fill("740");
+  await canvasSettings.getByRole("button", { name: "应用", exact: true }).click();
   await app.evaluate(({ dialog }, root) => {
     dialog.showOpenDialog = async () => ({
       canceled: false,
@@ -722,6 +891,11 @@ try {
     await fs.readFile(path.join(root, "界面测试", "界面测试.troncut"), "utf8"),
   );
   expect(saved.camera).toBeUndefined();
+  expect(saved.canvas).toEqual({ ...project.canvas, width: 1300, height: 740 });
+  const savedRecording = saved.clips.find((clip) => clip.id === "recorded-clip");
+  expect(savedRecording.contentTransform.scale).toBe(savedVideoContent.scale);
+  expect(savedRecording.contentTransform.x).toBeCloseTo(savedVideoContent.x, 5);
+  expect(savedRecording.contentTransform.y).toBeCloseTo(savedVideoContent.y, 5);
   expect(saved.clips.filter((clip) => clip.kind === "video").every((clip) => clip.keyframes.some((frame) => frame.zoomPan))).toBe(true);
   expect(saved.clips.filter((clip) => clip.kind !== "video").every((clip) => clip.keyframes.every((frame) => !frame.zoomPan))).toBe(true);
   expect(saved.tracks.map((track) => track.name)).toEqual(

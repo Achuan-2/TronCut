@@ -12,6 +12,7 @@ import { defaultCrop, fadeDurations, visualFilters } from "../shared/effects";
 import { cursorFilters } from "./cursor-export";
 import { loopImageInput } from "./loop-image";
 import { easingExpression } from "../shared/easing";
+import { contentFilters, axisRotationFilters } from "./visual-transform";
 
 // Avoid lookahead buffering in short, delayed overlay graphs. Hardware failure
 // fallback and explicitly requested software encoding use identical settings.
@@ -346,15 +347,25 @@ export async function exportVideo(
       const animatedRotation = clip.keyframes.some(
         (frame) => (frame.value.rotation ?? rotation) !== rotation,
       );
-      const rotate = animatedRotation
-        ? [
-            `rotate=a='(${expression(clip, "rotation")})*PI/180':ow='ceil(sqrt(iw*iw+ih*ih)/2)*2':oh='ceil(sqrt(iw*iw+ih*ih)/2)*2':c=black@0`,
-          ]
-        : rotation
+      const hasAxisRotation = [
+        clip.transform,
+        ...clip.keyframes.map((frame) => frame.value),
+      ].some((value) => value.rotationX || value.rotationY);
+      const rotate = hasAxisRotation
+        ? axisRotationFilters({
+            x: expression(clip, "rotationX", "T"),
+            y: expression(clip, "rotationY", "T"),
+            z: expression(clip, "rotation", "T"),
+          })
+        : animatedRotation
           ? [
-              `rotate=${(rotation * Math.PI) / 180}:ow=rotw(${(rotation * Math.PI) / 180}):oh=roth(${(rotation * Math.PI) / 180}):c=none`,
+              `rotate=a='(${expression(clip, "rotation")})*PI/180':ow='ceil(sqrt(iw*iw+ih*ih)/2)*2':oh='ceil(sqrt(iw*iw+ih*ih)/2)*2':c=black@0`,
             ]
-          : [];
+          : rotation
+            ? [
+                `rotate=${(rotation * Math.PI) / 180}:ow=rotw(${(rotation * Math.PI) / 180}):oh=roth(${(rotation * Math.PI) / 180}):c=none`,
+              ]
+            : [];
       let source = `${index}:v`;
       if (asset?.cursor) {
         const cursor = await cursorFilters(
@@ -381,7 +392,7 @@ export async function exportVideo(
           ? `trim=start=${clip.sourceIn}:duration=${clip.duration * clip.speed},setpts=(PTS-STARTPTS)/${clip.speed}+${clip.start}/TB,`
           : "";
       filters.push(
-        `[${source}]${timing}format=rgba,${[...visualEffects, transform, "setsar=1", ...rotate, alpha].join(",")}[${visual}]`,
+        `[${source}]${timing}format=rgba,${[...contentFilters(clip), ...visualEffects, transform, "setsar=1", ...rotate, alpha].join(",")}[${visual}]`,
       );
       filters.push(
         `[${base}][${visual}]overlay=x='${width}*(${expression(clip, "x")})-overlay_w/2':y='${height}*(${expression(clip, "y")})-overlay_h/2':enable='gte(t,${clip.start})*lt(t,${clip.start + clip.duration})':eof_action=pass:repeatlast=0[${output}]`,

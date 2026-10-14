@@ -58,6 +58,8 @@ interface Drag {
 export default function Timeline({
   editor,
   onCopyAnimation,
+  onDropFiles,
+  dropDisabled = false,
 }: {
   editor: Editor;
   onCopyAnimation: (
@@ -65,6 +67,8 @@ export default function Timeline({
     range: AnimationRange,
     cut?: boolean,
   ) => void;
+  onDropFiles: (files: File[], time: number, trackId?: string) => void;
+  dropDisabled?: boolean;
 }) {
   const { project, apply, playhead, seek, selected, selectedId, select } =
     editor;
@@ -79,6 +83,7 @@ export default function Timeline({
   const scroll = useRef<HTMLDivElement>(null),
     duration = Math.max(20, projectDuration(project) + 5),
     width = duration * zoom;
+  const [fileDrop, setFileDrop] = useState<{ time: number; trackId?: string } | null>(null);
   const headers = useRef<HTMLDivElement>(null);
   const deleteControl = useRef<HTMLDivElement>(null);
   const deletePopup = useRef<HTMLDivElement>(null);
@@ -245,7 +250,7 @@ export default function Timeline({
     );
   return (
     <section
-      className="timeline"
+      className={`timeline ${fileDrop ? "file-drag-active" : ""}`}
       onClick={() => context && setContext(null)}
       onContextMenuCapture={(event) => {
         if ((event.target as HTMLElement).closest(".clip-animations"))
@@ -485,6 +490,27 @@ export default function Timeline({
         <div
           className="timeline-scroll"
           ref={scroll}
+          onDragOver={(event) => {
+            if (!event.dataTransfer.types.includes("Files")) return;
+            event.preventDefault();
+            const trackId = (event.target as HTMLElement).closest<HTMLElement>(".track-lane")?.dataset.track;
+            const locked = project.tracks.find((track) => track.id === trackId)?.locked;
+            event.dataTransfer.dropEffect = dropDisabled || locked ? "none" : "copy";
+            if (dropDisabled || locked) { setFileDrop(null); return; }
+            const seconds = (event.clientX - event.currentTarget.getBoundingClientRect().left + event.currentTarget.scrollLeft) / zoom;
+            setFileDrop({ time: Math.max(0, Math.round(seconds * project.canvas.fps) / project.canvas.fps), trackId });
+          }}
+          onDragLeave={(event) => {
+            if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setFileDrop(null);
+          }}
+          onDrop={(event) => {
+            if (!event.dataTransfer.files.length) return;
+            event.preventDefault(); event.stopPropagation(); setFileDrop(null);
+            if (dropDisabled) return;
+            const trackId = (event.target as HTMLElement).closest<HTMLElement>(".track-lane")?.dataset.track;
+            const seconds = (event.clientX - event.currentTarget.getBoundingClientRect().left + event.currentTarget.scrollLeft) / zoom;
+            onDropFiles(Array.from(event.dataTransfer.files), Math.max(0, Math.round(seconds * project.canvas.fps) / project.canvas.fps), trackId);
+          }}
           onScroll={(event) => {
             setViewport({
               left: event.currentTarget.scrollLeft,
@@ -558,7 +584,7 @@ export default function Timeline({
             {project.tracks.map((track) => (
               <div
                 key={track.id}
-                className={`track-lane ${track.hidden ? "hidden-track" : ""}`}
+                className={`track-lane ${track.hidden ? "hidden-track" : ""} ${fileDrop?.trackId === track.id ? "external-drop-target" : ""}`}
                 data-track={track.id}
                 style={{ backgroundSize: `${zoom * 2}px 100%` }}
                 onClick={(event) => {
@@ -570,6 +596,7 @@ export default function Timeline({
                 onDragOver={(e) => e.preventDefault()}
                 onDrop={(e) => {
                   e.preventDefault();
+                  if (e.dataTransfer.files.length) return;
                   if (track.locked) return;
                   const asset = project.assets.find(
                     (a) => a.id === e.dataTransfer.getData("framecraft-asset"),

@@ -17,6 +17,7 @@ export async function probeMedia(
       ".webp",
       ".gif",
       ".tiff",
+      ".tif",
       ".bmp",
       ".svg",
     ].includes(ext)

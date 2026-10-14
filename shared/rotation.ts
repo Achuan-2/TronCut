@@ -1,0 +1,63 @@
+import type { Clip, Transform } from "./model";
+
+export const rotationKeys = ["rotation", "rotationX", "rotationY"] as const;
+export function normalizeRotationAxes(
+  clip: Pick<Clip, "transform"> & Partial<Pick<Clip, "rotation">>,
+  value: Transform,
+  keys: readonly (typeof rotationKeys)[number][],
+): Transform {
+  return {
+    ...value,
+    ...Object.fromEntries(
+      keys.map((key) => [
+        key,
+        value[key] ??
+          clip.transform[key] ??
+          (key === "rotation" ? (clip.rotation ?? 0) : 0),
+      ]),
+    ),
+  };
+}
+
+// Orthographic projection of the same Z -> Y -> X rotation used by the canvas.
+// Keeping the projection shared also makes drag deltas follow a tilted plane.
+export function rotationMatrix(value: Transform, fallbackZ = 0) {
+  const x = ((value.rotationX ?? 0) * Math.PI) / 180;
+  const y = ((value.rotationY ?? 0) * Math.PI) / 180;
+  const z = ((value.rotation ?? fallbackZ) * Math.PI) / 180;
+  const cx = Math.cos(x),
+    sx = Math.sin(x),
+    cy = Math.cos(y),
+    sy = Math.sin(y),
+    cz = Math.cos(z),
+    sz = Math.sin(z);
+  return {
+    a: cz * cy,
+    b: sz * cy,
+    c: cz * sy * sx - sz * cx,
+    d: sz * sy * sx + cz * cx,
+  };
+}
+
+export function projectDelta(
+  value: Transform,
+  delta: { x: number; y: number },
+  fallbackZ = 0,
+) {
+  const { a, b, c, d } = rotationMatrix(value, fallbackZ);
+  return { x: a * delta.x + c * delta.y, y: b * delta.x + d * delta.y };
+}
+
+export function localDelta(
+  value: Transform,
+  delta: { x: number; y: number },
+  fallbackZ = 0,
+) {
+  const { a, b, c, d } = rotationMatrix(value, fallbackZ),
+    determinant = a * d - b * c;
+  if (Math.abs(determinant) < 1e-6) return { x: 0, y: 0 };
+  return {
+    x: (d * delta.x - c * delta.y) / determinant,
+    y: (a * delta.y - b * delta.x) / determinant,
+  };
+}

@@ -30,7 +30,7 @@ try {
     if (message.type() === "error") console.error(message.text());
   });
   page.on("pageerror", (err) => errors.push(err.message));
-  await expect(page.getByText("画布预览", { exact: true })).toBeVisible();
+  await expect(page.getByRole("toolbar", { name: "画布工具", exact: true })).toBeVisible();
   await expect(page.locator(".workspace-status")).toContainText(
     "媒体引擎就绪",
     { timeout: 20000 },
@@ -97,7 +97,7 @@ try {
   await page.getByTitle("撤销 Ctrl+Z").click();
   await page.locator(".timeline-clip.video").click();
   await expect(page.getByLabel("裁切左侧 (%)")).toHaveCount(0);
-  await page.getByLabel("旋转 (度)").fill("15");
+  await page.getByLabel("旋转 Z (度)").fill("15");
   await expect(page.getByLabel("效果预设")).toHaveCount(0);
   await page.getByLabel("水平翻转", { exact: true }).check();
   await expect(

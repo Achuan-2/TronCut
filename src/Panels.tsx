@@ -33,11 +33,7 @@ import {
   newText,
   newTrack,
 } from "../shared/model";
-import {
-  animation,
-  changeSpeed,
-  transformAt,
-} from "../shared/editor";
+import { animation, changeSpeed, transformAt } from "../shared/editor";
 import type { Cue } from "../shared/subtitles";
 import type { Capabilities } from "../shared/bridge";
 import type { Editor } from "./useEditor";
@@ -49,6 +45,8 @@ import { MediaThumbnail } from "./MediaThumbnail";
 import { defaultCursorStyle } from "../shared/cursor";
 import NarrationPanel from "./NarrationPanel";
 import ZoomPanPanel from "./ZoomPanPanel";
+import { defaultContentTransform } from "../shared/crop";
+import { ScaleControl, RotationControls } from "./TransformControls";
 
 export type Tab =
   | "media"
@@ -305,8 +303,14 @@ export default function Panels(props: Props) {
           </>
         )}
         <div hidden={tab !== "narration"}>
-          <NarrationPanel key={project.id} editor={editor} active={tab === "narration"}
-            busy={props.busy} run={run} toast={toast} />
+          <NarrationPanel
+            key={project.id}
+            editor={editor}
+            active={tab === "narration"}
+            busy={props.busy}
+            run={run}
+            toast={toast}
+          />
         </div>
         {tab === "captions" && (
           <>
@@ -852,7 +856,16 @@ export function Inspector({ editor }: { editor: Editor }) {
     if (c && !locked) editor.updateClip(c.id, patch);
   };
   const transform = (key: keyof typeof value, v: number) => {
-    if (c && !locked && Number.isFinite(v)) editor.updateTransform(c.id, { [key]: v });
+    if (c && !locked && Number.isFinite(v))
+      editor.updateTransform(c.id, { [key]: v });
+  };
+  const editingContent =
+    editor.canvasMode === "crop" && c && ["image", "video"].includes(c.kind);
+  const content = c?.contentTransform ?? defaultContentTransform;
+  const contentOrFrame = (key: "scale" | "x" | "y", next: number) => {
+    if (!c || locked || !Number.isFinite(next)) return;
+    if (editingContent) editor.updateContentTransform(c.id, { [key]: next });
+    else transform(key, next);
   };
   const asset = editor.project.assets.find((asset) => asset.id === c?.assetId);
   const fit = asset
@@ -998,10 +1011,18 @@ export function Inspector({ editor }: { editor: Editor }) {
                 </small>
               </div>
             </div>
-            {editor.selectedKeyframe && <div className="keyframe-edit-status" role="status">
-              <span>编辑动画{editor.selectedKeyframe.side === "start" ? "起点" : "终点"} · {timeLabel(editor.playhead)}</span>
-              <button type="button" onClick={editor.clearKeyframeEdit}>退出</button>
-            </div>}
+            {editor.selectedKeyframe && (
+              <div className="keyframe-edit-status" role="status">
+                <span>
+                  编辑动画
+                  {editor.selectedKeyframe.side === "start" ? "起点" : "终点"} ·{" "}
+                  {timeLabel(editor.playhead)}
+                </span>
+                <button type="button" onClick={editor.clearKeyframeEdit}>
+                  退出
+                </button>
+              </div>
+            )}
             {hasCursor && (
               <div
                 id="inspector-cursor"
@@ -1137,14 +1158,19 @@ export function Inspector({ editor }: { editor: Editor }) {
               )}
               {c.kind !== "audio" && (
                 <>
-                  <h3 className="section-title">变换</h3>
-                  {numberField(
-                    "缩放 (%)",
-                    value.scale * 100,
-                    (scale) => transform("scale", scale / 100),
-                    5,
-                    800,
+                  <h3 className="section-title">
+                    {editingContent ? "框内画面" : "变换"}
+                  </h3>
+                  {editingContent && (
+                    <p className="field-help">
+                      拖动画面或调整缩放，裁剪框的位置与大小保持不变。
+                    </p>
                   )}
+                  <ScaleControl
+                    value={(editingContent ? content.scale : value.scale) * 100}
+                    onChange={(scale) => contentOrFrame("scale", scale / 100)}
+                    disabled={locked}
+                  />
                   <label className="field">
                     不透明度
                     <input
@@ -1161,42 +1187,47 @@ export function Inspector({ editor }: { editor: Editor }) {
                       {Math.round(value.opacity * 100)}%
                     </span>
                   </label>
+                  {!editingContent && (
+                    <RotationControls
+                      value={value}
+                      fallbackZ={c.rotation}
+                      onChange={transform}
+                      disabled={locked}
+                    />
+                  )}
                   <h3 className="section-title">
-                    旋转与位置
+                    {editingContent ? "内容位置" : "位置"}
                     <button
                       type="button"
                       className="center-layer"
-                      title="画布居中"
-                      aria-label="画布居中"
+                      title={editingContent ? "内容居中" : "画布居中"}
+                      aria-label={editingContent ? "内容居中" : "画布居中"}
                       onClick={() =>
-                        editor.updateTransform(c.id, { x: 0.5, y: 0.5 })
+                        editingContent
+                          ? editor.updateContentTransform(c.id, { x: 0, y: 0 })
+                          : editor.updateTransform(c.id, { x: 0.5, y: 0.5 })
                       }
                     >
                       <AlignCenter size={14} />
                     </button>
                   </h3>
                   {numberField(
-                    "旋转 (度)",
-                    value.rotation ?? c.rotation ?? 0,
-                    (rotation) => transform("rotation", rotation),
-                    -3600,
-                    3600,
-                  )}
-                  {numberField(
-                    "位置 X (%)",
-                    value.x * 100,
-                    (x) => transform("x", x / 100),
+                    editingContent ? "内容位置 X (%)" : "位置 X (%)",
+                    (editingContent ? content.x : value.x) * 100,
+                    (x) => contentOrFrame("x", x / 100),
                     -400,
                     400,
                   )}
                   {numberField(
-                    "位置 Y (%)",
-                    value.y * 100,
-                    (y) => transform("y", y / 100),
+                    editingContent ? "内容位置 Y (%)" : "位置 Y (%)",
+                    (editingContent ? content.y : value.y) * 100,
+                    (y) => contentOrFrame("y", y / 100),
                     -400,
                     400,
                   )}
-                  <h3 className="section-title">尺寸</h3>
+                  <h3 className="section-title">
+                    {editingContent ? "裁剪框尺寸" : "尺寸"}
+                  </h3>
                   {size.width > 0 &&
                     numberField(
                       "宽度 (px)",
@@ -1204,6 +1235,8 @@ export function Inspector({ editor }: { editor: Editor }) {
                       (pixels) => resize("width", pixels),
                       1,
                       262144,
+                      1,
+                      !!editingContent,
                     )}
                   {size.height > 0 &&
                     numberField(
@@ -1212,6 +1245,8 @@ export function Inspector({ editor }: { editor: Editor }) {
                       (pixels) => resize("height", pixels),
                       1,
                       262144,
+                      1,
+                      !!editingContent,
                     )}
                   {c.kind !== "text" && (
                     <p className="size-ratio">
@@ -1220,23 +1255,23 @@ export function Inspector({ editor }: { editor: Editor }) {
                     </p>
                   )}
                   <div className="flip-controls">
-                  {(["flipX", "flipY"] as const).map((key, index) => (
-                    <label className="check-field" key={key}>
-                      <input
-                        type="checkbox"
-                        checked={(c.effects ?? defaultEffects)[key]}
-                        onChange={(e) =>
-                          update({
-                            effects: {
-                              ...(c.effects ?? defaultEffects),
-                              [key]: e.target.checked,
-                            },
-                          })
-                        }
-                      />
-                      {["水平翻转", "垂直翻转"][index]}
-                    </label>
-                  ))}
+                    {(["flipX", "flipY"] as const).map((key, index) => (
+                      <label className="check-field" key={key}>
+                        <input
+                          type="checkbox"
+                          checked={(c.effects ?? defaultEffects)[key]}
+                          onChange={(e) =>
+                            update({
+                              effects: {
+                                ...(c.effects ?? defaultEffects),
+                                [key]: e.target.checked,
+                              },
+                            })
+                          }
+                        />
+                        {["水平翻转", "垂直翻转"][index]}
+                      </label>
+                    ))}
                   </div>
                 </>
               )}

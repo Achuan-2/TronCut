@@ -41,6 +41,7 @@ export default function App() {
     [caps, setCaps] = useState<Capabilities>(),
     [toastMessage, setToast] = useState(""),
     [busy, setBusy] = useState(false),
+    [mediaImporting, setMediaImporting] = useState(false),
     [progress, setProgress] = useState<{
       percent: number;
       label: string;
@@ -77,6 +78,15 @@ export default function App() {
     },
     [toast],
   );
+  const mediaImportLock = useRef(false);
+  const importIntoTimeline = async (fn: () => Promise<void>) => {
+    if (mediaImportLock.current || busy || recording) return;
+    mediaImportLock.current = true;
+    setMediaImporting(true);
+    try { await fn(); }
+    catch (error) { toast(String(error).replace(/^Error: /, "")); }
+    finally { mediaImportLock.current = false; setMediaImporting(false); }
+  };
   const bridge = () => {
     if (!window.framecraft)
       throw new Error("此功能需要桌面版，请运行 pnpm dev");
@@ -170,7 +180,7 @@ export default function App() {
     toast(cut ? "已剪切动画" : "已复制动画");
   };
   const paste = () =>
-    run(async () => {
+    importIntoTimeline(async () => {
       const result = window.framecraft
         ? await window.framecraft.importClipboardMedia()
         : {
@@ -205,6 +215,18 @@ export default function App() {
         toast("剪贴板中没有可粘贴的图片、视频或片段");
       }
     });
+  const dropFiles = (files: File[], time: number, trackId?: string) =>
+    importIntoTimeline(async () => {
+      if (editor.project.tracks.find((track) => track.id === trackId)?.locked) {
+        toast("轨道已锁定，请拖入其他轨道"); return;
+      }
+      const assets = await bridge().importDroppedMedia(files);
+      if (!assets.length) { toast("没有可导入的图片、视频或音频文件"); return; }
+      editor.setPlaying(false);
+      editor.addAssets(assets, true, { time, trackId });
+      setTab("media");
+      toast(`已添加 ${assets.length} 个素材到时间线`);
+    });
   const pasteHandler = useRef<(event: ClipboardEvent) => void>(() => {});
   pasteHandler.current = (event) => {
     if (
@@ -222,6 +244,15 @@ export default function App() {
     const listener = (event: ClipboardEvent) => pasteHandler.current(event);
     window.addEventListener("paste", listener);
     return () => window.removeEventListener("paste", listener);
+  }, []);
+  useEffect(() => {
+    // Prevent Chromium from navigating away when a file is dropped outside a lane.
+    const preventFileNavigation = (event: DragEvent) => {
+      if (event.dataTransfer?.types.includes("Files")) event.preventDefault();
+    };
+    window.addEventListener("dragover", preventFileNavigation);
+    window.addEventListener("drop", preventFileNavigation);
+    return () => { window.removeEventListener("dragover", preventFileNavigation); window.removeEventListener("drop", preventFileNavigation); };
   }, []);
   const newProject = () => {
     if (editor.dirty && !confirm("当前工程有未保存修改，确定新建工程？"))
@@ -364,13 +395,9 @@ export default function App() {
       void paste();
     } else if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
       event.preventDefault();
-      editor.setPlaying(false);
-      editor.seek((t) =>
-        Math.max(
-          0,
-          t + (event.key === "ArrowLeft" ? -1 : 1) / editor.project.canvas.fps,
-        ),
-      );
+      const direction = event.key === "ArrowLeft" ? -1 : 1;
+      if (event.ctrlKey || event.metaKey) editor.jumpMedia(direction);
+      else editor.stepFrame(direction);
     }
   };
   useEffect(() => {
@@ -519,16 +546,16 @@ export default function App() {
         <span
           className="workspace-status"
           title={
-            caps?.ffmpeg
+            mediaImporting ? "正在添加素材…" : caps?.ffmpeg
               ? "媒体引擎就绪"
               : window.framecraft
                 ? "媒体引擎待配置"
                 : "浏览器预览 · 文件与录屏请用桌面版"
           }
         >
-          <i className={caps?.ffmpeg ? "ready" : "pending"} />
+          <i className={mediaImporting ? "importing" : caps?.ffmpeg ? "ready" : "pending"} />
           <span className="engine-label">
-            {caps?.ffmpeg
+            {mediaImporting ? "正在添加素材…" : caps?.ffmpeg
               ? "媒体引擎就绪"
               : window.framecraft
                 ? "媒体引擎待配置"
@@ -622,7 +649,7 @@ export default function App() {
         <Preview editor={editor} />
         <Inspector editor={editor} />
       </div>
-      <Timeline editor={editor} onCopyAnimation={copyAnimation} />
+      <Timeline editor={editor} onCopyAnimation={copyAnimation} onDropFiles={dropFiles} dropDisabled={busy || recording || mediaImporting} />
       {toastMessage && (
         <div className="toast" role="status">
           <Check size={17} />

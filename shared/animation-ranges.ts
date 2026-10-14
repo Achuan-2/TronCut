@@ -1,10 +1,23 @@
 import type { Clip, Transform } from "./model";
+import { normalizeRotationAxes, rotationKeys } from "./rotation";
 
-export function sameTransform(a: Transform, b: Transform, rotation = 0) {
+export function sameTransform(
+  a: Transform,
+  b: Transform,
+  rotation = 0,
+  fallback: Partial<Pick<Transform, "rotationX" | "rotationY">> = {},
+) {
   return (
     (["x", "y", "scale", "opacity"] as const).every(
       (key) => Math.abs(a[key] - b[key]) < 1e-9,
-    ) && Math.abs((a.rotation ?? rotation) - (b.rotation ?? rotation)) < 1e-9
+    ) &&
+    Math.abs((a.rotation ?? rotation) - (b.rotation ?? rotation)) < 1e-9 &&
+    (["rotationX", "rotationY"] as const).every(
+      (key) =>
+        Math.abs(
+          (a[key] ?? fallback[key] ?? 0) - (b[key] ?? fallback[key] ?? 0),
+        ) < 1e-9,
+    )
   );
 }
 
@@ -65,6 +78,7 @@ export function retimeAnimation(
         frames[index - 1].value,
         frames[index].value,
         rotationValue,
+        clip.transform,
       ))
   ) {
     frames.splice(index + 1, 0, { ...frames[index], animation: undefined });
@@ -78,6 +92,7 @@ export function retimeAnimation(
         frames[index + 1].value,
         frames[index + 2].value,
         rotationValue,
+        clip.transform,
       ))
   ) {
     frames.splice(index + 2, 0, { ...frames[index + 1], animation: undefined });
@@ -131,17 +146,16 @@ export function retimeAnimation(
   if (start === a.time && end === b.time) return clip;
   frames[index] = { ...a, time: start };
   frames[index + 1] = { ...b, time: end };
-  const rotation = clip.transform.rotation ?? clip.rotation ?? 0;
-  const hasRotation =
-    clip.rotation !== undefined ||
-    frames.some((frame) => frame.value.rotation !== undefined);
-  const normalized = hasRotation
+  const axes = rotationKeys.filter(
+    (key) =>
+      clip.transform[key] !== undefined ||
+      (key === "rotation" && clip.rotation !== undefined) ||
+      frames.some((frame) => frame.value[key] !== undefined),
+  );
+  const normalized = axes.length
     ? frames.map((frame) => ({
         ...frame,
-        value: {
-          ...frame.value,
-          rotation: frame.value.rotation ?? rotation,
-        },
+        value: normalizeRotationAxes(clip, frame.value, axes),
       }))
     : frames;
   // Moving the first start away from zero should hold its original state before
@@ -172,6 +186,7 @@ export function animationRanges(
       a.value,
       b.value,
       clip.transform.rotation ?? clip.rotation ?? 0,
+      clip.transform,
     );
     if (!(b.time > a.time) || (unchanged && !b.animation)) continue;
     const start = a.time - offset,

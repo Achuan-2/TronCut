@@ -5,28 +5,9 @@ import { fileURLToPath } from "node:url";
 import { uid, type Asset } from "../shared/model";
 import { probeMedia } from "./media";
 import { runProcess } from "./process";
+import { importMediaPaths } from "./import-media";
 
 const clipFormat = "TronCut.Clips";
-const mediaExtensions = new Set([
-  ".png",
-  ".jpg",
-  ".jpeg",
-  ".webp",
-  ".gif",
-  ".tiff",
-  ".bmp",
-  ".svg",
-  ".mp4",
-  ".mov",
-  ".mkv",
-  ".webm",
-  ".avi",
-  ".m4v",
-  ".mpeg",
-  ".mpg",
-  ".mts",
-  ".m2ts",
-]);
 
 export function copyClipClipboard(token: string): void {
   clipboard.writeBuffer(clipFormat, Buffer.from(token, "utf8"));
@@ -80,14 +61,13 @@ export async function importClipboardMedia(
 ): Promise<{ assets: Asset[]; clipToken: string | null }> {
   const token = clipboard.readBuffer(clipFormat).toString("utf8");
   if (token) return { assets: [], clipToken: token };
-  const files = [...new Set(await clipboardFiles())].filter((file) =>
-    mediaExtensions.has(path.extname(file).toLowerCase()),
-  );
-  if (files.length) {
-    const assets = await Promise.all(
-      files.map((file) => probeMedia(file, resourcesPath)),
-    );
-    return { assets, clipToken: null };
+  const hasFiles = clipboard.availableFormats().some((format) =>
+    /^(CF_HDROP|FileDrop|FileNameW?|Shell IDList Array|text\/uri-list|public\.file-url)$/i.test(format));
+  if (hasFiles) {
+    // Explorer can expose a thumbnail as well as files. Prefer the real files,
+    // but never start an STA helper for ordinary screenshot/image clipboard data.
+    const assets = await importMediaPaths(await clipboardFiles(), resourcesPath);
+    if (assets.length) return { assets, clipToken: null };
   }
   const image = clipboard.readImage();
   if (image.isEmpty()) return { assets: [], clipToken: null };

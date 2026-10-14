@@ -809,6 +809,13 @@ fieldset:disabled {
   min-width: 0;
   min-height: 0;
 }
+.workspace-status i.importing {
+  background: var(--accent);
+  animation: import-pulse 0.8s ease-in-out infinite alternate;
+}
+@keyframes import-pulse { from { opacity: 0.35; } to { opacity: 1; } }
+.timeline.file-drag-active { outline: 2px solid var(--accent); outline-offset: -2px; }
+.track-lane.external-drop-target { background-color: #76e5b524; box-shadow: inset 0 0 0 1px var(--accent); }
 .panel-heading {
   height: 42px;
   display: flex;
@@ -826,18 +833,109 @@ fieldset:disabled {
 .canvas-holder {
   flex: 1;
   min-height: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  overflow: auto;
   position: relative;
   background-image: radial-gradient(#87978c19 1px, transparent 1px);
   background-size: 17px 17px;
 }
 .canvas-holder:fullscreen {
   background: #111;
+}
+.canvas-stage {
+  min-width: 100%;
+  min-height: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
+}
+.canvas-toolbar {
+  height: 38px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 10px;
+  border-bottom: 1px solid var(--line);
+  background: #202528;
+}
+.canvas-mode-buttons {
+  display: flex;
+  gap: 2px;
+}
+.canvas-mode-buttons button {
+  width: 31px;
+  height: 30px;
+  padding: 5px;
+}
+.canvas-mode-buttons button.active {
+  background: var(--accent);
+  color: #14372a;
+}
+.canvas-toolbar select {
+  width: 116px;
+  height: 29px;
+  padding: 3px 8px;
+}
+.canvas-size-button {
+  margin-left: auto;
+  color: #acb9b2;
+  padding: 5px 7px;
+  font-size: 11px;
+}
+.preview-layer.selected.cropping {
+  cursor: grab;
+}
+.preview-layer.selected.cropping:after {
+  border-color: #eac16b;
+  outline-color: #7b5f2b40;
+}
+.resize-handle.crop-handle {
+  border-radius: 1px;
+  background: #ffe3a6;
+  border-color: #7b5f2b;
+}
+.canvas-settings {
+  width: 430px;
+  max-width: 90vw;
+  border: 1px solid #46534b;
+  border-radius: 10px;
+  background: #202724;
+  color: #d9dde0;
+  padding: 23px;
+  box-shadow: 0 25px 90px #0008;
+}
+.canvas-settings::backdrop {
+  background: #060c09b8;
+  backdrop-filter: blur(6px);
+}
+.canvas-settings .field {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+}
+.canvas-settings .field input,
+.canvas-settings .field select {
+  width: 100%;
+}
+.canvas-settings .field input[type="color"] {
+  height: 31px;
+}
+.canvas-size-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+.canvas-settings-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
+}
+.canvas-settings-actions .primary {
+  background: var(--accent);
+  color: #14372a;
+  padding: 7px 20px;
 }
 .canvas {
   position: relative;
@@ -1059,11 +1157,12 @@ fieldset:disabled {
   background: #1a1e20;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 12px;
   padding: 0 20px;
   position: relative;
 }
 .timecode {
+  white-space: nowrap;
   font-variant-numeric: tabular-nums;
   font-family: "Cascadia Code", Consolas, monospace;
   font-size: 11px;
@@ -1074,27 +1173,48 @@ fieldset:disabled {
   font-size: 10px;
 }
 .playback-buttons {
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
   display: flex;
   align-items: center;
-  gap: 12px;
+  flex-shrink: 0;
+  gap: 7px;
 }
 .playback-buttons > button {
   color: #91a298;
-  padding: 8px;
+  padding: 6px;
+  width: 29px;
+  height: 29px;
+  background: #2a3330;
+  border-radius: 50%;
 }
 .playback-buttons > .play-button {
   color: #bddfc8;
-  width: 35px;
-  height: 35px;
+  width: 44px;
+  height: 44px;
   background: #2c3830;
   border: 1px solid #3e5043;
   border-radius: 50%;
 }
 .playback > button {
   color: #71867a;
+}
+.playback-progress {
+  flex: 1;
+  min-width: 36px;
+  width: 0;
+}
+.playback-fps {
+  color: #879b8e;
+  font-size: 10px;
+  white-space: nowrap;
+}
+@media (max-width: 1250px) {
+  .playback {
+    padding: 0 10px;
+    gap: 7px;
+  }
+  .playback-fps {
+    display: none;
+  }
 }
 .inspector {
   border-left: 1px solid var(--line);
@@ -1220,6 +1340,118 @@ fieldset:disabled {
   display: flex;
   gap: 18px;
   margin-top: 14px;
+}
+.transform-scale.field {
+  gap: 5px;
+}
+.transform-scale > span {
+  width: 31px;
+  flex-shrink: 0;
+}
+.transform-scale input[type="range"] {
+  min-width: 28px;
+  width: 50px;
+  flex: 1;
+}
+.transform-scale > button {
+  padding: 3px;
+  flex-shrink: 0;
+  color: #a1adb2;
+}
+.transform-number {
+  position: relative;
+  width: 67px;
+  flex-shrink: 0;
+}
+#inspector-video .transform-number input {
+  width: 100%;
+  text-align: right;
+  padding: 5px 17px 5px 4px;
+  font-size: 11px;
+  appearance: textfield;
+}
+.transform-number input::-webkit-inner-spin-button {
+  appearance: none;
+}
+.transform-number > span {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #9da9ae;
+  pointer-events: none;
+  font-size: 10px;
+}
+.rotation-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 0;
+  margin-top: 12px;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  color: #aeb7b3;
+  font-size: 10px;
+}
+.rotation-controls > span {
+  align-self: flex-start;
+  margin-top: 8px;
+}
+.rotation-controls > div {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.rotation-axis {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.rotation-axis-icon {
+  color: #9ba6ac;
+}
+.rotation-axis-icon.axis-y {
+  transform: scaleY(0.6);
+}
+.rotation-axis-icon.axis-x {
+  transform: rotate(90deg) scaleY(0.6);
+}
+.rotation-axis-name {
+  width: 11px;
+  font-size: 11px;
+}
+.rotation-dial {
+  position: relative;
+  width: 27px;
+  height: 27px;
+  padding: 0;
+  border-radius: 50%;
+  background: #c8d1d5;
+  touch-action: none;
+  cursor: grab;
+  flex-shrink: 0;
+}
+.rotation-dial:hover {
+  background: #e2edf1;
+}
+.rotation-dial:active {
+  cursor: grabbing;
+}
+.rotation-dial > span {
+  position: absolute;
+  inset: 2px;
+  width: 21px;
+  height: 21px;
+  pointer-events: none;
+}
+.rotation-dial i {
+  display: block;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #435057;
+  margin: 0 auto;
 }
 .auto-badge {
   font-size: 9px;
@@ -1632,7 +1864,9 @@ fieldset:disabled {
   border-radius: 50%;
   background: #bdcdd0;
   transform: translate(-50%, -50%);
-  transition: transform 180ms ease-out, box-shadow 180ms ease-out;
+  transition:
+    transform 180ms ease-out,
+    box-shadow 180ms ease-out;
   pointer-events: auto;
   cursor: ew-resize;
   z-index: 1;

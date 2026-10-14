@@ -28,17 +28,21 @@ export const cursorStyleSchema = z.object({
 });
 export const transformSchema = z.object({
   rotation: finite.min(-3600).max(3600).optional(),
+  rotationX: finite.min(-3600).max(3600).optional(),
+  rotationY: finite.min(-3600).max(3600).optional(),
   x: finite.min(-4).max(4),
   y: finite.min(-4).max(4),
   scale: finite.min(0.05).max(8),
   opacity: finite.min(0).max(1),
 });
-const cameraTransformSchema = transformSchema.omit({ rotation: true }).extend({
-  x: finite.min(0).max(1),
-  y: finite.min(0).max(1),
-  scale: finite.min(1).max(8),
-  opacity: z.literal(1),
-});
+const cameraTransformSchema = transformSchema
+  .omit({ rotation: true, rotationX: true, rotationY: true })
+  .extend({
+    x: finite.min(0).max(1),
+    y: finite.min(0).max(1),
+    scale: finite.min(1).max(8),
+    opacity: z.literal(1),
+  });
 export const cameraSchema = z.object({
   transform: cameraTransformSchema,
   keyframes: z
@@ -139,6 +143,13 @@ export const projectSchema = z.object({
           .optional(),
         groupId: identifier.optional(),
         rotation: finite.min(-3600).max(3600).optional(),
+        contentTransform: z
+          .object({
+            x: finite.min(-4).max(4),
+            y: finite.min(-4).max(4),
+            scale: finite.min(0.05).max(8),
+          })
+          .optional(),
         crop: z
           .object({
             left: finite.min(0).max(0.95),

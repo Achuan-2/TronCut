@@ -35,6 +35,7 @@ import { ttsOptionsSchema } from "../shared/tts";
 import { mediaThumbnail } from "./thumbnails";
 import { NativeRecording } from "./native-recording";
 import { copyClipClipboard, importClipboardMedia } from "./clipboard-media";
+import { importMediaPaths } from "./import-media";
 
 protocol.registerSchemesAsPrivileged([
   {
@@ -153,6 +154,10 @@ function installHandlers() {
       process.resourcesPath,
     );
     return { ...result, assets: result.assets.map(register) };
+  });
+  handle("media:import-paths", async (input: unknown) => {
+    const files = z.array(z.string().min(1).max(32768)).max(128).parse(input);
+    return (await importMediaPaths(files, process.resourcesPath)).map(register);
   });
   handle(
     "capture:native:available",

@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer } from "electron";
+import { contextBridge, ipcRenderer, webUtils } from "electron";
 import type { FrameCraftBridge } from "../shared/bridge";
 
 const bridge: FrameCraftBridge = {
@@ -15,6 +15,7 @@ const bridge: FrameCraftBridge = {
     return () => ipcRenderer.removeListener("window:state", fn);
   },
   importMedia: () => ipcRenderer.invoke("media:import"),
+  importDroppedMedia: (files) => ipcRenderer.invoke("media:import-paths", files.map((file) => webUtils.getPathForFile(file)).filter(Boolean)),
   copyClipClipboard: (token) => ipcRenderer.invoke("clipboard:clips", token),
   importClipboardMedia: () => ipcRenderer.invoke("media:clipboard"),
   relinkMedia: (id, duration) =>

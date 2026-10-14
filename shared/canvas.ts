@@ -5,6 +5,7 @@ import {
   type Transform,
 } from "./model";
 import { setTransform, transformAt } from "./editor";
+import { localDelta, projectDelta } from "./rotation";
 
 export const resizeHandles = [
   { name: "nw", x: -1, y: -1 },
@@ -29,11 +30,7 @@ export function resizeTransform(
   canvas: { width: number; height: number },
   rotation = 0,
 ): Transform {
-  const angle = (rotation * Math.PI) / 180,
-    cos = Math.cos(angle),
-    sin = Math.sin(angle);
-  const dx = delta.x * cos + delta.y * sin;
-  const dy = -delta.x * sin + delta.y * cos;
+  const { x: dx, y: dy } = localDelta(value, delta, rotation);
   const vx = handle.x * size.width,
     vy = handle.y * size.height;
   const scale = clamp(
@@ -43,11 +40,12 @@ export function resizeTransform(
   );
   const shiftX = (vx * (scale - value.scale)) / 2,
     shiftY = (vy * (scale - value.scale)) / 2;
+  const shift = projectDelta(value, { x: shiftX, y: shiftY }, rotation);
   return {
     ...value,
     scale,
-    x: clamp(value.x + (shiftX * cos - shiftY * sin) / canvas.width, -4, 4),
-    y: clamp(value.y + (shiftX * sin + shiftY * cos) / canvas.height, -4, 4),
+    x: clamp(value.x + shift.x / canvas.width, -4, 4),
+    y: clamp(value.y + shift.y / canvas.height, -4, 4),
   };
 }
 

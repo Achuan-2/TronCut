@@ -15,6 +15,7 @@ import {
   type Transform,
   newTrack,
   numberTracks,
+  projectDuration,
 } from "../shared/model";
 import {
   addMediaAssets,
@@ -24,6 +25,7 @@ import {
 } from "../shared/editor";
 import { selectionWithGroups } from "../shared/timeline";
 import { setVideoZoomPan } from "../shared/video-zoom-pan";
+import { setContentTransform, type ContentTransform } from "../shared/crop";
 import { fitUpdatedText } from "./text";
 import {
   animationEditTarget,
@@ -38,6 +40,11 @@ import {
   type CopiedAnimation,
 } from "../shared/animation-edit";
 import { uid } from "../shared/model";
+import {
+  stepFrameTime,
+  mediaBoundaryTime,
+  type PlaybackDirection,
+} from "../shared/playback";
 
 export function demoProject(): Project {
   const project = createProject("我的第一个视频");
@@ -70,6 +77,7 @@ export function useEditor() {
   const [project, setProject] = useState<Project>(demoProject);
   const [editingTextId, setEditingTextId] = useState<string | null>(null);
   const [zoomPanDraft, setZoomPanDraft] = useState<Transform | null>(null);
+  const [canvasMode, setCanvasMode] = useState<"select" | "crop">("select");
   type KeyframeSelection = {
     clipId: string;
     time: number;
@@ -152,6 +160,7 @@ export function useEditor() {
     setProject(next);
     setEditingTextId(null);
     setZoomPanDraft(null);
+    setCanvasMode("select");
     select(null);
     seek(0);
     setPlaying(false);
@@ -203,6 +212,12 @@ export function useEditor() {
       }));
     },
     [apply],
+  );
+  const updateContentTransform = useCallback(
+    (id: string, patch: Partial<ContentTransform>) => {
+      updateClip(id, (clip) => setContentTransform(clip, patch));
+    },
+    [updateClip],
   );
   const editKeyframe = useCallback(
     (
@@ -327,18 +342,18 @@ export function useEditor() {
     (
       assets: Asset[],
       toTimeline = false,
-      options: { newTrackForImages?: boolean } = {},
+      options: { newTrackForImages?: boolean; trackId?: string; time?: number } = {},
     ) => {
       const before = current.current;
       const next = addMediaAssets(
         before,
         assets,
-        playhead,
+        options.time ?? playhead,
         toTimeline,
         options,
       );
       apply(next);
-      if (toTimeline && options.newTrackForImages) {
+      if (toTimeline && (options.newTrackForImages || options.time !== undefined)) {
         selectMany(
           next.clips.slice(before.clips.length).map((clip) => clip.id),
         );
@@ -373,6 +388,27 @@ export function useEditor() {
       apply((project) => setVideoZoomPan(project, patch, time));
     },
     [apply, playhead],
+  );
+  const stepFrame = useCallback(
+    (direction: PlaybackDirection) => {
+      setPlaying(false);
+      seek((time) =>
+        stepFrameTime(
+          time,
+          current.current.canvas.fps,
+          direction,
+          projectDuration(current.current),
+        ),
+      );
+    },
+    [seek, setPlaying],
+  );
+  const jumpMedia = useCallback(
+    (direction: PlaybackDirection) => {
+      setPlaying(false);
+      seek((time) => mediaBoundaryTime(current.current, time, direction));
+    },
+    [seek, setPlaying],
   );
   const deleteAnimation = useCallback(
     (clipId: string, range: AnimationRange) => {
@@ -483,6 +519,9 @@ export function useEditor() {
     undo,
     redo,
     updateClip,
+    updateContentTransform,
+    canvasMode,
+    setCanvasMode,
     updateTransform,
     addSelectedKeyframe,
     selectedKeyframe,
@@ -504,6 +543,8 @@ export function useEditor() {
     zoomPanDraft,
     setZoomPanDraft,
     updateVideoZoomPan,
+    stepFrame,
+    jumpMedia,
     autoAnimate,
     setAutoAnimate,
   };

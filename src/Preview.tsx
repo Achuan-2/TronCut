@@ -1,5 +1,19 @@
-import { useEffect, useRef, useState, type CSSProperties } from "react";
-import { Maximize2, Pause, Play, SkipBack, SkipForward } from "lucide-react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+} from "react";
+import {
+  Maximize2,
+  Pause,
+  Play,
+  StepBack,
+  StepForward,
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react";
 import {
   type Asset,
   type Clip,
@@ -19,6 +33,21 @@ import { cameraAt, resizeHandles, resizeTransform } from "../shared/canvas";
 import { setVideoZoomPan, unzoomVideoPreview } from "../shared/video-zoom-pan";
 import { resizeTextBox, textLineHeight, type TextBox } from "../shared/text";
 import { textBoxFor, fittedTextFont } from "./text";
+import {
+  cropClip,
+  croppedTransform,
+  dragCrop,
+  type Crop,
+  type ContentTransform,
+  defaultContentTransform,
+  contentLayout,
+  croppedContent,
+  panContent,
+} from "../shared/crop";
+import CanvasToolbar, {
+  type CanvasMode,
+  type CanvasZoom,
+} from "./CanvasToolbar";
 import type { Editor } from "./useEditor";
 
 export function timeLabel(t: number): string {
@@ -112,6 +141,7 @@ function PreviewLayer({
   muted,
   interactive = true,
   cameraScale = 1,
+  mode = "select",
 }: {
   clip: Clip;
   project: Project;
@@ -120,6 +150,7 @@ function PreviewLayer({
   muted: boolean;
   interactive?: boolean;
   cameraScale?: number;
+  mode?: CanvasMode;
 }) {
   const transform = transformAt(clip, editor.playhead - clip.start),
     asset = project.assets.find((a) => a.id === clip.assetId);
@@ -159,13 +190,17 @@ function PreviewLayer({
   const [drag, setDrag] = useState<{
     x: number;
     y: number;
-    mode: "move" | "resize";
+    mode: "move" | "resize" | "crop" | "content";
     handle?: { x: number; y: number };
     original: Transform;
     value: Transform;
     originalBox?: TextBox;
     box?: TextBox;
     fontSize?: number;
+    originalCrop?: Crop;
+    crop?: Crop;
+    originalContent?: ContentTransform;
+    content?: ContentTransform;
   } | null>(null);
   const dragRef = useRef<typeof drag>(null);
   const setGesture = (value: typeof drag) => {
@@ -182,7 +217,7 @@ function PreviewLayer({
     opacity: editing
       ? 1
       : displayed.opacity * fadeOpacity(clip, editor.playhead - clip.start),
-    transform: `translate(-50%, -50%) rotate(${displayed.rotation ?? clip.rotation ?? 0}deg) scale(${displayed.scale})`,
+    transform: `translate(-50%, -50%) rotateZ(${displayed.rotation ?? clip.rotation ?? 0}deg) rotateY(${displayed.rotationY ?? 0}deg) rotateX(${displayed.rotationX ?? 0}deg) scale(${displayed.scale})`,
     "--canvas-scale": scale,
   } as CSSProperties;
   if (textBox) {
@@ -194,7 +229,7 @@ function PreviewLayer({
   }
   let mediaWidth = 0,
     mediaHeight = 0;
-  const crop = clip.crop ?? defaultCrop,
+  const crop = drag?.crop ?? clip.crop ?? defaultCrop,
     effects = clip.effects ?? defaultEffects;
   const cursor = asset
     ? cursorAt(
@@ -222,13 +257,25 @@ function PreviewLayer({
     style.height = mediaHeight * (1 - crop.top - crop.bottom);
   }
   const selectable = interactive && !track?.locked && clip.kind !== "audio";
+  const cropping =
+    mode === "crop" && asset && ["image", "video"].includes(clip.kind);
+  const contentView =
+    drag?.mode === "crop"
+      ? croppedContent(clip, crop)
+      : (drag?.content ?? clip.contentTransform ?? defaultContentTransform);
+  const layout = contentLayout(
+    { ...clip, crop },
+    { width: mediaWidth, height: mediaHeight },
+    contentView,
+  );
   return (
     <div
-      className={`preview-layer ${clip.kind} ${interactive && editor.selectedIds.includes(clip.id) ? "selected" : ""} ${editing ? "editing" : ""}`}
+      className={`preview-layer ${clip.kind} ${interactive && editor.selectedIds.includes(clip.id) ? "selected" : ""} ${editing ? "editing" : ""} ${cropping ? "cropping" : ""}`}
       style={style}
       onClick={(event) => event.stopPropagation()}
       onDoubleClick={(event) => {
-        if (clip.kind !== "text" || editing || !selectable) return;
+        if (clip.kind !== "text" || editing || !selectable || mode !== "select")
+          return;
         event.stopPropagation();
         setGesture(null);
         editor.beginTextEdit(clip.id);
@@ -245,13 +292,15 @@ function PreviewLayer({
           clip.id,
           event.ctrlKey || event.metaKey || event.shiftKey,
         );
+        if (mode === "crop" && !cropping) return;
         event.currentTarget.setPointerCapture(event.pointerId);
         setGesture({
           x: event.clientX,
           y: event.clientY,
-          mode: "move",
+          mode: cropping ? "content" : "move",
           original: transform,
           value: transform,
+          originalContent: clip.contentTransform ?? defaultContentTransform,
         });
       }}
       onPointerMove={(event) => {
@@ -261,6 +310,47 @@ function PreviewLayer({
           x: (event.clientX - gesture.x) / (scale * cameraScale),
           y: (event.clientY - gesture.y) / (scale * cameraScale),
         };
+        if (gesture.mode === "content") {
+          setGesture({
+            ...gesture,
+            content: panContent(
+              clip,
+              gesture.original,
+              gesture.originalContent!,
+              delta,
+              { width: mediaWidth / scale, height: mediaHeight / scale },
+            ),
+          });
+          return;
+        }
+        if (gesture.mode === "crop") {
+          const sourceSize = {
+            width: mediaWidth / scale,
+            height: mediaHeight / scale,
+          };
+          const next = dragCrop(
+            gesture.originalCrop!,
+            gesture.original,
+            delta,
+            gesture.handle!,
+            sourceSize,
+            gesture.original.rotation ?? clip.rotation,
+            effects.flipX,
+            effects.flipY,
+          );
+          setGesture({
+            ...gesture,
+            crop: next,
+            value: croppedTransform(
+              clip,
+              gesture.original,
+              next,
+              sourceSize,
+              project.canvas,
+            ),
+          });
+          return;
+        }
         if (gesture.mode === "resize" && gesture.originalBox) {
           const resized = resizeTextBox(
             gesture.original,
@@ -318,6 +408,25 @@ function PreviewLayer({
       }}
       onPointerUp={() => {
         const drag = dragRef.current;
+        if (drag?.mode === "content") {
+          if (drag.content)
+            editor.updateContentTransform(clip.id, drag.content);
+          setGesture(null);
+          return;
+        }
+        if (drag?.mode === "crop" && drag.crop) {
+          const crop = drag.crop;
+          editor.updateClip(clip.id, (current) =>
+            cropClip(
+              current,
+              crop,
+              { width: mediaWidth / scale, height: mediaHeight / scale },
+              project.canvas,
+            ),
+          );
+          setGesture(null);
+          return;
+        }
         if (
           drag &&
           (drag.original.x !== drag.value.x ||
@@ -355,11 +464,11 @@ function PreviewLayer({
         >
           <div
             style={{
-              width: mediaWidth,
-              height: mediaHeight,
+              width: layout.width,
+              height: layout.height,
               position: "absolute",
-              left: -mediaWidth * crop.left,
-              top: -mediaHeight * crop.top,
+              left: layout.left,
+              top: layout.top,
               filter: previewFilter(clip).replace(
                 `blur(${effects.blur}px)`,
                 `blur(${effects.blur * scale}px)`,
@@ -379,10 +488,10 @@ function PreviewLayer({
                   <div
                     className="cursor-click"
                     style={{
-                      left: (cursor.clickX ?? cursor.x) * mediaWidth,
-                      top: (cursor.clickY ?? cursor.y) * mediaHeight,
-                      width: cursorStyle.size * 2 * scale,
-                      height: cursorStyle.size * 2 * scale,
+                      left: (cursor.clickX ?? cursor.x) * layout.width,
+                      top: (cursor.clickY ?? cursor.y) * layout.height,
+                      width: cursorStyle.size * 2 * scale * contentView.scale,
+                      height: cursorStyle.size * 2 * scale * contentView.scale,
                       borderColor: cursorStyle.color,
                     }}
                   />
@@ -392,10 +501,10 @@ function PreviewLayer({
                   src={`data:image/svg+xml,${encodeURIComponent(cursorSvg(cursorStyle))}`}
                   alt="可编辑鼠标"
                   style={{
-                    left: cursor.x * mediaWidth,
-                    top: cursor.y * mediaHeight,
-                    width: cursorStyle.size * scale,
-                    height: cursorStyle.size * scale,
+                    left: cursor.x * layout.width,
+                    top: cursor.y * layout.height,
+                    width: cursorStyle.size * scale * contentView.scale,
+                    height: cursorStyle.size * scale * contentView.scale,
                     transform:
                       cursorStyle.style === "arrow"
                         ? "translate(-9%, -6%)"
@@ -472,18 +581,20 @@ function PreviewLayer({
       )}
       {selectable &&
         !editing &&
-        (clip.kind === "text" ||
+        ((mode === "select" && clip.kind === "text") ||
           (asset && ["image", "video"].includes(clip.kind))) &&
         editor.selectedIds.includes(clip.id) &&
         resizeHandles.map((handle) => (
           <button
             key={handle.name}
-            className={`resize-handle ${handle.name}`}
-            aria-label={`调整尺寸 ${handle.name}`}
+            className={`resize-handle ${cropping ? "crop-handle" : ""} ${handle.name}`}
+            aria-label={`${cropping ? "裁剪" : "调整尺寸"} ${handle.name}`}
             title={
-              clip.kind === "text"
-                ? "拖动调整文本框尺寸"
-                : "拖动调整尺寸（保持比例）"
+              cropping
+                ? "拖动边缘裁剪素材"
+                : clip.kind === "text"
+                  ? "拖动调整文本框尺寸"
+                  : "拖动调整尺寸（保持比例）"
             }
             style={{
               left: `${(handle.x + 1) * 50}%`,
@@ -499,10 +610,11 @@ function PreviewLayer({
               setGesture({
                 x: event.clientX,
                 y: event.clientY,
-                mode: "resize",
+                mode: cropping ? "crop" : "resize",
                 handle,
                 original: transform,
                 value: transform,
+                originalCrop: cropping ? (clip.crop ?? defaultCrop) : undefined,
                 originalBox:
                   editor.selectedKeyframe?.clipId === clip.id
                     ? undefined
@@ -520,12 +632,14 @@ export function ScenePreview({
   interactive = true,
   applyCamera = true,
   applyVideoZoomPan = true,
+  mode = "select",
 }: {
   editor: Editor;
   scale: number;
   interactive?: boolean;
   applyCamera?: boolean;
   applyVideoZoomPan?: boolean;
+  mode?: CanvasMode;
 }) {
   const { playhead } = editor;
   const project = !applyVideoZoomPan
@@ -569,6 +683,7 @@ export function ScenePreview({
                 muted={!interactive || track.muted}
                 interactive={interactive}
                 cameraScale={camera?.scale ?? 1}
+                mode={mode}
               />
             )),
         )}
@@ -578,6 +693,8 @@ export function ScenePreview({
 export default function Preview({ editor }: { editor: Editor }) {
   const holder = useRef<HTMLDivElement>(null),
     [size, setSize] = useState({ width: 700, height: 400 });
+  const { canvasMode: mode, setCanvasMode: setMode } = editor;
+  const [zoom, setZoom] = useState<CanvasZoom>("fit");
   const { project, playing, playhead, seek, setPlaying } = editor,
     duration = projectDuration(project);
   useEffect(() => {
@@ -610,56 +727,97 @@ export default function Preview({ editor }: { editor: Editor }) {
     frame = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frame);
   }, [playing, duration, seek, setPlaying]);
-  const scale = Math.max(
-    0.05,
+  const fitScale = Math.max(
+    0.01,
     Math.min(
       size.width / project.canvas.width,
       size.height / project.canvas.height,
     ),
   );
+  const scale = zoom === "fit" ? fitScale : zoom;
+  useLayoutEffect(() => {
+    const element = holder.current;
+    if (!element) return;
+    element.scrollLeft = (element.scrollWidth - element.clientWidth) / 2;
+    element.scrollTop = (element.scrollHeight - element.clientHeight) / 2;
+  }, [zoom, project.canvas.width, project.canvas.height]);
+  const resetCrop = () => {
+    const clip = editor.selected;
+    const asset = project.assets.find((asset) => asset.id === clip?.assetId);
+    if (!clip || !asset) return;
+    const fit = Math.min(
+      project.canvas.width / Math.max(1, asset.width),
+      project.canvas.height / Math.max(1, asset.height),
+    );
+    editor.updateClip(clip.id, (current) => ({
+      ...cropClip(
+        current,
+        defaultCrop,
+        { width: asset.width * fit, height: asset.height * fit },
+        project.canvas,
+      ),
+      contentTransform: undefined,
+    }));
+  };
   return (
     <section className="preview-panel">
-      <div className="panel-heading">
-        <span>画布预览</span>
-        <span className="subtle">
-          {project.canvas.width} × {project.canvas.height}
-          <span className="separator-dot">·</span>
-          {project.canvas.fps} fps
-        </span>
-      </div>
+      <CanvasToolbar
+        editor={editor}
+        mode={mode}
+        setMode={setMode}
+        zoom={zoom}
+        setZoom={setZoom}
+        scale={fitScale}
+        onResetCrop={resetCrop}
+      />
       <div
         className="canvas-holder"
         ref={holder}
         onClick={() => editor.select(null)}
       >
         <div
-          className="canvas"
+          className="canvas-stage"
           style={{
-            width: project.canvas.width * scale,
-            height: project.canvas.height * scale,
-            background: project.canvas.background,
+            width: project.canvas.width * scale + 72,
+            height: project.canvas.height * scale + 72,
           }}
         >
-          <ScenePreview editor={editor} scale={scale} />
-          {!project.clips.length && (
-            <div className="canvas-empty">
-              <span className="empty-symbol">T</span>
-              <b>你的下一部作品，从这里开始</b>
-              <span>录制屏幕，或导入一段素材</span>
-            </div>
-          )}
+          <div
+            className="canvas"
+            style={{
+              width: project.canvas.width * scale,
+              height: project.canvas.height * scale,
+              background: project.canvas.background,
+            }}
+          >
+            <ScenePreview editor={editor} scale={scale} mode={mode} />
+            {!project.clips.length && (
+              <div className="canvas-empty">
+                <span className="empty-symbol">T</span>
+                <b>你的下一部作品，从这里开始</b>
+                <span>录制屏幕，或导入一段素材</span>
+              </div>
+            )}
+          </div>
         </div>
-        <span className="canvas-zoom">
-          适应窗口 · {Math.round(scale * 100)}%
-        </span>
       </div>
       <div className="playback">
-        <span className="timecode">
-          {timeLabel(playhead)} <span>/ {timeLabel(duration)}</span>
-        </span>
         <div className="playback-buttons">
-          <button title="回到开始" onClick={() => seek(0)}>
-            <SkipBack size={17} />
+          <button
+            aria-label="前一帧"
+            title="前一帧（←）"
+            disabled={playhead <= 0 || !duration}
+            onClick={() => editor.stepFrame(-1)}
+          >
+            <StepBack size={17} fill="currentColor" />
+          </button>
+          <button
+            aria-label="后一帧"
+            title="后一帧（→）"
+            disabled={playhead >= duration || !duration}
+            onClick={() => editor.stepFrame(1)}
+          >
+            <StepForward size={17} fill="currentColor" />
           </button>
           <button
             className="play-button"
@@ -677,15 +835,40 @@ export default function Preview({ editor }: { editor: Editor }) {
             )}
           </button>
           <button
-            title="跳到结尾"
-            onClick={() => {
-              seek(duration);
-              setPlaying(false);
-            }}
+            aria-label="前一个媒体"
+            title="前一个媒体（Ctrl/⌘ + ←）"
+            disabled={playhead <= 0 || !duration}
+            onClick={() => editor.jumpMedia(-1)}
           >
-            <SkipForward size={17} />
+            <ChevronLeft size={19} />
+          </button>
+          <button
+            aria-label="后一个媒体"
+            title="后一个媒体（Ctrl/⌘ + →）"
+            disabled={playhead >= duration || !duration}
+            onClick={() => editor.jumpMedia(1)}
+          >
+            <ChevronRight size={19} />
           </button>
         </div>
+        <input
+          className="playback-progress"
+          aria-label="播放进度"
+          type="range"
+          min={0}
+          max={duration || 1}
+          step={1 / project.canvas.fps}
+          value={Math.min(playhead, duration)}
+          disabled={!duration}
+          onChange={(event) => {
+            setPlaying(false);
+            seek(Number(event.target.value));
+          }}
+        />
+        <span className="timecode">
+          {timeLabel(playhead)} <span>/ {timeLabel(duration)}</span>
+        </span>
+        <span className="playback-fps">{project.canvas.fps} fps</span>
         <button
           title="全屏预览"
           onClick={() => holder.current?.requestFullscreen()}

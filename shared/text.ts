@@ -1,4 +1,5 @@
 import type { Transform } from "./model";
+import { localDelta, projectDelta } from "./rotation";
 
 export type TextBox = { width: number; height: number };
 export const textLineHeight = 1.25;
@@ -36,23 +37,22 @@ export function resizeTextBox(
   canvas: TextBox,
   rotation = 0,
 ): { value: Transform; box: TextBox } {
-  const angle = (rotation * Math.PI) / 180,
-    cos = Math.cos(angle),
-    sin = Math.sin(angle);
-  const dx = (delta.x * cos + delta.y * sin) / original.scale;
-  const dy = (-delta.x * sin + delta.y * cos) / original.scale;
+  const local = localDelta(original, delta, rotation);
+  const dx = local.x / original.scale;
+  const dy = local.y / original.scale;
   const next = {
     width: clamp(box.width + dx * handle.x, 16, 32768),
     height: clamp(box.height + dy * handle.y, 16, 32768),
   };
   const sx = ((next.width - box.width) * handle.x * original.scale) / 2;
   const sy = ((next.height - box.height) * handle.y * original.scale) / 2;
+  const shift = projectDelta(original, { x: sx, y: sy }, rotation);
   return {
     box: next,
     value: {
       ...original,
-      x: clamp(original.x + (sx * cos - sy * sin) / canvas.width, -4, 4),
-      y: clamp(original.y + (sx * sin + sy * cos) / canvas.height, -4, 4),
+      x: clamp(original.x + shift.x / canvas.width, -4, 4),
+      y: clamp(original.y + shift.y / canvas.height, -4, 4),
     },
   };
 }
