@@ -510,11 +510,11 @@ try {
   await expect(page.locator(".timeline-clip.video")).toHaveCount(3);
   await expect(page.locator(".timeline-clip.image")).toHaveCount(1);
   await expect(page.locator(".asset-card")).toHaveCount(3);
-  await expect(page.locator(".track-header")).toHaveCount(15);
-  await expect(page.locator(".track-name").first()).toHaveText("轨道15");
+  await expect(page.locator(".track-header")).toHaveCount(16);
+  await expect(page.locator(".track-name").first()).toHaveText("轨道16");
   expect(await page.locator(".timeline-clip.image").evaluate((element) =>
     element.closest(".track-lane").dataset.track,
-  )).toBe(await page.locator(".track-lane").first().getAttribute("data-track"));
+  )).toBe(await page.locator(".track-lane").nth(1).getAttribute("data-track"));
   const originalImageTrack = await page.locator(".timeline-clip.image").evaluate((element) =>
     element.closest(".track-lane").dataset.track,
   );
@@ -523,7 +523,7 @@ try {
   }, assets);
   await page.keyboard.press("Control+v");
   await expect(page.locator(".timeline-clip.image")).toHaveCount(2);
-  await expect(page.locator(".track-header")).toHaveCount(16);
+  await expect(page.locator(".track-header")).toHaveCount(17);
   const pastedImageTracks = await page.locator(".timeline-clip.image").evaluateAll((elements) =>
     elements.map((element) => element.closest(".track-lane").dataset.track),
   );
@@ -532,7 +532,15 @@ try {
   await page.screenshot({ path: path.join(root, "pasted-image-tracks.png") });
   await page.getByTitle("撤销 Ctrl+Z", { exact: true }).click();
   await expect(page.locator(".timeline-clip.image")).toHaveCount(1);
-  await expect(page.locator(".track-header")).toHaveCount(15);
+  await expect(page.locator(".track-header")).toHaveCount(16);
+  // Clipboard video now receives its own top track; hide that overlay while
+  // exercising the image underneath, then restore it for the video checks.
+  const overlayTrack = await page.locator(".track-lane").first().getAttribute("data-track");
+  const toggleOverlay = async () => {
+    const index = await page.locator(".track-lane").evaluateAll((lanes, id) => lanes.findIndex(lane => lane.dataset.track === id), overlayTrack);
+    await page.locator(".track-header").nth(index).getByTitle("显示 / 隐藏轨道", { exact: true }).click({ force: true });
+  };
+  await toggleOverlay();
   await app.evaluate((_, assets) => {
     globalThis.editingClipboard = { assets, clipToken: null };
   }, assets);
@@ -862,6 +870,7 @@ try {
   await textLock.click();
   await page.screenshot({ path: path.join(root, "text-properties.png") });
 
+  await toggleOverlay();
   for (let i = 0; i < 3; i++) {
     const clip = page.locator(".timeline-clip.video").nth(i);
     await clip.click();

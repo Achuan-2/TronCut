@@ -36,15 +36,27 @@ export function addMediaAssets(
   assets: Asset[],
   start: number,
   toTimeline = false,
-  options: { newTrackForImages?: boolean; trackId?: string } = {},
+  options: {
+    newTrackForImages?: boolean;
+    pasteToTop?: boolean;
+    trackId?: string;
+  } = {},
 ): Project {
   const tracks = [...project.tracks],
     clips = [...project.clips];
   if (toTimeline)
     for (const asset of assets) {
       const duration = asset.duration || 5;
-      let track =
-        options.newTrackForImages && asset.kind === "image"
+      const pasteVisual = options.pasteToTop && asset.kind !== "audio";
+      const top = tracks[0];
+      let track = pasteVisual
+        ? top &&
+          !top.locked &&
+          !top.hidden &&
+          !clips.some((clip) => clip.trackId === top.id)
+          ? top
+          : undefined
+        : options.newTrackForImages && asset.kind === "image"
           ? undefined
           : availableTrack({ tracks, clips }, start, duration);
       const target = tracks.find(

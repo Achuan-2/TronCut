@@ -380,6 +380,7 @@ export function useEditor() {
       toTimeline = false,
       options: {
         newTrackForImages?: boolean;
+        pasteToTop?: boolean;
         trackId?: string;
         time?: number;
       } = {},
@@ -395,7 +396,9 @@ export function useEditor() {
       apply(next);
       if (
         toTimeline &&
-        (options.newTrackForImages || options.time !== undefined)
+        (options.newTrackForImages ||
+          options.pasteToTop ||
+          options.time !== undefined)
       ) {
         selectMany(
           next.clips.slice(before.clips.length).map((clip) => clip.id),

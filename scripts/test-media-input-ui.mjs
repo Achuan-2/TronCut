@@ -103,7 +103,8 @@ try {
   expect(Date.now() - started).toBeLessThan(5000);
   await expect(page.locator(".busy-overlay")).toHaveCount(0);
   expect(await app.evaluate(() => globalThis.clipboardReads)).toBe(1);
-  await expect(page.locator(".track-lane")).toHaveCount(3);
+  await expect(page.locator(".track-lane")).toHaveCount(2);
+  await expect(page.locator('.track-lane[data-track="top"] .timeline-clip.image')).toHaveCount(1);
   expect(await fs.readdir(path.join(profile, "pasted-media"))).toHaveLength(1);
   await page.screenshot({ path: path.join(root, "fast-image-paste.png") });
 

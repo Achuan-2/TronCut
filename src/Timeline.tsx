@@ -757,9 +757,20 @@ export default function Timeline({
                         }}
                         onPointerMove={(event) => {
                           if (!drag || drag.id !== c.id) return;
-                          const hit = document
-                            .elementFromPoint(event.clientX, event.clientY)
-                            ?.closest<HTMLElement>("[data-track]");
+                          // The translated clip stays under its original lane
+                          // in the DOM. Hit-testing it would alternate between
+                          // that lane and the destination on every pointer move.
+                          const hit = Array.from(
+                            scroll.current?.querySelectorAll<HTMLElement>(
+                              ".track-lane",
+                            ) ?? [],
+                          ).find((lane) => {
+                            const bounds = lane.getBoundingClientRect();
+                            return (
+                              event.clientY >= bounds.top &&
+                              event.clientY < bounds.bottom
+                            );
+                          });
                           const target = project.tracks.find(
                             (t) => t.id === hit?.dataset.track,
                           );

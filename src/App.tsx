@@ -235,7 +235,7 @@ export default function App() {
           };
       if (result.assets.length) {
         editor.setPlaying(false);
-        editor.addAssets(result.assets, true, { newTrackForImages: true });
+        editor.addAssets(result.assets, true, { pasteToTop: true });
         setTab("media");
         toast(`已粘贴 ${result.assets.length} 个素材到时间线`);
       } else if (

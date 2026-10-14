@@ -136,4 +136,73 @@ describe("通用编号轨道与图片粘贴", () => {
       "轨道1",
     ]);
   });
+  it.each(["image", "video"] as const)(
+    "粘贴%s复用空白顶层轨道，即使选中的素材在下层",
+    (kind) => {
+      const project = createProject();
+      project.clips = [newText(project.tracks[1].id, 0)];
+      const asset: Asset = {
+        ...image,
+        kind,
+        duration: kind === "video" ? 2 : 0,
+      };
+      const pasted = addMediaAssets(project, [asset], 3, true, {
+        pasteToTop: true,
+      });
+      expect(pasted.tracks).toEqual(project.tracks);
+      expect(pasted.clips[1]).toMatchObject({
+        trackId: project.tracks[0].id,
+        start: 3,
+        duration: kind === "video" ? 2 : 5,
+      });
+      expect(pasted.clips[0]).toBe(project.clips[0]);
+    },
+  );
+  it("顶层有素材但当前时间空闲时仍新增，批量粘贴不复用其他空轨道", () => {
+    const project = createProject();
+    project.clips = [newText(project.tracks[0].id, 10)];
+    const video: Asset = { ...image, id: "video", kind: "video", duration: 2 };
+    const pasted = addMediaAssets(project, [image, video], 0, true, {
+      pasteToTop: true,
+    });
+    expect(pasted.tracks).toHaveLength(5);
+    expect(pasted.clips[1].trackId).toBe(pasted.tracks[1].id);
+    expect(pasted.clips[2].trackId).toBe(pasted.tracks[0].id);
+    expect(pasted.tracks.slice(2)).toEqual(project.tracks);
+  });
+  it("批量粘贴先复用空白顶层，再新增；锁定或隐藏的空白顶层不复用", () => {
+    const project = createProject();
+    const pasted = addMediaAssets(
+      project,
+      [image, { ...image, id: "second" }],
+      1,
+      true,
+      { pasteToTop: true },
+    );
+    expect(pasted.tracks).toHaveLength(4);
+    expect(pasted.clips[0].trackId).toBe(project.tracks[0].id);
+    expect(pasted.clips[1].trackId).toBe(pasted.tracks[0].id);
+    for (const state of ["locked", "hidden"] as const) {
+      const blocked = {
+        ...project,
+        tracks: project.tracks.map((track, index) =>
+          index === 0 ? { ...track, [state]: true } : track,
+        ),
+      };
+      const next = addMediaAssets(blocked, [image], 1, true, {
+        pasteToTop: true,
+      });
+      expect(next.tracks).toHaveLength(4);
+      expect(next.clips[0].trackId).toBe(next.tracks[0].id);
+    }
+    const withoutTracks = addMediaAssets(
+      { ...project, tracks: [] },
+      [image],
+      1,
+      true,
+      { pasteToTop: true },
+    );
+    expect(withoutTracks.tracks).toHaveLength(1);
+    expect(withoutTracks.clips[0].trackId).toBe(withoutTracks.tracks[0].id);
+  });
 });
