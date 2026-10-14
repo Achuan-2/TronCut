@@ -118,6 +118,7 @@ export const projectSchema = z.object({
         duration: finite.positive().max(86400),
         sourceIn: finite.nonnegative(),
         speed: finite.min(0.25).max(8),
+        speedEffect: z.boolean().optional(),
         transform: transformSchema,
         animationOffset: finite.min(-86400).max(86400).optional(),
         keyframes: z

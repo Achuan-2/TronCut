@@ -5,7 +5,6 @@ import {
   Captions,
   Sparkles,
   AudioLines,
-  Shapes,
   Settings2,
   Plus,
   Film,
@@ -27,12 +26,11 @@ import {
 import {
   type Clip,
   textPresets,
-  uid,
   defaultTransform,
   newText,
   newTrack,
 } from "../shared/model";
-import { animation, changeSpeed, transformAt } from "../shared/editor";
+import { animation, transformAt } from "../shared/editor";
 import type { Cue } from "../shared/subtitles";
 import type { Capabilities } from "../shared/bridge";
 import type { Editor } from "./useEditor";
@@ -47,26 +45,30 @@ import ZoomPanPanel from "./ZoomPanPanel";
 import { defaultContentTransform } from "../shared/crop";
 import { visualClipAt } from "../shared/visual-state";
 import { ScaleControl, RotationControls } from "./TransformControls";
+import AnnotationsPanel from "./AnnotationsPanel";
+import VisualEffectsPanel from "./VisualEffectsPanel";
+import SpeedProperties from "./SpeedProperties";
+import { hasClipSpeed } from "../shared/clip-speed";
 
 export type Tab =
   | "media"
-  | "text"
+  | "annotations"
   | "captions"
   | "animations"
   | "zoompan"
   | "audio"
   | "narration"
-  | "shapes"
+  | "effects"
   | "settings";
 const tabs = [
   { id: "media", name: "媒体", icon: FolderOpen },
-  { id: "text", name: "文本", icon: Type },
+  { id: "annotations", name: "标注", icon: Type },
   { id: "captions", name: "字幕", icon: Captions },
   { id: "animations", name: "动画", icon: Sparkles },
   { id: "zoompan", name: "缩放与平移", icon: Scan },
+  { id: "effects", name: "视觉效果", icon: WandSparkles },
   { id: "audio", name: "音频", icon: AudioLines },
   { id: "narration", name: "配音", icon: Mic },
-  { id: "shapes", name: "标注", icon: Shapes },
   { id: "settings", name: "设置", icon: Settings2 },
 ] as const;
 interface Props {
@@ -271,37 +273,10 @@ export default function Panels(props: Props) {
             </div>
           </>
         )}
-        {tab === "text" && (
-          <>
-            <p className="panel-intro">
-              点击模板，在播放头处直接添加。
-              <br />
-              也可以用时间线旁的「添加文本」。
-            </p>
-            <div className="text-presets">
-              {textPresets.map((preset, i) => (
-                <button
-                  key={preset.name}
-                  className="preset-card"
-                  onClick={() => editor.addText(i)}
-                >
-                  <span
-                    style={{
-                      color: preset.style.color,
-                      WebkitTextStroke: `${preset.style.outlineWidth / 2}px ${preset.style.outline}`,
-                      paintOrder: "stroke fill",
-                    }}
-                  >
-                    花字
-                  </span>
-                  <small>{preset.name}</small>
-                  <Plus size={14} />
-                </button>
-              ))}
-            </div>
-            <p className="small-note">所有文字都可编辑，样式随工程保存。</p>
-          </>
-        )}
+        <div hidden={tab !== "annotations"}>
+          <AnnotationsPanel key={project.id} editor={editor} />
+        </div>
+        {tab === "effects" && <VisualEffectsPanel editor={editor} />}
         <div hidden={tab !== "narration"}>
           <NarrationPanel
             key={project.id}
@@ -585,58 +560,6 @@ export default function Panels(props: Props) {
               <p className="small-note">
                 实际听感取决于素材与倍率，需要通过 A/B 试听调校。
               </p>
-            </div>
-          </>
-        )}
-        {tab === "shapes" && (
-          <>
-            <p className="panel-intro">轻量标注，让重点更直观。</p>
-            <div className="shape-presets">
-              {(["rectangle", "ellipse", "arrow"] as const).map((shape, i) => (
-                <button
-                  key={shape}
-                  onClick={() => {
-                    const track = project.tracks.find(
-                      (t) => !t.locked && !t.hidden,
-                    );
-                    if (!track) return;
-                    const clip: Clip = {
-                      id: uid(),
-                      trackId: track.id,
-                      kind: "shape",
-                      shape,
-                      fill: "#71e6b5",
-                      name: ["圆角矩形", "椭圆", "箭头"][i],
-                      start: editor.playhead,
-                      duration: 5,
-                      sourceIn: 0,
-                      speed: 1,
-                      volume: 1,
-                      podcast: false,
-                      transform: { ...defaultTransform },
-                      keyframes: [],
-                    };
-                    editor.apply((p) => ({ ...p, clips: [...p.clips, clip] }));
-                    editor.select(clip.id);
-                  }}
-                >
-                  <svg
-                    width="100"
-                    height="54"
-                    viewBox="0 0 120 60"
-                    fill="currentColor"
-                  >
-                    {shape === "rectangle" ? (
-                      <rect x="15" y="9" width="90" height="42" rx="7" />
-                    ) : shape === "ellipse" ? (
-                      <ellipse cx="60" cy="30" rx="42" ry="22" />
-                    ) : (
-                      <path d="M10 22H76V8L110 30L76 52V38H10Z" />
-                    )}
-                  </svg>
-                  <span>{["圆角矩形", "椭圆", "箭头"][i]}</span>
-                </button>
-              ))}
             </div>
           </>
         )}
@@ -1282,24 +1205,6 @@ export function Inspector({ editor }: { editor: Editor }) {
               aria-labelledby="inspector-audio-tab"
               hidden={activeTab !== "audio"}
             >
-              {["video", "audio"].includes(c.kind) && (
-                <>
-                  {numberField(
-                    "播放速度",
-                    c.speed,
-                    (speed) =>
-                      editor.updateClip(c.id, (clip) =>
-                        changeSpeed(clip, speed),
-                      ),
-                    0.25,
-                    8,
-                    0.25,
-                  )}
-                  <p className="small-note">
-                    保持音调 · 速度修改同步调整片段时长
-                  </p>
-                </>
-              )}
               {c.assetId &&
                 editor.project.assets.find((a) => a.id === c.assetId)
                   ?.hasAudio && (
@@ -1332,6 +1237,7 @@ export function Inspector({ editor }: { editor: Editor }) {
                   </>
                 )}
             </div>
+            {hasClipSpeed(c) && <SpeedProperties clip={c} editor={editor} />}
           </fieldset>
         )}
       </div>

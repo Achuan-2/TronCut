@@ -30,6 +30,14 @@ import { animateContent, animateCrop } from "../shared/crop-animation";
 import type { Crop } from "../shared/crop";
 import { fitUpdatedText } from "./text";
 import {
+  addClipSpeed,
+  removeClipSpeed,
+  setClipSpeed,
+  setSpeedDuration,
+  supportsClipSpeed,
+} from "../shared/clip-speed";
+import { annotationClip, type AnnotationTemplate } from "../shared/annotations";
+import {
   animationEditTarget,
   animationRanges,
   type AnimationRange,
@@ -374,6 +382,102 @@ export function useEditor() {
     },
     [apply, playhead],
   );
+  const addAnnotation = useCallback(
+    (
+      template: AnnotationTemplate,
+      time = playhead,
+      trackId?: string,
+      position?: { x: number; y: number },
+    ) => {
+      const p = current.current;
+      const preferred = trackId
+        ? p.tracks.filter((track) => track.id === trackId)
+        : p.tracks.slice(0, 1);
+      let track = availableTrack(
+        { tracks: preferred, clips: p.clips },
+        time,
+        5,
+      );
+      const tracks = [...p.tracks];
+      if (!track) {
+        track = newTrack(tracks.length);
+        tracks.unshift(track);
+      }
+      const clip = annotationClip(template, track.id, time);
+      if (clip.kind === "shape")
+        clip.transform.scale = Math.max(
+          0.05,
+          Math.min(
+            1,
+            (p.canvas.width * 0.4) / 600,
+            (p.canvas.height * 0.4) / 300,
+          ),
+        );
+      if (position) clip.transform = { ...clip.transform, ...position };
+      apply({ ...p, tracks, clips: [...p.clips, clip] });
+      setPlaying(false);
+      select(clip.id);
+    },
+    [apply, playhead, select, setPlaying],
+  );
+  const addSpeedEffect = useCallback(
+    (id?: string) => {
+      const p = current.current;
+      const ids = id ? [id] : selectedIds;
+      const clips = p.clips.map((clip) =>
+        ids.includes(clip.id) &&
+        !p.tracks.find((track) => track.id === clip.trackId)?.locked
+          ? addClipSpeed(clip)
+          : clip,
+      );
+      if (clips.some((clip, index) => clip !== p.clips[index]))
+        apply({ ...p, clips });
+      if (
+        id &&
+        p.clips.some((clip) => clip.id === id && supportsClipSpeed(clip))
+      )
+        select(id);
+      clearKeyframeEdit();
+      setPlaying(false);
+    },
+    [apply, selectedIds, select, clearKeyframeEdit, setPlaying],
+  );
+  const changeClipSpeed = useCallback(
+    (id: string, speed: number) => {
+      const before = current.current.clips.find((clip) => clip.id === id);
+      if (!before) return;
+      const next = setClipSpeed(before, speed);
+      if (next === before) return;
+      clearKeyframeEdit();
+      setPlaying(false);
+      updateClip(id, next);
+    },
+    [clearKeyframeEdit, setPlaying, updateClip],
+  );
+  const changeSpeedDuration = useCallback(
+    (id: string, duration: number) => {
+      const before = current.current.clips.find((clip) => clip.id === id);
+      if (!before) return;
+      const next = setSpeedDuration(
+        before,
+        duration,
+        current.current.canvas.fps,
+      );
+      if (next === before) return;
+      clearKeyframeEdit();
+      setPlaying(false);
+      updateClip(id, next);
+    },
+    [clearKeyframeEdit, setPlaying, updateClip],
+  );
+  const removeSpeedEffect = useCallback(
+    (id: string) => {
+      clearKeyframeEdit();
+      setPlaying(false);
+      updateClip(id, removeClipSpeed);
+    },
+    [clearKeyframeEdit, setPlaying, updateClip],
+  );
   const addAssets = useCallback(
     (
       assets: Asset[],
@@ -583,6 +687,11 @@ export function useEditor() {
     editKeyframe,
     clearKeyframeEdit,
     addText,
+    addAnnotation,
+    addSpeedEffect,
+    changeClipSpeed,
+    changeSpeedDuration,
+    removeSpeedEffect,
     addAssets,
     editingTextId,
     beginTextEdit,

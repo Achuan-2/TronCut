@@ -50,6 +50,7 @@ import CanvasToolbar, {
 } from "./CanvasToolbar";
 import type { Editor } from "./useEditor";
 import { visualClipAt } from "../shared/visual-state";
+import { annotationMime, parseAnnotation } from "../shared/annotations";
 
 export function timeLabel(t: number): string {
   const seconds = Math.max(0, t);
@@ -231,6 +232,12 @@ function PreviewLayer({
   }
   let mediaWidth = 0,
     mediaHeight = 0;
+  if (clip.kind === "shape") {
+    mediaWidth = 600 * scale;
+    mediaHeight = 300 * scale;
+    style.width = mediaWidth;
+    style.height = mediaHeight;
+  }
   const crop = drag?.crop ?? clip.crop ?? defaultCrop,
     effects = clip.effects ?? defaultEffects;
   const cursor = asset
@@ -576,7 +583,7 @@ function PreviewLayer({
       )}
       {selectable &&
         !editing &&
-        ((mode === "select" && clip.kind === "text") ||
+        ((mode === "select" && ["text", "shape"].includes(clip.kind)) ||
           (asset && ["image", "video"].includes(clip.kind))) &&
         editor.selectedIds.includes(clip.id) &&
         resizeHandles.map((handle) => (
@@ -801,6 +808,31 @@ export default function Preview({ editor }: { editor: Editor }) {
         >
           <div
             className="canvas"
+            onDragOver={(event) => {
+              if (!event.dataTransfer.types.includes(annotationMime)) return;
+              event.preventDefault();
+              event.dataTransfer.dropEffect = "copy";
+            }}
+            onDrop={(event) => {
+              const template = parseAnnotation(
+                event.dataTransfer.getData(annotationMime),
+              );
+              if (!template) return;
+              event.preventDefault();
+              event.stopPropagation();
+              const bounds = event.currentTarget.getBoundingClientRect();
+              const camera = cameraAt(project, editor.playhead);
+              editor.addAnnotation(template, editor.playhead, undefined, {
+                x:
+                  camera.x +
+                  ((event.clientX - bounds.left) / bounds.width - 0.5) /
+                    camera.scale,
+                y:
+                  camera.y +
+                  ((event.clientY - bounds.top) / bounds.height - 0.5) /
+                    camera.scale,
+              });
+            }}
             style={{
               width: project.canvas.width * scale,
               height: project.canvas.height * scale,

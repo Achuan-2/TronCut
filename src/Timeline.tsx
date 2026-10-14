@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   Eye,
@@ -21,6 +21,7 @@ import {
   Flag,
   ChevronDown,
   Camera,
+  ChevronUp,
 } from "lucide-react";
 import {
   type Clip,
@@ -46,6 +47,9 @@ import {
 } from "../shared/animation-ranges";
 import type { Editor } from "./useEditor";
 import { timeLabel } from "./Preview";
+import { hasClipSpeed, supportsClipSpeed } from "../shared/clip-speed";
+import TimelineSpeedEffect from "./TimelineSpeedEffect";
+import { annotationMime, parseAnnotation } from "../shared/annotations";
 
 interface Drag {
   id: string;
@@ -90,6 +94,46 @@ export default function Timeline({
     time: number;
     trackId?: string;
   } | null>(null);
+  const [expandedEffects, setExpandedEffects] = useState<
+    Record<string, boolean>
+  >({});
+  const [speedDraft, setSpeedDraft] = useState<Clip | null>(null);
+  const [activeSpeed, setActiveSpeed] = useState<string | null>(null);
+  const [effectDrop, setEffectDrop] = useState<string | null>(null);
+  const knownSpeedEffects = useRef(new Set<string>());
+  useEffect(() => {
+    const ids = project.clips.filter(hasClipSpeed).map((clip) => clip.id);
+    const added = ids.filter((id) => !knownSpeedEffects.current.has(id));
+    knownSpeedEffects.current = new Set(ids);
+    if (added.length)
+      setExpandedEffects((previous) => ({
+        ...previous,
+        ...Object.fromEntries(added.map((id) => [id, true])),
+      }));
+  }, [project.clips]);
+  const trackHeights = project.tracks.map((track) =>
+    project.clips.some(
+      (clip) =>
+        clip.trackId === track.id &&
+        hasClipSpeed(clip) &&
+        expandedEffects[clip.id],
+    )
+      ? 98
+      : 70,
+  );
+  const layoutKey = trackHeights.join(",");
+  const trackTop = (id: string) => {
+    const index = project.tracks.findIndex((track) => track.id === id);
+    return trackHeights
+      .slice(0, Math.max(0, index))
+      .reduce((sum, height) => sum + height, 0);
+  };
+  const selectSpeed = (id: string) => {
+    editor.clearKeyframeEdit();
+    editor.setPlaying(false);
+    select(id);
+    setActiveSpeed(id);
+  };
   const headers = useRef<HTMLDivElement>(null);
   const deleteControl = useRef<HTMLDivElement>(null);
   const deletePopup = useRef<HTMLDivElement>(null);
@@ -140,11 +184,12 @@ export default function Timeline({
       (track) => track.id === selected?.trackId,
     );
     if (!element || index < 0) return;
-    const top = 36 + index * 70;
+    const height = trackHeights[index];
+    const top = 36 + trackTop(selected!.trackId);
     if (top < element.scrollTop + 36) element.scrollTop = Math.max(0, top - 36);
-    else if (top + 70 > element.scrollTop + element.clientHeight)
-      element.scrollTop = top + 70 - element.clientHeight;
-  }, [selected?.trackId, project.tracks.length]);
+    else if (top + height > element.scrollTop + element.clientHeight)
+      element.scrollTop = top + height - element.clientHeight;
+  }, [selected?.trackId, project.tracks.length, layoutKey]);
   const [viewport, setViewport] = useState({ left: 0, width: 1600 });
   useEffect(() => {
     const element = scroll.current;
@@ -444,6 +489,7 @@ export default function Timeline({
             <div
               className={`track-header ${track.locked ? "locked" : ""}`}
               key={track.id}
+              style={{ height: trackHeights[index] }}
             >
               <div>
                 <span className="track-name">
@@ -565,7 +611,10 @@ export default function Timeline({
         >
           <div
             className="timeline-content"
-            style={{ width, minHeight: project.tracks.length * 70 + 36 }}
+            style={{
+              width,
+              minHeight: trackHeights.reduce((sum, height) => sum + height, 36),
+            }}
           >
             <div
               className="ruler"
@@ -632,23 +681,47 @@ export default function Timeline({
                 <span>{timeLabel(fileDrop.time)} · 添加素材</span>
               </div>
             )}
-            {project.tracks.map((track) => (
+            {project.tracks.map((track, trackIndex) => (
               <div
                 key={track.id}
                 className={`track-lane ${track.hidden ? "hidden-track" : ""} ${fileDrop?.trackId === track.id ? "external-drop-target" : ""}`}
                 data-track={track.id}
-                style={{ backgroundSize: `${zoom * 2}px 100%` }}
+                style={{
+                  backgroundSize: `${zoom * 2}px 100%`,
+                  height: trackHeights[trackIndex],
+                }}
                 onClick={(event) => {
                   if (event.target === event.currentTarget) {
                     select(null);
                     seek(timeFromEvent(event));
                   }
                 }}
-                onDragOver={(e) => e.preventDefault()}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  if (e.dataTransfer.types.includes("troncut-effect"))
+                    e.dataTransfer.dropEffect = "none";
+                }}
                 onDrop={(e) => {
                   e.preventDefault();
                   if (e.dataTransfer.files.length) return;
                   if (track.locked) return;
+                  const template = parseAnnotation(
+                    e.dataTransfer.getData(annotationMime),
+                  );
+                  if (template) {
+                    e.stopPropagation();
+                    const time = Math.max(
+                      0,
+                      Math.round(
+                        ((e.clientX -
+                          e.currentTarget.getBoundingClientRect().left) /
+                          zoom) *
+                          project.canvas.fps,
+                      ) / project.canvas.fps,
+                    );
+                    editor.addAnnotation(template, time, track.id);
+                    return;
+                  }
                   const asset = project.assets.find(
                     (a) => a.id === e.dataTransfer.getData("framecraft-asset"),
                   );
@@ -711,192 +784,293 @@ export default function Timeline({
                                   leader!.start - drag.original.start,
                                 ),
                             }
-                          : original;
+                          : speedDraft?.id === original.id
+                            ? speedDraft
+                            : original;
                     return (
-                      <div
-                        key={c.id}
-                        className={`timeline-clip ${c.kind} ${animationRanges(c).length ? "has-animation" : ""} ${editor.selectedIds.includes(c.id) ? "selected" : ""} ${track.locked ? "locked" : ""}`}
-                        style={{
-                          left: c.start * zoom,
-                          width: Math.max(4, c.duration * zoom),
-                          translate:
-                            drag?.id === c.id
-                              ? `0 ${(project.tracks.findIndex((t) => t.id === drag.trackId) - project.tracks.findIndex((t) => t.id === original.trackId)) * 70}px`
-                              : undefined,
-                        }}
-                        onPointerDown={(event) => {
-                          if (event.button !== 0 || track.locked) return;
-                          event.stopPropagation();
-                          editor.clearKeyframeEdit();
-                          if (
-                            event.ctrlKey ||
-                            event.metaKey ||
-                            event.shiftKey
-                          ) {
-                            select(c.id, true);
-                            return;
-                          }
-                          const ids = editor.selectedIds.includes(c.id)
-                            ? editor.selectedIds
-                            : selectionWithGroups(project, [c.id]);
-                          if (!editor.selectedIds.includes(c.id)) select(c.id);
-                          const mode = (event.target as HTMLElement).dataset
-                            .trim as "left" | "right" | undefined;
-                          event.currentTarget.setPointerCapture(
-                            event.pointerId,
-                          );
-                          setDrag({
-                            id: c.id,
-                            mode: mode ?? "move",
-                            x: event.clientX,
-                            original,
-                            delta: 0,
-                            trackId: c.trackId,
-                            ids,
-                          });
-                        }}
-                        onPointerMove={(event) => {
-                          if (!drag || drag.id !== c.id) return;
-                          // The translated clip stays under its original lane
-                          // in the DOM. Hit-testing it would alternate between
-                          // that lane and the destination on every pointer move.
-                          const hit = Array.from(
-                            scroll.current?.querySelectorAll<HTMLElement>(
-                              ".track-lane",
-                            ) ?? [],
-                          ).find((lane) => {
-                            const bounds = lane.getBoundingClientRect();
-                            return (
-                              event.clientY >= bounds.top &&
-                              event.clientY < bounds.bottom
-                            );
-                          });
-                          const target = project.tracks.find(
-                            (t) => t.id === hit?.dataset.track,
-                          );
-                          setDrag({
-                            ...drag,
-                            delta: (event.clientX - drag.x) / zoom,
-                            trackId:
-                              drag.mode === "move" &&
-                              drag.ids.length === 1 &&
-                              target &&
-                              !target.locked
-                                ? target.id
-                                : drag.trackId,
-                          });
-                        }}
-                        onPointerUp={() => {
-                          if (drag) {
-                            const next = dragClip(drag);
-                            if (drag.mode === "move" && drag.ids.length > 1)
-                              apply((p) =>
-                                moveClips(
-                                  p,
-                                  drag.ids,
-                                  next.start - drag.original.start,
-                                ),
-                              );
-                            else editor.updateClip(drag.id, next);
-                          }
-                          setDrag(null);
-                        }}
-                        onPointerCancel={() => setDrag(null)}
-                        onDoubleClick={(event) => {
-                          if (c.kind !== "text" || track.locked) return;
-                          event.stopPropagation();
-                          setDrag(null);
-                          editor.beginTextEdit(c.id);
-                        }}
-                        onContextMenu={(event) => {
-                          event.preventDefault();
-                          if (!editor.selectedIds.includes(c.id)) select(c.id);
-                          setContext({
-                            x: Math.min(event.clientX, window.innerWidth - 210),
-                            y: Math.min(
-                              event.clientY,
-                              window.innerHeight - 280,
-                            ),
-                            id: c.id,
-                          });
-                        }}
-                      >
-                        <span className="trim-handle left" data-trim="left" />
-                        <div className="clip-label">
-                          {c.kind === "text" ? (
-                            <Type size={13} />
-                          ) : c.kind === "audio" ? (
-                            <Volume2 size={13} />
-                          ) : (
-                            <span className="clip-media-icon">▣</span>
-                          )}
-                          <span>
-                            {c.groupId ? "▧ " : ""}
-                            {c.name}
-                          </span>
-                          {c.speed !== 1 && <b>{c.speed}×</b>}
-                        </div>
-                        <div className="clip-detail">
-                          {c.kind === "text"
-                            ? c.text
-                            : `${timeLabel(c.duration)}${c.podcast ? " · 播客人声" : ""}`}
-                        </div>
-                        {c.assetId &&
-                          project.assets.find((a) => a.id === c.assetId)
-                            ?.hasAudio &&
-                          (() => {
-                            const asset = project.assets.find(
-                              (a) => a.id === c.assetId,
-                            )!;
-                            return (
-                              <div className="clip-waveform">
-                                <MediaThumbnail
-                                  asset={asset}
-                                  waveform
-                                  style={{
-                                    width: `${Math.max(c.duration, asset.duration / c.speed) * zoom}px`,
-                                    left: `${(-c.sourceIn / c.speed) * zoom}px`,
-                                  }}
-                                />
-                              </div>
-                            );
-                          })()}
-                        <TimelineAnimations
-                          clip={c}
-                          zoom={zoom}
-                          playhead={playhead}
-                          fps={project.canvas.fps}
-                          selected={editor.selectedIds.includes(c.id)}
-                          selectedFrame={
-                            editor.selectedKeyframe?.clipId === c.id
-                              ? editor.selectedKeyframe
-                              : null
-                          }
-                          locked={track.locked}
-                          copy={(range, cut) =>
-                            onCopyAnimation(c.id, range, cut)
-                          }
-                          remove={(range) =>
-                            editor.deleteAnimation(c.id, range)
-                          }
-                          commit={(clip) =>
-                            editor.updateClip(c.id, (current) => ({
-                              ...current,
-                              transform: clip.transform,
-                              keyframes: clip.keyframes,
-                            }))
-                          }
-                          locate={(time, side) => {
-                            if (track.locked) {
-                              editor.setPlaying(false);
-                              select(c.id);
-                              seek(time);
-                            } else
-                              editor.editKeyframe(c.id, time - c.start, side);
+                      <Fragment key={c.id}>
+                        <div
+                          className={`timeline-clip ${c.kind} ${animationRanges(c).length ? "has-animation" : ""} ${editor.selectedIds.includes(c.id) ? "selected" : ""} ${track.locked ? "locked" : ""} ${effectDrop === c.id ? "effect-drop-target" : ""}`}
+                          style={{
+                            left: c.start * zoom,
+                            width: Math.max(4, c.duration * zoom),
+                            translate:
+                              drag?.id === c.id
+                                ? `0 ${trackTop(drag.trackId) - trackTop(original.trackId)}px`
+                                : undefined,
                           }}
-                        />
-                        <span className="trim-handle right" data-trim="right" />
-                      </div>
+                          onDragOver={(event) => {
+                            if (
+                              !event.dataTransfer.types.includes(
+                                "troncut-effect",
+                              )
+                            )
+                              return;
+                            event.preventDefault();
+                            event.stopPropagation();
+                            const allowed =
+                              !track.locked && supportsClipSpeed(c);
+                            event.dataTransfer.dropEffect = allowed
+                              ? "copy"
+                              : "none";
+                            setEffectDrop(allowed ? c.id : null);
+                          }}
+                          onDragLeave={(event) => {
+                            if (
+                              !event.currentTarget.contains(
+                                event.relatedTarget as Node | null,
+                              )
+                            )
+                              setEffectDrop(null);
+                          }}
+                          onDrop={(event) => {
+                            if (
+                              event.dataTransfer.getData("troncut-effect") !==
+                              "clip-speed"
+                            )
+                              return;
+                            event.preventDefault();
+                            event.stopPropagation();
+                            setEffectDrop(null);
+                            if (track.locked || !supportsClipSpeed(c)) return;
+                            editor.addSpeedEffect(c.id);
+                            setActiveSpeed(c.id);
+                            setExpandedEffects((previous) => ({
+                              ...previous,
+                              [c.id]: true,
+                            }));
+                          }}
+                          onPointerDown={(event) => {
+                            if (event.button !== 0 || track.locked) return;
+                            event.stopPropagation();
+                            editor.clearKeyframeEdit();
+                            if (
+                              event.ctrlKey ||
+                              event.metaKey ||
+                              event.shiftKey
+                            ) {
+                              select(c.id, true);
+                              return;
+                            }
+                            const ids = editor.selectedIds.includes(c.id)
+                              ? editor.selectedIds
+                              : selectionWithGroups(project, [c.id]);
+                            if (!editor.selectedIds.includes(c.id))
+                              select(c.id);
+                            const mode = (event.target as HTMLElement).dataset
+                              .trim as "left" | "right" | undefined;
+                            event.currentTarget.setPointerCapture(
+                              event.pointerId,
+                            );
+                            setDrag({
+                              id: c.id,
+                              mode: mode ?? "move",
+                              x: event.clientX,
+                              original,
+                              delta: 0,
+                              trackId: c.trackId,
+                              ids,
+                            });
+                          }}
+                          onPointerMove={(event) => {
+                            if (!drag || drag.id !== c.id) return;
+                            // The translated clip stays under its original lane
+                            // in the DOM. Hit-testing it would alternate between
+                            // that lane and the destination on every pointer move.
+                            const hit = Array.from(
+                              scroll.current?.querySelectorAll<HTMLElement>(
+                                ".track-lane",
+                              ) ?? [],
+                            ).find((lane) => {
+                              const bounds = lane.getBoundingClientRect();
+                              return (
+                                event.clientY >= bounds.top &&
+                                event.clientY < bounds.bottom
+                              );
+                            });
+                            const target = project.tracks.find(
+                              (t) => t.id === hit?.dataset.track,
+                            );
+                            setDrag({
+                              ...drag,
+                              delta: (event.clientX - drag.x) / zoom,
+                              trackId:
+                                drag.mode === "move" &&
+                                drag.ids.length === 1 &&
+                                target &&
+                                !target.locked
+                                  ? target.id
+                                  : drag.trackId,
+                            });
+                          }}
+                          onPointerUp={() => {
+                            if (drag) {
+                              const next = dragClip(drag);
+                              if (drag.mode === "move" && drag.ids.length > 1)
+                                apply((p) =>
+                                  moveClips(
+                                    p,
+                                    drag.ids,
+                                    next.start - drag.original.start,
+                                  ),
+                                );
+                              else editor.updateClip(drag.id, next);
+                            }
+                            setDrag(null);
+                          }}
+                          onPointerCancel={() => setDrag(null)}
+                          onDoubleClick={(event) => {
+                            if (c.kind !== "text" || track.locked) return;
+                            event.stopPropagation();
+                            setDrag(null);
+                            editor.beginTextEdit(c.id);
+                          }}
+                          onContextMenu={(event) => {
+                            event.preventDefault();
+                            if (!editor.selectedIds.includes(c.id))
+                              select(c.id);
+                            setContext({
+                              x: Math.min(
+                                event.clientX,
+                                window.innerWidth - 210,
+                              ),
+                              y: Math.min(
+                                event.clientY,
+                                window.innerHeight - 280,
+                              ),
+                              id: c.id,
+                            });
+                          }}
+                        >
+                          <span className="trim-handle left" data-trim="left" />
+                          <div className="clip-label">
+                            {c.kind === "text" ? (
+                              <Type size={13} />
+                            ) : c.kind === "audio" ? (
+                              <Volume2 size={13} />
+                            ) : (
+                              <span className="clip-media-icon">▣</span>
+                            )}
+                            <span>
+                              {c.groupId ? "▧ " : ""}
+                              {c.name}
+                            </span>
+                            {c.speed !== 1 && <b>{c.speed}×</b>}
+                          </div>
+                          <div className="clip-detail">
+                            {c.kind === "text"
+                              ? c.text
+                              : `${timeLabel(c.duration)}${c.podcast ? " · 播客人声" : ""}`}
+                          </div>
+                          {c.assetId &&
+                            project.assets.find((a) => a.id === c.assetId)
+                              ?.hasAudio &&
+                            (() => {
+                              const asset = project.assets.find(
+                                (a) => a.id === c.assetId,
+                              )!;
+                              return (
+                                <div className="clip-waveform">
+                                  <MediaThumbnail
+                                    asset={asset}
+                                    waveform
+                                    style={{
+                                      width: `${Math.max(c.duration, asset.duration / c.speed) * zoom}px`,
+                                      left: `${(-c.sourceIn / c.speed) * zoom}px`,
+                                    }}
+                                  />
+                                </div>
+                              );
+                            })()}
+                          <TimelineAnimations
+                            clip={c}
+                            zoom={zoom}
+                            playhead={playhead}
+                            fps={project.canvas.fps}
+                            selected={editor.selectedIds.includes(c.id)}
+                            selectedFrame={
+                              editor.selectedKeyframe?.clipId === c.id
+                                ? editor.selectedKeyframe
+                                : null
+                            }
+                            locked={track.locked}
+                            copy={(range, cut) =>
+                              onCopyAnimation(c.id, range, cut)
+                            }
+                            remove={(range) =>
+                              editor.deleteAnimation(c.id, range)
+                            }
+                            commit={(clip) =>
+                              editor.updateClip(c.id, (current) => ({
+                                ...current,
+                                transform: clip.transform,
+                                keyframes: clip.keyframes,
+                              }))
+                            }
+                            locate={(time, side) => {
+                              if (track.locked) {
+                                editor.setPlaying(false);
+                                select(c.id);
+                                seek(time);
+                              } else
+                                editor.editKeyframe(c.id, time - c.start, side);
+                            }}
+                          />
+                          <span
+                            className="trim-handle right"
+                            data-trim="right"
+                          />
+                          {hasClipSpeed(c) && (
+                            <button
+                              className="clip-effects-toggle"
+                              type="button"
+                              aria-label={
+                                expandedEffects[c.id]
+                                  ? "收起剪辑速度效果"
+                                  : "展开剪辑速度效果"
+                              }
+                              aria-expanded={!!expandedEffects[c.id]}
+                              onPointerDown={(event) => event.stopPropagation()}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                setExpandedEffects((previous) => ({
+                                  ...previous,
+                                  [c.id]: !previous[c.id],
+                                }));
+                                selectSpeed(c.id);
+                              }}
+                            >
+                              {expandedEffects[c.id] ? (
+                                <ChevronUp size={12} />
+                              ) : (
+                                <ChevronDown size={12} />
+                              )}
+                            </button>
+                          )}
+                        </div>
+                        {hasClipSpeed(c) && expandedEffects[c.id] && (
+                          <TimelineSpeedEffect
+                            clip={c}
+                            zoom={zoom}
+                            fps={project.canvas.fps}
+                            locked={track.locked}
+                            selected={
+                              activeSpeed === c.id &&
+                              selectedId === c.id &&
+                              !editor.selectedKeyframe
+                            }
+                            offsetY={
+                              drag?.id === c.id
+                                ? trackTop(drag.trackId) -
+                                  trackTop(original.trackId)
+                                : 0
+                            }
+                            select={() => selectSpeed(c.id)}
+                            preview={setSpeedDraft}
+                            commit={(next) => editor.updateClip(next.id, next)}
+                          />
+                        )}
+                      </Fragment>
                     );
                   })}
               </div>
