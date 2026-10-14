@@ -17,6 +17,7 @@
     "dev": "node scripts/dev.mjs",
     "build": "tsc --noEmit && vite build && node scripts/build-electron.mjs",
     "start": "node scripts/start.mjs",
+    "cli": "node scripts/cli.mjs",
     "test": "vitest run",
     "test:smoke": "node scripts/smoke.mjs",
     "dist:win": "pnpm build && node scripts/check-packaging.mjs && electron-builder --win nsis",
@@ -93,6 +94,12 @@
     ],
     "win": {
       "target": "nsis",
+      "extraFiles": [
+        {
+          "from": "resources/troncut.cmd",
+          "to": "troncut.cmd"
+        }
+      ],
       "icon": "resources/icon.ico"
     },
     "nsis": {

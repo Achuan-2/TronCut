@@ -62,6 +62,14 @@ TronCut 将录屏、剪辑、文字、字幕和声音处理放在同一个工作
 
 ## 本地开发
 
+开发版提供可供 Codex 调用的 CLI：剪辑、抽帧、转录、文案配音、字幕和视频导出均返回结构化 JSON，并保留可编辑工程。无声视频由 Codex 根据抽帧生成脚本，再交给 CLI 配音和导出，说明见 [CLI 文档](docs/CLI.md)。此前发布的 v0.4.0 安装包尚未包含该入口。
+
+```powershell
+pnpm build
+pnpm --silent cli help
+pnpm --silent cli run --plan plan.json
+```
+
 需要 **Node.js 22+、pnpm**；字幕开发使用 **uv 与 Python 3.11/3.12**。Windows 原生组件构建需要 Visual Studio 2022 C++ 工具链、Windows SDK 10.0.22621+ 和 CMake。
 
 ```sh

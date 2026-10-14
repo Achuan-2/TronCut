@@ -95,6 +95,7 @@ export const ttsOptionsSchema = z
     instruction: z.string().trim().max(500).default(""),
     offline: z.boolean().default(false),
     modelDir: z.string().trim().max(4096).optional(),
+    captionChars: z.number().int().min(8).max(100).optional(),
     referenceAssetId: z
       .string()
       .regex(/^[a-zA-Z0-9_-]{1,128}$/)

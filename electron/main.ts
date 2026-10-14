@@ -40,6 +40,11 @@ import { NativeRecording } from "./native-recording";
 import { copyClipClipboard, importClipboardMedia } from "./clipboard-media";
 import { importMediaPaths } from "./import-media";
 import { RecentProjects } from "./recent-projects";
+import { runCli } from "./cli";
+
+const cliIndex = process.argv.indexOf("--cli");
+const cliMode = cliIndex >= 0;
+if (cliMode) app.commandLine.appendSwitch("disable-gpu");
 
 protocol.registerSchemesAsPrivileged([
   {
@@ -944,6 +949,20 @@ app
     } catch {
       /* First launch uses bundled engines or PATH. */
     }
+    if (cliMode) {
+      const controller = new AbortController();
+      const cancel = () => controller.abort();
+      process.once("SIGINT", cancel);
+      process.once("SIGTERM", cancel);
+      const code = await runCli(process.argv.slice(cliIndex + 1), {
+        userData: app.getPath("userData"),
+        resources: app.isPackaged ? process.resourcesPath : path.resolve(__dirname, "../resources"),
+        workers: app.isPackaged ? path.join(process.resourcesPath, "workers/onnx") : path.resolve(__dirname, "../workers/onnx"),
+        version: app.getVersion(), signal: controller.signal,
+      });
+      app.exit(code);
+      return;
+    }
     protocol.handle("framecraft-media", (request) => {
       const id = decodeURIComponent(new URL(request.url).pathname.slice(1)),
         asset = assets.get(id);
@@ -988,6 +1007,11 @@ app
     );
   })
   .catch((error) => {
+    if (cliMode) {
+      process.stdout.write(JSON.stringify({ ok: false, error: { code: "STARTUP_ERROR", message: String(error) } }) + "\n");
+      app.exit(1);
+      return;
+    }
     dialog.showErrorBox("TronCut 启动失败", String(error));
     app.quit();
   });

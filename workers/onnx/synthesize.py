@@ -69,11 +69,15 @@ def synthesize(request, output):
     load_seconds = time.monotonic() - started
     if not 0 <= sid < tts.num_speakers:
         raise ValueError(f"该模型音色编号超出范围：0–{tts.num_speakers - 1}")
-    chunks = text_chunks(request["text"])
+    caption_chars = int(request.get("captionChars", 100))
+    if not 8 <= caption_chars <= 100:
+        raise ValueError("字幕分段长度必须在 8–100 字符之间")
+    chunks = text_chunks(request["text"], limit=caption_chars)
     if not chunks:
         raise ValueError("请输入有效的配音文字")
     generation = time.monotonic()
     sample_count = 0
+    segments = []
     with wave.open(str(output), "wb") as audio_file:
         audio_file.setnchannels(1)
         audio_file.setsampwidth(2)
@@ -86,11 +90,13 @@ def synthesize(request, output):
             if not len(samples) or not np.isfinite(samples).all():
                 raise RuntimeError(f"第 {index + 1} 段没有生成有效音频")
             audio_file.writeframes((np.clip(samples, -1, 1) * 32767).astype("<i2").tobytes())
+            segment_start = sample_count / tts.sample_rate
             sample_count += len(samples)
+            segments.append({"start": segment_start, "end": sample_count / tts.sample_rate, "text": chunk})
     metadata = {"model": engine, "device": "cpu", "precision": "int8" if engine == "kokoro-onnx" else "float32",
                 "sampleRate": tts.sample_rate, "duration": sample_count / tts.sample_rate,
                 "loadSeconds": load_seconds, "generationSeconds": time.monotonic() - generation,
-                "modelDirectory": str(directory)}
+                "modelDirectory": str(directory), "segments": segments}
     Path(f"{output}.json").write_text(json.dumps(metadata, ensure_ascii=False), encoding="utf-8")
     progress(90, "ONNX 配音生成完成")
 

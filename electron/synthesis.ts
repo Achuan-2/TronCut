@@ -25,6 +25,15 @@ const runtimeSchema = z.object({
   loadSeconds: z.number().finite().nonnegative(),
   generationSeconds: z.number().finite().nonnegative(),
   modelDirectory: z.string().max(4096).optional(),
+  segments: z
+    .array(
+      z.object({
+        start: z.number().finite().nonnegative(),
+        end: z.number().finite().positive(),
+        text: z.string(),
+      }),
+    )
+    .optional(),
 });
 
 /** Keep generated narration in user data until project save collects it into media/. */

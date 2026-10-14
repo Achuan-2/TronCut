@@ -61,6 +61,14 @@ A complete effects library, nested sequences, TREC cursor metadata, proxy media,
 
 ## Local development
 
+The development build provides a headless CLI for Codex: editing plans, frame sampling, transcription, narration, captions, and MP4 export return structured JSON and preserve editable projects. Codex writes a timed script from sampled frames, then the CLI renders the narration and captions. See [CLI documentation](docs/CLI.md). Previously published v0.4.0 packages do not include this entry point.
+
+```sh
+pnpm build
+pnpm --silent cli help
+pnpm --silent cli run --plan plan.json
+```
+
 Use **Node.js 22+ and pnpm**. Speech development uses **uv and Python 3.11/3.12**. Windows native helpers require the Visual Studio 2022 C++ toolchain, Windows SDK 10.0.22621+, and CMake.
 
 ```sh
