@@ -21,6 +21,7 @@ import {
   type Project,
   uid,
   validateProject,
+  projectDuration,
 } from "../shared/model";
 import { parseSrt, toSrt } from "../shared/subtitles";
 import { capabilities, probeMedia } from "./media";
@@ -36,6 +37,7 @@ import { mediaThumbnail } from "./thumbnails";
 import { NativeRecording } from "./native-recording";
 import { copyClipClipboard, importClipboardMedia } from "./clipboard-media";
 import { importMediaPaths } from "./import-media";
+import { RecentProjects } from "./recent-projects";
 
 protocol.registerSchemesAsPrivileged([
   {
@@ -59,6 +61,16 @@ const windowState = () => ({
   fullscreen: window.isFullScreen(),
 });
 let projectFile: string | null = null;
+const recentProjects = new RecentProjects(path.join(app.getPath("userData"), "recent-projects.json"));
+async function rememberProject(project: Project, file: string) {
+  let thumbnail: string | null = null;
+  const visible = new Set(project.tracks.filter((track) => !track.hidden).map((track) => track.id));
+  const clip = project.clips.find((clip) => visible.has(clip.trackId) && ["image", "video"].includes(clip.kind));
+  const asset = project.assets.find((asset) => asset.id === clip?.assetId && !asset.missing);
+  if (asset) thumbnail = await mediaThumbnail(asset, false, path.join(app.getPath("userData"), "thumbnails"), process.resourcesPath).catch(() => null);
+  // Recent-project metadata must not turn a successfully opened/saved project into an error.
+  await recentProjects.remember(project, file, thumbnail ?? undefined).catch(() => {});
+}
 let projectDirty = false;
 let pendingProject =
   process.argv.find((argument) => /\.(troncut|framecraft)$/i.test(argument)) ??
@@ -240,6 +252,7 @@ function installHandlers() {
     pendingProject = null;
     const project = registerProject(await openProject(file));
     projectFile = file;
+    await rememberProject(project, file);
     return { project, file };
   });
   handle("project:dirty", (dirty: unknown) => {
@@ -324,6 +337,24 @@ function installHandlers() {
       return null;
     }
   });
+  handle("project:recovery:info", async () => {
+    try {
+      const file = path.join(app.getPath("userData"), "recovery.json");
+      const result = JSON.parse(await fs.readFile(file, "utf8"));
+      const project = validateProject(result.project);
+      return { name: project.name, file: typeof result.file === "string" ? result.file : null,
+        modifiedAt: (await fs.stat(file)).mtimeMs, duration: projectDuration(project) };
+    } catch { return null; }
+  });
+  handle("project:recent", () => recentProjects.list());
+  handle("project:recent:open", async (input: unknown) => {
+    const file = z.string().min(1).max(32768).parse(input);
+    if (!(await recentProjects.list()).some((entry) => entry.file === file)) throw new Error("项目不在最近项目列表中，请使用打开项目");
+    const project = registerProject(await openProject(file));
+    projectFile = file;
+    await rememberProject(project, file);
+    return { project, file };
+  });
   handle("media:import", async () => {
     const result = await dialog.showOpenDialog(window, {
       title: "导入素材",
@@ -394,6 +425,7 @@ function installHandlers() {
     if (!file) return null;
     const project = registerProject(await openProject(file));
     projectFile = file;
+    await rememberProject(project, file);
     return { project, file };
   });
   handle("project:save", async (input: unknown, saveAs: unknown) => {
@@ -422,6 +454,7 @@ function installHandlers() {
       : path.resolve("resources/icon.ico");
     const saved = registerProject(await saveProject(project, file, icon));
     projectFile = file;
+    await rememberProject(saved, file);
     await fs.rm(path.join(app.getPath("userData"), "recovery.json"), {
       force: true,
     });
@@ -864,7 +897,7 @@ app
       (contents, permission, callback) =>
         callback(
           contents === window?.webContents &&
-            ["media", "display-capture"].includes(permission),
+            ["media", "display-capture", "fullscreen"].includes(permission),
         ),
     );
     session.defaultSession.setDisplayMediaRequestHandler(

@@ -63,7 +63,10 @@ describe("粘贴媒体与内部片段剪贴板", () => {
   it.skipIf(process.platform !== "win32")(
     "读取多选图片和视频文件，保留中文路径并过滤无关文件",
     async () => {
-      mocks.availableFormats.mockReturnValue(["FileNameW", "Shell IDList Array"]);
+      mocks.availableFormats.mockReturnValue([
+        "FileNameW",
+        "Shell IDList Array",
+      ]);
       mocks.runProcess.mockResolvedValue(
         JSON.stringify([
           "D:\\素材\\图片.PNG",

@@ -15,7 +15,11 @@ const bridge: FrameCraftBridge = {
     return () => ipcRenderer.removeListener("window:state", fn);
   },
   importMedia: () => ipcRenderer.invoke("media:import"),
-  importDroppedMedia: (files) => ipcRenderer.invoke("media:import-paths", files.map((file) => webUtils.getPathForFile(file)).filter(Boolean)),
+  importDroppedMedia: (files) =>
+    ipcRenderer.invoke(
+      "media:import-paths",
+      files.map((file) => webUtils.getPathForFile(file)).filter(Boolean),
+    ),
   copyClipClipboard: (token) => ipcRenderer.invoke("clipboard:clips", token),
   importClipboardMedia: () => ipcRenderer.invoke("media:clipboard"),
   relinkMedia: (id, duration) =>
@@ -24,6 +28,9 @@ const bridge: FrameCraftBridge = {
     ipcRenderer.invoke("media:thumbnail", id, waveform),
   mediaUrl: (id) => ipcRenderer.invoke("media:url", id),
   openProject: () => ipcRenderer.invoke("project:open"),
+  recentProjects: () => ipcRenderer.invoke("project:recent"),
+  openRecentProject: (file) => ipcRenderer.invoke("project:recent:open", file),
+  recoveryInfo: () => ipcRenderer.invoke("project:recovery:info"),
   initialProject: () => ipcRenderer.invoke("project:initial"),
   newProject: () => ipcRenderer.invoke("project:new"),
   markDirty: (dirty) => ipcRenderer.invoke("project:dirty", dirty),

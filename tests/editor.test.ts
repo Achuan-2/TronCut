@@ -13,6 +13,35 @@ import { parseSrt, toSrt } from "../shared/subtitles";
 import { audioFilters, expression } from "../electron/export";
 
 describe("编辑操作保留素材和动画时间", () => {
+  it("外部拖入使用指定轨道和落点，批量文件避开占用区间及锁定轨道", () => {
+    const p = createProject();
+    const asset = {
+      id: "drop",
+      name: "图片.png",
+      path: "图片.png",
+      kind: "image" as const,
+      duration: 5,
+      width: 100,
+      height: 80,
+      hasAudio: false,
+    };
+    const target = p.tracks[1].id;
+    const first = addMediaAssets(
+      p,
+      [asset, { ...asset, id: "drop2" }],
+      3,
+      true,
+      { trackId: target },
+    );
+    expect(first.clips[0].trackId).toBe(target);
+    expect(first.clips[1].trackId).not.toBe(target);
+    expect(first.clips.every((clip) => clip.start === 3)).toBe(true);
+    expect(validateProject(first).clips).toHaveLength(2);
+    p.tracks[1].locked = true;
+    expect(
+      addMediaAssets(p, [asset], 3, true, { trackId: target }).clips[0].trackId,
+    ).not.toBe(target);
+  });
   it("双击素材选择空闲通用轨道，重复加入时避开已占用的文本和媒体区间", () => {
     const p = createProject();
     p.clips = [newText("titles", 0)];

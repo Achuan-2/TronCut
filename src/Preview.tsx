@@ -7,6 +7,7 @@ import {
 } from "react";
 import {
   Maximize2,
+  Minimize2,
   Pause,
   Play,
   StepBack,
@@ -691,10 +692,34 @@ export function ScenePreview({
   );
 }
 export default function Preview({ editor }: { editor: Editor }) {
+  const panel = useRef<HTMLElement>(null);
   const holder = useRef<HTMLDivElement>(null),
     [size, setSize] = useState({ width: 700, height: 400 });
   const { canvasMode: mode, setCanvasMode: setMode } = editor;
   const [zoom, setZoom] = useState<CanvasZoom>("fit");
+  const [fullscreen, setFullscreen] = useState(false);
+  const [fullscreenError, setFullscreenError] = useState("");
+  useEffect(() => {
+    const changed = () =>
+      setFullscreen(document.fullscreenElement === panel.current);
+    document.addEventListener("fullscreenchange", changed);
+    return () => document.removeEventListener("fullscreenchange", changed);
+  }, []);
+  const toggleFullscreen = async () => {
+    try {
+      if (document.fullscreenElement === panel.current)
+        await document.exitFullscreen();
+      else {
+        if (editor.editingTextId) editor.endTextEdit(editor.editingTextId);
+        await panel.current?.requestFullscreen();
+      }
+      setFullscreenError("");
+    } catch (error) {
+      setFullscreenError(
+        `全屏预览失败：${String(error).replace(/^.*?: /, "")}`,
+      );
+    }
+  };
   const { project, playing, playhead, seek, setPlaying } = editor,
     duration = projectDuration(project);
   useEffect(() => {
@@ -734,13 +759,13 @@ export default function Preview({ editor }: { editor: Editor }) {
       size.height / project.canvas.height,
     ),
   );
-  const scale = zoom === "fit" ? fitScale : zoom;
+  const scale = fullscreen || zoom === "fit" ? fitScale : zoom;
   useLayoutEffect(() => {
     const element = holder.current;
     if (!element) return;
     element.scrollLeft = (element.scrollWidth - element.clientWidth) / 2;
     element.scrollTop = (element.scrollHeight - element.clientHeight) / 2;
-  }, [zoom, project.canvas.width, project.canvas.height]);
+  }, [fullscreen, zoom, project.canvas.width, project.canvas.height]);
   const resetCrop = () => {
     const clip = editor.selected;
     const asset = project.assets.find((asset) => asset.id === clip?.assetId);
@@ -760,7 +785,17 @@ export default function Preview({ editor }: { editor: Editor }) {
     }));
   };
   return (
-    <section className="preview-panel">
+    <section
+      className="preview-panel"
+      ref={panel}
+      onKeyDownCapture={(event) => {
+        if (fullscreen && event.key === "Escape") {
+          event.preventDefault();
+          event.stopPropagation();
+          void toggleFullscreen();
+        }
+      }}
+    >
       <CanvasToolbar
         editor={editor}
         mode={mode}
@@ -773,7 +808,9 @@ export default function Preview({ editor }: { editor: Editor }) {
       <div
         className="canvas-holder"
         ref={holder}
-        onClick={() => editor.select(null)}
+        onClick={() => {
+          if (!fullscreen) editor.select(null);
+        }}
       >
         <div
           className="canvas-stage"
@@ -801,6 +838,11 @@ export default function Preview({ editor }: { editor: Editor }) {
           </div>
         </div>
       </div>
+      {fullscreenError && (
+        <div className="fullscreen-error" role="alert">
+          {fullscreenError}
+        </div>
+      )}
       <div className="playback">
         <div className="playback-buttons">
           <button
@@ -870,10 +912,11 @@ export default function Preview({ editor }: { editor: Editor }) {
         </span>
         <span className="playback-fps">{project.canvas.fps} fps</span>
         <button
-          title="全屏预览"
-          onClick={() => holder.current?.requestFullscreen()}
+          title={fullscreen ? "退出全屏预览" : "全屏预览"}
+          aria-label={fullscreen ? "退出全屏预览" : "全屏预览"}
+          onClick={() => void toggleFullscreen()}
         >
-          <Maximize2 size={17} />
+          {fullscreen ? <Minimize2 size={17} /> : <Maximize2 size={17} />}
         </button>
       </div>
     </section>

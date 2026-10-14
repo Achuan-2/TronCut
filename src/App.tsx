@@ -59,6 +59,8 @@ export default function App() {
     clipClipboard = useRef<Clip[]>([]),
     clipClipboardToken = useRef("");
   const initialized = useRef(false);
+  const mediaImportLock = useRef(false);
+  const actionsBlocked = busy || mediaImporting || recording;
   const toast = useCallback((message: string) => {
     setToast(message);
     clearTimeout(toastTimer.current);
@@ -66,6 +68,7 @@ export default function App() {
   }, []);
   const run = useCallback(
     async (fn: () => Promise<unknown>) => {
+      if (mediaImportLock.current) return;
       setBusy(true);
       try {
         await fn();
@@ -78,14 +81,18 @@ export default function App() {
     },
     [toast],
   );
-  const mediaImportLock = useRef(false);
   const importIntoTimeline = async (fn: () => Promise<void>) => {
     if (mediaImportLock.current || busy || recording) return;
     mediaImportLock.current = true;
     setMediaImporting(true);
-    try { await fn(); }
-    catch (error) { toast(String(error).replace(/^Error: /, "")); }
-    finally { mediaImportLock.current = false; setMediaImporting(false); }
+    try {
+      await fn();
+    } catch (error) {
+      toast(String(error).replace(/^Error: /, ""));
+    } finally {
+      mediaImportLock.current = false;
+      setMediaImporting(false);
+    }
   };
   const bridge = () => {
     if (!window.framecraft)
@@ -204,13 +211,17 @@ export default function App() {
         result.clipToken === clipClipboardToken.current &&
         clipClipboard.current.length
       ) {
-        const pasted = pasteClips(
-          editor.project,
-          clipClipboard.current,
-          editor.playhead,
-        );
-        editor.apply(pasted.project);
-        editor.selectMany(pasted.ids);
+        let ids: string[] = [];
+        editor.apply((project) => {
+          const pasted = pasteClips(
+            project,
+            clipClipboard.current,
+            editor.playhead,
+          );
+          ids = pasted.ids;
+          return pasted.project;
+        });
+        editor.selectMany(ids);
       } else {
         toast("剪贴板中没有可粘贴的图片、视频或片段");
       }
@@ -218,10 +229,14 @@ export default function App() {
   const dropFiles = (files: File[], time: number, trackId?: string) =>
     importIntoTimeline(async () => {
       if (editor.project.tracks.find((track) => track.id === trackId)?.locked) {
-        toast("轨道已锁定，请拖入其他轨道"); return;
+        toast("轨道已锁定，请拖入其他轨道");
+        return;
       }
       const assets = await bridge().importDroppedMedia(files);
-      if (!assets.length) { toast("没有可导入的图片、视频或音频文件"); return; }
+      if (!assets.length) {
+        toast("没有可导入的图片、视频或音频文件");
+        return;
+      }
       editor.setPlaying(false);
       editor.addAssets(assets, true, { time, trackId });
       setTab("media");
@@ -252,7 +267,10 @@ export default function App() {
     };
     window.addEventListener("dragover", preventFileNavigation);
     window.addEventListener("drop", preventFileNavigation);
-    return () => { window.removeEventListener("dragover", preventFileNavigation); window.removeEventListener("drop", preventFileNavigation); };
+    return () => {
+      window.removeEventListener("dragover", preventFileNavigation);
+      window.removeEventListener("drop", preventFileNavigation);
+    };
   }, []);
   const newProject = () => {
     if (editor.dirty && !confirm("当前工程有未保存修改，确定新建工程？"))
@@ -271,7 +289,7 @@ export default function App() {
     });
   const commands = useRef<(command: string) => void>(() => {});
   commands.current = (command) => {
-    if (busy || recording) return;
+    if (actionsBlocked) return;
     if (command === "openPending") {
       void run(async () => {
         if (
@@ -479,7 +497,7 @@ export default function App() {
         <nav className="header-menus" aria-label="主菜单">
           <button
             className="project-menu-trigger"
-            disabled={busy || recording}
+            disabled={actionsBlocked}
             aria-expanded={menu}
             onClick={(event) => {
               event.stopPropagation();
@@ -492,20 +510,20 @@ export default function App() {
           {window.framecraft && (
             <>
               <button
-                disabled={busy || recording}
+                disabled={actionsBlocked}
                 onClick={(event) => showWindowMenu("edit", event.currentTarget)}
               >
                 编辑
               </button>
               <button
-                disabled={busy || recording}
+                disabled={actionsBlocked}
                 onClick={(event) => showWindowMenu("view", event.currentTarget)}
               >
                 视图
               </button>
             </>
           )}
-          {menu && !busy && !recording && (
+          {menu && !actionsBlocked && (
             <div className="project-menu" onClick={() => setMenu(false)}>
               <button onClick={newProject}>
                 <Plus size={15} />
@@ -529,7 +547,7 @@ export default function App() {
         <div className="project-title">
           <input
             aria-label="工程名称"
-            disabled={busy || recording}
+            disabled={actionsBlocked}
             value={editor.project.name}
             onChange={(e) => {
               if (e.target.value.trim())
@@ -546,26 +564,34 @@ export default function App() {
         <span
           className="workspace-status"
           title={
-            mediaImporting ? "正在添加素材…" : caps?.ffmpeg
-              ? "媒体引擎就绪"
-              : window.framecraft
-                ? "媒体引擎待配置"
-                : "浏览器预览 · 文件与录屏请用桌面版"
+            mediaImporting
+              ? "正在添加素材…"
+              : caps?.ffmpeg
+                ? "媒体引擎就绪"
+                : window.framecraft
+                  ? "媒体引擎待配置"
+                  : "浏览器预览 · 文件与录屏请用桌面版"
           }
         >
-          <i className={mediaImporting ? "importing" : caps?.ffmpeg ? "ready" : "pending"} />
+          <i
+            className={
+              mediaImporting ? "importing" : caps?.ffmpeg ? "ready" : "pending"
+            }
+          />
           <span className="engine-label">
-            {mediaImporting ? "正在添加素材…" : caps?.ffmpeg
-              ? "媒体引擎就绪"
-              : window.framecraft
-                ? "媒体引擎待配置"
-                : "浏览器预览"}
+            {mediaImporting
+              ? "正在添加素材…"
+              : caps?.ffmpeg
+                ? "媒体引擎就绪"
+                : window.framecraft
+                  ? "媒体引擎待配置"
+                  : "浏览器预览"}
           </span>
         </span>
         <div className="header-actions">
           <button
             className="record-button"
-            disabled={busy || recording}
+            disabled={actionsBlocked}
             onClick={() => {
               editor.setPlaying(false);
               setRecording(true);
@@ -577,7 +603,7 @@ export default function App() {
           <button
             className="save-button"
             title="保存工程 Ctrl+S"
-            disabled={busy || recording}
+            disabled={actionsBlocked}
             onClick={() => void save()}
           >
             <Save size={17} />
@@ -587,7 +613,7 @@ export default function App() {
             className="export-button"
             aria-label="导出视频"
             title="导出视频 Ctrl+E"
-            disabled={busy || recording}
+            disabled={actionsBlocked}
             onClick={() => void exportVideo()}
           >
             导出
@@ -644,12 +670,17 @@ export default function App() {
           toast={toast}
           capabilities={caps}
           refreshCapabilities={refreshCapabilities}
-          busy={busy}
+          busy={busy || mediaImporting}
         />
         <Preview editor={editor} />
         <Inspector editor={editor} />
       </div>
-      <Timeline editor={editor} onCopyAnimation={copyAnimation} onDropFiles={dropFiles} dropDisabled={busy || recording || mediaImporting} />
+      <Timeline
+        editor={editor}
+        onCopyAnimation={copyAnimation}
+        onDropFiles={dropFiles}
+        dropDisabled={busy || recording || mediaImporting}
+      />
       {toastMessage && (
         <div className="toast" role="status">
           <Check size={17} />

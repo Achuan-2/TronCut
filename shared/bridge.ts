@@ -2,6 +2,7 @@ import type { Asset, Project } from "./model";
 import type { Cue } from "./subtitles";
 import type { SpeechEngine, SpeechOptions } from "./asr";
 import type { TtsOptions } from "./tts";
+import type { RecentProject, RecoveryInfo } from "./recent-projects";
 export interface CaptureSource {
   id: string;
   name: string;
@@ -36,6 +37,9 @@ export interface FrameCraftBridge {
   mediaThumbnail(assetId: string, waveform: boolean): Promise<string | null>;
   mediaUrl(assetId: string): Promise<string>;
   openProject(): Promise<{ project: Project; file: string } | null>;
+  recentProjects(): Promise<RecentProject[]>;
+  openRecentProject(file: string): Promise<{ project: Project; file: string }>;
+  recoveryInfo(): Promise<RecoveryInfo | null>;
   initialProject(): Promise<{ project: Project; file: string } | null>;
   newProject(): Promise<void>;
   markDirty(dirty: boolean): Promise<void>;

@@ -342,7 +342,11 @@ export function useEditor() {
     (
       assets: Asset[],
       toTimeline = false,
-      options: { newTrackForImages?: boolean; trackId?: string; time?: number } = {},
+      options: {
+        newTrackForImages?: boolean;
+        trackId?: string;
+        time?: number;
+      } = {},
     ) => {
       const before = current.current;
       const next = addMediaAssets(
@@ -353,7 +357,10 @@ export function useEditor() {
         options,
       );
       apply(next);
-      if (toTimeline && (options.newTrackForImages || options.time !== undefined)) {
+      if (
+        toTimeline &&
+        (options.newTrackForImages || options.time !== undefined)
+      ) {
         selectMany(
           next.clips.slice(before.clips.length).map((clip) => clip.id),
         );

@@ -61,12 +61,20 @@ export async function importClipboardMedia(
 ): Promise<{ assets: Asset[]; clipToken: string | null }> {
   const token = clipboard.readBuffer(clipFormat).toString("utf8");
   if (token) return { assets: [], clipToken: token };
-  const hasFiles = clipboard.availableFormats().some((format) =>
-    /^(CF_HDROP|FileDrop|FileNameW?|Shell IDList Array|text\/uri-list|public\.file-url)$/i.test(format));
+  const hasFiles = clipboard
+    .availableFormats()
+    .some((format) =>
+      /^(CF_HDROP|FileDrop|FileNameW?|Shell IDList Array|text\/uri-list|public\.file-url)$/i.test(
+        format,
+      ),
+    );
   if (hasFiles) {
     // Explorer can expose a thumbnail as well as files. Prefer the real files,
     // but never start an STA helper for ordinary screenshot/image clipboard data.
-    const assets = await importMediaPaths(await clipboardFiles(), resourcesPath);
+    const assets = await importMediaPaths(
+      await clipboardFiles(),
+      resourcesPath,
+    );
     if (assets.length) return { assets, clipToken: null };
   }
   const image = clipboard.readImage();

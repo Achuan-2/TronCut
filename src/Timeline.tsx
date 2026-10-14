@@ -83,7 +83,10 @@ export default function Timeline({
   const scroll = useRef<HTMLDivElement>(null),
     duration = Math.max(20, projectDuration(project) + 5),
     width = duration * zoom;
-  const [fileDrop, setFileDrop] = useState<{ time: number; trackId?: string } | null>(null);
+  const [fileDrop, setFileDrop] = useState<{
+    time: number;
+    trackId?: string;
+  } | null>(null);
   const headers = useRef<HTMLDivElement>(null);
   const deleteControl = useRef<HTMLDivElement>(null);
   const deletePopup = useRef<HTMLDivElement>(null);
@@ -493,23 +496,59 @@ export default function Timeline({
           onDragOver={(event) => {
             if (!event.dataTransfer.types.includes("Files")) return;
             event.preventDefault();
-            const trackId = (event.target as HTMLElement).closest<HTMLElement>(".track-lane")?.dataset.track;
-            const locked = project.tracks.find((track) => track.id === trackId)?.locked;
-            event.dataTransfer.dropEffect = dropDisabled || locked ? "none" : "copy";
-            if (dropDisabled || locked) { setFileDrop(null); return; }
-            const seconds = (event.clientX - event.currentTarget.getBoundingClientRect().left + event.currentTarget.scrollLeft) / zoom;
-            setFileDrop({ time: Math.max(0, Math.round(seconds * project.canvas.fps) / project.canvas.fps), trackId });
+            const trackId = (event.target as HTMLElement).closest<HTMLElement>(
+              ".track-lane",
+            )?.dataset.track;
+            const locked = project.tracks.find(
+              (track) => track.id === trackId,
+            )?.locked;
+            event.dataTransfer.dropEffect =
+              dropDisabled || locked ? "none" : "copy";
+            if (dropDisabled || locked) {
+              setFileDrop(null);
+              return;
+            }
+            const seconds =
+              (event.clientX -
+                event.currentTarget.getBoundingClientRect().left +
+                event.currentTarget.scrollLeft) /
+              zoom;
+            setFileDrop({
+              time: Math.max(
+                0,
+                Math.round(seconds * project.canvas.fps) / project.canvas.fps,
+              ),
+              trackId,
+            });
           }}
           onDragLeave={(event) => {
-            if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setFileDrop(null);
+            if (
+              !event.currentTarget.contains(event.relatedTarget as Node | null)
+            )
+              setFileDrop(null);
           }}
           onDrop={(event) => {
             if (!event.dataTransfer.files.length) return;
-            event.preventDefault(); event.stopPropagation(); setFileDrop(null);
+            event.preventDefault();
+            event.stopPropagation();
+            setFileDrop(null);
             if (dropDisabled) return;
-            const trackId = (event.target as HTMLElement).closest<HTMLElement>(".track-lane")?.dataset.track;
-            const seconds = (event.clientX - event.currentTarget.getBoundingClientRect().left + event.currentTarget.scrollLeft) / zoom;
-            onDropFiles(Array.from(event.dataTransfer.files), Math.max(0, Math.round(seconds * project.canvas.fps) / project.canvas.fps), trackId);
+            const trackId = (event.target as HTMLElement).closest<HTMLElement>(
+              ".track-lane",
+            )?.dataset.track;
+            const seconds =
+              (event.clientX -
+                event.currentTarget.getBoundingClientRect().left +
+                event.currentTarget.scrollLeft) /
+              zoom;
+            onDropFiles(
+              Array.from(event.dataTransfer.files),
+              Math.max(
+                0,
+                Math.round(seconds * project.canvas.fps) / project.canvas.fps,
+              ),
+              trackId,
+            );
           }}
           onScroll={(event) => {
             setViewport({
@@ -581,6 +620,14 @@ export default function Timeline({
                 <span />
               </div>
             </div>
+            {fileDrop && (
+              <div
+                className="external-drop-marker"
+                style={{ left: fileDrop.time * zoom }}
+              >
+                <span>{timeLabel(fileDrop.time)} · 添加素材</span>
+              </div>
+            )}
             {project.tracks.map((track) => (
               <div
                 key={track.id}

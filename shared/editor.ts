@@ -46,8 +46,20 @@ export function addMediaAssets(
         options.newTrackForImages && asset.kind === "image"
           ? undefined
           : availableTrack({ tracks, clips }, start, duration);
-      const target = tracks.find((track) => track.id === options.trackId && !track.locked && !track.hidden);
-      if (target && !clips.some((clip) => clip.trackId === target.id && clip.start < start + duration && clip.start + clip.duration > start)) track = target;
+      const target = tracks.find(
+        (track) =>
+          track.id === options.trackId && !track.locked && !track.hidden,
+      );
+      if (
+        target &&
+        !clips.some(
+          (clip) =>
+            clip.trackId === target.id &&
+            clip.start < start + duration &&
+            clip.start + clip.duration > start,
+        )
+      )
+        track = target;
       if (!track) {
         track = newTrack(tracks.length);
         tracks.unshift(track);
