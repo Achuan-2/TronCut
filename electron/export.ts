@@ -242,7 +242,7 @@ export async function exportVideo(
     "-f",
     "lavfi",
     "-i",
-    `anullsrc=r=48000:cl=stereo`,
+    `anullsrc=r=48000:cl=stereo:d=${duration}`,
   ];
   const filters: string[] = [],
     audioLabels: string[] = ["[1:a]"];
@@ -269,9 +269,34 @@ export async function exportVideo(
         size = await rasterize(clip, image);
       intrinsicWidth = size.width;
       intrinsicHeight = size.height;
-      args.push("-loop", "1", "-framerate", String(fps), "-i", image);
+      // Finite sources avoid relying only on downstream trim to stop loops.
+      // Decode static images on one thread: FFmpeg 9 frame-threaded PNG inputs
+      // can stall in multi-overlay graphs with delayed/truncated sources.
+      args.push(
+        "-loop",
+        "1",
+        "-framerate",
+        String(fps),
+        "-t",
+        String(clip.sourceIn + clip.duration * clip.speed),
+        "-threads",
+        "1",
+        "-i",
+        image,
+      );
     } else if (clip.kind === "image")
-      args.push("-loop", "1", "-framerate", String(fps), "-i", asset!.path);
+      args.push(
+        "-loop",
+        "1",
+        "-framerate",
+        String(fps),
+        "-t",
+        String(clip.sourceIn + clip.duration * clip.speed),
+        "-threads",
+        "1",
+        "-i",
+        asset!.path,
+      );
     else args.push("-i", asset!.path);
     if (clip.kind !== "audio") {
       const visual = `v${layer}`,

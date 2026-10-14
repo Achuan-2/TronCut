@@ -34,7 +34,7 @@ it("文本框调整后的实际字号可保存重开，并按字号导出", asyn
     output,
     path.join(root, "render"),
     false,
-    new AbortController().signal,
+    AbortSignal.timeout(20000),
     () => {},
   );
   const widths: number[] = [];
