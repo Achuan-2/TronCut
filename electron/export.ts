@@ -11,6 +11,7 @@ import { findBinary, runProcess } from "./process";
 import { defaultCrop, fadeDurations, visualFilters } from "../shared/effects";
 import { cursorFilters } from "./cursor-export";
 import { loopImageInput } from "./loop-image";
+import { easingExpression } from "../shared/easing";
 
 // Avoid lookahead buffering in short, delayed overlay graphs. Hardware failure
 // fallback and explicitly requested software encoding use identical settings.
@@ -57,10 +58,15 @@ export function expression(
     const a = frames[i - 1],
       b = frames[i],
       p = `clip((${clock}-${origin + a.time})/${Math.max(0.00001, b.time - a.time)},0,1)`;
-    const ease = `((${p})*(${p})*(3-2*(${p})))`;
+    const ease = easingExpression(p, b.easing);
     result = `if(lt(${clock},${origin + b.time}),${frameValue(a.value)}+(${frameValue(b.value) - frameValue(a.value)})*${ease},${result})`;
   }
-  return `if(lt(${clock},${origin + frames[0].time}),${frameValue(frames[0].value)},${result})`;
+  const value = `if(lt(${clock},${origin + frames[0].time}),${frameValue(frames[0].value)},${result})`;
+  return key === "opacity"
+    ? `clip(${value},0,1)`
+    : key === "scale"
+      ? `max(0.05,${value})`
+      : value;
 }
 export function audioFilters(clip: Clip, rubberband: boolean): string[] {
   const filters: string[] = [];

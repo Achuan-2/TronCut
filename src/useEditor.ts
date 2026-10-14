@@ -25,7 +25,18 @@ import {
 import { selectionWithGroups } from "../shared/timeline";
 import { setCameraTransform } from "../shared/canvas";
 import { fitUpdatedText } from "./text";
-import { animationEditTarget } from "../shared/animation-ranges";
+import {
+  animationEditTarget,
+  animationRanges,
+  type AnimationRange,
+} from "../shared/animation-ranges";
+import {
+  snapshotAnimation,
+  removeAnimation,
+  pasteAnimation,
+  type CopiedAnimation,
+} from "../shared/animation-edit";
+import { uid } from "../shared/model";
 
 export function demoProject(): Project {
   const project = createProject("我的第一个视频");
@@ -66,6 +77,10 @@ export function useEditor() {
   const [keyframeSelection, setKeyframeSelection] =
     useState<KeyframeSelection | null>(null);
   const keyframeRef = useRef<KeyframeSelection | null>(null);
+  const animationClipboard = useRef<{
+    token: string;
+    value: CopiedAnimation;
+  } | null>(null);
   const clearKeyframeEdit = useCallback(() => {
     keyframeRef.current = null;
     setKeyframeSelection(null);
@@ -318,6 +333,54 @@ export function useEditor() {
     },
     [apply, playhead],
   );
+  const deleteAnimation = useCallback(
+    (clipId: string, range: AnimationRange) => {
+      updateClip(clipId, (clip) => removeAnimation(clip, range));
+      clearKeyframeEdit();
+    },
+    [updateClip, clearKeyframeEdit],
+  );
+  const copyAnimation = useCallback(
+    (clipId: string, range: AnimationRange, cut = false) => {
+      const clip = current.current.clips.find((clip) => clip.id === clipId);
+      if (
+        !clip ||
+        (cut &&
+          current.current.tracks.find((track) => track.id === clip.trackId)
+            ?.locked)
+      )
+        return null;
+      const value = snapshotAnimation(clip, range);
+      if (!value) return null;
+      const token = uid();
+      animationClipboard.current = { token, value };
+      if (cut) deleteAnimation(clipId, range);
+      return token;
+    },
+    [deleteAnimation],
+  );
+  const pasteCopiedAnimation = useCallback(() => {
+    const clip = current.current.clips.find((clip) => clip.id === selectedId);
+    if (
+      !clip ||
+      !animationClipboard.current ||
+      current.current.tracks.find((track) => track.id === clip.trackId)?.locked
+    )
+      return false;
+    const next = pasteAnimation(
+      clip,
+      animationClipboard.current.value,
+      playhead - clip.start,
+    );
+    if (next === clip) return false;
+    updateClip(clip.id, next);
+    editKeyframe(
+      clip.id,
+      playhead - clip.start + animationClipboard.current.value.duration,
+      "end",
+    );
+    return true;
+  }, [selectedId, playhead, updateClip, editKeyframe]);
   const selected = project.clips.find((c) => c.id === selectedId);
   const editingTrack = project.tracks.find(
     (track) => track.id === selected?.trackId,
@@ -346,6 +409,17 @@ export function useEditor() {
       ? keyframeSelection
       : null;
   keyframeRef.current = selectedKeyframe;
+  const selectedAnimation =
+    selectedKeyframe && selected
+      ? (animationRanges(selected).find(
+          (range) =>
+            Math.abs(
+              (selectedKeyframe.side === "end" ? range.end : range.start) +
+                (selected.animationOffset ?? 0) -
+                selectedKeyframe.time,
+            ) < 1e-6,
+        ) ?? null)
+      : null;
   useEffect(() => {
     if (keyframeSelection && !selectedKeyframe) clearKeyframeEdit();
   }, [keyframeSelection, selectedKeyframe, clearKeyframeEdit]);
@@ -370,6 +444,14 @@ export function useEditor() {
     updateClip,
     updateTransform,
     selectedKeyframe,
+    selectedAnimation,
+    copyAnimation,
+    deleteAnimation,
+    pasteCopiedAnimation,
+    animationClipboardToken: () => animationClipboard.current?.token ?? null,
+    clearAnimationClipboard: () => {
+      animationClipboard.current = null;
+    },
     editKeyframe,
     clearKeyframeEdit,
     addText,

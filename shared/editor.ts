@@ -9,6 +9,7 @@ import {
   numberTracks,
 } from "./model";
 import { sameTransform } from "./animation-ranges";
+import { easeProgress } from "./easing";
 
 export function availableTrack(
   project: Pick<Project, "tracks" | "clips">,
@@ -105,10 +106,10 @@ export function transformAt(
         0,
         Math.min(1, (localTime - a.time) / Math.max(0.00001, b.time - a.time)),
       );
-      const ease = p * p * (3 - 2 * p);
+      const ease = easeProgress(p, b.easing);
       const from = normalize(a.value),
         to = normalize(b.value);
-      return Object.fromEntries(
+      const value = Object.fromEntries(
         Object.keys(from).map((key) => {
           const k = key as keyof Transform;
           const start = from[k] ?? 0,
@@ -116,6 +117,11 @@ export function transformAt(
           return [k, start + (end - start) * ease];
         }),
       ) as Transform;
+      return {
+        ...value,
+        scale: Math.max(0.05, value.scale),
+        opacity: Math.max(0, Math.min(1, value.opacity)),
+      };
     }
   }
   return normalize(points.at(-1)!.value);

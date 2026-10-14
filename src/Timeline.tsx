@@ -26,7 +26,7 @@ import {
   newTrack,
   trackName,
 } from "../shared/model";
-import { animation, snapTime, splitClip, transformAt } from "../shared/editor";
+import { snapTime, splitClip, transformAt } from "../shared/editor";
 import {
   deleteClips,
   moveClips,
@@ -37,7 +37,10 @@ import {
 } from "../shared/timeline";
 import { MediaThumbnail } from "./MediaThumbnail";
 import { TimelineAnimations } from "./TimelineAnimations";
-import { animationRanges } from "../shared/animation-ranges";
+import {
+  animationRanges,
+  type AnimationRange,
+} from "../shared/animation-ranges";
 import type { Editor } from "./useEditor";
 import { timeLabel } from "./Preview";
 
@@ -50,7 +53,17 @@ interface Drag {
   trackId: string;
   ids: string[];
 }
-export default function Timeline({ editor }: { editor: Editor }) {
+export default function Timeline({
+  editor,
+  onCopyAnimation,
+}: {
+  editor: Editor;
+  onCopyAnimation: (
+    clipId: string,
+    range: AnimationRange,
+    cut?: boolean,
+  ) => void;
+}) {
   const { project, apply, playhead, seek, selected, selectedId, select } =
     editor;
   const [zoom, setZoom] = useState(65),
@@ -186,7 +199,14 @@ export default function Timeline({ editor }: { editor: Editor }) {
       ),
     );
   return (
-    <section className="timeline" onClick={() => context && setContext(null)}>
+    <section
+      className="timeline"
+      onClick={() => context && setContext(null)}
+      onContextMenuCapture={(event) => {
+        if ((event.target as HTMLElement).closest(".clip-animations"))
+          setContext(null);
+      }}
+    >
       <div className="timeline-toolbar">
         <div className="tool-group">
           <button title="撤销 Ctrl+Z" onClick={editor.undo}>
@@ -678,8 +698,18 @@ export default function Timeline({ editor }: { editor: Editor }) {
                           playhead={playhead}
                           fps={project.canvas.fps}
                           selected={editor.selectedIds.includes(c.id)}
-                          selectedFrame={editor.selectedKeyframe?.clipId === c.id ? editor.selectedKeyframe : null}
+                          selectedFrame={
+                            editor.selectedKeyframe?.clipId === c.id
+                              ? editor.selectedKeyframe
+                              : null
+                          }
                           locked={track.locked}
+                          copy={(range, cut) =>
+                            onCopyAnimation(c.id, range, cut)
+                          }
+                          remove={(range) =>
+                            editor.deleteAnimation(c.id, range)
+                          }
                           commit={(clip) =>
                             editor.updateClip(c.id, (current) => ({
                               ...current,
@@ -692,7 +722,8 @@ export default function Timeline({ editor }: { editor: Editor }) {
                               editor.setPlaying(false);
                               select(c.id);
                               seek(time);
-                            } else editor.editKeyframe(c.id, time - c.start, side);
+                            } else
+                              editor.editKeyframe(c.id, time - c.start, side);
                           }}
                         />
                         <span className="trim-handle right" data-trim="right" />
@@ -710,7 +741,7 @@ export default function Timeline({ editor }: { editor: Editor }) {
       <div className="timeline-footer">
         <span>
           空格 播放 / 暂停<span className="separator-dot">·</span>S 拆分
-          <span className="separator-dot">·</span>右键 添加动画
+          <span className="separator-dot">·</span>右键动画 编辑动画
         </span>
         <span>
           {project.clips.length} 个片段 · 已选 {editor.selectedIds.length} ·{" "}
@@ -723,27 +754,6 @@ export default function Timeline({ editor }: { editor: Editor }) {
           style={{ left: context.x, top: context.y }}
           onClick={() => setContext(null)}
         >
-          {(["fade", "zoom", "slide"] as const).map((type, i) => (
-            <button
-              key={type}
-              disabled={
-                project.tracks.find(
-                  (t) =>
-                    t.id ===
-                    project.clips.find((c) => c.id === context.id)?.trackId,
-                )?.locked
-              }
-              onClick={() =>
-                editor.updateClip(context.id, (c) =>
-                  animation(c, type, playhead - c.start),
-                )
-              }
-            >
-              <Diamond size={14} />
-              {["添加淡入动画", "添加缩放动画", "添加滑入动画"][i]}
-            </button>
-          ))}
-          <hr />
           <button
             onClick={() => {
               apply((p) => deleteClips(p, editor.selectedIds, true));

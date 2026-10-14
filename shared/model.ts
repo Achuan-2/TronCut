@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { ttsOptionsSchema } from "./tts";
+import { animationEasings } from "./easing";
 
 const finite = z.number().finite();
 const identifier = z
@@ -110,7 +111,11 @@ export const projectSchema = z.object({
         animationOffset: finite.min(-86400).max(86400).optional(),
         keyframes: z
           .array(
-            z.object({ time: finite.nonnegative(), value: transformSchema }),
+            z.object({
+              time: finite.nonnegative(),
+              value: transformSchema,
+              easing: z.enum(animationEasings).optional(),
+            }),
           )
           .max(10000),
         text: z.string().max(10000).optional(),

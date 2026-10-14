@@ -71,8 +71,12 @@ try {
   await page.getByLabel("位置 X (%)").fill("70");
   await expect(page.locator(".timeline-clip.selected .clip-animation")).toHaveCount(1);
   await page.locator(".timeline-clip.selected").click({ button: "right" });
-  await page.getByRole("button", { name: "添加缩放动画", exact: true }).click();
-  await expect(page.locator(".timeline-clip.selected .clip-animation")).toHaveCount(2);
+  await expect(page.getByRole("button", { name: "添加缩放动画", exact: true })).toHaveCount(0);
+  await page.mouse.click(ruler.x + 65 * 3, ruler.y + 12);
+  await page.locator(".timeline-clip.selected .animation-arrow").click({ button: "right" });
+  await page.getByRole("menuitem", { name: "启用缓冲", exact: true }).click();
+  await page.getByRole("menuitemradio", { name: "线性", exact: true }).click();
+  await expect(page.locator(".timeline-clip.selected .clip-animation")).toHaveCount(1);
   await app.evaluate(({ dialog }, file) => {
     dialog.showOpenDialog = async () => ({
       canceled: false,
@@ -225,7 +229,7 @@ try {
     ),
   );
   console.log(
-    "桌面 UI、文本编辑、自动关键帧、右键动画、素材导入、工程归档与 MP4 导出通过",
+    "桌面 UI、文本编辑、自动关键帧、动画右键缓动、素材导入、工程归档与 MP4 导出通过",
   );
 } finally {
   await app.close();

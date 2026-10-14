@@ -483,6 +483,63 @@ try {
   for (let i = 0; i < 3; i++) await page.getByTitle("撤销 Ctrl+Z", { exact: true }).click();
   await expect(imageArrow).toHaveCount(1);
   await imageArrow.locator(".animation-point.end").click();
+  await expect(imageArrow).toHaveClass(/selected-animation/);
+  await expect(imageArrow.locator(".animation-arrow svg")).toHaveCSS("stroke", "rgb(255, 212, 91)");
+  const openAnimationMenu = async (arrow) => {
+    await arrow.locator(".animation-arrow").click({ button: "right" });
+    await expect(page.getByRole("menu", { name: "动画菜单", exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "删除片段", exact: true })).toHaveCount(0);
+  };
+  for (const label of ["指数缓入/缓出", "线性", "跳跃", "回弹", "自动"]) {
+    await openAnimationMenu(imageArrow);
+    await page.getByRole("menuitem", { name: "启用缓冲", exact: true }).click();
+    await page.getByRole("menuitemradio", { name: label, exact: true }).click();
+    await openAnimationMenu(imageArrow);
+    await page.getByRole("menuitem", { name: "启用缓冲", exact: true }).click();
+    await expect(page.getByRole("menuitemradio", { name: label, exact: true })).toHaveAttribute("aria-checked", "true");
+    if (label === "回弹") await page.screenshot({ path: path.join(root, "animation-context-menu.png") });
+    await page.keyboard.press("Escape");
+  }
+  for (let i = 0; i < 5; i++) await page.getByTitle("撤销 Ctrl+Z", { exact: true }).click();
+  await openAnimationMenu(imageArrow);
+  await page.getByRole("menuitem", { name: "复制", exact: false }).click();
+  await seek(9);
+  await page.keyboard.press("Control+v");
+  await expect(imageClip.locator(".clip-animation")).toHaveCount(2);
+  await expect(page.locator(".timeline-clip.image")).toHaveCount(1);
+  const pastedArrow = imageClip.locator(".clip-animation").nth(1);
+  expect(Number(await pastedArrow.getAttribute("data-start"))).toBeCloseTo(9, 2);
+  expect(Number(await pastedArrow.getAttribute("data-end"))).toBeCloseTo(10, 2);
+  await openAnimationMenu(pastedArrow);
+  await page.getByRole("menuitem", { name: "删除", exact: false }).click();
+  await expect(imageClip.locator(".clip-animation")).toHaveCount(1);
+  await expect(page.locator(".timeline-clip.image")).toHaveCount(1);
+  for (let i = 0; i < 2; i++) await page.getByTitle("撤销 Ctrl+Z", { exact: true }).click();
+  await openAnimationMenu(imageArrow);
+  await page.getByRole("menuitem", { name: "剪切", exact: false }).click();
+  await expect(imageClip.locator(".clip-animation")).toHaveCount(0);
+  await expect(page.locator(".timeline-clip.image")).toHaveCount(1);
+  await seek(animationStart);
+  await page.keyboard.press("Control+v");
+  await expect(imageArrow).toHaveCount(1);
+  expect(Number(await imageArrow.getAttribute("data-start"))).toBeCloseTo(animationStart, 2);
+  expect(Number(await imageArrow.getAttribute("data-end"))).toBeCloseTo(animationEnd, 2);
+  for (let i = 0; i < 2; i++) await page.getByTitle("撤销 Ctrl+Z", { exact: true }).click();
+  await imageClip.click({ button: "right", position: { x: 20, y: 10 } });
+  for (const label of ["添加淡入动画", "添加缩放动画", "添加滑入动画"]) {
+    await expect(page.getByRole("button", { name: label, exact: true })).toHaveCount(0);
+  }
+  await seek(animationEnd);
+  await imageArrow.locator(".animation-point.end").click();
+  await page.keyboard.press("Control+c");
+  await seek(9);
+  await page.keyboard.press("Control+v");
+  await expect(imageClip.locator(".clip-animation")).toHaveCount(2);
+  await page.keyboard.press("Delete");
+  await expect(imageClip.locator(".clip-animation")).toHaveCount(1);
+  await expect(page.locator(".timeline-clip.image")).toHaveCount(1);
+  for (let i = 0; i < 2; i++) await page.getByTitle("撤销 Ctrl+Z", { exact: true }).click();
+  await imageArrow.locator(".animation-point.end").click();
   const trackLock = async (clip) => {
     await page.locator(".timeline-scroll").evaluate((element) => {
       element.scrollTop = 0;
@@ -500,6 +557,11 @@ try {
   const imageLock = await trackLock(page.locator(".timeline-clip.image"));
   await imageLock.click();
   await expect(canvasImage.locator(".resize-handle")).toHaveCount(0);
+  await openAnimationMenu(imageArrow);
+  await expect(page.getByRole("menuitem", { name: "剪切", exact: false })).toBeDisabled();
+  await expect(page.getByRole("menuitem", { name: "删除", exact: false })).toBeDisabled();
+  await expect(page.getByRole("menuitem", { name: "启用缓冲", exact: true })).toBeDisabled();
+  await page.keyboard.press("Escape");
   await dragHandle(imageArrow.locator(".animation-arrow"), 65, 0, 1);
   expect(Number(await imageArrow.getAttribute("data-start"))).toBeCloseTo(animationStart, 2);
   expect(Number(await imageArrow.getAttribute("data-end"))).toBeCloseTo(animationEnd, 2);

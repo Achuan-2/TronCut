@@ -30,6 +30,7 @@ import {
 import { useEditor } from "./useEditor";
 import Preview from "./Preview";
 import Timeline from "./Timeline";
+import type { AnimationRange } from "../shared/animation-ranges";
 import Panels, { Inspector, type Tab } from "./Panels";
 import Recorder from "./Recorder";
 
@@ -154,16 +155,40 @@ export default function App() {
         setImportReport(project.importReport ?? []);
       }
     });
+  const copyAnimation = (
+    clipId: string,
+    range: AnimationRange,
+    cut = false,
+  ) => {
+    const token = editor.copyAnimation(clipId, range, cut);
+    if (!token) return;
+    clipClipboard.current = [];
+    clipClipboardToken.current = "";
+    void window.framecraft
+      ?.copyClipClipboard(token)
+      .catch((error) => toast(String(error)));
+    toast(cut ? "已剪切动画" : "已复制动画");
+  };
   const paste = () =>
     run(async () => {
       const result = window.framecraft
         ? await window.framecraft.importClipboardMedia()
-        : { assets: [], clipToken: clipClipboardToken.current };
+        : {
+            assets: [],
+            clipToken:
+              editor.animationClipboardToken() ?? clipClipboardToken.current,
+          };
       if (result.assets.length) {
         editor.setPlaying(false);
         editor.addAssets(result.assets, true, { newTrackForImages: true });
         setTab("media");
         toast(`已粘贴 ${result.assets.length} 个素材到时间线`);
+      } else if (
+        result.clipToken &&
+        result.clipToken === editor.animationClipboardToken()
+      ) {
+        if (editor.pasteCopiedAnimation()) toast("已粘贴动画");
+        else toast("请选中可编辑片段，并将播放头放到足够长的空闲动画区间");
       } else if (
         result.clipToken &&
         result.clipToken === clipClipboardToken.current &&
@@ -262,7 +287,27 @@ export default function App() {
       locked = editor.project.tracks.find(
         (t) => t.id === selected?.trackId,
       )?.locked;
-    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "a") {
+    const animation = editor.selectedAnimation;
+    if (
+      animation &&
+      selected &&
+      (event.ctrlKey || event.metaKey) &&
+      ["c", "x"].includes(event.key.toLowerCase())
+    ) {
+      event.preventDefault();
+      if (event.key.toLowerCase() === "c" || !locked)
+        copyAnimation(selected.id, animation, event.key.toLowerCase() === "x");
+    } else if (
+      animation &&
+      selected &&
+      ["Delete", "Backspace"].includes(event.key)
+    ) {
+      event.preventDefault();
+      if (!locked) editor.deleteAnimation(selected.id, animation);
+    } else if (
+      (event.ctrlKey || event.metaKey) &&
+      event.key.toLowerCase() === "a"
+    ) {
       event.preventDefault();
       editor.selectMany(editor.project.clips.map((c) => c.id));
     } else if (
@@ -302,6 +347,7 @@ export default function App() {
       selected
     ) {
       event.preventDefault();
+      editor.clearAnimationClipboard();
       clipClipboard.current = structuredClone(
         editor.project.clips.filter((c) => editor.selectedIds.includes(c.id)),
       );
@@ -576,7 +622,7 @@ export default function App() {
         <Preview editor={editor} />
         <Inspector editor={editor} />
       </div>
-      <Timeline editor={editor} />
+      <Timeline editor={editor} onCopyAnimation={copyAnimation} />
       {toastMessage && (
         <div className="toast" role="status">
           <Check size={17} />

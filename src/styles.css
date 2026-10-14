@@ -1604,6 +1604,11 @@ fieldset:disabled {
 .animation-arrow:hover svg {
   fill: #32b9aacc;
 }
+.selected-animation .animation-arrow svg,
+.selected-animation .animation-arrow:hover svg {
+  fill: #e9b938cc;
+  stroke: #ffd45b;
+}
 .animation-arrow:hover {
   background: transparent;
 }
@@ -1759,6 +1764,24 @@ fieldset:disabled {
   border: 0;
   border-top: 1px solid #3f5044;
   margin: 5px;
+}
+.animation-context-menu {
+  width: 232px;
+}
+.menu-shortcut {
+  margin-left: auto;
+  color: #9bac9f;
+}
+.animation-easing {
+  position: relative;
+}
+.animation-easing-menu {
+  position: absolute;
+  top: -110px;
+  width: 205px;
+}
+.animation-easing.expanded > button {
+  background: #3c4740;
 }
 .toast {
   position: fixed;

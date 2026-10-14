@@ -1,5 +1,10 @@
 import type { Clip } from "../shared/model";
-import { useRef, useState, type PointerEvent } from "react";
+import { useCallback, useRef, useState, type PointerEvent } from "react";
+import {
+  snapshotAnimation,
+  setAnimationEasing,
+} from "../shared/animation-edit";
+import { AnimationContextMenu } from "./AnimationContextMenu";
 import {
   animationRanges,
   retimeAnimation,
@@ -19,6 +24,8 @@ export function TimelineAnimations({
   locked,
   commit,
   selectedFrame,
+  copy,
+  remove,
 }: {
   clip: Clip;
   zoom: number;
@@ -29,6 +36,8 @@ export function TimelineAnimations({
   locked: boolean;
   commit: (clip: Clip) => void;
   selectedFrame: { time: number; side: "start" | "end" } | null;
+  copy: (range: AnimationRange, cut?: boolean) => void;
+  remove: (range: AnimationRange) => void;
 }) {
   type Gesture = {
     x: number;
@@ -40,6 +49,12 @@ export function TimelineAnimations({
   };
   const [gesture, setGesture] = useState<Gesture | null>(null);
   const live = useRef<Gesture | null>(null);
+  const [context, setContext] = useState<{
+    x: number;
+    y: number;
+    range: AnimationRange;
+  } | null>(null);
+  const closeContext = useCallback(() => setContext(null), []);
   const suppressClick = useRef(false);
   const setDrag = (next: Gesture | null) => {
     live.current = next;
@@ -82,124 +97,150 @@ export function TimelineAnimations({
   };
   const displayed = gesture?.value ?? clip;
   return (
-    <div
-      className={`clip-animations ${locked ? "locked" : ""} ${gesture?.moved ? "dragging" : ""}`}
-      onPointerDown={(event) => event.stopPropagation()}
-      onDoubleClick={(event) => event.stopPropagation()}
-      onPointerMove={(event) => {
-        const drag = live.current;
-        if (!drag) return;
-        event.stopPropagation();
-        const delta = event.clientX - drag.x;
-        if (!drag.moved && Math.abs(delta) < 3) return;
-        setDrag({
-          ...drag,
-          moved: true,
-          value: retimeAnimation(
-            drag.original,
-            drag.range,
-            drag.mode,
-            delta / zoom,
-            fps,
-          ),
-        });
-      }}
-      onPointerUp={(event) => {
-        const drag = live.current;
-        if (!drag) return;
-        event.stopPropagation();
-        suppressClick.current = drag.moved;
-        if (!locked && drag.value !== drag.original) {
-          commit(drag.value);
-          const index = animationRanges(drag.original).findIndex(
-            (range) =>
-              range.start === drag.range.start && range.end === drag.range.end,
-          );
-          const range = animationRanges(drag.value)[index];
-          if (range)
-            locate(
-              clip.start + (drag.mode === "start" ? range.start : range.end),
-              drag.mode === "start" ? "start" : "end",
+    <>
+      <div
+        className={`clip-animations ${locked ? "locked" : ""} ${gesture?.moved ? "dragging" : ""}`}
+        onPointerDown={(event) => event.stopPropagation()}
+        onDoubleClick={(event) => event.stopPropagation()}
+        onPointerMove={(event) => {
+          const drag = live.current;
+          if (!drag) return;
+          event.stopPropagation();
+          const delta = event.clientX - drag.x;
+          if (!drag.moved && Math.abs(delta) < 3) return;
+          setDrag({
+            ...drag,
+            moved: true,
+            value: retimeAnimation(
+              drag.original,
+              drag.range,
+              drag.mode,
+              delta / zoom,
+              fps,
+            ),
+          });
+        }}
+        onPointerUp={(event) => {
+          const drag = live.current;
+          if (!drag) return;
+          event.stopPropagation();
+          suppressClick.current = drag.moved;
+          if (!locked && drag.value !== drag.original) {
+            commit(drag.value);
+            const index = animationRanges(drag.original).findIndex(
+              (range) =>
+                range.start === drag.range.start &&
+                range.end === drag.range.end,
             );
-        }
-        setDrag(null);
-      }}
-      onPointerCancel={() => setDrag(null)}
-      onLostPointerCapture={() => setDrag(null)}
-    >
-      {animationRanges(displayed).map((range, index) => {
-        const start = clip.start + range.start,
-          end = clip.start + range.end;
-        const width = (range.end - range.start) * zoom;
-        const head = range.hasEnd ? Math.min(12, width * 0.4) : 0;
-        const active = selected && Math.abs(playhead - end) <= 0.5 / fps;
-        const startSelected =
-          selectedFrame?.side === "start" &&
-          Math.abs(
-            selectedFrame.time - range.start - (clip.animationOffset ?? 0),
-          ) < 1e-6;
-        const endSelected =
-          selectedFrame?.side === "end" &&
-          Math.abs(
-            selectedFrame.time - range.end - (clip.animationOffset ?? 0),
-          ) < 1e-6;
-        return (
-          <div
-            key={index}
-            className="clip-animation"
-            data-start={start}
-            data-end={end}
-            style={{ left: range.start * zoom, width }}
-          >
-            <button
-              type="button"
-              className="animation-arrow"
-              aria-label={`动画 ${timeLabel(start)} 至 ${timeLabel(end)}`}
-              title={`${timeLabel(start)} → ${timeLabel(end)} · 持续 ${timeLabel(end - start)}`}
-              onPointerDown={(event) => begin(event, range, "move")}
-              onClick={(event) => click(event, end, "end")}
+            const range = animationRanges(drag.value)[index];
+            if (range)
+              locate(
+                clip.start + (drag.mode === "start" ? range.start : range.end),
+                drag.mode === "start" ? "start" : "end",
+              );
+          }
+          setDrag(null);
+        }}
+        onPointerCancel={() => setDrag(null)}
+        onLostPointerCapture={() => setDrag(null)}
+      >
+        {animationRanges(displayed).map((range, index) => {
+          const start = clip.start + range.start,
+            end = clip.start + range.end;
+          const width = (range.end - range.start) * zoom;
+          const head = range.hasEnd ? Math.min(12, width * 0.4) : 0;
+          const active = selected && Math.abs(playhead - end) <= 0.5 / fps;
+          const startSelected =
+            selectedFrame?.side === "start" &&
+            Math.abs(
+              selectedFrame.time - range.start - (clip.animationOffset ?? 0),
+            ) < 1e-6;
+          const endSelected =
+            selectedFrame?.side === "end" &&
+            Math.abs(
+              selectedFrame.time - range.end - (clip.animationOffset ?? 0),
+            ) < 1e-6;
+          return (
+            <div
+              key={index}
+              className={`clip-animation ${startSelected || endSelected ? "selected-animation" : ""}`}
+              onContextMenu={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                locate(end, "end");
+                setContext({ x: event.clientX, y: event.clientY, range });
+              }}
+              data-start={start}
+              data-end={end}
+              style={{ left: range.start * zoom, width }}
             >
-              <svg
-                width="100%"
-                height="20"
-                viewBox={`0 0 ${width} 20`}
-                preserveAspectRatio="none"
-                aria-hidden="true"
-              >
-                <path
-                  d={`${range.hasStart ? "M0 10" : "M0 5"} L${width - head} 5 ${range.hasEnd ? `L${width - head} 1 L${width} 10 L${width - head} 19` : `L${width} 15`} L${width - head} 15 ${range.hasStart ? "" : "L0 15"} Z`}
-                />
-              </svg>
-            </button>
-            {range.hasStart && (
               <button
                 type="button"
-                className={`animation-point start ${startSelected ? "selected-frame" : ""}`}
-                aria-pressed={startSelected}
-                style={
-                  locked ? undefined : { cursor: animationCursor("start") }
-                }
-                aria-label={`动画开始 ${timeLabel(start)}`}
-                title={`动画开始 ${timeLabel(start)}`}
-                onPointerDown={(event) => begin(event, range, "start")}
-                onClick={(event) => click(event, start, "start")}
-              />
-            )}
-            {range.hasEnd && (
-              <button
-                type="button"
-                className={`animation-point end ${active ? "active" : ""} ${endSelected ? "selected-frame" : ""}`}
-                aria-pressed={endSelected}
-                style={locked ? undefined : { cursor: animationCursor("end") }}
-                aria-label={`动画结束 ${timeLabel(end)}`}
-                title={`动画结束 ${timeLabel(end)}`}
-                onPointerDown={(event) => begin(event, range, "end")}
+                className="animation-arrow"
+                aria-label={`动画 ${timeLabel(start)} 至 ${timeLabel(end)}`}
+                title={`${timeLabel(start)} → ${timeLabel(end)} · 持续 ${timeLabel(end - start)}`}
+                onPointerDown={(event) => begin(event, range, "move")}
                 onClick={(event) => click(event, end, "end")}
-              />
-            )}
-          </div>
-        );
-      })}
-    </div>
+              >
+                <svg
+                  width="100%"
+                  height="20"
+                  viewBox={`0 0 ${width} 20`}
+                  preserveAspectRatio="none"
+                  aria-hidden="true"
+                >
+                  <path
+                    d={`${range.hasStart ? "M0 10" : "M0 5"} L${width - head} 5 ${range.hasEnd ? `L${width - head} 1 L${width} 10 L${width - head} 19` : `L${width} 15`} L${width - head} 15 ${range.hasStart ? "" : "L0 15"} Z`}
+                  />
+                </svg>
+              </button>
+              {range.hasStart && (
+                <button
+                  type="button"
+                  className={`animation-point start ${startSelected ? "selected-frame" : ""}`}
+                  aria-pressed={startSelected}
+                  style={
+                    locked ? undefined : { cursor: animationCursor("start") }
+                  }
+                  aria-label={`动画开始 ${timeLabel(start)}`}
+                  title={`动画开始 ${timeLabel(start)}`}
+                  onPointerDown={(event) => begin(event, range, "start")}
+                  onClick={(event) => click(event, start, "start")}
+                />
+              )}
+              {range.hasEnd && (
+                <button
+                  type="button"
+                  className={`animation-point end ${active ? "active" : ""} ${endSelected ? "selected-frame" : ""}`}
+                  aria-pressed={endSelected}
+                  style={
+                    locked ? undefined : { cursor: animationCursor("end") }
+                  }
+                  aria-label={`动画结束 ${timeLabel(end)}`}
+                  title={`动画结束 ${timeLabel(end)}`}
+                  onPointerDown={(event) => begin(event, range, "end")}
+                  onClick={(event) => click(event, end, "end")}
+                />
+              )}
+            </div>
+          );
+        })}
+      </div>
+      {context && (
+        <AnimationContextMenu
+          x={context.x}
+          y={context.y}
+          locked={locked}
+          easing={snapshotAnimation(clip, context.range)?.easing ?? "auto"}
+          close={closeContext}
+          copy={() => copy(context.range)}
+          cut={() => copy(context.range, true)}
+          remove={() => remove(context.range)}
+          changeEasing={(easing) =>
+            commit(setAnimationEasing(clip, context.range, easing))
+          }
+        />
+      )}
+    </>
   );
 }
