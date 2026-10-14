@@ -49,6 +49,8 @@ The [Build release workflow](../.github/workflows/release.yml) runs when a GitHu
 
 To rebuild an existing release, open **Actions → Build release → Run workflow**, select `main`, and enter the existing tag. Upload replaces assets with the same names and regenerates checksums; the Release description, visibility, and prerelease state are preserved. Uncheck **Upload packages** to build only: packages remain available as Actions artifacts for 14 days. A failed build does not run the upload job, and a failed upload can be retried without rebuilding by rerunning the failed job. This workflow does not create commits, tags, or Releases.
 
+也可先创建 Release 草稿，再手动运行该工作流构建并上传附件，校验完成后公开正式版。草稿存在性检查由具有 `contents: write` 的上传任务执行，其余任务保留只读权限；源码按版本标签锁定。
+
 已有版本补包：在 **Actions → Build release → Run workflow** 中选择 `main`，输入标签即可。取消 **Upload packages** 可只构建而不发附件，保留明确的“不发版”入口。工作流不会创建或修改提交、标签、Release 文案或预发布状态。同名附件会被替换，校验文件会同步更新；上传过程失败可能留下部分附件，重跑失败任务可以继续上传。
 
 The first `v0.2.0` tag omitted `index.html`. Only this tag may restore that existing entry from the workflow commit; the source ZIP and build-info JSON record the repair and both commit IDs. Subsequent tags must contain their complete source. macOS automatic distribution is not enabled until matching standalone engines and real-device validation are available. Windows CI builds remain unsigned; CI success does not replace capture, installation, or performance acceptance on actual devices.

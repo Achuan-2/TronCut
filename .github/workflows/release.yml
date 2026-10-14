@@ -34,16 +34,12 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           RELEASE_TAG: ${{ github.event.release.tag_name || inputs.tag }}
-          UPLOAD: ${{ github.event_name == 'release' || inputs.upload }}
         shell: bash
         run: |
           set -euo pipefail
           [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]] || {
             echo 'Expected a version tag such as v0.2.0'; exit 1;
           }
-          if [[ "$UPLOAD" == 'true' ]]; then
-            gh release view "$RELEASE_TAG" --json tagName >/dev/null
-          fi
           source=$(gh api "repos/$GH_REPO/commits/$RELEASE_TAG" --jq .sha)
           echo "tag=$RELEASE_TAG" >> "$GITHUB_OUTPUT"
           echo "source=$source" >> "$GITHUB_OUTPUT"
@@ -167,6 +163,8 @@ jobs:
         run: |
           set -euo pipefail
           sha256sum --check SHA256SUMS.txt
+          # Draft releases require contents:write; check here rather than in resolve.
+          gh release view "$RELEASE_TAG" --json tagName >/dev/null
           gh release upload "$RELEASE_TAG" ./* --clobber
           gh release view "$RELEASE_TAG" --json url,assets
           echo "Packages uploaded to Release $RELEASE_TAG" >> "$GITHUB_STEP_SUMMARY"
