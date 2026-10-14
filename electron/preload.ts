@@ -48,6 +48,8 @@ const bridge: FrameCraftBridge = {
   previewAudio: (project, clipId) =>
     ipcRenderer.invoke("audio:preview", project, clipId),
   synthesize: (options) => ipcRenderer.invoke("audio:synthesize", options),
+  downloadSpeechModel: (engine) =>
+    ipcRenderer.invoke("speech:downloadModel", engine),
   selectNarrationReference: () => ipcRenderer.invoke("audio:reference"),
   cancelTask: () => ipcRenderer.invoke("task:cancel"),
   onProgress: (callback) => {

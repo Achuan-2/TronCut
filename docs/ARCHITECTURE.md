@@ -10,9 +10,13 @@
 
 `electron/project-store.ts` 收集工程素材并原子替换 JSON；`media.ts` 通过 FFprobe 探测实际媒体；`camtasia.ts` 做保守的基础转换，并保留原 JSON 和逐项报告；`export.ts` 把同一关键帧模型转换为 FFmpeg 表达式。外部进程用参数数组启动，`shell:false`，支持取消，stderr 有长度上限。文字图层用 Pango 测量和 rasterize，再合成描边与透明度，避免把字幕固定在底部。
 
-`workers/` 是独立的本地 Faster Whisper / SenseVoiceSmall 工作进程，由 uv 管理按需依赖并用 `uv.lock` 锁定。运行时复制到应用数据目录，避免向 macOS 应用包或 Windows 安装目录写虚拟环境。`electron/transcription.ts` 只提取选中片段对应的 16 kHz 单声道源音频，工作进程返回的局部时间加回 `sourceIn`，再按剪辑速度映射到时间线。模型和音频处理不在界面线程执行。
+`workers/onnx/` 是字幕与配音共用的 sherpa-onnx CPU 工作进程，由 uv 管理 Python 3.12 与锁定依赖。显式依赖 `sherpa-onnx-core`，确保安装配套 ONNX Runtime 原生库。运行时复制到应用数据目录的 `workers/onnx/`，避免向应用安装目录写虚拟环境。模型只从用户指定的目录或应用数据目录的 `models/onnx/` 读取；默认缓存缺失时按需下载，离线模式同时禁止 uv 与模型下载。
 
-SenseVoiceSmall 使用 FunASR 内置实现（`trust_remote_code=False`）与独立 FSMN-VAD。VAD 使用一分钟窗口，编码器输入最多十秒；当前 FunASR `timestamp` 的每个 `[start_ms,end_ms]` 与 `words` 对应，旧仓库三元组的单位为秒，转换器分别处理，不能混用。移除语言/情绪/事件标签后按真实词时间断句；时间戳缺失或格式不一致时保留整段文字与真实 VAD 边界，不按文字长度伪造词时间。GPU/CPU 与总耗时写入 CLI 的元数据文件；一次性工作进程仍会在每次任务加载模型，不能把官方热模型推理数字视为整条链路耗时。
+模型准备通过 `speech:downloadModel` IPC 与 `workers/onnx/prepare.py` 执行，校验模型枚举后复用同一运行环境；ASR 准备时额外下载共享 VAD。完整文件以临时路径下载，TTS 模型包在暂存目录安全解压并检查必要文件，准备完成后才替换所选缓存模型。缓存完整时跳过下载，主进程共用后台任务互斥与进程树取消。
+
+`electron/transcription.ts` 只提取选中片段对应的 16 kHz 单声道 PCM16 源音频。Silero VAD 以 512 个样本为窗口流式读取，单段语音最多八秒，结尾调用 flush 保留尾句。SenseVoiceSmall / Paraformer 通过 sherpa-onnx 返回识别结果，优先采用真实 token 时间戳断句；时间信息缺失或不一致时保留完整文字与 VAD 边界。局部时间加回 `sourceIn`，再按剪辑速度映射到时间线。
+
+`electron/synthesis.ts` 调用同一运行环境中的 Kokoro / VITS ONNX 工作进程，文稿通过 JSON 请求文件传递，分段写出 PCM16 WAV，再由 FFmpeg 应用一次语速并统一为 48 kHz 单声道。素材保留文稿、模型、音色、目录与语速参数，运行记录包含模型路径、CPU、精度、加载与生成耗时。旧 Kokoro/Qwen/IndexTTS 工程参数保留解析能力；新生成仅使用 ONNX，读取旧参数时提示重新选择音色。当前模型每次任务重新加载。
 
 ## 时间、空间与动画
 

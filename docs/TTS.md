@@ -1,31 +1,32 @@
-# 本地文本转语音
+# 本地 ONNX 文本转语音
 
-配音功能从 v0.3.0 起在“配音”面板中提供。输入文稿，或选中文本/字幕片段后点击“读取选中文本”；生成结果会作为音频素材加入开始生成时播放头所在的位置。已有轨道在该时间被占用、隐藏或锁定时，会选择另一条可用轨道，没有可用轨道时再新建。
+在“配音”面板输入文稿，或选中文本/字幕片段后点击“读取选中文本”。Kokoro v1.1 提供 103 个中英文音色，VITS AIShell3 提供 174 个中文说话人；选择音色与 0.5–2 倍语速后生成，结果作为音频素材加入时间线。Kokoro 支持中英文混读；VITS 仅支持中文。生成音频统一为 48 kHz、单声道、PCM16 WAV，语速仅在最终 FFmpeg 转换时应用一次。
 
-IndexTTS 2.5 使用参考音频复刻音色，有独立 Python 3.11 环境和模型缓存，配置见 [IndexTTS 说明](INDEXTTS.md)。
+两种模型均通过 sherpa-onnx 调用，当前提供 CPU 运行环境，无需 PyTorch 或 CUDA。字幕与配音共用 `workers/onnx/` 下的 Python 3.12 环境，`uv.lock` 锁定 `sherpa-onnx` 和配套 `sherpa-onnx-core` 原生库。应用数据目录的 `models/onnx/` 保存下载模型；生成记录保留实际模型目录、精度、采样率、加载和推理耗时。
 
-Kokoro 中文版提供中文女声和男声，适合 CPU 配音。Qwen3-TTS 0.6B 和 1.7B 提供中文及英语配音；1.7B 还支持自然语言语气指令。语速为 0.5–2 倍，生成后统一转换为 48 kHz、单声道、PCM 16-bit WAV，可继续剪辑、应用声音效果并导出。
+“配音模型目录”留空时，仅检查 TronCut 自己的模型缓存；缺少模型时下载官方完整模型包。也可以手动指定完整模型文件夹，不会自动检查其他应用目录。Kokoro 需要 `model.int8.onnx`、`voices.bin`、`tokens.txt`、中英文词典、`espeak-ng-data/` 和中文规范化 FST；VITS 需要 `model.onnx`、`tokens.txt`、`lexicon.txt` 与规范化 FST。指定目录不完整时直接提示缺失文件，应用不会修改该目录或自动替换成其他模型。
 
-首次运行通过 uv 下载 Python 3.12、对应依赖及 Hugging Face 模型，不向云端提交文稿。CPU 与 CUDA、Kokoro 与 Qwen 的环境分开存放；CPU 使用 CPU 版 PyTorch，CUDA 显式选择 NVIDIA 版。自动模式默认准备 CPU 环境，Mac 的 MPS 需要手动选择，尚待真机验证。
+配音面板提供“下载配音模型”按钮，字幕面板提供“下载识别模型”按钮；无需输入文稿或导入媒体即可准备环境和模型。下载完成后切回 TronCut 自己的缓存，已存在的完整模型不会重复下载。字幕模型下载时同时准备 Silero VAD。用户直接生成而默认缓存缺少模型时，也会自动下载，并显示字节数及进度。
 
-完成同一模型、设备、音色的首次生成后，可勾选“仅使用已下载的依赖和模型”。离线模式同时约束 uv 和 Hugging Face，缺少缓存时会报错，不会联网补齐。切换模型或音色可能需要额外下载。Qwen 还需准备其语音 tokenizer；仅缓存主模型不代表已具备完整离线环境。
+勾选“仅使用已下载的依赖和模型”后，生成流程同时禁止 uv 与模型下载；环境或模型不完整时明确报错。主动点击下载按钮仍会联网准备所选模型。下载与生成均可通过任务栏取消，生成失败或取消会清理本次配音输出。文稿与音频在本地处理。
 
-生成时显示进度，可通过全局任务栏取消；失败或取消会清理本次生成目录。模型加载阶段的百分比不会反映实际下载字节数。当前每次生成重新加载模型，尚未实现常驻推理，长文稿会按句子、段落与长度分段生成。
+长文稿按标点和长度分块，每块不超过 100 个字符，逐块写入 WAV。当前每次任务重新加载模型，尚无常驻推理。生成结果可以试听，离开面板停止试听，返回时保留文稿和参数。保存工程会归档 WAV，`narration` 保留模型、音色、目录、语速和离线选项；已经生成的配音可在没有模型环境的电脑上继续播放和编辑。
 
-Kokoro 在文字转音素后还会检查 510 音素上限，超过时继续细分，避免上游 pipeline 直接截断中文或数字展开后的音素。单字符展开过长或无法产生音素时明确报错。
+旧 Kokoro、Qwen3-TTS 与 IndexTTS 工程仍可打开、播放和读取配音参数；重新生成会切换到 Kokoro ONNX 并提示重新选择音色。新流程不提供旧模型的语气指令或参考声音克隆。
 
-生成结果可在面板试听，离开面板会停止试听，返回时保留文稿及参数。保存工程会收集 WAV 到 `media/`，文稿、模型选择、音色、设备、语速和语气指令记录在素材的 `narration` 字段中；选中配音片段后可“读取配音参数”并生成新素材。离线打开和播放已保存工程不需要模型或 Python 环境。
+开发验证：
 
-开发环境的依赖准备和纯逻辑测试：
-
-```sh
-uv sync --project workers/tts --python 3.12 --frozen --extra kokoro --extra cpu
-uv run --no-project --python 3.12 python -m unittest discover -s workers/tts/tests -v
-pnpm exec vitest run tests/tts.test.ts
+```powershell
+uv sync --project workers/onnx --frozen
+uv run --project workers/onnx --frozen python -m unittest discover -s workers/onnx/tests -v
+pnpm exec vitest run tests/asr.test.ts tests/tts.test.ts tests/onnx.test.ts
+node scripts/verify-onnx.mjs
 ```
 
-Qwen 使用 `--extra qwen`；NVIDIA 环境将 `--extra cpu` 换为 `--extra cuda`。Windows 安装包带有 uv，Python 环境与模型按需下载，worker 文件由打包配置单独收集。
+真实验证脚本支持 `TRONCUT_TEST_KOKORO_DIR`、`TRONCUT_TEST_SENSEVOICE_DIR` 和 `TRONCUT_TEST_PARAFORMER_DIR` 指定模型目录；默认从 TronCut 测试缓存下载模型。结果写入 `test-output/onnx-integration/result.json`，涵盖配音、一次语速转换、字幕、工程保存重开和离线生成。
 
-模型调用参考 [Kokoro 官方中文示例](https://huggingface.co/hexgrad/Kokoro-82M-v1.1-zh/blob/main/samples/make_zh.py)、[Qwen3-TTS 官方说明](https://github.com/QwenLM/Qwen3-TTS)，CPU/CUDA 依赖配置参考 [uv 可选依赖来源](https://docs.astral.sh/uv/concepts/projects/dependencies/#optional-dependencies)。
+设置 `TRONCUT_TEST_DOWNLOAD=1` 可额外验证 VITS 的真实下载、完整解压与缓存离线推理；`TRONCUT_TEST_DOWNLOAD_ONLY=1` 只运行此项。`node scripts/smoke-onnx-ui.mjs` 使用上述 Kokoro/SenseVoice 目录设置与已准备好的验证环境，检查实际 Electron 配音、试听、字幕及保存。
 
-2026-10-13 在 Windows 上完成 Kokoro 的真实 CPU 下载与中文合成，以及完整 Electron 离线生成、1.25 倍语速、试听、切换面板、参数读取、时间线插入、工程保存与重开测试。Qwen、CUDA、MPS 仍为接口接入，尚未完成真实推理；GPU 自动检测和环境就绪状态尚未提供。详细证据见 [验证记录](VALIDATION.md)。
+模型与配置参考 [sherpa-onnx 官方 Python 配音示例](https://github.com/k2-fsa/sherpa-onnx/blob/master/python-api-examples/offline-tts.py)；历史 IndexTTS 说明见 [INDEXTTS.md](INDEXTTS.md)。
+
+本次在 Windows 完成 Kokoro/VITS 真实 CPU 合成、SenseVoiceSmall/Paraformer 真实转录、中文模型路径、VITS 官方模型包下载解压、缓存离线合成及工程保存重开验证。专项 Electron 流程通过模型准备按钮、配音加入时间线、试听与离开面板停止、参数保留、识别语言切换、字幕生成及工程保存，结果位于 `test-output/onnx-ui/`。类型检查、构建、10 项语音服务测试、8 项 Python 测试及打包资源检查通过；通用 `scripts/smoke.mjs` 在“组合”步骤超时，未作为本次完整编辑回归通过的证据。

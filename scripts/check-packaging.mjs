@@ -31,12 +31,16 @@ if (process.platform === "win32") {
       throw new Error(`安装包缺少第三方许可声明：${name}`);
   }
 }
-for (const name of ["pyproject.toml", "uv.lock", "synthesize.py", "tts_utils.py"]) {
-  if (!fs.existsSync(path.resolve("workers/tts", name)))
-    throw new Error(`安装包缺少配音 worker：${name}`);
+for (const name of [
+  "pyproject.toml",
+  "uv.lock",
+  "transcribe.py",
+  "prepare.py",
+  "synthesize.py",
+  "models.py",
+  "caption_utils.py",
+]) {
+  if (!fs.existsSync(path.resolve("workers/onnx", name)))
+    throw new Error(`安装包缺少 sherpa-onnx worker：${name}`);
 }
-for (const name of ["pyproject.toml", "uv.lock", "synthesize.py", "models.py"]) {
-  if (!fs.existsSync(path.resolve("workers/indextts", name)))
-    throw new Error(`安装包缺少 IndexTTS worker：${name}`);
-}
-console.log("安装包媒体引擎与配音 worker 检查通过");
+console.log("安装包媒体引擎与 sherpa-onnx worker 检查通过");

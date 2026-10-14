@@ -1,0 +1,6 @@
+[project]
+name = "troncut-sherpa-onnx"
+version = "0.1.0"
+requires-python = ">=3.12,<3.13"
+# sherpa-onnx's sdist omits this native dependency; declare it for uv's lock resolver.
+dependencies = ["sherpa-onnx==1.13.8", "sherpa-onnx-core==1.13.8", "numpy>=1.26,<3"]

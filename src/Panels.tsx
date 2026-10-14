@@ -122,9 +122,11 @@ export default function Panels(props: Props) {
   const { editor, tab, setTab, run, toast } = props,
     { project, selected, updateClip } = editor;
   const [query, setQuery] = useState(""),
-    [engine, setEngine] = useState<SpeechEngine>("faster-whisper"),
+    [engine, setEngine] = useState<SpeechEngine>("sensevoice"),
     [language, setLanguage] = useState("auto");
-  const [device, setDevice] = useState<"auto" | "cpu" | "cuda">("auto");
+  const [device, setDevice] = useState<"auto" | "cpu">("auto");
+  const [modelDir, setModelDir] = useState("");
+  const [offlineAsr, setOfflineAsr] = useState(false);
   const bridge = () => {
     if (!window.framecraft)
       throw new Error("此功能需要运行桌面版，请使用 pnpm dev");
@@ -297,53 +299,83 @@ export default function Panels(props: Props) {
             <label className="field vertical">
               识别引擎
               <select
+                aria-label="识别引擎"
                 value={engine}
                 onChange={(e) => {
                   setEngine(e.target.value as SpeechEngine);
-                  if (e.target.value !== "sensevoice" && language === "yue")
+                  setModelDir("");
+                  if (e.target.value === "paraformer" && language !== "zh")
                     setLanguage("auto");
                 }}
               >
                 <option value="sensevoice">
-                  SenseVoiceSmall · 中文 / 快速识别
+                  SenseVoiceSmall · 多语言 ONNX
                 </option>
-                <option value="faster-whisper">
-                  Faster Whisper · 本地识别
-                </option>
-                <option value="whisper-cpp">
-                  VideoCaptioner · Whisper.cpp
-                </option>
+                <option value="paraformer">Paraformer · 中文 ONNX</option>
               </select>
             </label>
             <label className="field">
               语言
               <select
+                aria-label="语言"
                 value={language}
                 onChange={(e) => setLanguage(e.target.value)}
               >
                 <option value="auto">自动识别</option>
                 <option value="zh">中文</option>
-                <option value="en">英语</option>
-                <option value="ja">日语</option>
-                <option value="ko">韩语</option>
-                {engine === "sensevoice" && <option value="yue">粤语</option>}
+                {engine === "sensevoice" && (
+                  <>
+                    <option value="en">英语</option>
+                    <option value="ja">日语</option>
+                    <option value="ko">韩语</option>
+                    <option value="yue">粤语</option>
+                  </>
+                )}
               </select>
             </label>
-            {engine === "sensevoice" && (
-              <label className="field">
-                计算设备
-                <select
-                  value={device}
-                  onChange={(e) => setDevice(e.target.value as typeof device)}
-                >
-                  <option value="auto">自动 · CUDA / CPU</option>
-                  <option value="cpu">CPU</option>
-                  <option value="cuda">CUDA GPU</option>
-                </select>
-              </label>
-            )}
+            <label className="field">
+              计算设备
+              <select
+                aria-label="计算设备"
+                value={device}
+                onChange={(e) => setDevice(e.target.value as typeof device)}
+              >
+                <option value="auto">自动 · CPU</option>
+                <option value="cpu">CPU · sherpa-onnx</option>
+              </select>
+            </label>
+            <label className="field vertical">
+              识别模型目录
+              <input
+                value={modelDir}
+                placeholder="留空自动查找本机模型"
+                onChange={(e) => setModelDir(e.target.value)}
+              />
+            </label>
+            <label className="narration-offline">
+              <input
+                type="checkbox"
+                checked={offlineAsr}
+                onChange={(e) => setOfflineAsr(e.target.checked)}
+              />
+              仅使用已下载的依赖和模型
+            </label>
+            <button
+              className="wide-button"
+              disabled={props.busy}
+              onClick={() =>
+                run(async () => {
+                  const prepared = await bridge().downloadSpeechModel(engine);
+                  setModelDir("");
+                  toast(`识别模型已就绪：${prepared.directory}`);
+                })
+              }
+            >
+              下载识别模型
+            </button>
             <button
               className="wide-button primary"
+              disabled={props.busy}
               onClick={() =>
                 run(async () => {
                   if (!selected?.assetId)
@@ -355,6 +387,8 @@ export default function Panels(props: Props) {
                     language,
                     {
                       device,
+                      modelDir,
+                      offline: offlineAsr,
                       sourceIn: target.sourceIn,
                       sourceDuration: target.duration * target.speed,
                     },
@@ -370,11 +404,10 @@ export default function Panels(props: Props) {
               从选中片段生成字幕
             </button>
             <p className="small-note">
-              {engine === "sensevoice"
-                ? "SenseVoiceSmall 使用本地 FunASR + 语音分段，需安装 uv，首次运行会下载依赖与模型。支持词级时间戳时自动细分字幕，否则保留真实语音区间；CUDA 模式需匹配的运行环境。"
-                : engine === "faster-whisper"
-                  ? "Faster Whisper 需要 uv，首次识别会下载依赖与 medium 模型；音频在本地处理。"
-                  : "Whisper.cpp 需在设置中配置 VideoCaptioner 可执行文件。"}
+              sherpa-onnx 在本机识别，默认使用 TronCut
+              已下载的模型，也可指定包含 model.int8.onnx 和 tokens.txt
+              的目录。首次准备环境，缺少模型时下载；有词时间戳时细分字幕，否则保留真实语音段。离线识别还需本地
+              Silero VAD 模型。
             </p>
             <div className="two-buttons">
               <button

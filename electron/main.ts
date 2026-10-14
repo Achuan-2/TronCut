@@ -33,6 +33,8 @@ import { speechEngineSchema, speechOptionsSchema } from "../shared/asr";
 import { transcribeAsset } from "./transcription";
 import { synthesizeSpeech } from "./synthesis";
 import { ttsOptionsSchema } from "../shared/tts";
+import { onnxModelSchema } from "../shared/onnx";
+import { downloadOnnxModel } from "./onnx";
 import { mediaThumbnail } from "./thumbnails";
 import { NativeRecording } from "./native-recording";
 import { copyClipClipboard, importClipboardMedia } from "./clipboard-media";
@@ -602,18 +604,14 @@ function installHandlers() {
   handle("audio:synthesize", async (input: unknown) => {
     if (task) throw new Error("已有后台任务正在执行");
     const options = ttsOptionsSchema.parse(input);
-    const reference = options.engine === "indextts" ? assetById(options.referenceAssetId) : undefined;
-    if (reference && (reference.kind !== "audio" || !reference.hasAudio || reference.duration < 1 || reference.duration > 30))
-      throw new Error("请选择 1–30 秒的参考音频");
     task = new AbortController();
     try {
       return register(await synthesizeSpeech(options, {
         userData: app.getPath("userData"),
         workers: app.isPackaged
-          ? path.join(process.resourcesPath, "workers", options.engine === "indextts" ? "indextts" : "tts")
-          : path.resolve(options.engine === "indextts" ? "workers/indextts" : "workers/tts"),
+          ? path.join(process.resourcesPath, "workers", "onnx")
+          : path.resolve("workers/onnx"),
         resources: process.resourcesPath,
-        referenceAudio: reference?.path,
       }, task.signal, notify));
     } finally {
       task = null;
@@ -628,6 +626,23 @@ function installHandlers() {
     return register(asset);
   });
   handle("app:capabilities", () => capabilities(process.resourcesPath));
+  handle("speech:downloadModel", async (input: unknown) => {
+    if (task) throw new Error("已有后台任务正在执行");
+    const engine = onnxModelSchema.parse(input);
+    task = new AbortController();
+    const temp = await fs.mkdtemp(path.join(app.getPath("temp"), "troncut-model-"));
+    try {
+      return await downloadOnnxModel(engine, {
+        userData: app.getPath("userData"),
+        workers: app.isPackaged ? path.join(process.resourcesPath, "workers", "onnx") : path.resolve("workers/onnx"),
+        resources: process.resourcesPath,
+        temp,
+      }, task.signal, notify);
+    } finally {
+      task = null;
+      await fs.rm(temp, { recursive: true, force: true });
+    }
+  });
   handle("app:selectBinary", async (value: unknown) => {
     const name = z.enum(["ffmpeg", "ffprobe", "videocaptioner"]).parse(value);
     const file = await chooseFile(
@@ -680,8 +695,8 @@ function installHandlers() {
           {
             userData: app.getPath("userData"),
             workers: app.isPackaged
-              ? path.join(process.resourcesPath, "workers")
-              : path.resolve("workers"),
+              ? path.join(process.resourcesPath, "workers", "onnx")
+              : path.resolve("workers/onnx"),
             temp,
             resources: process.resourcesPath,
           },

@@ -37,7 +37,9 @@ try {
   await page.getByLabel("文本内容").fill("把想法，变成作品。");
   await page.getByRole("button", { name: "添加文本", exact: true }).click();
   await page.getByLabel("文本内容").fill("录制 · 剪辑 · 表达");
-  await expect(page.getByRole("toolbar", { name: "画布工具", exact: true })).toBeVisible();
+  await expect(
+    page.getByRole("toolbar", { name: "画布工具", exact: true }),
+  ).toBeVisible();
   await expect(page.locator(".workspace-status")).toContainText(
     "媒体引擎就绪",
     { timeout: 20000 },
@@ -47,7 +49,7 @@ try {
   await page.getByLabel("识别引擎").selectOption("sensevoice");
   await expect(page.getByLabel("计算设备")).toHaveValue("auto");
   await page.getByLabel("语言").selectOption("yue");
-  await page.getByLabel("识别引擎").selectOption("faster-whisper");
+  await page.getByLabel("识别引擎").selectOption("paraformer");
   await expect(page.getByLabel("语言")).toHaveValue("auto");
   await page.getByRole("button", { name: "媒体", exact: true }).click();
   await page.getByRole("button", { name: "添加文本", exact: true }).click();
@@ -55,35 +57,44 @@ try {
   await expect(page.locator(".timeline-clip")).toHaveCount(3);
   await page.getByRole("button", { name: "配音", exact: true }).click();
   await page.getByRole("button", { name: "读取选中文本", exact: true }).click();
-  await expect(page.getByLabel("配音文字")).toHaveValue("TronCut：中文文本与动画");
-  await page.getByLabel("配音模型").selectOption("qwen-quality");
-  await page.getByLabel("语气指令").fill("语气自然亲切");
+  await expect(page.getByLabel("配音文字")).toHaveValue(
+    "TronCut：中文文本与动画",
+  );
+  await page.getByLabel("配音模型", { exact: true }).selectOption("vits-onnx");
+  await page.getByLabel("配音模型目录").fill("C:/我的模型/vits");
   await page.getByRole("button", { name: "媒体", exact: true }).click();
   await page.getByRole("button", { name: "配音", exact: true }).click();
-  await expect(page.getByLabel("配音文字")).toHaveValue("TronCut：中文文本与动画");
-  await expect(page.getByLabel("语气指令")).toHaveValue("语气自然亲切");
-  await page.getByLabel("配音模型").selectOption("kokoro");
-  await expect(page.getByLabel("配音音色")).toHaveValue("zf_001");
+  await expect(page.getByLabel("配音文字")).toHaveValue(
+    "TronCut：中文文本与动画",
+  );
+  await expect(page.getByLabel("配音模型目录")).toHaveValue("C:/我的模型/vits");
+  await page.getByLabel("配音模型", { exact: true }).selectOption("kokoro-onnx");
+  await expect(page.getByLabel("配音音色")).toHaveValue("10");
+  await expect(page.getByLabel("配音模型目录")).toHaveValue("");
   await expect(page.getByLabel("语气指令")).toHaveCount(0);
-  await page.getByLabel("配音模型").selectOption("indextts");
-  await expect(page.getByLabel("参考音频", { exact: true })).toHaveValue("");
-  await expect(page.getByLabel("配音设备")).toHaveValue("auto");
-  await expect(page.getByRole("button", { name: "生成配音并加入时间线", exact: true })).toBeDisabled();
-  await page.getByLabel("配音模型").selectOption("kokoro");
+  await expect(page.getByLabel("配音设备")).toHaveValue("cpu");
   await page.getByRole("button", { name: "媒体", exact: true }).click();
   await page.getByRole("button", { name: "自动动画", exact: true }).click();
   await page.getByRole("tab", { name: "画面", exact: true }).click();
   const ruler = await page.locator(".ruler").boundingBox();
   await page.mouse.click(ruler.x + 65 * 3, ruler.y + 12);
   await page.getByLabel("位置 X (%)").fill("70");
-  await expect(page.locator(".timeline-clip.selected .clip-animation")).toHaveCount(1);
+  await expect(
+    page.locator(".timeline-clip.selected .clip-animation"),
+  ).toHaveCount(1);
   await page.locator(".timeline-clip.selected").click({ button: "right" });
-  await expect(page.getByRole("button", { name: "添加缩放动画", exact: true })).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "添加缩放动画", exact: true }),
+  ).toHaveCount(0);
   await page.mouse.click(ruler.x + 65 * 3, ruler.y + 12);
-  await page.locator(".timeline-clip.selected .animation-arrow").click({ button: "right" });
+  await page
+    .locator(".timeline-clip.selected .animation-arrow")
+    .click({ button: "right" });
   await page.getByRole("menuitem", { name: "启用缓冲", exact: true }).click();
   await page.getByRole("menuitemradio", { name: "线性", exact: true }).click();
-  await expect(page.locator(".timeline-clip.selected .clip-animation")).toHaveCount(1);
+  await expect(
+    page.locator(".timeline-clip.selected .clip-animation"),
+  ).toHaveCount(1);
   await app.evaluate(({ dialog }, file) => {
     dialog.showOpenDialog = async () => ({
       canceled: false,

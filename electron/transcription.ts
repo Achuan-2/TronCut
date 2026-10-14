@@ -6,10 +6,10 @@ import {
   type SpeechEngine,
   type SpeechOptions,
   speechOptionsSchema,
-  workerArguments,
 } from "../shared/asr";
-import { parseSrt } from "../shared/subtitles";
+import { onnxWorkerArguments } from "../shared/onnx";
 import { findBinary, runProcess } from "./process";
+import { onnxEnvironment, prepareOnnxWorker, runOnnxWorker } from "./onnx";
 
 const cueSchema = z.object({
   start: z.number().finite().nonnegative(),
@@ -18,7 +18,7 @@ const cueSchema = z.object({
 });
 const progressSchema = z.object({
   percent: z.number().finite().min(0).max(100),
-  label: z.string().max(500),
+  label: z.string().max(5000),
 });
 
 export async function transcribeAsset(
@@ -31,16 +31,18 @@ export async function transcribeAsset(
   progress: (percent: number, label: string) => void,
 ) {
   const options = speechOptionsSchema.parse(inputOptions);
-  if (language === "yue" && engine !== "sensevoice")
-    throw new Error("粤语选项请使用 SenseVoiceSmall 引擎");
+  if (engine === "paraformer" && !["auto", "zh"].includes(language))
+    throw new Error("Paraformer 仅支持中文，其他语言请选择 SenseVoiceSmall");
   const duration = options.sourceDuration ?? asset.duration - options.sourceIn;
   if (
+    duration <= 0 ||
     options.sourceIn >= asset.duration ||
     options.sourceIn + duration > asset.duration + 0.1
   )
     throw new Error("识别范围超出了源素材时长");
-  const audio = path.join(paths.temp, "audio.wav"),
-    output = path.join(paths.temp, "captions.json");
+  const audio = path.join(paths.temp, "audio.wav");
+  const output = path.join(paths.temp, "captions.json");
+  const request = path.join(paths.temp, "request.json");
   progress(0, "正在提取选中片段的音频");
   await runProcess(
     findBinary("ffmpeg", paths.resources),
@@ -57,95 +59,55 @@ export async function transcribeAsset(
       "16000",
       "-ac",
       "1",
+      "-c:a",
+      "pcm_s16le",
       audio,
     ],
     { signal },
   );
-  let cues;
-  if (engine === "whisper-cpp") {
-    const srt = path.join(paths.temp, "captions.srt");
-    await runProcess(
-      findBinary("videocaptioner", paths.resources),
-      [
-        "transcribe",
-        audio,
-        "--asr",
-        engine,
-        "--language",
-        language,
-        "--word-timestamps",
-        "--format",
-        "srt",
-        "-o",
-        srt,
-      ],
-      { signal },
-    );
-    cues = parseSrt(await fs.readFile(srt, "utf8"));
-  } else {
-    const workers = path.join(paths.userData, "workers");
-    await fs.mkdir(workers, { recursive: true });
-    for (const name of [
-      "pyproject.toml",
+  const workers = await prepareOnnxWorker(paths.workers, paths.userData);
+  await fs.writeFile(
+    request,
+    JSON.stringify({ ...options, input: audio, engine, language }),
+    "utf8",
+  );
+  progress(
+    0,
+    options.offline
+      ? "正在加载本地 sherpa-onnx 识别环境与模型"
+      : "正在准备 sherpa-onnx；优先复用本地模型，缺少时下载",
+  );
+  await runOnnxWorker(
+    findBinary("uv", paths.resources),
+    onnxWorkerArguments(
+      workers,
       "transcribe.py",
-      "sensevoice.py",
-      "caption_utils.py",
-    ])
-      await fs.copyFile(
-        path.join(paths.workers, name),
-        path.join(workers, name),
-      );
-    const lock = path.join(paths.workers, "uv.lock");
-    if (
-      await fs.access(lock).then(
-        () => true,
-        () => false,
-      )
-    )
-      await fs.copyFile(lock, path.join(workers, "uv.lock"));
-    progress(
-      0,
-      `${engine === "sensevoice" ? "SenseVoiceSmall" : "Faster Whisper"}：首次运行会下载依赖与模型`,
-    );
-    await runProcess(
-      findBinary("uv", paths.resources),
-      workerArguments(
-        engine,
-        workers,
-        path.join(workers, "transcribe.py"),
-        audio,
-        output,
-        language,
-        options.device,
-      ),
-      {
-        signal,
-        env: {
-          ...process.env,
-          PYTHONUTF8: "1",
-          UV_CACHE_DIR: path.join(paths.userData, "uv-cache"),
-          UV_PYTHON_INSTALL_DIR: path.join(paths.userData, "python"),
-          MODELSCOPE_CACHE: path.join(paths.userData, "models", "modelscope"),
-          HF_HOME: path.join(paths.userData, "models", "huggingface"),
-        },
-        onLine: (line) => {
-          const prefix = "FRAMECRAFT_PROGRESS ";
-          if (!line.startsWith(prefix)) return;
-          try {
-            const event = progressSchema.parse(
-              JSON.parse(line.slice(prefix.length)),
-            );
-            progress(event.percent, event.label);
-          } catch {
-            /* Ordinary model logs are not progress events. */
-          }
-        },
+      request,
+      output,
+      options.offline,
+    ),
+    {
+      signal,
+      cwd: workers,
+      env: onnxEnvironment(paths.userData, workers),
+      onLine(line) {
+        const prefix = "FRAMECRAFT_PROGRESS ";
+        if (!line.startsWith(prefix)) return;
+        try {
+          const event = progressSchema.parse(
+            JSON.parse(line.slice(prefix.length)),
+          );
+          progress(event.percent, event.label);
+        } catch {
+          /* Ordinary model logs are not progress events. */
+        }
       },
-    );
-    cues = z
-      .array(cueSchema)
-      .parse(JSON.parse(await fs.readFile(output, "utf8")));
-  }
+    },
+  );
+  if (signal.aborted) throw new Error("字幕生成已取消");
+  const cues = z
+    .array(cueSchema)
+    .parse(JSON.parse(await fs.readFile(output, "utf8")));
   const converted = cues
     .filter((c) => c.text.trim() && c.end > c.start && c.start < duration)
     .map((c) => ({

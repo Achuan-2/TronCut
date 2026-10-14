@@ -29,6 +29,10 @@ Dependency versions are locked in `pnpm-lock.yaml`. Notable components include R
 
 ## Optional speech dependencies and models / 可选语音组件
 
+Current speech recognition and synthesis use [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) and its native core (Apache-2.0), plus [ONNX Runtime](https://github.com/microsoft/onnxruntime) (MIT). Native libraries are installed in the isolated runtime and retain their package licenses. SenseVoiceSmall/Paraformer ONNX models, Kokoro v1.1 and VITS AIShell3 are downloaded separately from the [sherpa-onnx model releases](https://github.com/k2-fsa/sherpa-onnx/releases); model weights, lexicons, normalization rules and espeak-ng data retain their respective licenses. The [SmartSub model catalogue](https://github.com/buxuku/SmartSub) was consulted for model layouts and speaker IDs; no SmartSub cache discovery or runtime code is included.
+
+The following components document previous implementations and legacy project metadata; they are not installed by the current ONNX speech workflow.
+
 Speech environments are downloaded on demand and are not included in the Windows release. Versions are locked in `workers/uv.lock` (recognition) and `workers/tts/uv.lock` (synthesis); model weights are downloaded separately to application data.
 
 - [SenseVoice](https://github.com/QwenAudio/SenseVoice) and [FunASR](https://github.com/modelscope/FunASR): MIT code; model weights are subject to their model-card terms.

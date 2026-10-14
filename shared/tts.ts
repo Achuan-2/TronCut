@@ -1,6 +1,35 @@
 import { z } from "zod";
+import { onnxWorkerArguments } from "./onnx";
+
+export const onnxTtsModels = {
+  "kokoro-onnx": {
+    name: "Kokoro v1.1 · 中英文 ONNX",
+    repo: "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/kokoro-int8-multi-lang-v1_1.tar.bz2",
+    extra: "onnx",
+    voices: Array.from({ length: 103 }, (_, sid) => ({
+      id: String(sid),
+      name:
+        sid < 3
+          ? ["Maple · 美式女声", "Sol · 美式女声", "Vale · 英式女声"][sid]
+          : sid < 58
+            ? `中文女声 ${String(sid - 2).padStart(2, "0")}`
+            : `中文男声 ${String(sid - 57).padStart(2, "0")}`,
+    })),
+  },
+  "vits-onnx": {
+    name: "VITS AIShell3 · 中文 ONNX",
+    repo: "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-icefall-zh-aishell3.tar.bz2",
+    extra: "onnx",
+    voices: Array.from({ length: 174 }, (_, sid) => ({
+      id: String(sid),
+      name: `中文说话人 ${String(sid + 1).padStart(3, "0")}`,
+    })),
+  },
+} as const;
+export type OnnxTtsEngine = keyof typeof onnxTtsModels;
 
 export const ttsModels = {
+  ...onnxTtsModels,
   kokoro: {
     name: "Kokoro 中文版 · 轻量",
     repo: "hexgrad/Kokoro-82M-v1.1-zh",
@@ -50,19 +79,43 @@ export type TtsEngine = keyof typeof ttsModels;
 export const ttsOptionsSchema = z
   .object({
     text: z.string().trim().min(1, "请输入配音文字").max(10000),
-    engine: z.enum(["kokoro", "qwen-small", "qwen-quality", "indextts"]),
+    // Legacy engines remain readable in saved projects; generation uses ONNX only.
+    engine: z.enum([
+      "kokoro-onnx",
+      "vits-onnx",
+      "kokoro",
+      "qwen-small",
+      "qwen-quality",
+      "indextts",
+    ]),
     voice: z.string().max(50),
     language: z.enum(["zh", "en"]).default("zh"),
     device: z.enum(["auto", "cpu", "cuda", "mps"]).default("auto"),
     speed: z.number().finite().min(0.5).max(2).default(1),
     instruction: z.string().trim().max(500).default(""),
     offline: z.boolean().default(false),
+    modelDir: z.string().trim().max(4096).optional(),
     referenceAssetId: z
       .string()
       .regex(/^[a-zA-Z0-9_-]{1,128}$/)
       .optional(),
   })
   .superRefine((options, context) => {
+    if (
+      options.engine in onnxTtsModels &&
+      !["cpu", "auto"].includes(options.device)
+    )
+      context.addIssue({
+        code: "custom",
+        path: ["device"],
+        message: "当前 sherpa-onnx 运行环境使用 CPU，请选择 CPU 或自动",
+      });
+    if (options.engine === "vits-onnx" && options.language !== "zh")
+      context.addIssue({
+        code: "custom",
+        path: ["language"],
+        message: "VITS AIShell3 仅支持中文，英语请选择 Kokoro",
+      });
     if (options.engine === "indextts" && !options.referenceAssetId)
       context.addIssue({
         code: "custom",
@@ -102,24 +155,13 @@ export function ttsWorkerArguments(
   request: string,
   output: string,
 ): string[] {
-  return [
-    "run",
-    "--project",
-    workers,
-    "--python",
-    options.engine === "indextts" ? "3.11" : "3.12",
-    "--frozen",
-    ...(options.engine === "indextts"
-      ? []
-      : ["--extra", ttsModels[options.engine].extra]),
-    "--extra",
-    options.device === "cuda" ? "cuda" : "cpu",
-    ...(options.offline ? ["--offline"] : []),
-    "python",
-    `${workers}/synthesize.py`,
-    "--request",
-    request,
-    "--output",
-    output,
-  ];
+  if (options.engine in onnxTtsModels)
+    return onnxWorkerArguments(
+      workers,
+      "synthesize.py",
+      request,
+      output,
+      options.offline,
+    );
+  throw new Error("配音已改用 ONNX，请选择 Kokoro 或 VITS");
 }

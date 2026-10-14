@@ -1,5 +1,13 @@
 # SenseVoice 字幕引擎
 
+当前字幕已改用 sherpa-onnx，默认 SenseVoiceSmall ONNX，也可选择 Paraformer 中文 ONNX。字幕面板支持手动指定模型目录与严格离线模式；默认仅从 TronCut 自己的 `models/onnx/` 缓存读取，缺少模型时下载。模型目录需要 `model.int8.onnx` 与 `tokens.txt`，Silero VAD 单独缓存为 `models/onnx/silero_vad.onnx`，也可放在手动选择的识别模型目录内。
+
+音频流式进入 Silero VAD，再按真实语音段识别；有 token 时间戳时细分字幕，否则保留完整语音段。当前为 CPU 环境，片段裁剪和变速时间映射保持不变。工作进程与真实验证命令见 [本地 ONNX 语音说明](TTS.md)。
+
+## 旧 FunASR 实现与历史验证
+
+以下是 2026-10-13 的旧实现记录，不代表当前 ONNX 后台的配置或性能。
+
 在左侧“字幕”面板选择 `SenseVoiceSmall · 中文 / 快速识别`，选中含声音的视频/音频片段，再生成字幕。模型支持普通话、粤语、英语、日语、韩语；不应将 SenseVoice 研究系列的 50+ 语言范围当作当前 Small 检查点的能力。
 
 应用通过 uv 按需安装 `sensevoice` extra，下载模型后在本地处理。首次调用包括 Python 依赖、模型下载与加载，不能与官方热模型推理时间直接比较。SenseVoice 和原有 Whisper 不需要同时安装，锁文件在 `workers/uv.lock`；应用缓存、模型和工作进程环境位于应用数据目录。

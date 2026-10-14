@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { AudioLines, Play, Square, Type } from "lucide-react";
 import {
-  ttsModels,
+  onnxTtsModels,
   ttsOptionsSchema,
-  type TtsEngine,
+  type OnnxTtsEngine,
   type TtsOptions,
 } from "../shared/tts";
 import type { Editor } from "./useEditor";
@@ -26,13 +26,14 @@ export default function NarrationPanel({
 }: Props) {
   const [options, setOptions] = useState<TtsOptions>({
     text: "",
-    engine: "kokoro",
-    voice: "zf_001",
+    engine: "kokoro-onnx",
+    voice: "10",
     language: "zh",
     device: "cpu",
     speed: 1,
     instruction: "",
     offline: false,
+    modelDir: "",
   });
   const [generatedId, setGeneratedId] = useState<string | null>(null);
   const generated = editor.project.assets.find(
@@ -66,8 +67,23 @@ export default function NarrationPanel({
       toast("请先选中已有配音片段");
       return;
     }
-    setOptions(asset.narration);
+    if (asset.narration.engine in onnxTtsModels) {
+      setOptions(asset.narration);
+    } else {
+      // Read old projects without silently assigning a legacy speaker ID to an ONNX voice.
+      setOptions({
+        ...asset.narration,
+        engine: "kokoro-onnx",
+        voice: "10",
+        device: "cpu",
+        instruction: "",
+        referenceAssetId: undefined,
+        modelDir: "",
+      });
+      toast("已读取旧配音文稿与语速，请重新选择 ONNX 音色");
+    }
   };
+  const engine = options.engine as OnnxTtsEngine;
   return (
     <div className="narration-panel">
       <p className="panel-intro">
@@ -95,127 +111,80 @@ export default function NarrationPanel({
         配音模型
         <select
           aria-label="配音模型"
-          value={options.engine}
+          value={engine}
           onChange={(e) => {
-            const engine = e.target.value as TtsEngine;
+            const next = e.target.value as OnnxTtsEngine;
             update({
-              engine,
-              voice: ttsModels[engine].voices[0].id,
-              language: engine === "kokoro" ? "zh" : options.language,
-              instruction: engine === "qwen-quality" ? options.instruction : "",
-              device: engine === "indextts" ? "auto" : options.device,
+              engine: next,
+              voice: next === "kokoro-onnx" ? "10" : "0",
+              language: "zh",
+              modelDir: "",
             });
           }}
         >
-          {Object.entries(ttsModels).map(([id, model]) => (
+          {Object.entries(onnxTtsModels).map(([id, model]) => (
             <option key={id} value={id}>
               {model.name}
             </option>
           ))}
         </select>
       </label>
-      {options.engine === "indextts" ? (
-        <>
-          <label className="field vertical">
-            参考音频
-            <select
-              aria-label="参考音频"
-              value={options.referenceAssetId ?? ""}
-              onChange={(event) =>
-                update({ referenceAssetId: event.target.value || undefined })
-              }
-            >
-              <option value="">请选择 1–30 秒的干净人声</option>
-              {editor.project.assets
-                .filter(
-                  (asset) =>
-                    asset.kind === "audio" &&
-                    asset.hasAudio &&
-                    !asset.missing &&
-                    asset.duration >= 1 &&
-                    asset.duration <= 30,
-                )
-                .map((asset) => (
-                  <option key={asset.id} value={asset.id}>
-                    {asset.name}
-                  </option>
-                ))}
-            </select>
-          </label>
-          <button
-            className="wide-button"
-            disabled={busy}
-            onClick={() =>
-              run(async () => {
-                if (!window.framecraft)
-                  throw new Error("导入参考音频需要桌面版");
-                const asset =
-                  await window.framecraft.selectNarrationReference();
-                if (!asset) return;
-                editor.addAssets([asset]);
-                update({ referenceAssetId: asset.id });
-              })
-            }
-          >
-            导入参考音频
-          </button>
-          <p className="small-note">
-            根据参考音频复刻音色，使用前 15 秒；参考音频会随工程保存。
-          </p>
-        </>
-      ) : (
-        <label className="field">
-          配音音色
-          <select
-            value={options.voice}
-            onChange={(e) => update({ voice: e.target.value })}
-          >
-            {ttsModels[options.engine].voices.map((voice) => (
-              <option key={voice.id} value={voice.id}>
-                {voice.name}
-              </option>
-            ))}
-          </select>
-        </label>
-      )}
-      {options.engine !== "kokoro" && (
-        <label className="field">
-          配音语言
-          <select
-            value={options.language}
-            onChange={(e) =>
-              update({ language: e.target.value as "zh" | "en" })
-            }
-          >
-            <option value="zh">中文</option>
-            <option value="en">英语</option>
-          </select>
-        </label>
-      )}
+      <label className="field">
+        配音音色
+        <select
+          aria-label="配音音色"
+          value={options.voice}
+          onChange={(e) => update({ voice: e.target.value })}
+        >
+          {onnxTtsModels[engine].voices.map((voice) => (
+            <option key={voice.id} value={voice.id}>
+              {voice.name}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label className="field vertical">
+        配音模型目录
+        <input
+          value={options.modelDir ?? ""}
+          placeholder="留空自动查找本机模型"
+          onChange={(e) => update({ modelDir: e.target.value })}
+        />
+      </label>
+      <p className="small-note">
+        默认使用 TronCut 已下载的模型。指定目录时，请选择包含
+        ONNX、音色和词典文件的完整模型文件夹。
+      </p>
+      <button
+        className="wide-button"
+        disabled={busy}
+        onClick={() =>
+          run(async () => {
+            if (!window.framecraft) throw new Error("下载模型需要桌面版");
+            const prepared =
+              await window.framecraft.downloadSpeechModel(engine);
+            update({ modelDir: "" });
+            toast(`配音模型已就绪：${prepared.directory}`);
+          })
+        }
+      >
+        下载配音模型
+      </button>
       <label className="field">
         配音设备
         <select
+          aria-label="配音设备"
           value={options.device}
-          onChange={(e) =>
-            update({ device: e.target.value as TtsOptions["device"] })
-          }
+          onChange={(e) => update({ device: e.target.value as "cpu" | "auto" })}
         >
-          <option value="cpu">CPU · 通用</option>
-          <option value="cuda">CUDA · NVIDIA 显卡</option>
-          <option value="auto">
-            {options.engine === "indextts"
-              ? "自动 · 优先 NVIDIA 显卡"
-              : "自动 · 优先兼容 CPU"}
-          </option>
-          {window.framecraft?.platform === "darwin" &&
-            options.engine !== "indextts" && (
-              <option value="mps">MPS · Apple Silicon（实验）</option>
-            )}
+          <option value="cpu">CPU · sherpa-onnx</option>
+          <option value="auto">自动 · CPU</option>
         </select>
       </label>
       <label className="field">
         配音语速
         <select
+          aria-label="配音语速"
           value={options.speed}
           onChange={(e) => update({ speed: Number(e.target.value) })}
         >
@@ -226,19 +195,6 @@ export default function NarrationPanel({
           ))}
         </select>
       </label>
-      {options.engine === "qwen-quality" && (
-        <label className="field vertical">
-          语气指令
-          <textarea
-            aria-label="语气指令"
-            rows={2}
-            maxLength={500}
-            value={options.instruction}
-            placeholder="例如：语气自然亲切，像在讲解教程"
-            onChange={(e) => update({ instruction: e.target.value })}
-          />
-        </label>
-      )}
       <label className="narration-offline">
         <input
           type="checkbox"
@@ -248,25 +204,12 @@ export default function NarrationPanel({
         仅使用已下载的依赖和模型
       </label>
       <p className="small-note">
-        {options.engine === "indextts"
-          ? "IndexTTS 2.5 使用独立环境与参考音色；推荐 NVIDIA 显卡，首次模型下载为数 GB。"
-          : options.engine === "kokoro"
-            ? "轻量中文配音，可用 CPU；中英文混读中不常见的英文词可能读音不完整。"
-            : "NVIDIA 显卡推荐先用 0.6B；1.7B 占用更多显存，CPU 推理较慢。"}
-        {options.device === "auto" &&
-          options.engine !== "indextts" &&
-          " 自动模式准备 CPU 环境；使用 NVIDIA 显卡请选择 CUDA。"}
-        {options.device === "cuda" &&
-          " 首次 CUDA 配音需要下载 NVIDIA 版 PyTorch，下载量较大。"}
-        首次联网准备，之后可离线生成，文稿不上传云端。
+        Kokoro 支持中英文混读，VITS
+        提供中文音色。首次运行准备本地语音环境，缺少模型时自动下载；生成过程中显示进度，可取消，文稿不上传云端。
       </p>
       <button
         className="wide-button primary"
-        disabled={
-          busy ||
-          !options.text.trim() ||
-          (options.engine === "indextts" && !options.referenceAssetId)
-        }
+        disabled={busy || !options.text.trim()}
         onClick={() =>
           run(async () => {
             const parsed = ttsOptionsSchema.safeParse(options);
