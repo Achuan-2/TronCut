@@ -25,7 +25,7 @@ pnpm test:smoke
 pnpm dist:win
 ```
 
-The installer is written to `release/TronCut Setup 0.3.0.exe`; the unpacked app is under `release/win-unpacked/`. Test the packaged app before uploading. Release asset names use hyphens for stable direct-download URLs.
+The installer is written to `release/TronCut Setup 0.4.0.exe`; the unpacked app is under `release/win-unpacked/`. Test the packaged app before uploading. Release asset names use hyphens for stable direct-download URLs.
 
 ```powershell
 $env:FRAMECRAFT_PACKAGED_SMOKE='1'
@@ -45,7 +45,7 @@ Build on a Mac with the matching Electron architecture, runnable FFmpeg/FFprobe 
 
 The [Build release workflow](../.github/workflows/release.yml) runs when a GitHub Release is published, including prereleases. It checks that `v<version>` matches `package.json`, checks out the exact tag commit, downloads SHA256-verified FFmpeg 9.0.2 and uv 0.6.5, compiles the Windows capture helpers, runs tests and builds, then uploads the Windows x64 installer, complete portable ZIP, source archives, build provenance, and `SHA256SUMS.txt` to that Release. Upload permissions are limited to the final job. No extra secret or personal access token is required.
 
-发布正式 Release 或预发布后，GitHub Actions 会自动构建并上传 Windows x64 安装包、免安装 ZIP、源码、构建记录和 SHA256 校验文件，无需本地打包或手动上传。先修改 `package.json` 版本并提交，推送对应 `v<version>` 标签，再在 GitHub 发布该标签的 Release。预览版本继续勾选预发布；普通提交或仅推送标签不会触发发版。
+发布正式 Release 或预发布后，GitHub Actions 会自动构建并上传 Windows x64 安装包、免安装 ZIP、源码、构建记录和 SHA256 校验文件，无需本地打包或手动上传。先修改 `package.json` 版本并提交，推送对应 `v<version>` 标签，再在 GitHub 发布该标签的 Release。正式版不勾选预发布；普通提交或仅推送标签不会触发发版。
 
 To rebuild an existing release, open **Actions → Build release → Run workflow**, select `main`, and enter the existing tag. Upload replaces assets with the same names and regenerates checksums; the Release description, visibility, and prerelease state are preserved. Uncheck **Upload packages** to build only: packages remain available as Actions artifacts for 14 days. A failed build does not run the upload job, and a failed upload can be retried without rebuilding by rerunning the failed job. This workflow does not create commits, tags, or Releases.
 
