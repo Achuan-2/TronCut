@@ -30,6 +30,13 @@ try {
     if (message.type() === "error") console.error(message.text());
   });
   page.on("pageerror", (err) => errors.push(err.message));
+  await page.getByRole("button", { name: "新建项目", exact: true }).click();
+  await page.getByLabel("工程名称").fill("我的第一个视频");
+  // Create the two editable text fixtures explicitly; launch now opens Home.
+  await page.getByRole("button", { name: "添加文本", exact: true }).click();
+  await page.getByLabel("文本内容").fill("把想法，变成作品。");
+  await page.getByRole("button", { name: "添加文本", exact: true }).click();
+  await page.getByLabel("文本内容").fill("录制 · 剪辑 · 表达");
   await expect(page.getByRole("toolbar", { name: "画布工具", exact: true })).toBeVisible();
   await expect(page.locator(".workspace-status")).toContainText(
     "媒体引擎就绪",

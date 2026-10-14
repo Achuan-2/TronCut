@@ -46,6 +46,7 @@ import { defaultCursorStyle } from "../shared/cursor";
 import NarrationPanel from "./NarrationPanel";
 import ZoomPanPanel from "./ZoomPanPanel";
 import { defaultContentTransform } from "../shared/crop";
+import { visualClipAt } from "../shared/visual-state";
 import { ScaleControl, RotationControls } from "./TransformControls";
 
 export type Tab =
@@ -861,7 +862,8 @@ export function Inspector({ editor }: { editor: Editor }) {
   };
   const editingContent =
     editor.canvasMode === "crop" && c && ["image", "video"].includes(c.kind);
-  const content = c?.contentTransform ?? defaultContentTransform;
+  const sampledVisual = c ? visualClipAt(c, value) : null;
+  const content = sampledVisual?.contentTransform ?? defaultContentTransform;
   const contentOrFrame = (key: "scale" | "x" | "y", next: number) => {
     if (!c || locked || !Number.isFinite(next)) return;
     if (editingContent) editor.updateContentTransform(c.id, { [key]: next });
@@ -874,7 +876,7 @@ export function Inspector({ editor }: { editor: Editor }) {
         editor.project.canvas.height / Math.max(1, asset.height),
       )
     : 1;
-  const crop = c?.crop ?? defaultCrop;
+  const crop = sampledVisual?.crop ?? defaultCrop;
   const size =
     c?.kind === "text"
       ? textBoxFor(c)
@@ -1015,8 +1017,9 @@ export function Inspector({ editor }: { editor: Editor }) {
               <div className="keyframe-edit-status" role="status">
                 <span>
                   编辑动画
-                  {editor.selectedKeyframe.side === "start" ? "起点" : "终点"} ·{" "}
-                  {timeLabel(editor.playhead)}
+                  {editor.selectedKeyframe.side === "start"
+                    ? "起点"
+                    : "终点"} · {timeLabel(editor.playhead)}
                 </span>
                 <button type="button" onClick={editor.clearKeyframeEdit}>
                   退出

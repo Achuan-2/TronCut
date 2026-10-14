@@ -9,5 +9,12 @@ export const recentProjectSchema = z.object({
   bytes: z.number().finite().nonnegative(),
   thumbnail: z.string().optional(),
 });
-export type RecentProject = z.infer<typeof recentProjectSchema> & { missing?: boolean };
-export interface RecoveryInfo { name: string; file: string | null; modifiedAt: number; duration: number; }
+export type RecentProject = z.infer<typeof recentProjectSchema> & {
+  missing?: boolean;
+};
+export interface RecoveryInfo {
+  name: string;
+  file: string | null;
+  modifiedAt: number;
+  duration: number;
+}

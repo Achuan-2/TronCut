@@ -11,6 +11,7 @@ import {
 import { sameTransform } from "./animation-ranges";
 import { easeProgress } from "./easing";
 import { normalizeRotationAxes, rotationKeys } from "./rotation";
+import { visualKeys, visualValues } from "./visual-state";
 
 export function availableTrack(
   project: Pick<Project, "tracks" | "clips">,
@@ -90,7 +91,8 @@ export function addMediaAssets(
 }
 
 export function transformAt(
-  clip: Pick<Clip, "transform" | "keyframes" | "animationOffset" | "rotation">,
+  clip: Pick<Clip, "transform" | "keyframes" | "animationOffset" | "rotation"> &
+    Partial<Pick<Clip, "crop" | "contentTransform">>,
   localTime: number,
 ): Transform {
   localTime += clip.animationOffset ?? 0;
@@ -100,6 +102,11 @@ export function transformAt(
     clip.transform.rotation !== undefined ||
     frames.some((frame) => frame.value.rotation !== undefined);
   const axes = (["rotationX", "rotationY"] as const).filter(
+    (key) =>
+      clip.transform[key] !== undefined ||
+      frames.some((frame) => frame.value[key] !== undefined),
+  );
+  const hasVisual = visualKeys.some(
     (key) =>
       clip.transform[key] !== undefined ||
       frames.some((frame) => frame.value[key] !== undefined),
@@ -115,6 +122,7 @@ export function transformAt(
     ...Object.fromEntries(
       axes.map((key) => [key, value[key] ?? clip.transform[key] ?? 0]),
     ),
+    ...(hasVisual ? visualValues(clip, value) : {}),
   });
   if (!frames.length) return normalize(clip.transform);
   const points =
@@ -145,6 +153,9 @@ export function transformAt(
         ...value,
         scale: Math.max(0.05, value.scale),
         opacity: Math.max(0, Math.min(1, value.opacity)),
+        ...(visualKeys.some((key) => value[key] !== undefined)
+          ? visualValues(clip, value)
+          : {}),
       };
     }
   }

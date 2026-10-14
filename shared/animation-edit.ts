@@ -6,6 +6,7 @@ import {
   type AnimationRange,
 } from "./animation-ranges";
 import { transformAt } from "./editor";
+import { visualKeys, visualValues } from "./visual-state";
 
 export interface CopiedAnimation {
   duration: number;
@@ -153,7 +154,12 @@ export function pasteAnimation(
   const start = localStart + offset,
     end = localEnd + offset;
   if (start < 0) return clip;
-  const from = transformAt(clip, localStart);
+  const sampled = transformAt(clip, localStart);
+  const from = visualKeys.some(
+    (key) => copied.from[key] !== undefined || copied.to[key] !== undefined,
+  )
+    ? { ...sampled, ...visualValues(clip, sampled) }
+    : sampled;
   const to = { ...from };
   // Paste the same motion relative to the target's current state. This keeps
   // its preceding hold intact, instead of adding a transition to copied values.
@@ -165,10 +171,17 @@ export function pasteAnimation(
     rotation: [-3600, 3600],
     rotationX: [-3600, 3600],
     rotationY: [-3600, 3600],
+    contentX: [-4, 4],
+    contentY: [-4, 4],
+    contentScale: [0.05, 8],
+    cropLeft: [0, 0.95],
+    cropTop: [0, 0.95],
+    cropRight: [0, 0.95],
+    cropBottom: [0, 0.95],
   };
   for (const key of Object.keys(bounds) as (keyof Transform)[]) {
     if (
-      ["rotation", "rotationX", "rotationY"].includes(key) &&
+      !["x", "y", "scale", "opacity"].includes(key) &&
       copied.from[key] === undefined &&
       copied.to[key] === undefined
     )
@@ -177,6 +190,8 @@ export function pasteAnimation(
       (from[key] ?? 0) + (copied.to[key] ?? 0) - (copied.from[key] ?? 0);
     to[key] = Math.max(bounds[key][0], Math.min(bounds[key][1], value));
   }
+  if (visualKeys.some((key) => to[key] !== undefined))
+    Object.assign(to, visualValues(clip, to));
   let holding = true;
   const rotation = clip.transform.rotation ?? clip.rotation ?? 0;
   const frames = [...clip.keyframes]

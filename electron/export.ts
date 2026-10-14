@@ -13,6 +13,12 @@ import { cursorFilters } from "./cursor-export";
 import { loopImageInput } from "./loop-image";
 import { easingExpression } from "../shared/easing";
 import { contentFilters, axisRotationFilters } from "./visual-transform";
+import { animatedViewportFilters } from "./visual-transform";
+import {
+  hasVisualAnimation,
+  visualDefaults,
+  visualKeys,
+} from "../shared/visual-state";
 
 // Avoid lookahead buffering in short, delayed overlay graphs. Hardware failure
 // fallback and explicitly requested software encoding use identical settings.
@@ -43,16 +49,28 @@ export function expression(
   clip: Pick<
     Clip,
     "transform" | "keyframes" | "start" | "animationOffset" | "rotation"
-  >,
+  > &
+    Partial<Pick<Clip, "crop" | "contentTransform">>,
   key: keyof Transform,
   clock = "t",
 ): string {
   const frames = [...clip.keyframes].sort((a, b) => a.time - b.time);
   const baseValue =
-    clip.transform[key] ?? (key === "rotation" ? (clip.rotation ?? 0) : 0);
+    clip.transform[key] ??
+    (key === "rotation"
+      ? (clip.rotation ?? 0)
+      : visualKeys.includes(key as (typeof visualKeys)[number])
+        ? visualDefaults(clip)[key as (typeof visualKeys)[number]]
+        : 0);
   const frameValue = (value: Transform) => value[key] ?? baseValue;
   if (!frames.length) return String(baseValue);
   if (frames[0].time > 0) frames.unshift({ time: 0, value: clip.transform });
+  if (
+    frames.every(
+      (frame) => frameValue(frame.value) === frameValue(frames[0].value),
+    )
+  )
+    return String(frameValue(frames[0].value));
   const origin = clip.start - (clip.animationOffset ?? 0);
   let result = String(frameValue(frames.at(-1)!.value));
   for (let i = frames.length - 1; i > 0; i--) {
@@ -65,7 +83,7 @@ export function expression(
   const value = `if(lt(${clock},${origin + frames[0].time}),${frameValue(frames[0].value)},${result})`;
   return key === "opacity"
     ? `clip(${value},0,1)`
-    : key === "scale"
+    : key === "scale" || key === "contentScale"
       ? `max(0.05,${value})`
       : value;
 }
@@ -317,14 +335,15 @@ export async function exportVideo(
             height / Math.max(1, intrinsicHeight),
           );
       const crop = clip.crop ?? defaultCrop;
+      const animatedViewport = hasVisualAnimation(clip);
       const cropWidth =
         intrinsicWidth -
-        Math.floor(intrinsicWidth * crop.left) -
-        Math.floor(intrinsicWidth * crop.right);
+        (animatedViewport ? 0 : Math.floor(intrinsicWidth * crop.left)) -
+        (animatedViewport ? 0 : Math.floor(intrinsicWidth * crop.right));
       const cropHeight =
         intrinsicHeight -
-        Math.floor(intrinsicHeight * crop.top) -
-        Math.floor(intrinsicHeight * crop.bottom);
+        (animatedViewport ? 0 : Math.floor(intrinsicHeight * crop.top)) -
+        (animatedViewport ? 0 : Math.floor(intrinsicHeight * crop.bottom));
       const scale = expression(clip, "scale");
       const transform = `scale=w='max(2,trunc(${cropWidth * fit}*(${scale})/2)*2)':h='max(2,trunc(${cropHeight * fit}*(${scale})/2)*2)':eval=frame`;
       const alphaAnimated = clip.keyframes.some(
@@ -339,7 +358,7 @@ export async function exportVideo(
         alpha = `geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='alpha(X,Y)*(${expression(clip, "opacity", "T")})*max(0,${fade})'`;
       }
       const visualEffects = visualFilters(
-        clip,
+        animatedViewport ? { ...clip, crop: undefined } : clip,
         intrinsicWidth,
         intrinsicHeight,
       );
@@ -392,7 +411,7 @@ export async function exportVideo(
           ? `trim=start=${clip.sourceIn}:duration=${clip.duration * clip.speed},setpts=(PTS-STARTPTS)/${clip.speed}+${clip.start}/TB,`
           : "";
       filters.push(
-        `[${source}]${timing}format=rgba,${[...contentFilters(clip), ...visualEffects, transform, "setsar=1", ...rotate, alpha].join(",")}[${visual}]`,
+        `[${source}]${timing}format=rgba,${[...(animatedViewport ? animatedViewportFilters((key) => expression(clip, key, "T")) : contentFilters(clip)), ...visualEffects, transform, "setsar=1", ...rotate, alpha].join(",")}[${visual}]`,
       );
       filters.push(
         `[${base}][${visual}]overlay=x='${width}*(${expression(clip, "x")})-overlay_w/2':y='${height}*(${expression(clip, "y")})-overlay_h/2':enable='gte(t,${clip.start})*lt(t,${clip.start + clip.duration})':eof_action=pass:repeatlast=0[${output}]`,

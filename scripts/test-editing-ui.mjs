@@ -110,6 +110,8 @@ const app = await electron.launch({
 });
 try {
   const page = await app.firstWindow();
+  await expect(page.locator(".home-page")).toBeVisible();
+  await page.getByRole("button", { name: "恢复编辑", exact: true }).click();
   if (packaged) {
     const builtHtml = await fs.readFile(path.resolve("dist/index.html"), "utf8");
     const script = builtHtml.match(/src="([^"]+\.js)"/)?.[1];
@@ -352,8 +354,7 @@ try {
   await expect.poll(async () => (await page.locator(".canvas").boundingBox()).width).toBeCloseTo(fittedWidth, 0);
   await expect(page.getByLabel("缩放 (%)", { exact: true })).toHaveValue(mediaScale);
 
-  // Crop is static even in automatic animation mode; retain the opposite edge.
-  await page.getByRole("button", { name: "自动动画", exact: true }).click();
+  // With automatic animation off, crop edits keep their existing static behavior.
   await page.getByRole("button", { name: "裁剪模式", exact: true }).click();
   await expect(page.getByRole("button", { name: "裁剪模式", exact: true })).toHaveAttribute("aria-pressed", "true");
   await expect(canvasVideo.locator(".crop-handle")).toHaveCount(8);
@@ -404,7 +405,6 @@ try {
   expect(savedVideoContent.x).toBeGreaterThan(0);
   await page.screenshot({ path: path.join(root, "fixed-crop-content.png") });
   await page.getByRole("button", { name: "选择模式", exact: true }).click();
-  await page.getByRole("button", { name: "自动动画", exact: true }).click();
   await expect(canvasVideo.locator(".crop-handle")).toHaveCount(0);
   await expect(page.getByLabel("缩放 (%)", { exact: true })).toHaveValue(mediaScale);
   expect(Number(await page.getByRole("slider", { name: "缩放滑条", exact: true }).inputValue())).toBeCloseTo(Number(mediaScale), 1);

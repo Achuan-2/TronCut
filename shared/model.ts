@@ -30,13 +30,20 @@ export const transformSchema = z.object({
   rotation: finite.min(-3600).max(3600).optional(),
   rotationX: finite.min(-3600).max(3600).optional(),
   rotationY: finite.min(-3600).max(3600).optional(),
+  contentX: finite.min(-4).max(4).optional(),
+  contentY: finite.min(-4).max(4).optional(),
+  contentScale: finite.min(0.05).max(8).optional(),
+  cropLeft: finite.min(0).max(0.95).optional(),
+  cropTop: finite.min(0).max(0.95).optional(),
+  cropRight: finite.min(0).max(0.95).optional(),
+  cropBottom: finite.min(0).max(0.95).optional(),
   x: finite.min(-4).max(4),
   y: finite.min(-4).max(4),
   scale: finite.min(0.05).max(8),
   opacity: finite.min(0).max(1),
 });
 const cameraTransformSchema = transformSchema
-  .omit({ rotation: true, rotationX: true, rotationY: true })
+  .pick({ x: true, y: true, scale: true, opacity: true })
   .extend({
     x: finite.min(0).max(1),
     y: finite.min(0).max(1),

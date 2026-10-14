@@ -109,6 +109,15 @@ export function TimelineAnimations({
     editedEnd?.value.scale,
     editedEnd?.value.opacity,
     editedEnd?.value.rotation,
+    editedEnd?.value.rotationX,
+    editedEnd?.value.rotationY,
+    editedEnd?.value.contentX,
+    editedEnd?.value.contentY,
+    editedEnd?.value.contentScale,
+    editedEnd?.value.cropLeft,
+    editedEnd?.value.cropTop,
+    editedEnd?.value.cropRight,
+    editedEnd?.value.cropBottom,
   ]);
   useEffect(() => () => pulse.current?.animation.cancel(), []);
   const setDrag = (next: Gesture | null) => {

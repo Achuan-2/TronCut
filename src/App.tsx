@@ -12,6 +12,7 @@ import {
   Minus,
   Square,
   Copy,
+  Home as HomeIcon,
 } from "lucide-react";
 import {
   createProject,
@@ -33,9 +34,16 @@ import Timeline from "./Timeline";
 import type { AnimationRange } from "../shared/animation-ranges";
 import Panels, { Inspector, type Tab } from "./Panels";
 import Recorder from "./Recorder";
+import Home from "./Home";
+import type { RecentProject, RecoveryInfo } from "../shared/recent-projects";
 
 export default function App() {
   const editor = useEditor(),
+    [screen, setScreen] = useState<"home" | "editor">("home"),
+    [hasSession, setHasSession] = useState(false),
+    [recent, setRecent] = useState<RecentProject[]>([]),
+    [recovery, setRecovery] = useState<RecoveryInfo | null>(null),
+    [homeLoading, setHomeLoading] = useState(true),
     [tab, setTab] = useState<Tab>("media"),
     [recording, setRecording] = useState(false),
     [caps, setCaps] = useState<Capabilities>(),
@@ -108,8 +116,35 @@ export default function App() {
     return desktop?.onWindowState(setWindowState);
   }, [toast]);
   useEffect(() => {
-    document.title = `${editor.project.name}${editor.dirty ? " *" : ""} — TronCut`;
-  }, [editor.project.name, editor.dirty]);
+    document.title =
+      screen === "home"
+        ? "首页 — TronCut"
+        : `${editor.project.name}${editor.dirty ? " *" : ""} — TronCut`;
+  }, [screen, editor.project.name, editor.dirty]);
+  const refreshHome = useCallback(async () => {
+    setHomeLoading(true);
+    try {
+      const [recent, recovery] = await Promise.all([
+        window.framecraft?.recentProjects(),
+        window.framecraft?.recoveryInfo(),
+      ]);
+      setRecent(recent ?? []);
+      setRecovery(recovery ?? null);
+    } finally {
+      setHomeLoading(false);
+    }
+  }, []);
+  const enterEditor = () => {
+    setScreen("editor");
+    setHasSession(true);
+    setMenu(false);
+  };
+  const goHome = () => {
+    editor.setPlaying(false);
+    setMenu(false);
+    setScreen("home");
+    void refreshHome().catch((error) => toast(String(error)));
+  };
   const showWindowMenu = (
     name: "edit" | "view",
     element: HTMLButtonElement,
@@ -138,6 +173,7 @@ export default function App() {
       if (result) {
         editor.markSaved(result.project);
         setFile(result.file);
+        void refreshHome().catch(() => {});
         toast("工程已保存，所有素材已归档到工程文件夹");
       }
     });
@@ -149,6 +185,7 @@ export default function App() {
       if (result) {
         editor.replace(result.project);
         setFile(result.file);
+        enterEditor();
         const missing = result.project.assets.filter((a) => a.missing).length;
         toast(missing ? `工程已打开，${missing} 个素材离线` : "工程已打开");
       }
@@ -170,6 +207,7 @@ export default function App() {
         editor.replace(project, true);
         setFile("");
         setImportReport(project.importReport ?? []);
+        enterEditor();
       }
     });
   const copyAnimation = (
@@ -249,7 +287,8 @@ export default function App() {
         'input, textarea, select, [contenteditable="true"]',
       ) ||
       busy ||
-      recording
+      recording ||
+      screen === "home"
     )
       return;
     event.preventDefault();
@@ -272,13 +311,16 @@ export default function App() {
       window.removeEventListener("drop", preventFileNavigation);
     };
   }, []);
-  const newProject = () => {
+  const newProject = (record = false) => {
     if (editor.dirty && !confirm("当前工程有未保存修改，确定新建工程？"))
       return;
     void run(async () => {
       await window.framecraft?.newProject();
-      editor.replace(createProject(), true);
+      editor.replace(createProject());
       setFile("");
+      setRecovery(null);
+      enterEditor();
+      if (record) setRecording(true);
     });
   };
   const exportVideo = () =>
@@ -301,13 +343,16 @@ export default function App() {
         if (result) {
           editor.replace(result.project);
           setFile(result.file);
+          enterEditor();
         }
       });
       return;
     }
+    if (screen === "home" && !["new", "open", "camtasia"].includes(command))
+      return;
     (
       ({
-        new: newProject,
+        new: () => newProject(),
         open,
         save: () => void save(),
         saveAs: () => void save(true),
@@ -329,7 +374,8 @@ export default function App() {
     if (
       target.closest('input, textarea, select, [contenteditable="true"]') ||
       busy ||
-      recording
+      recording ||
+      screen === "home"
     )
       return;
     const selected = editor.selected,
@@ -425,11 +471,11 @@ export default function App() {
   }, []);
   useEffect(() => {
     const timer = setTimeout(() => {
-      if (window.framecraft && editor.dirty)
+      if (window.framecraft && hasSession && editor.dirty)
         void window.framecraft.writeRecovery(editor.project).catch(() => {});
     }, 2000);
     return () => clearTimeout(timer);
-  }, [editor.project, editor.dirty]);
+  }, [editor.project, editor.dirty, hasSession]);
   useEffect(() => {
     void (async () => {
       if (initialized.current) return;
@@ -438,16 +484,39 @@ export default function App() {
       if (initial) {
         editor.replace(initial.project);
         setFile(initial.file);
+        enterEditor();
         return;
       }
-      const result = await window.framecraft?.readRecovery();
-      if (result) {
-        editor.replace(result.project, true);
-        setFile(result.file ?? "");
-        toast("已恢复上次自动保存的工程");
-      }
-    })().catch((error) => toast(String(error)));
+      await refreshHome();
+    })().catch((error) => {
+      setHomeLoading(false);
+      toast(String(error));
+    });
   }, []);
+  const recover = () =>
+    run(async () => {
+      if (editor.dirty && !confirm("当前工程有未保存修改，确定恢复上次编辑？"))
+        return;
+      const result = await bridge().readRecovery();
+      if (!result) {
+        setRecovery(null);
+        toast("没有可恢复的编辑");
+        return;
+      }
+      editor.replace(result.project, true);
+      setFile(result.file ?? "");
+      enterEditor();
+      toast("已恢复上次自动保存的工程");
+    });
+  const openRecent = (file: string) =>
+    run(async () => {
+      if (editor.dirty && !confirm("当前工程有未保存修改，确定打开其他工程？"))
+        return;
+      const result = await bridge().openRecentProject(file);
+      editor.replace(result.project);
+      setFile(result.file);
+      enterEditor();
+    });
   const recorded = (
     results: Parameters<React.ComponentProps<typeof Recorder>["onRecorded"]>[0],
   ) => {
@@ -494,7 +563,21 @@ export default function App() {
           </div>
           <b>TronCut</b>
         </div>
-        <nav className="header-menus" aria-label="主菜单">
+        {screen === "editor" && (
+          <button
+            aria-label="返回首页"
+            title="返回首页"
+            disabled={actionsBlocked}
+            onClick={goHome}
+          >
+            <HomeIcon size={16} />
+          </button>
+        )}
+        <nav
+          className="header-menus"
+          aria-label="主菜单"
+          hidden={screen === "home"}
+        >
           <button
             className="project-menu-trigger"
             disabled={actionsBlocked}
@@ -525,7 +608,7 @@ export default function App() {
           )}
           {menu && !actionsBlocked && (
             <div className="project-menu" onClick={() => setMenu(false)}>
-              <button onClick={newProject}>
+              <button onClick={() => newProject()}>
                 <Plus size={15} />
                 新建工程
               </button>
@@ -545,21 +628,27 @@ export default function App() {
           )}
         </nav>
         <div className="project-title">
-          <input
-            aria-label="工程名称"
-            disabled={actionsBlocked}
-            value={editor.project.name}
-            onChange={(e) => {
-              if (e.target.value.trim())
-                editor.apply((p) => ({ ...p, name: e.target.value }));
-            }}
-          />
-          <span
-            className="project-save-state"
-            title={editor.dirty ? "未保存" : file ? "已保存" : "起始工程"}
-          >
-            {editor.dirty ? "*" : ""}
-          </span>
+          {screen === "home" ? (
+            <span>首页</span>
+          ) : (
+            <>
+              <input
+                aria-label="工程名称"
+                disabled={actionsBlocked}
+                value={editor.project.name}
+                onChange={(e) => {
+                  if (e.target.value.trim())
+                    editor.apply((p) => ({ ...p, name: e.target.value }));
+                }}
+              />
+              <span
+                className="project-save-state"
+                title={editor.dirty ? "未保存" : file ? "已保存" : "起始工程"}
+              >
+                {editor.dirty ? "*" : ""}
+              </span>
+            </>
+          )}
         </div>
         <span
           className="workspace-status"
@@ -588,7 +677,7 @@ export default function App() {
                   : "浏览器预览"}
           </span>
         </span>
-        <div className="header-actions">
+        <div className="header-actions" hidden={screen === "home"}>
           <button
             className="record-button"
             disabled={actionsBlocked}
@@ -659,28 +748,45 @@ export default function App() {
           </div>
         )}
       </header>
-      <div className="editor-workspace">
-        <Panels
-          editor={editor}
-          tab={tab}
-          setTab={setTab}
-          importMedia={importMedia}
-          importCamtasia={importCamtasia}
-          run={(fn) => void run(fn)}
-          toast={toast}
-          capabilities={caps}
-          refreshCapabilities={refreshCapabilities}
-          busy={busy || mediaImporting}
+      {screen === "home" ? (
+        <Home
+          recent={recent}
+          recovery={hasSession ? null : recovery}
+          loading={homeLoading}
+          disabled={actionsBlocked}
+          onNew={() => newProject()}
+          onRecord={() => newProject(true)}
+          onOpen={() => void open()}
+          onRecent={(file) => void openRecent(file)}
+          onRecover={() => void recover()}
+          onContinue={hasSession ? enterEditor : undefined}
         />
-        <Preview editor={editor} />
-        <Inspector editor={editor} />
-      </div>
-      <Timeline
-        editor={editor}
-        onCopyAnimation={copyAnimation}
-        onDropFiles={dropFiles}
-        dropDisabled={busy || recording || mediaImporting}
-      />
+      ) : (
+        <>
+          <div className="editor-workspace">
+            <Panels
+              editor={editor}
+              tab={tab}
+              setTab={setTab}
+              importMedia={importMedia}
+              importCamtasia={importCamtasia}
+              run={(fn) => void run(fn)}
+              toast={toast}
+              capabilities={caps}
+              refreshCapabilities={refreshCapabilities}
+              busy={busy || mediaImporting}
+            />
+            <Preview editor={editor} />
+            <Inspector editor={editor} />
+          </div>
+          <Timeline
+            editor={editor}
+            onCopyAnimation={copyAnimation}
+            onDropFiles={dropFiles}
+            dropDisabled={busy || recording || mediaImporting}
+          />
+        </>
+      )}
       {toastMessage && (
         <div className="toast" role="status">
           <Check size={17} />

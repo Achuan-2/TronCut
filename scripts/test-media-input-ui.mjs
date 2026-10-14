@@ -76,6 +76,8 @@ try {
   const page = await app.firstWindow(),
     errors = [];
   page.on("pageerror", (error) => errors.push(error.message));
+  await expect(page.locator(".home-page")).toBeVisible();
+  await page.getByRole("button", { name: "恢复编辑", exact: true }).click();
   await expect(page.locator(".track-lane")).toHaveCount(2);
   // Substitute only native clipboard accessors, preserving the user's actual
   // clipboard. The PNG persistence, probing, registration and renderer IPC run normally.

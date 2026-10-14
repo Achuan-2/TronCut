@@ -25,7 +25,9 @@ import {
 } from "../shared/editor";
 import { selectionWithGroups } from "../shared/timeline";
 import { setVideoZoomPan } from "../shared/video-zoom-pan";
-import { setContentTransform, type ContentTransform } from "../shared/crop";
+import { type ContentTransform } from "../shared/crop";
+import { animateContent, animateCrop } from "../shared/crop-animation";
+import type { Crop } from "../shared/crop";
 import { fitUpdatedText } from "./text";
 import {
   animationEditTarget,
@@ -74,7 +76,7 @@ export function demoProject(): Project {
   return { ...project, tracks: numberTracks(project.tracks) };
 }
 export function useEditor() {
-  const [project, setProject] = useState<Project>(demoProject);
+  const [project, setProject] = useState<Project>(() => createProject());
   const [editingTextId, setEditingTextId] = useState<string | null>(null);
   const [zoomPanDraft, setZoomPanDraft] = useState<Transform | null>(null);
   const [canvasMode, setCanvasMode] = useState<"select" | "crop">("select");
@@ -215,9 +217,43 @@ export function useEditor() {
   );
   const updateContentTransform = useCallback(
     (id: string, patch: Partial<ContentTransform>) => {
-      updateClip(id, (clip) => setContentTransform(clip, patch));
+      const frame = keyframeRef.current;
+      updateClip(id, (clip) =>
+        animateContent(clip, patch, {
+          time: playhead - clip.start,
+          auto: autoAnimate,
+          endpoint: frame?.clipId === id ? frame : undefined,
+        }),
+      );
     },
-    [updateClip],
+    [updateClip, playhead, autoAnimate],
+  );
+  const updateCrop = useCallback(
+    (id: string, crop: Crop, resetContent = false) => {
+      const frame = keyframeRef.current;
+      updateClip(id, (clip) => {
+        const project = current.current;
+        const asset = project.assets.find((asset) => asset.id === clip.assetId);
+        if (!asset) return clip;
+        const fit = Math.min(
+          project.canvas.width / Math.max(1, asset.width),
+          project.canvas.height / Math.max(1, asset.height),
+        );
+        return animateCrop(
+          clip,
+          crop,
+          { width: asset.width * fit, height: asset.height * fit },
+          project.canvas,
+          {
+            time: playhead - clip.start,
+            auto: autoAnimate,
+            endpoint: frame?.clipId === id ? frame : undefined,
+          },
+          resetContent,
+        );
+      });
+    },
+    [updateClip, playhead, autoAnimate],
   );
   const editKeyframe = useCallback(
     (
@@ -527,6 +563,7 @@ export function useEditor() {
     redo,
     updateClip,
     updateContentTransform,
+    updateCrop,
     canvasMode,
     setCanvasMode,
     updateTransform,

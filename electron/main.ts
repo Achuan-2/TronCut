@@ -346,7 +346,17 @@ function installHandlers() {
         modifiedAt: (await fs.stat(file)).mtimeMs, duration: projectDuration(project) };
     } catch { return null; }
   });
-  handle("project:recent", () => recentProjects.list());
+  handle("project:recent", async () => {
+    const entries = await recentProjects.list();
+    if (entries.length) return entries;
+    // Older versions only kept the last project's path in recovery. Import that
+    // existing saved project into history without selecting or restoring it.
+    try {
+      const recovery = JSON.parse(await fs.readFile(path.join(app.getPath("userData"), "recovery.json"), "utf8"));
+      if (typeof recovery.file === "string") await rememberProject(await openProject(recovery.file), recovery.file);
+    } catch { /* No saved project to migrate. */ }
+    return recentProjects.list();
+  });
   handle("project:recent:open", async (input: unknown) => {
     const file = z.string().min(1).max(32768).parse(input);
     if (!(await recentProjects.list()).some((entry) => entry.file === file)) throw new Error("项目不在最近项目列表中，请使用打开项目");

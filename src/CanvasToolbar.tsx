@@ -3,6 +3,8 @@ import { createPortal } from "react-dom";
 import { Crop, MousePointer2, Settings2, Undo2, X } from "lucide-react";
 import type { Project } from "../shared/model";
 import type { Editor } from "./useEditor";
+import { transformAt } from "../shared/editor";
+import { visualClipAt } from "../shared/visual-state";
 
 export type CanvasMode = "select" | "crop";
 export type CanvasZoom = "fit" | number;
@@ -166,8 +168,14 @@ export default function CanvasToolbar({
   onResetCrop: () => void;
 }) {
   const [settings, setSettings] = useState(false);
-  const crop = editor.selected?.crop;
-  const content = editor.selected?.contentTransform;
+  const sampled = editor.selected
+    ? visualClipAt(
+        editor.selected,
+        transformAt(editor.selected, editor.playhead - editor.selected.start),
+      )
+    : null;
+  const crop = sampled?.crop;
+  const content = sampled?.contentTransform;
   const canReset =
     ((crop && Object.values(crop).some((value) => value > 0)) ||
       (content &&

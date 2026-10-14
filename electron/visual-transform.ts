@@ -1,5 +1,6 @@
 import type { Clip } from "../shared/model";
 import { contentOrigin, defaultContentTransform } from "../shared/crop";
+import type { VisualKey } from "../shared/visual-state";
 
 // Resample into a fixed transparent surface. Unlike scaling the whole source,
 // this keeps both the clipping boundary and memory use independent of zoom.
@@ -17,6 +18,38 @@ export function contentFilters(clip: Clip) {
       `(X+0.5-W*(${origin.x}))/${view.scale}-0.5`,
       `(Y+0.5-H*(${origin.y}))/${view.scale}-0.5`,
     ),
+  ];
+}
+
+// Compose a changing viewport into a fixed transparent plane. Crop dimensions
+// then animate without changing FFmpeg's filter surface or exposing the source
+// beyond the crop window; clip position stays at the window's center.
+export function animatedViewportFilters(
+  expression: (key: VisualKey) => string,
+) {
+  // FFmpeg expression registers avoid re-evaluating long animation curves
+  // dozens of times per pixel, especially for the crop validity mask.
+  const prefix =
+    [
+      `st(0,clip((${expression("contentScale")}),0.05,8))`,
+      `st(1,(${expression("contentX")}))`,
+      `st(2,(${expression("contentY")}))`,
+      ...(["cropLeft", "cropTop", "cropRight", "cropBottom"] as const).map(
+        (key, i) => `st(${i + 3},clip((${expression(key)}),0,0.95))`,
+      ),
+      "st(7,max(1,(ld(3)+ld(5))/0.98))",
+      "st(8,max(1,(ld(4)+ld(6))/0.98))",
+      "st(3,ld(3)/ld(7))",
+      "st(5,ld(5)/ld(7))",
+      "st(4,ld(4)/ld(8))",
+      "st(6,ld(6)/ld(8))",
+      "st(7,(X-W/2-W*ld(1))/ld(0)+W*(0.5+(ld(3)-ld(5))/2))",
+      "st(8,(Y-H/2-H*ld(2))/ld(0)+H*(0.5+(ld(4)-ld(6))/2))",
+    ].join(";") + ";";
+  const mask =
+    "between(ld(7),0,W-1)*between(ld(8),0,H-1)*lte(abs(X-W/2),W*(1-ld(3)-ld(5))/2)*lte(abs(Y-H/2),H*(1-ld(4)-ld(6))/2)";
+  return [
+    `geq=r='${prefix}r(ld(7),ld(8))':g='${prefix}g(ld(7),ld(8))':b='${prefix}b(ld(7),ld(8))':a='${prefix}if(${mask},alpha(ld(7),ld(8)),0)'`,
   ];
 }
 

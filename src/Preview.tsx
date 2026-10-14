@@ -35,7 +35,6 @@ import { setVideoZoomPan, unzoomVideoPreview } from "../shared/video-zoom-pan";
 import { resizeTextBox, textLineHeight, type TextBox } from "../shared/text";
 import { textBoxFor, fittedTextFont } from "./text";
 import {
-  cropClip,
   croppedTransform,
   dragCrop,
   type Crop,
@@ -50,6 +49,7 @@ import CanvasToolbar, {
   type CanvasZoom,
 } from "./CanvasToolbar";
 import type { Editor } from "./useEditor";
+import { visualClipAt } from "../shared/visual-state";
 
 export function timeLabel(t: number): string {
   const seconds = Math.max(0, t);
@@ -155,6 +155,7 @@ function PreviewLayer({
 }) {
   const transform = transformAt(clip, editor.playhead - clip.start),
     asset = project.assets.find((a) => a.id === clip.assetId);
+  clip = visualClipAt(clip, transform);
   const editing = interactive && editor.editingTextId === clip.id;
   const textInput = useRef<HTMLTextAreaElement>(null);
   const track = project.tracks.find((t) => t.id === clip.trackId);
@@ -417,14 +418,7 @@ function PreviewLayer({
         }
         if (drag?.mode === "crop" && drag.crop) {
           const crop = drag.crop;
-          editor.updateClip(clip.id, (current) =>
-            cropClip(
-              current,
-              crop,
-              { width: mediaWidth / scale, height: mediaHeight / scale },
-              project.canvas,
-            ),
-          );
+          editor.updateCrop(clip.id, crop);
           setGesture(null);
           return;
         }
@@ -768,21 +762,7 @@ export default function Preview({ editor }: { editor: Editor }) {
   }, [fullscreen, zoom, project.canvas.width, project.canvas.height]);
   const resetCrop = () => {
     const clip = editor.selected;
-    const asset = project.assets.find((asset) => asset.id === clip?.assetId);
-    if (!clip || !asset) return;
-    const fit = Math.min(
-      project.canvas.width / Math.max(1, asset.width),
-      project.canvas.height / Math.max(1, asset.height),
-    );
-    editor.updateClip(clip.id, (current) => ({
-      ...cropClip(
-        current,
-        defaultCrop,
-        { width: asset.width * fit, height: asset.height * fit },
-        project.canvas,
-      ),
-      contentTransform: undefined,
-    }));
+    if (clip) editor.updateCrop(clip.id, defaultCrop, true);
   };
   return (
     <section

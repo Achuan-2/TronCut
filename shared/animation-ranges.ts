@@ -1,11 +1,13 @@
 import type { Clip, Transform } from "./model";
 import { normalizeRotationAxes, rotationKeys } from "./rotation";
+import { visualKeys, visualDefaults } from "./visual-state";
+const defaultVisual = visualDefaults({});
 
 export function sameTransform(
   a: Transform,
   b: Transform,
   rotation = 0,
-  fallback: Partial<Pick<Transform, "rotationX" | "rotationY">> = {},
+  fallback: Partial<Transform> = {},
 ) {
   return (
     (["x", "y", "scale", "opacity"] as const).every(
@@ -16,6 +18,13 @@ export function sameTransform(
       (key) =>
         Math.abs(
           (a[key] ?? fallback[key] ?? 0) - (b[key] ?? fallback[key] ?? 0),
+        ) < 1e-9,
+    ) &&
+    visualKeys.every(
+      (key) =>
+        Math.abs(
+          (a[key] ?? fallback[key] ?? defaultVisual[key]) -
+            (b[key] ?? fallback[key] ?? defaultVisual[key]),
         ) < 1e-9,
     )
   );
@@ -146,6 +155,29 @@ export function retimeAnimation(
   if (start === a.time && end === b.time) return clip;
   frames[index] = { ...a, time: start };
   frames[index + 1] = { ...b, time: end };
+  const visual = visualKeys.some(
+    (key) =>
+      clip.transform[key] !== undefined ||
+      frames.some((frame) => frame.value[key] !== undefined),
+  );
+  if (visual) {
+    const defaults = visualDefaults(clip);
+    for (let i = 0; i < frames.length; i++) {
+      const frame = frames[i];
+      frames[i] = {
+        ...frame,
+        value: {
+          ...frame.value,
+          ...Object.fromEntries(
+            visualKeys.map((key) => [
+              key,
+              frame.value[key] ?? clip.transform[key] ?? defaults[key],
+            ]),
+          ),
+        },
+      };
+    }
+  }
   const axes = rotationKeys.filter(
     (key) =>
       clip.transform[key] !== undefined ||
