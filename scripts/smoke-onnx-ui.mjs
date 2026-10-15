@@ -43,13 +43,17 @@ try {
   await page.getByRole("button", { name: "旁白", exact: true }).click();
   await page.getByText("AI 配音设置", { exact: true }).click();
   await expect(page.getByLabel("配音模型", { exact: true })).toHaveValue(
-    "kokoro-onnx",
+    process.platform === "win32" ? "windows-sapi" : "kokoro-onnx",
   );
   const engines = await page
     .getByLabel("配音模型", { exact: true })
     .locator("option")
     .evaluateAll((items) => items.map((item) => item.value));
-  assert.deepEqual(engines, ["kokoro-onnx", "vits-onnx"]);
+  assert.deepEqual(engines, [
+    ...(process.platform === "win32" ? ["windows-sapi"] : []),
+    "kokoro-onnx",
+    "vits-onnx",
+  ]);
   await page.getByLabel("配音模型", { exact: true }).selectOption("vits-onnx");
   await page
     .getByLabel("配音模型目录", { exact: true })

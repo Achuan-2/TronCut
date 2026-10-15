@@ -11,6 +11,7 @@ import {
 import { findBinary, runProcess } from "./process";
 import { probeMedia } from "./media";
 import { onnxEnvironment, prepareOnnxWorker, runOnnxWorker } from "./onnx";
+import { synthesizeWindowsSpeech } from "./windows-speech";
 
 const progressSchema = z.object({
   percent: z.number().finite().min(0).max(100),
@@ -25,6 +26,8 @@ const runtimeSchema = z.object({
   loadSeconds: z.number().finite().nonnegative(),
   generationSeconds: z.number().finite().nonnegative(),
   modelDirectory: z.string().max(4096).optional(),
+  voiceId: z.string().max(1024).optional(),
+  voiceName: z.string().max(500).optional(),
   segments: z
     .array(
       z.object({
@@ -44,22 +47,29 @@ export async function synthesizeSpeech(
   progress: (percent: number, label: string) => void,
 ) {
   const options = ttsOptionsSchema.parse(input);
-  if (!(options.engine in onnxTtsModels))
+  const windows = options.engine === "windows-sapi";
+  if (!windows && !(options.engine in onnxTtsModels))
     throw new Error(
       "配音已改用 ONNX，请重新选择 Kokoro 或 VITS；已有配音仍可播放",
     );
   if (signal.aborted) throw new Error("配音已取消");
-  progress(0, "正在检查 sherpa-onnx 配音运行环境");
+  progress(
+    0,
+    windows ? "正在准备 Windows 系统语音" : "正在检查 sherpa-onnx 配音运行环境",
+  );
   await Promise.all(
-    ["uv", "ffmpeg", "ffprobe"].map((name) =>
-      runProcess(
-        findBinary(name, paths.resources),
-        [name === "uv" ? "--version" : "-version"],
-        { signal, timeout: 10000 },
-      ),
+    (windows ? ["ffmpeg", "ffprobe"] : ["uv", "ffmpeg", "ffprobe"]).map(
+      (name) =>
+        runProcess(
+          findBinary(name, paths.resources),
+          [name === "uv" ? "--version" : "-version"],
+          { signal, timeout: 10000 },
+        ),
     ),
   );
-  const workers = await prepareOnnxWorker(paths.workers, paths.userData);
+  const workers = windows
+    ? paths.workers
+    : await prepareOnnxWorker(paths.workers, paths.userData);
   const root = path.join(paths.userData, "narration");
   await fs.mkdir(root, { recursive: true });
   const folder = await fs.mkdtemp(path.join(root, "speech-"));
@@ -67,38 +77,49 @@ export async function synthesizeSpeech(
   const raw = path.join(folder, "raw.wav");
   const output = path.join(folder, "narration.wav");
   try {
-    await fs.writeFile(
-      request,
-      JSON.stringify({ ...options, device: "cpu" }),
-      "utf8",
-    );
-    progress(
-      0,
-      options.offline
-        ? "正在加载本地 ONNX 配音模型"
-        : "正在准备 sherpa-onnx；优先复用本地模型，缺少时下载",
-    );
-    await runOnnxWorker(
-      findBinary("uv", paths.resources),
-      ttsWorkerArguments(options, workers, request, raw),
-      {
+    if (windows) {
+      await synthesizeWindowsSpeech(
+        options,
+        workers,
+        request,
+        raw,
         signal,
-        cwd: workers,
-        env: onnxEnvironment(paths.userData, workers),
-        onLine(line) {
-          const prefix = "TRONCUT_PROGRESS ";
-          if (!line.startsWith(prefix)) return;
-          try {
-            const event = progressSchema.parse(
-              JSON.parse(line.slice(prefix.length)),
-            );
-            progress(event.percent, event.label);
-          } catch {
-            /* Ignore ordinary model output. */
-          }
+        progress,
+      );
+    } else {
+      await fs.writeFile(
+        request,
+        JSON.stringify({ ...options, device: "cpu" }),
+        "utf8",
+      );
+      progress(
+        0,
+        options.offline
+          ? "正在加载本地 ONNX 配音模型"
+          : "正在准备 sherpa-onnx；优先复用本地模型，缺少时下载",
+      );
+      await runOnnxWorker(
+        findBinary("uv", paths.resources),
+        ttsWorkerArguments(options, workers, request, raw),
+        {
+          signal,
+          cwd: workers,
+          env: onnxEnvironment(paths.userData, workers),
+          onLine(line) {
+            const prefix = "TRONCUT_PROGRESS ";
+            if (!line.startsWith(prefix)) return;
+            try {
+              const event = progressSchema.parse(
+                JSON.parse(line.slice(prefix.length)),
+              );
+              progress(event.percent, event.label);
+            } catch {
+              /* Ignore ordinary model output. */
+            }
+          },
         },
-      },
-    );
+      );
+    }
     if (signal.aborted) throw new Error("配音已取消");
     progress(95, "正在保存配音音频");
     await runProcess(

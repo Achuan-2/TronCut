@@ -28,8 +28,24 @@ export const onnxTtsModels = {
 } as const;
 export type OnnxTtsEngine = keyof typeof onnxTtsModels;
 
-export const ttsModels = {
+export interface WindowsSpeechVoice {
+  id: string;
+  name: string;
+  language: string;
+  gender: string;
+}
+export const availableTtsModels = {
+  "windows-sapi": {
+    name: "Windows 系统语音 · 本机音色",
+    repo: "https://learn.microsoft.com/dotnet/api/system.speech.synthesis.speechsynthesizer",
+    voices: [{ id: "auto", name: "自动 · 优先微软云希" }],
+  },
   ...onnxTtsModels,
+} as const;
+export type AvailableTtsEngine = keyof typeof availableTtsModels;
+
+export const ttsModels = {
+  ...availableTtsModels,
   kokoro: {
     name: "Kokoro 中文版 · 轻量",
     repo: "hexgrad/Kokoro-82M-v1.1-zh",
@@ -79,8 +95,9 @@ export type TtsEngine = keyof typeof ttsModels;
 export const ttsOptionsSchema = z
   .object({
     text: z.string().trim().min(1, "请输入配音文字").max(10000),
-    // Legacy engines remain readable in saved projects; generation uses ONNX only.
+    // Legacy engines remain readable in saved projects.
     engine: z.enum([
+      "windows-sapi",
       "kokoro-onnx",
       "vits-onnx",
       "kokoro",
@@ -88,7 +105,7 @@ export const ttsOptionsSchema = z
       "qwen-quality",
       "indextts",
     ]),
-    voice: z.string().max(50),
+    voice: z.string().min(1).max(1024),
     language: z.enum(["zh", "en"]).default("zh"),
     device: z.enum(["auto", "cpu", "cuda", "mps"]).default("auto"),
     speed: z.number().finite().min(0.5).max(2).default(1),
@@ -129,7 +146,19 @@ export const ttsOptionsSchema = z
         path: ["device"],
         message: "IndexTTS 的 MPS 尚未验证，请选择 CPU 或 NVIDIA CUDA",
       });
-    if (!ttsModels[options.engine].voices.some((v) => v.id === options.voice))
+    if (
+      options.engine === "windows-sapi" &&
+      !["cpu", "auto"].includes(options.device)
+    )
+      context.addIssue({
+        code: "custom",
+        path: ["device"],
+        message: "Windows 系统语音无需选择 GPU",
+      });
+    if (
+      options.engine !== "windows-sapi" &&
+      !ttsModels[options.engine].voices.some((v) => v.id === options.voice)
+    )
       context.addIssue({
         code: "custom",
         path: ["voice"],

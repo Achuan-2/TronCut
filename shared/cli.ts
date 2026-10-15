@@ -26,8 +26,10 @@ export const transcriptionSchema = z
   .strict();
 export const narrationSchema = z
   .object({
-    engine: z.enum(["kokoro-onnx", "vits-onnx"]).default("kokoro-onnx"),
-    voice: z.string().default("10"),
+    engine: z
+      .enum(["windows-sapi", "kokoro-onnx", "vits-onnx"])
+      .default("kokoro-onnx"),
+    voice: z.string().optional(),
     modelDir: z.string().default(""),
     offline: z.boolean().default(false),
     speed: z.number().finite().min(0.5).max(2).default(1),
@@ -48,6 +50,10 @@ export const narrationSchema = z
       .max(1000),
   })
   .strict()
+  .transform((value) => ({
+    ...value,
+    voice: value.voice ?? (value.engine === "windows-sapi" ? "auto" : "10"),
+  }))
   .superRefine((value, context) => {
     let previousEnd = 0;
     for (const [index, segment] of value.segments.entries()) {

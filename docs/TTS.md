@@ -1,4 +1,6 @@
-# 本地 ONNX 文本转语音
+# 文本转语音
+
+Windows 默认使用本机 Windows 系统语音，自动优先微软云希；也可切换至 Kokoro/VITS 本地 ONNX 模型。系统音色的安装与调用见文末“Windows 系统语音”。
 
 在“配音”面板输入文稿，或选中文本/字幕片段后点击“读取选中文本”。Kokoro v1.1 提供 103 个中英文音色，VITS AIShell3 提供 174 个中文说话人；选择音色与 0.5–2 倍语速后生成，结果作为音频素材加入时间线。Kokoro 支持中英文混读；VITS 仅支持中文。生成音频统一为 48 kHz、单声道、PCM16 WAV，语速仅在最终 FFmpeg 转换时应用一次。
 
@@ -32,3 +34,11 @@ GPU 识别在字幕弹窗中选择“GPU · NVIDIA CUDA”，或通过 CLI 的 `
 模型与配置参考 [sherpa-onnx 官方 Python 配音示例](https://github.com/k2-fsa/sherpa-onnx/blob/master/python-api-examples/offline-tts.py)；历史 IndexTTS 说明见 [INDEXTTS.md](INDEXTTS.md)。
 
 本次在 Windows 完成 Kokoro/VITS 真实 CPU 合成、SenseVoiceSmall/Paraformer 真实转录、中文模型路径、VITS 官方模型包下载解压、缓存离线合成及工程保存重开验证。专项 Electron 流程通过模型准备按钮、配音加入时间线、试听与离开面板停止、参数保留、识别语言切换、字幕生成及工程保存，结果位于 `test-output/onnx-ui/`。类型检查、构建、10 项语音服务测试、8 项 Python 测试及打包资源检查通过；通用 `scripts/smoke.mjs` 在“组合”步骤超时，未作为本次完整编辑回归通过的证据。
+
+## Windows 系统语音
+
+Windows 桌面版配音默认选择“Windows 系统语音 · 本机音色”，自动优先使用本机注册的微软云希。音色列表从 `System.Speech` 实时读取，“刷新系统音色”可以重新发现刚安装的声音。无须 Python、ONNX 或下载模型；现有 Kokoro/VITS 仍可切换使用。名称带 `Online` 或注册 ID 以 `Edge-` 开头的音色不会出现在该列表中。通过 Windows 接口调用的自定义语音提供程序可能有自己的联网行为，TronCut 不会另接微软在线 TTS。
+
+配音输出为 48 kHz 单声道 PCM16 WAV，语速仅在最后转换一次；分段字幕依据实际写入的 PCM 样本边界生成。系统音色 ID、文稿和语速随工程保存，生成失败和取消会清理本次输出。该入口只在 Windows 上提供，其他系统仍默认使用本地模型。
+
+CLI 分段文案可指定 `"engine":"windows-sapi", "voice":"auto", "offline":true`，或把 `voice` 设为本机音色 ID。`auto` 同样优先云希。实际合成与保存重开验证：`node scripts/verify-windows-speech.mjs`，结果位于 `test-output/windows-speech/`。

@@ -1,7 +1,7 @@
 import type { Asset, Project } from "./model";
 import type { Cue } from "./subtitles";
 import type { SpeechEngine, SpeechOptions } from "./asr";
-import type { TtsOptions } from "./tts";
+import type { TtsOptions, WindowsSpeechVoice } from "./tts";
 import type { OnnxModel, PreparedOnnxModel } from "./onnx";
 import type { RecentProject, RecoveryInfo } from "./recent-projects";
 import type { Preferences, PreferencesUpdate } from "./preferences";
@@ -73,6 +73,7 @@ export interface FrameCraftBridge {
   ): Promise<Asset>;
   previewAudio(project: Project, clipId: string): Promise<string>;
   synthesize(options: TtsOptions): Promise<Asset>;
+  windowsSpeechVoices(): Promise<WindowsSpeechVoice[]>;
   downloadSpeechModel(engine: OnnxModel): Promise<PreparedOnnxModel>;
   selectNarrationReference(): Promise<Asset | null>;
   cancelTask(): Promise<void>;

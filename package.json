@@ -83,6 +83,13 @@
         "to": "project.ico"
       },
       {
+        "from": "workers/windows-speech",
+        "to": "workers/windows-speech",
+        "filter": [
+          "*.ps1"
+        ]
+      },
+      {
         "from": "workers/onnx",
         "to": "workers/onnx",
         "filter": [

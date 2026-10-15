@@ -31,6 +31,7 @@ import { audioFilters, exportVideo, exportFrame } from "./export";
 import { speechEngineSchema, speechOptionsSchema } from "../shared/asr";
 import { transcribeProject } from "./transcription";
 import { synthesizeSpeech } from "./synthesis";
+import { windowsSpeechVoices } from "./windows-speech";
 import { ttsOptionsSchema } from "../shared/tts";
 import { onnxModelSchema } from "../shared/onnx";
 import { downloadOnnxModel } from "./onnx";
@@ -633,6 +634,9 @@ function installHandlers() {
   handle("task:cancel", () => {
     task?.abort();
   });
+  handle("audio:windows-voices", () => windowsSpeechVoices(app.isPackaged
+    ? path.join(process.resourcesPath, "workers", "onnx")
+    : path.resolve("workers/onnx")));
   handle("audio:synthesize", async (input: unknown) => {
     if (task) throw new Error("已有后台任务正在执行");
     const options = ttsOptionsSchema.parse(input);

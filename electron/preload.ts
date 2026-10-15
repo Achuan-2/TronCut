@@ -54,6 +54,7 @@ const bridge: FrameCraftBridge = {
   previewAudio: (project, clipId) =>
     ipcRenderer.invoke("audio:preview", project, clipId),
   synthesize: (options) => ipcRenderer.invoke("audio:synthesize", options),
+  windowsSpeechVoices: () => ipcRenderer.invoke("audio:windows-voices"),
   downloadSpeechModel: (engine) =>
     ipcRenderer.invoke("speech:downloadModel", engine),
   selectNarrationReference: () => ipcRenderer.invoke("audio:reference"),

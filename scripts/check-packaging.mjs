@@ -45,4 +45,6 @@ for (const name of [
   if (!fs.existsSync(path.resolve("workers/onnx", name)))
     throw new Error(`安装包缺少 sherpa-onnx worker：${name}`);
 }
-console.log("安装包媒体引擎与 sherpa-onnx worker 检查通过");
+if (!fs.existsSync(path.resolve("workers/windows-speech/synthesize.ps1")))
+  throw new Error("安装包缺少 Windows 系统语音 worker");
+console.log("安装包媒体引擎、Windows 语音与 sherpa-onnx worker 检查通过");

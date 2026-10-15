@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { AudioLines, Play, Square, Type } from "lucide-react";
 import {
-  onnxTtsModels,
+  availableTtsModels,
   ttsOptionsSchema,
-  type OnnxTtsEngine,
+  type AvailableTtsEngine,
+  type WindowsSpeechVoice,
   type TtsOptions,
 } from "../shared/tts";
 import type { Editor } from "./useEditor";
@@ -27,8 +28,9 @@ export default function NarrationPanel({
 }: Props) {
   const [options, setOptions] = useState<TtsOptions>({
     text: "",
-    engine: "kokoro-onnx",
-    voice: "10",
+    engine:
+      window.framecraft?.platform === "win32" ? "windows-sapi" : "kokoro-onnx",
+    voice: window.framecraft?.platform === "win32" ? "auto" : "10",
     language: "zh",
     device: "cpu",
     speed: 1,
@@ -36,6 +38,38 @@ export default function NarrationPanel({
     offline: false,
     modelDir: "",
   });
+  const [windowsVoices, setWindowsVoices] = useState<WindowsSpeechVoice[]>([]);
+  const [voiceLoading, setVoiceLoading] = useState(false);
+  const [voiceError, setVoiceError] = useState("");
+  const [voiceRefresh, setVoiceRefresh] = useState(0);
+  useEffect(() => {
+    if (!active || options.engine !== "windows-sapi") return;
+    let cancelled = false;
+    setVoiceLoading(true);
+    setVoiceError("");
+    window.framecraft
+      ?.windowsSpeechVoices()
+      .then((voices) => {
+        if (cancelled) return;
+        setWindowsVoices(voices);
+        if (!voices.length)
+          setVoiceError(
+            "未找到 Windows 系统音色，请先在 Windows 中安装语音或切换配音模型",
+          );
+      })
+      .catch((error) => {
+        if (!cancelled)
+          setVoiceError(
+            `读取 Windows 音色失败：${error instanceof Error ? error.message : String(error)}`,
+          );
+      })
+      .finally(() => {
+        if (!cancelled) setVoiceLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [active, options.engine, voiceRefresh]);
   const [generatedId, setGeneratedId] = useState<string | null>(null);
   const generated = editor.project.assets.find(
     (asset) => asset.id === generatedId,
@@ -68,7 +102,7 @@ export default function NarrationPanel({
       toast("请先选中已有配音片段");
       return;
     }
-    if (asset.narration.engine in onnxTtsModels) {
+    if (asset.narration.engine in availableTtsModels) {
       setOptions(asset.narration);
     } else {
       // Read old projects without silently assigning a legacy speaker ID to an ONNX voice.
@@ -84,7 +118,8 @@ export default function NarrationPanel({
       toast("已读取旧配音文稿与语速，请重新选择 ONNX 音色");
     }
   };
-  const engine = options.engine as OnnxTtsEngine;
+  const engine = options.engine as AvailableTtsEngine;
+  const windows = engine === "windows-sapi";
   const working = busy || !!editor.narrationRecording;
   const stopAudition = () => {
     auditionToken.current++;
@@ -129,20 +164,31 @@ export default function NarrationPanel({
                 aria-label="配音模型"
                 value={engine}
                 onChange={(e) => {
-                  const next = e.target.value as OnnxTtsEngine;
+                  const next = e.target.value as AvailableTtsEngine;
                   update({
                     engine: next,
-                    voice: next === "kokoro-onnx" ? "10" : "0",
+                    voice:
+                      next === "windows-sapi"
+                        ? "auto"
+                        : next === "kokoro-onnx"
+                          ? "10"
+                          : "0",
                     language: "zh",
                     modelDir: "",
                   });
                 }}
               >
-                {Object.entries(onnxTtsModels).map(([id, model]) => (
-                  <option key={id} value={id}>
-                    {model.name}
-                  </option>
-                ))}
+                {Object.entries(availableTtsModels)
+                  .filter(
+                    ([id]) =>
+                      id !== "windows-sapi" ||
+                      window.framecraft?.platform === "win32",
+                  )
+                  .map(([id, model]) => (
+                    <option key={id} value={id}>
+                      {model.name}
+                    </option>
+                  ))}
               </select>
             </label>
             <label className="field">
@@ -152,53 +198,99 @@ export default function NarrationPanel({
                 value={options.voice}
                 onChange={(e) => update({ voice: e.target.value })}
               >
-                {onnxTtsModels[engine].voices.map((voice) => (
+                {availableTtsModels[engine].voices.map((voice) => (
                   <option key={voice.id} value={voice.id}>
                     {voice.name}
                   </option>
                 ))}
+                {windows &&
+                  windowsVoices.map((voice) => (
+                    <option key={voice.id} value={voice.id}>
+                      {voice.name} · {voice.language} ·{" "}
+                      {voice.gender === "Male"
+                        ? "男声"
+                        : voice.gender === "Female"
+                          ? "女声"
+                          : voice.gender}
+                    </option>
+                  ))}
+                {windows &&
+                  options.voice !== "auto" &&
+                  !windowsVoices.some(
+                    (voice) => voice.id === options.voice,
+                  ) && (
+                    <option value={options.voice}>
+                      原音色不可用 · {options.voice}
+                    </option>
+                  )}
               </select>
             </label>
-            <label className="field vertical">
-              配音模型目录
-              <input
-                value={options.modelDir ?? ""}
-                placeholder="留空自动查找本机模型"
-                onChange={(e) => update({ modelDir: e.target.value })}
-              />
-            </label>
-            <p className="small-note">
-              默认使用 TronCut 已下载的模型。指定目录时，请选择包含
-              ONNX、音色和词典文件的完整模型文件夹。
-            </p>
-            <button
-              className="wide-button"
-              disabled={working}
-              onClick={() =>
-                run(async () => {
-                  if (!window.framecraft) throw new Error("下载模型需要桌面版");
-                  const prepared =
-                    await window.framecraft.downloadSpeechModel(engine);
-                  update({ modelDir: "" });
-                  toast(`配音模型已就绪：${prepared.directory}`);
-                })
-              }
-            >
-              下载配音模型
-            </button>
-            <label className="field">
-              配音设备
-              <select
-                aria-label="配音设备"
-                value={options.device}
-                onChange={(e) =>
-                  update({ device: e.target.value as "cpu" | "auto" })
-                }
-              >
-                <option value="cpu">CPU · sherpa-onnx</option>
-                <option value="auto">自动 · CPU</option>
-              </select>
-            </label>
+            {windows && (
+              <>
+                <button
+                  disabled={working || voiceLoading}
+                  onClick={() => setVoiceRefresh((value) => value + 1)}
+                >
+                  {voiceLoading ? "正在读取音色…" : "刷新系统音色"}
+                </button>
+                <p className="small-note">
+                  调用本机已安装的 Windows
+                  语音，无需下载模型；自动优先使用微软云希。自定义音色是否联网取决于本机安装的语音服务。
+                </p>
+                {voiceError && (
+                  <p className="small-note" role="alert">
+                    {voiceError}
+                  </p>
+                )}
+              </>
+            )}
+            {!windows && (
+              <>
+                <label className="field vertical">
+                  配音模型目录
+                  <input
+                    value={options.modelDir ?? ""}
+                    placeholder="留空自动查找本机模型"
+                    onChange={(e) => update({ modelDir: e.target.value })}
+                  />
+                </label>
+                <p className="small-note">
+                  默认使用 TronCut 已下载的模型。指定目录时，请选择包含
+                  ONNX、音色和词典文件的完整模型文件夹。
+                </p>
+                <button
+                  className="wide-button"
+                  disabled={working}
+                  onClick={() =>
+                    run(async () => {
+                      if (!window.framecraft)
+                        throw new Error("下载模型需要桌面版");
+                      const prepared =
+                        await window.framecraft.downloadSpeechModel(
+                          engine as "kokoro-onnx" | "vits-onnx",
+                        );
+                      update({ modelDir: "" });
+                      toast(`配音模型已就绪：${prepared.directory}`);
+                    })
+                  }
+                >
+                  下载配音模型
+                </button>
+                <label className="field">
+                  配音设备
+                  <select
+                    aria-label="配音设备"
+                    value={options.device}
+                    onChange={(e) =>
+                      update({ device: e.target.value as "cpu" | "auto" })
+                    }
+                  >
+                    <option value="cpu">CPU · sherpa-onnx</option>
+                    <option value="auto">自动 · CPU</option>
+                  </select>
+                </label>
+              </>
+            )}
             <label className="field">
               配音语速
               <select
@@ -213,24 +305,32 @@ export default function NarrationPanel({
                 ))}
               </select>
             </label>
-            <label className="narration-offline">
-              <input
-                type="checkbox"
-                checked={options.offline}
-                onChange={(e) => update({ offline: e.target.checked })}
-              />
-              仅使用已下载的依赖和模型
-            </label>
-            <p className="small-note">
-              Kokoro 支持中英文混读，VITS
-              提供中文音色。首次运行准备本地语音环境，缺少模型时自动下载；生成过程中显示进度，可取消，文稿不上传云端。
-            </p>
+            {!windows && (
+              <>
+                <label className="narration-offline">
+                  <input
+                    type="checkbox"
+                    checked={options.offline}
+                    onChange={(e) => update({ offline: e.target.checked })}
+                  />
+                  仅使用已下载的依赖和模型
+                </label>
+                <p className="small-note">
+                  Kokoro 支持中英文混读，VITS
+                  提供中文音色。首次运行准备本地语音环境，缺少模型时自动下载；生成过程中显示进度，可取消，文稿不上传云端。
+                </p>
+              </>
+            )}
           </fieldset>
         </details>
       </div>
       <button
         className="wide-button primary narration-generate"
-        disabled={working || !options.text.trim()}
+        disabled={
+          working ||
+          !options.text.trim() ||
+          (windows && (voiceLoading || !windowsVoices.length || !!voiceError))
+        }
         onClick={() =>
           run(async () => {
             const parsed = ttsOptionsSchema.safeParse(options);
