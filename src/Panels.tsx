@@ -632,7 +632,7 @@ export function Inspector({ editor }: { editor: Editor }) {
                 )}
               </span>
               <div>
-                <b>{c.name}</b>
+                <b title={c.name}>{c.name}</b>
                 <small>
                   {locked
                     ? "轨道已锁定"
