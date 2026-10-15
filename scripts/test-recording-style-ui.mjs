@@ -113,7 +113,7 @@ try {
   await expect(page.locator(".timeline-clip")).toHaveCount(2);
   await page.locator(".timeline-clip.video").click();
   await page.getByRole("tab", { name: "视频", exact: true }).click();
-  await page.getByLabel("圆角 (px)", { exact: true }).fill("0");
+  await page.getByLabel("圆角 (%)", { exact: true }).fill("0");
   await page.getByLabel("缩放 (%)", { exact: true }).fill("75");
   await expect(page.getByLabel("缩放 (%)", { exact: true })).toHaveValue("75");
   await page.getByRole("tab", { name: "鼠标", exact: true }).click();
@@ -200,7 +200,7 @@ try {
   await page.getByRole("button", { name: "打开项目", exact: true }).click();
   await page.locator(".timeline-clip.video").click();
   await page.getByRole("tab", { name: "视频", exact: true }).click();
-  await expect(page.getByLabel("圆角 (px)", { exact: true })).toHaveValue("0");
+  await expect(page.getByLabel("圆角 (%)", { exact: true })).toHaveValue("0");
   await expect(page.getByLabel("缩放 (%)", { exact: true })).toHaveValue("75");
   await page.getByRole("tab", { name: "鼠标", exact: true }).click();
   await expect(

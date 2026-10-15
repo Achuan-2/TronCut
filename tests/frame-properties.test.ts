@@ -3,7 +3,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import sharp from "sharp";
 import { createProject, newText, validateProject, type Clip } from "../shared/model";
-import { addMediaFrame, mediaFrameRadii } from "../shared/media-frame";
+import { addMediaFrame, mediaFrameRadii, mediaFrameRadiusPercent } from "../shared/media-frame";
 import { localDelta, projectDelta, depthScale } from "../shared/rotation";
 import { setTransform, transformAt, setKeyframeTransform } from "../shared/editor";
 import { animationRanges, sameTransform } from "../shared/animation-ranges";
@@ -36,18 +36,33 @@ it("倾斜、深度与三轴旋转组合后拖拽可逆，关键帧缺省、端�
 });
 
 it("圆角作为可选效果添加且不重复，旧工程保留圆角，关闭不丢失半径和角设置", () => {
-  const clip: Clip = { ...newText("video", 0), kind: "image" };
+  const clip: Clip = { ...newText("video", 0), kind: "image", assetId: "image" };
+  const project = createProject();
+  project.assets = [{ id: "image", name: "图片", path: "image.png", kind: "image", width: 400, height: 200, duration: 0, hasAudio: false }];
+  const size = { width: 400, height: 200 };
   expect(clip.mediaFrame).toBeUndefined();
   const applied = addMediaFrame(clip);
-  expect(mediaFrameRadii(applied)).toEqual([20, 20, 20, 20]);
+  expect(applied.mediaFrame?.unit).toBe("percent");
+  expect(mediaFrameRadii(applied, size)).toEqual([20, 20, 20, 20]);
+  expect(mediaFrameRadii(applied, { width: 800, height: 400 })).toEqual([40, 40, 40, 40]);
   expect(addMediaFrame(applied)).toBe(applied);
   expect(addMediaFrame(newText("titles", 0)).mediaFrame).toBeUndefined();
   const legacy = { ...clip, mediaFrame: { radius: 33 } };
-  expect(mediaFrameRadii(legacy)).toEqual([33, 33, 33, 33]);
+  expect(mediaFrameRadii(legacy, size)).toEqual([33, 33, 33, 33]);
+  expect(mediaFrameRadii(legacy, { width: 800, height: 400 })).toEqual([33, 33, 33, 33]);
+  expect(mediaFrameRadiusPercent(legacy, size)).toBe(33);
+  expect(mediaFrameRadiusPercent(legacy, { width: 200, height: 100 })).toBe(66);
+  expect(mediaFrameRadiusPercent({ ...clip, mediaFrame: { radius: 200 } }, size)).toBe(100);
+  project.clips = [legacy];
+  expect(validateProject(project).clips[0].mediaFrame).toEqual({ radius: 33 });
+  project.clips = [{ ...applied, mediaFrame: { ...applied.mediaFrame!, radius: 101 } }];
+  expect(() => validateProject(project)).toThrow("圆角百分比不能超过 100%");
   const disabled = { ...applied, mediaFrame: { ...applied.mediaFrame!, enabled: false } };
-  const reopened = validateProject({ ...createProject(), clips: [disabled] }).clips[0];
+  const reopened = validateProject({ ...project, clips: [disabled] }).clips[0];
   expect(reopened.mediaFrame).toEqual(disabled.mediaFrame);
-  expect(mediaFrameRadii(reopened)).toEqual([0, 0, 0, 0]);
+  expect(mediaFrameRadii(reopened, size)).toEqual([0, 0, 0, 0]);
+  const single = { ...applied, mediaFrame: { ...applied.mediaFrame!, radius: 100, corners: { topLeft: true, topRight: false, bottomRight: false, bottomLeft: false } } };
+  expect(mediaFrameRadii(single, size)).toEqual([100, 0, 0, 0]);
 });
 
 it("真实导出单角、关闭圆角及倾斜/深度/旋转关键帧，保存重开保持属性", async () => {
@@ -67,6 +82,9 @@ it("真实导出单角、关闭圆角及倾斜/深度/旋转关键帧，保存�
     { ...base, transform: { ...base.transform, skew: 30 } },
     { ...base, transform: { ...base.transform, skew: -25, rotationX: 20, rotationY: 15, rotation: 20, z: 500 } },
     { ...base, keyframes: [{ time: 0, value: base.transform }, { time: 1, value: { ...base.transform, skew: 60, z: 600 }, easing: "linear" }] },
+    { ...base, mediaFrame: { radius: 100, unit: "percent" } },
+    { ...base, crop: { left: 0.5, right: 0, top: 0, bottom: 0 }, mediaFrame: { radius: 100, unit: "percent" } },
+    { ...base, mediaFrame: { radius: 100, unit: "percent" }, keyframes: [{ time: 0, value: { ...base.transform, cropLeft: 0 } }, { time: 1, value: { ...base.transform, cropLeft: 0.5 }, easing: "linear" }] },
   ];
   for (const [index, clip] of states.entries()) {
     project.clips = [clip];
@@ -84,7 +102,7 @@ it("真实导出单角、关闭圆角及倾斜/深度/旋转关键帧，保存�
     if (index === 0) { background(82, 52); green(237, 52); green(82, 127); }
     if (index === 1) { green(82, 52); green(237, 52); }
     if (index === 2) { green(75, 60); background(245, 60); green(245, 120); background(85, 120); }
-    if (index >= 3) {
+    if (index === 3 || index === 4) {
       const pose = transformAt(clip, 0.5);
       for (const point of [{ x: -50, y: -25 }, { x: 50, y: 25 }]) {
         const projected = projectDelta(pose, point);
@@ -92,5 +110,8 @@ it("真实导出单角、关闭圆角及倾斜/深度/旋转关键帧，保存�
       }
       background(5, 5);
     }
+    if (index === 5) { background(82, 52); green(160, 52); green(160, 90); }
+    if (index === 6) { background(122, 52); green(160, 52); green(160, 90); }
+    if (index === 7) { background(102, 52); green(160, 52); green(160, 90); }
   }
 }, 30000);

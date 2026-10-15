@@ -1,22 +1,30 @@
 import type { Clip } from "../shared/model";
 import { contentOrigin, defaultContentTransform } from "../shared/crop";
 import type { VisualKey } from "../shared/visual-state";
-import { mediaFrameRadii } from "../shared/media-frame";
+import { defaultFrameCorners, frameCorners } from "../shared/media-frame";
 
 export function mediaFrameFilters(
   clip: Clip,
   fit: number,
   cropExpression?: (key: VisualKey) => string,
 ) {
-  const radii = mediaFrameRadii(clip);
-  if (!radii.some(Boolean)) return [];
+  const frame = clip.mediaFrame;
+  if (!frame || frame.enabled === false || !frame.radius) return [];
+  const corners = frame.corners ?? defaultFrameCorners;
+  if (!frameCorners.some((corner) => corners[corner])) return [];
   const width = cropExpression
     ? `W*(1-(${cropExpression("cropLeft")})-(${cropExpression("cropRight")}))`
     : "W";
   const height = cropExpression
     ? `H*(1-(${cropExpression("cropTop")})-(${cropExpression("cropBottom")}))`
     : "H";
-  const [tl, tr, br, bl] = radii.map((radius) => radius / fit);
+  const value =
+    frame.unit === "percent"
+      ? `min(ld(0),ld(1))*${frame.radius / 100}`
+      : String(frame.radius / fit);
+  const [tl, tr, br, bl] = frameCorners.map((corner) =>
+    corners[corner] ? value : "0",
+  );
   const radius = `if(lt(X,W/2),if(lt(Y,H/2),${tl},${bl}),if(lt(Y,H/2),${tr},${br}))`;
   const prefix = `st(0,(${width})/2);st(1,(${height})/2);st(2,min(${radius},min(ld(0),ld(1))));`;
   const mask =

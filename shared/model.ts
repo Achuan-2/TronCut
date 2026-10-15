@@ -212,11 +212,14 @@ export const projectSchema = z.object({
         cursorStyle: cursorStyleSchema.optional(),
         mediaFrame: z.object({
           radius: finite.min(0).max(200),
+          unit: z.enum(["px", "percent"]).optional(),
           enabled: z.boolean().optional(),
           corners: z.object({
             topLeft: z.boolean(), topRight: z.boolean(),
             bottomRight: z.boolean(), bottomLeft: z.boolean(),
           }).optional(),
+        }).refine((frame) => frame.unit !== "percent" || frame.radius <= 100, {
+          message: "圆角百分比不能超过 100%",
         }).optional(),
       }),
     )

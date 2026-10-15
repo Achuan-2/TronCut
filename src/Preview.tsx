@@ -272,9 +272,6 @@ function PreviewLayer({
   }
   const crop = drag?.crop ?? clip.crop ?? defaultCrop,
     effects = clip.effects ?? defaultEffects;
-  let radii = mediaFrameRadii(clip);
-  if (effects.flipX) radii = [radii[1], radii[0], radii[3], radii[2]];
-  if (effects.flipY) radii = [radii[3], radii[2], radii[1], radii[0]];
   const cursor = asset
     ? cursorAt(asset, clip, clip.sourceIn + localTime * clip.speed)
     : null;
@@ -296,6 +293,12 @@ function PreviewLayer({
     style.width = mediaWidth * (1 - crop.left - crop.right);
     style.height = mediaHeight * (1 - crop.top - crop.bottom);
   }
+  let radii = mediaFrameRadii(clip, {
+    width: (mediaWidth * (1 - crop.left - crop.right)) / scale,
+    height: (mediaHeight * (1 - crop.top - crop.bottom)) / scale,
+  });
+  if (effects.flipX) radii = [radii[1], radii[0], radii[3], radii[2]];
+  if (effects.flipY) radii = [radii[3], radii[2], radii[1], radii[0]];
   const selectable = interactive && !track?.locked && clip.kind !== "audio";
   const cropping =
     mode === "crop" && asset && ["image", "video"].includes(clip.kind);

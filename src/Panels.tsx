@@ -774,7 +774,9 @@ export function Inspector({ editor }: { editor: Editor }) {
                   </div>
                 </>
               )}
-              {c.mediaFrame && <RoundedCornersProperties key={c.id} clip={c} editor={editor} />}
+              {c.mediaFrame && (
+                <RoundedCornersProperties key={c.id} clip={c} editor={editor} size={size} />
+              )}
               {hasClipSpeed(c) && <SpeedProperties key={c.id} clip={c} editor={editor} />}
             </div>
             <div

@@ -1,17 +1,24 @@
 import type { Clip } from "../shared/model";
-import { defaultFrameCorners, frameCorners } from "../shared/media-frame";
+import {
+  defaultFrameCorners,
+  frameCorners,
+  mediaFrameRadiusPercent,
+} from "../shared/media-frame";
 import EffectSection from "./EffectSection";
 import type { Editor } from "./useEditor";
 
 export default function RoundedCornersProperties({
   clip,
   editor,
+  size,
 }: {
   clip: Clip;
   editor: Editor;
+  size: { width: number; height: number };
 }) {
   const frame = clip.mediaFrame!;
   const corners = frame.corners ?? defaultFrameCorners;
+  const percent = Math.round(mediaFrameRadiusPercent(clip, size) * 100) / 100;
   const update = (patch: Partial<typeof frame>) =>
     editor.updateClip(clip.id, { mediaFrame: { ...frame, ...patch } });
   return (
@@ -22,6 +29,7 @@ export default function RoundedCornersProperties({
       onReset={() =>
         update({
           radius: 20,
+          unit: "percent",
           enabled: true,
           corners: { ...defaultFrameCorners },
         })
@@ -50,27 +58,32 @@ export default function RoundedCornersProperties({
         <div className="property-slider-row">
           <span>半径</span>
           <input
-            aria-label="圆角半径滑条"
+            aria-label="圆角半径百分比滑条"
+            title="100% 为画面短边的一半"
             type="range"
             min={0}
-            max={200}
+            max={100}
             step={1}
-            value={frame.radius}
-            onChange={(event) => update({ radius: Number(event.target.value) })}
+            value={percent}
+            onChange={(event) =>
+              update({ radius: Number(event.target.value), unit: "percent" })
+            }
           />
           <input
-            aria-label="圆角 (px)"
+            aria-label="圆角 (%)"
+            title="100% 为画面短边的一半"
             type="number"
             min={0}
-            max={200}
+            max={100}
             step={1}
-            value={frame.radius}
+            value={percent}
             onChange={(event) => {
               const radius = Number(event.target.value);
-              if (Number.isFinite(radius) && radius >= 0 && radius <= 200)
-                update({ radius });
+              if (Number.isFinite(radius) && radius >= 0 && radius <= 100)
+                update({ radius, unit: "percent" });
             }}
           />
+          <span>%</span>
         </div>
       </fieldset>
     </EffectSection>
