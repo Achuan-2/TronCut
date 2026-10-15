@@ -175,6 +175,9 @@ export function useEditor() {
     [clearKeyframeEdit],
   );
   const [playing, setPlayingState] = useState(false);
+  const [narrationRecording, setNarrationRecording] = useState<{
+    muted: boolean;
+  } | null>(null);
   const setPlaying = useCallback(
     (next: boolean) => {
       if (next) clearKeyframeEdit();
@@ -929,6 +932,8 @@ export function useEditor() {
     seek,
     playing,
     setPlaying,
+    narrationRecording,
+    setNarrationRecording,
     dirty,
     setDirty,
     undo,

@@ -40,7 +40,8 @@ try {
   page.on("pageerror", (error) => errors.push(error.message));
   await page.getByRole("button", { name: "新建项目", exact: true }).click();
   await page.getByLabel("工程名称", { exact: true }).fill("ONNX语音");
-  await page.getByRole("button", { name: "配音", exact: true }).click();
+  await page.getByRole("button", { name: "旁白", exact: true }).click();
+  await page.getByText("AI 配音设置", { exact: true }).click();
   await expect(page.getByLabel("配音模型", { exact: true })).toHaveValue(
     "kokoro-onnx",
   );
@@ -64,28 +65,26 @@ try {
     .getByLabel("配音模型", { exact: true })
     .selectOption("kokoro-onnx");
   await page
-    .getByLabel("配音文字", { exact: true })
+    .getByLabel("旁白文稿", { exact: true })
     .fill("欢迎使用本地语音模型。现在可以生成配音和字幕。");
   await page.getByLabel("配音模型目录", { exact: true }).fill(kokoro);
   await page.getByLabel("配音语速", { exact: true }).selectOption("1.25");
   await page
     .getByRole("checkbox", { name: "仅使用已下载的依赖和模型", exact: true })
     .check();
-  await page
-    .getByRole("button", { name: "生成配音并加入时间线", exact: true })
-    .click();
+  await page.getByRole("button", { name: "生成音频", exact: true }).click();
   await expect(page.locator(".narration-result")).toBeVisible({
     timeout: 90000,
   });
   await expect(page.locator(".timeline-clip.audio")).toHaveCount(1);
-  await page.getByRole("button", { name: "试听配音", exact: true }).click();
+  await page.getByRole("button", { name: "试听音频", exact: true }).click();
   await expect(
     page.getByRole("button", { name: "停止试听", exact: true }),
   ).toBeVisible();
   await page.getByRole("button", { name: "媒体", exact: true }).click();
-  await page.getByRole("button", { name: "配音", exact: true }).click();
+  await page.getByRole("button", { name: "旁白", exact: true }).click();
   await expect(
-    page.getByRole("button", { name: "试听配音", exact: true }),
+    page.getByRole("button", { name: "试听音频", exact: true }),
   ).toBeVisible();
   await expect(page.getByLabel("配音模型目录", { exact: true })).toHaveValue(
     kokoro,

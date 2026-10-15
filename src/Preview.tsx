@@ -733,7 +733,11 @@ export function ScenePreview({
                 project={project}
                 editor={editor}
                 scale={scale}
-                muted={!interactive || track.muted}
+                muted={
+                  !interactive ||
+                  track.muted ||
+                  !!editor.narrationRecording?.muted
+                }
                 interactive={interactive}
                 cameraScale={camera?.scale ?? 1}
                 mode={mode}

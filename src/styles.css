@@ -810,6 +810,108 @@ fieldset:disabled {
   padding: 9px;
   line-height: 1.6;
 }
+.narration-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  height: 100%;
+  min-height: 0;
+}
+.library-content.narration-library {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding-bottom: 16px;
+}
+.narration-library .library-heading {
+  flex-shrink: 0;
+}
+.narration-content {
+  flex: 1;
+  min-height: 0;
+}
+.narration-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-right: 3px;
+}
+.narration-body > * {
+  flex-shrink: 0;
+}
+.narration-recorder .field {
+  margin-top: 0;
+}
+.narration-recorder .field > span,
+.narration-volume {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.narration-meter {
+  height: 6px;
+  overflow: hidden;
+  border-radius: 4px;
+  background: #151b19;
+  margin: 8px 0 12px;
+}
+.narration-meter > span {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, #76d6a0, #e8ca70);
+}
+.narration-volume input {
+  flex: 1;
+  min-width: 0;
+}
+.narration-volume-value {
+  min-width: 36px;
+  text-align: right;
+  font-size: 11px;
+  color: #b6c3bc;
+}
+.narration-record-button {
+  background: #b74444;
+  border-color: #d45e5e;
+  color: #fff;
+  min-height: 40px;
+}
+.narration-record-button:hover,
+.narration-record-button.recording {
+  background: #cd5050;
+}
+.narration-panel .narration-script {
+  margin: 0;
+  flex: 1 0 auto;
+}
+.narration-script textarea {
+  flex: 1;
+  min-height: 160px;
+}
+.narration-settings {
+  border-block: 1px solid #343d38;
+  padding: 11px 0;
+}
+.narration-settings summary {
+  cursor: pointer;
+  color: #c4d0c8;
+  font-size: 12px;
+}
+.narration-settings fieldset {
+  border: 0;
+  padding: 0;
+  margin: 12px 0 0;
+  min-width: 0;
+}
+.narration-panel > .small-note {
+  margin: 0;
+}
+.narration-generate {
+  flex-shrink: 0;
+}
 .narration-offline {
   display: flex;
   align-items: center;

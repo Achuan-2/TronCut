@@ -67,7 +67,9 @@ try {
     page.getByRole("button", { name: "开始识别", exact: true }),
   ).toBeEnabled();
   await page.getByRole("button", { name: "开始识别", exact: true }).click();
-  await expect(page.getByRole("status")).toContainText("时间线上没有可识别的声音");
+  await expect(page.getByRole("status")).toContainText(
+    "时间线上没有可识别的声音",
+  );
   await page.getByRole("button", { name: "字幕操作", exact: true }).click();
   await page.getByRole("menuitem", { name: "语音转文本", exact: true }).click();
   await page.getByLabel("识别模型").selectOption("sensevoice");
@@ -104,16 +106,17 @@ try {
   await page.getByRole("button", { name: "添加文本", exact: true }).click();
   await page.getByLabel("文本内容").fill("TronCut：中文文本与动画");
   await expect(page.locator(".timeline-clip")).toHaveCount(3);
-  await page.getByRole("button", { name: "配音", exact: true }).click();
+  await page.getByRole("button", { name: "旁白", exact: true }).click();
   await page.getByRole("button", { name: "读取选中文本", exact: true }).click();
-  await expect(page.getByLabel("配音文字")).toHaveValue(
+  await expect(page.getByLabel("旁白文稿")).toHaveValue(
     "TronCut：中文文本与动画",
   );
+  await page.getByText("AI 配音设置", { exact: true }).click();
   await page.getByLabel("配音模型", { exact: true }).selectOption("vits-onnx");
   await page.getByLabel("配音模型目录").fill("C:/我的模型/vits");
   await page.getByRole("button", { name: "媒体", exact: true }).click();
-  await page.getByRole("button", { name: "配音", exact: true }).click();
-  await expect(page.getByLabel("配音文字")).toHaveValue(
+  await page.getByRole("button", { name: "旁白", exact: true }).click();
+  await expect(page.getByLabel("旁白文稿")).toHaveValue(
     "TronCut：中文文本与动画",
   );
   await expect(page.getByLabel("配音模型目录")).toHaveValue("C:/我的模型/vits");

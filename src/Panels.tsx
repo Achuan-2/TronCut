@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import {
   FolderOpen,
   Type,
@@ -16,7 +16,6 @@ import {
   Check,
   FileJson,
   ArrowRight,
-  Play,
   Mic,
   MousePointer2,
   Scan,
@@ -56,7 +55,6 @@ export type Tab =
   | "captions"
   | "animations"
   | "zoompan"
-  | "audio"
   | "narration"
   | "effects"
   | "behaviors"
@@ -71,8 +69,7 @@ const tabs = [
   { id: "transitions", name: "转换", icon: ArrowRightLeft },
   { id: "zoompan", name: "缩放与平移", icon: Scan },
   { id: "effects", name: "视觉效果", icon: WandSparkles },
-  { id: "audio", name: "音频", icon: AudioLines },
-  { id: "narration", name: "配音", icon: Mic },
+  { id: "narration", name: "旁白", icon: Mic },
   { id: "settings", name: "设置", icon: Settings2 },
 ] as const;
 interface Props {
@@ -97,13 +94,6 @@ export default function Panels(props: Props) {
       throw new Error("此功能需要运行桌面版，请使用 pnpm dev");
     return window.framecraft;
   };
-  const audition = useRef<HTMLAudioElement | null>(null);
-  useEffect(
-    () => () => {
-      audition.current?.pause();
-    },
-    [],
-  );
   return (
     <aside className="library">
       <nav className="tool-rail">
@@ -119,7 +109,7 @@ export default function Panels(props: Props) {
         ))}
       </nav>
       <div
-        className={`library-content ${tab === "captions" ? "captions-library" : ""}`}
+        className={`library-content ${tab === "captions" ? "captions-library" : tab === "narration" ? "narration-library" : ""}`}
       >
         {tab !== "captions" && (
           <div className="library-heading">
@@ -246,7 +236,7 @@ export default function Panels(props: Props) {
         {tab === "effects" && <VisualEffectsPanel editor={editor} />}
         {tab === "behaviors" && <BehaviorsPanel editor={editor} />}
         {tab === "transitions" && <TransitionsPanel editor={editor} />}
-        <div hidden={tab !== "narration"}>
+        <div className="narration-content" hidden={tab !== "narration"}>
           <NarrationPanel
             key={project.id}
             editor={editor}
@@ -308,75 +298,6 @@ export default function Panels(props: Props) {
                 {editor.autoAnimate ? "已开启" : "开启自动动画"}
                 {editor.autoAnimate && <Check size={14} />}
               </button>
-            </div>
-          </>
-        )}
-        {tab === "audio" && (
-          <>
-            <div className="audio-hero">
-              <AudioLines size={38} />
-              <h3>让旁白更好听</h3>
-              <p>降噪 · 均衡 · 压缩 · 响度归一</p>
-            </div>
-            <button
-              className="wide-button primary"
-              onClick={() => {
-                if (
-                  !selected?.assetId ||
-                  !project.assets.find((a) => a.id === selected.assetId)
-                    ?.hasAudio
-                ) {
-                  toast("请选中有声音的片段");
-                  return;
-                }
-                updateClip(selected.id, { podcast: !selected.podcast });
-              }}
-            >
-              {selected?.podcast ? (
-                <Check size={17} />
-              ) : (
-                <WandSparkles size={17} />
-              )}
-              {selected?.podcast ? "播客人声已启用" : "应用播客人声"}
-            </button>
-            <button
-              className="wide-button"
-              onClick={() =>
-                run(async () => {
-                  if (!selected) throw new Error("请选中有声音的片段");
-                  audition.current?.pause();
-                  editor.setPlaying(false);
-                  const url = await bridge().previewAudio(project, selected.id);
-                  audition.current = new Audio(url);
-                  await audition.current.play();
-                  toast("正在试听处理后的音频（最多 15 秒）");
-                })
-              }
-            >
-              <Play size={15} />
-              处理后试听
-            </button>
-            <button
-              className="wide-button"
-              onClick={() => audition.current?.pause()}
-            >
-              停止试听
-            </button>
-            <p className="small-note">
-              导出时应用高通、FFT 降噪、存在感均衡、动态压缩和 −16 LUFS
-              响度处理。画布实时预览播放原音，可用「处理后试听」对比效果。这是
-              DSP 预设，尚未接入 AI 人声重建。
-            </p>
-            <div className="tip-card">
-              <h3>加速，也保留音调</h3>
-              <p>
-                {props.capabilities?.rubberband
-                  ? "导出引擎已支持 Rubber Band 变速，保持原始音调。"
-                  : "当前导出使用 FFmpeg atempo 保持音调。安装含 Rubber Band 的 FFmpeg 后将自动使用该引擎。"}
-              </p>
-              <p className="small-note">
-                实际听感取决于素材与倍率，需要通过 A/B 试听调校。
-              </p>
             </div>
           </>
         )}

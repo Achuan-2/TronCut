@@ -71,7 +71,8 @@ export default function App() {
     clipClipboardToken = useRef("");
   const initialized = useRef(false);
   const mediaImportLock = useRef(false);
-  const actionsBlocked = busy || mediaImporting || recording;
+  const actionsBlocked =
+    busy || mediaImporting || recording || !!editor.narrationRecording;
   const toast = useCallback((message: string) => {
     setToast(message);
     clearTimeout(toastTimer.current);
