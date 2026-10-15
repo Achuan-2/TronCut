@@ -341,7 +341,6 @@ export default function App() {
       if (result.assets.length) {
         editor.setPlaying(false);
         editor.addAssets(result.assets, true, { pasteToTop: true });
-        setTab("media");
         toast(`已粘贴 ${result.assets.length} 个素材到时间线`);
       } else if (
         result.clipToken &&
@@ -390,7 +389,6 @@ export default function App() {
       }
       editor.setPlaying(false);
       editor.addAssets(assets, true, { time, trackId });
-      setTab("media");
       toast(`已添加 ${assets.length} 个素材到时间线`);
     });
   const captureFrame = () =>
@@ -403,7 +401,6 @@ export default function App() {
         editor.selectedKeyframe?.clipId,
       );
       editor.addAssets([asset], true, { time, newTrackForImages: true });
-      setTab("media");
       toast("当前帧已作为图片插入新轨道");
     });
   const pasteHandler = useRef<(event: ClipboardEvent) => void>(() => {});

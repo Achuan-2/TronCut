@@ -164,6 +164,8 @@ try {
   await page.locator(".animation-point.end").click();
   await page.getByRole("button", { name: "裁剪模式", exact: true }).click();
   await expect(page.locator(".crop-handle")).toHaveCount(8);
+  const tools = page.locator(".tool-rail");
+  await tools.getByRole("button", { name: "行为", exact: true }).click();
   await capture.click();
   await expect(page.locator(".timeline-clip.image")).toHaveCount(2, {
     timeout: 20000,
@@ -180,6 +182,8 @@ try {
     "width",
     "325px",
   );
+  await expect(tools.locator(".selected")).toHaveText("行为");
+  await tools.getByRole("button", { name: "媒体", exact: true }).click();
   await expect(page.locator(".asset-card")).toHaveCount(3);
   await expect(page.locator(".toast")).toContainText(
     "当前帧已作为图片插入新轨道",

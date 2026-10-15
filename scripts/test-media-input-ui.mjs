@@ -90,6 +90,8 @@ try {
       return nativeImage.createFromPath(image);
     };
   }, image);
+  const tools = page.locator(".tool-rail");
+  await tools.getByRole("button", { name: "标注", exact: true }).click();
   const started = Date.now();
   await page.evaluate(() => {
     for (let i = 0; i < 3; i++)
@@ -102,6 +104,7 @@ try {
   });
   expect(Date.now() - started).toBeLessThan(5000);
   await expect(page.locator(".busy-overlay")).toHaveCount(0);
+  await expect(tools.locator(".selected")).toHaveText("标注");
   expect(await app.evaluate(() => globalThis.clipboardReads)).toBe(1);
   await expect(page.locator(".track-lane")).toHaveCount(2);
   await expect(page.locator('.track-lane[data-track="top"] .timeline-clip.image')).toHaveCount(1);
@@ -160,6 +163,7 @@ try {
     );
   };
   const target = page.locator('.track-lane[data-track="bottom"]');
+  await tools.getByRole("button", { name: "视觉效果", exact: true }).click();
   await drop([image, video, text], target, 3);
   await expect(page.locator(".timeline-clip.image")).toHaveCount(2);
   await expect(page.locator(".timeline-clip.video")).toHaveCount(1);
@@ -168,6 +172,7 @@ try {
   await expect(page.locator(".timeline-clip.video")).toHaveCSS("left", "195px");
   await expect(page.locator(".busy-overlay")).toHaveCount(0);
   await expect(page.locator(".timeline-clip.selected")).toHaveCount(2);
+  await expect(tools.locator(".selected")).toHaveText("视觉效果");
   await page.screenshot({ path: path.join(root, "external-media-drop.png") });
   await page.getByTitle("撤销 Ctrl+Z", { exact: true }).click();
   await expect(page.locator(".timeline-clip")).toHaveCount(1);
@@ -184,6 +189,7 @@ try {
     "260px",
   );
   await expect(page.locator(".timeline-clip")).toHaveCount(2);
+  await expect(tools.locator(".selected")).toHaveText("视觉效果");
   expect(errors).toEqual([]);
   console.log(
     `剪贴板 PNG 快速导入、防重复及无全屏等待；真实外部文件路径、落点、批量导入、撤销及错误后恢复通过：${root}`,
