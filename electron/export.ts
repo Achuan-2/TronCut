@@ -23,7 +23,7 @@ import { frameSnapshot } from "../shared/frame-snapshot";
 import { objectBehaviorExpressions } from "./behavior-export";
 import { rasterizeBehaviorText } from "./behavior-text-export";
 import { textFillRectangle } from "./text-fill";
-import { textFrameSize } from "../shared/text";
+import { textFrameSize, textFillGeometry } from "../shared/text";
 import {
   transitionRange,
   transitionOffsetExpression,
@@ -244,13 +244,16 @@ async function rasterize(
     .toBuffer();
   const info = await sharp(text).metadata();
   const box = textFrameSize(clip, info.width ?? 16);
+  const background = textFillGeometry(style, box);
   const width = Math.ceil(
-      Math.max(16, (info.width ?? 16) + margin * 2, box.width),
+      Math.max(16, (info.width ?? 16) + margin * 2, background.width),
     ),
-    height = Math.max(
-      16,
-      (info.height ?? style.fontSize * lines.length) + margin * 2,
-      Math.ceil(box.height),
+    height = Math.ceil(
+      Math.max(
+        16,
+        (info.height ?? style.fontSize * lines.length) + margin * 2,
+        background.height,
+      ),
     );
   const alpha = await sharp(text).extractChannel(3).toBuffer();
   const coloredText = (color: string) =>
@@ -575,8 +578,10 @@ async function renderProject(
       filters.push(
         `[${source}]${timing}${animatedText ? `fps=${fps},` : ""}format=rgba,${[...(animatedViewport ? animatedViewportFilters((key) => pose(key, "T")) : contentFilters(clip)), ...visualEffects, transform, "setsar=1", ...rotate, alpha].join(",")}[${visual}]`,
       );
+      // Composite text before chroma subsampling so rounded fills and glyphs
+      // retain the same pixel position in video and frame captures.
       filters.push(
-        `[${base}][${visual}]overlay=x='${width}*((${pose("x")})+(${transitionOffsetExpression(project, clip)}))-overlay_w/2':y='${height}*(${pose("y")})-overlay_h/2':enable='gte(t,${range.start})*lt(t,${range.end})':eof_action=pass:repeatlast=0${still ? ":format=auto" : ""}[${output}]`,
+        `[${base}][${visual}]overlay=x='${width}*((${pose("x")})+(${transitionOffsetExpression(project, clip)}))-overlay_w/2':y='${height}*(${pose("y")})-overlay_h/2':enable='gte(t,${range.start})*lt(t,${range.end})':eof_action=pass:repeatlast=0${still || clip.kind === "text" ? ":format=auto" : ""}[${output}]`,
       );
       base = output;
     }

@@ -1,4 +1,4 @@
-import type { TextStyle } from "../shared/model";
+import { type TextStyle, textFillDefaults } from "../shared/model";
 import { textFill } from "../shared/text";
 
 export default function TextFillFields({
@@ -49,6 +49,29 @@ export default function TextFillFields({
           <span>%</span>
         </span>
       </label>
+      {(
+        [
+          ["fillPaddingX", "水平内边距 (px)"],
+          ["fillPaddingY", "垂直内边距 (px)"],
+          ["fillRadius", "填充圆角 (px)"],
+        ] as const
+      ).map(([key, label]) => (
+        <label className="field" key={key}>
+          {label}
+          <input
+            type="number"
+            min="0"
+            max="200"
+            step="1"
+            value={style?.[key] ?? textFillDefaults[key]}
+            onChange={(event) => {
+              const value = Number(event.target.value);
+              if (Number.isFinite(value))
+                onChange({ [key]: Math.max(0, Math.min(200, value)) });
+            }}
+          />
+        </label>
+      ))}
     </>
   );
 }

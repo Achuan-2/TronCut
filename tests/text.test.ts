@@ -10,9 +10,41 @@ import {
   resizeTextBox,
   textFill,
   textFillCss,
+  textFillGeometry,
 } from "../shared/text";
 
 describe("文本框与自动字号", () => {
+  it("填充默认留白和圆角独立于文字框，并限制圆角不超过背景尺寸", () => {
+    const clip = newText("titles", 0);
+    const frame = { width: 100, height: 40 };
+    expect(textFillGeometry(clip.style, frame)).toEqual({
+      paddingX: 12,
+      paddingY: 6,
+      width: 124,
+      height: 52,
+      radius: 6,
+    });
+    expect(
+      textFillGeometry(
+        { ...clip.style!, fillPaddingX: 20, fillPaddingY: 8, fillRadius: 200 },
+        frame,
+      ),
+    ).toEqual({
+      paddingX: 20,
+      paddingY: 8,
+      width: 140,
+      height: 56,
+      radius: 28,
+    });
+    expect(frame).toEqual({ width: 100, height: 40 });
+    expect(() =>
+      validateProject({
+        ...createProject(),
+        clips: [{ ...clip, style: { ...clip.style!, fillPaddingX: -1 } }],
+      }),
+    ).toThrow();
+  });
+
   it("文本默认黑色 75% 填充，旧工程缺省字段使用默认值，也支持关闭填充", () => {
     const clip = newText("titles", 0);
     expect(textFill(clip.style)).toEqual({ color: "#000000", opacity: 0.75 });

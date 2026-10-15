@@ -130,6 +130,11 @@ it("文本、字幕和逐字行为导出独立填充，颜色透明度可保存�
     pixel(100, 70).forEach((channel, index) =>
       expect(Math.abs(channel - expected[index])).toBeLessThan(7),
     );
+    // Fill extends beyond the 160x60 text frame, while the rounded corner stays clear.
+    pixel(72, 90).forEach((channel, index) =>
+      expect(Math.abs(channel - expected[index])).toBeLessThan(7),
+    );
+    expect(pixel(68, 54).every((channel) => channel > 240)).toBe(true);
     // The texture's transparent motion margins must not become a giant filled rectangle.
     expect(pixel(30, 30).every((channel) => channel > 248)).toBe(true);
     let brightText = 0;

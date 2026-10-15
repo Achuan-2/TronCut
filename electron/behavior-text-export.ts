@@ -3,7 +3,7 @@ import path from "node:path";
 import sharp from "sharp";
 import type { Clip } from "../shared/model";
 import { glyphMotion, layoutGlyphs, textGlyphs } from "../shared/behaviors";
-import { textFrameSize } from "../shared/text";
+import { textFrameSize, textFillGeometry } from "../shared/text";
 import { textFillRectangle } from "./text-fill";
 
 const xml = (text: string) =>
@@ -125,8 +125,13 @@ export async function rasterizeBehaviorText(
   }
   const padding = Math.ceil(fontSize * 6 + style.outlineWidth * 2 + 12);
   const box = textFrameSize(clip, layout.width);
-  const width = Math.ceil(Math.max(layout.width, box.width) + padding * 2),
-    height = Math.ceil(Math.max(layout.height, box.height) + padding * 2);
+  const background = textFillGeometry(style, box);
+  const width = Math.ceil(
+      Math.max(layout.width, background.width) + padding * 2,
+    ),
+    height = Math.ceil(
+      Math.max(layout.height, background.height) + padding * 2,
+    );
   const left = (width - layout.width) / 2,
     top = (height - layout.height) / 2;
   const fill = textFillRectangle(clip, box, { width, height });

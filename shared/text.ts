@@ -22,6 +22,25 @@ export function textFillCss(style?: TextStyle) {
     .padStart(2, "0")}`;
 }
 
+// Background spacing is independent of the text frame, font size and fitting.
+export function textFillGeometry(style: TextStyle | undefined, frame: TextBox) {
+  const paddingX = style?.fillPaddingX ?? textFillDefaults.fillPaddingX;
+  const paddingY = style?.fillPaddingY ?? textFillDefaults.fillPaddingY;
+  const width = frame.width + paddingX * 2;
+  const height = frame.height + paddingY * 2;
+  return {
+    paddingX,
+    paddingY,
+    width,
+    height,
+    radius: Math.min(
+      style?.fillRadius ?? textFillDefaults.fillRadius,
+      width / 2,
+      height / 2,
+    ),
+  };
+}
+
 export function textFrameSize(
   clip: Pick<Clip, "text" | "style" | "textBox">,
   measuredWidth: number,

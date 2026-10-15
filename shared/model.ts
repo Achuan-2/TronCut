@@ -71,6 +71,9 @@ export const styleSchema = z.object({
     .regex(/^#[\da-f]{6}$/i)
     .optional(),
   fillOpacity: finite.min(0).max(1).optional(),
+  fillPaddingX: finite.min(0).max(200).optional(),
+  fillPaddingY: finite.min(0).max(200).optional(),
+  fillRadius: finite.min(0).max(200).optional(),
 });
 export const projectSchema = z.object({
   format: z.enum(["troncut", "framecraft"]),
@@ -247,7 +250,13 @@ export const defaultTransform: Transform = {
   scale: 1,
   opacity: 1,
 };
-export const textFillDefaults = { fill: "#000000", fillOpacity: 0.75 } as const;
+export const textFillDefaults = {
+  fill: "#000000",
+  fillOpacity: 0.75,
+  fillPaddingX: 12,
+  fillPaddingY: 6,
+  fillRadius: 6,
+} as const;
 export const textPresets: { name: string; style: TextStyle }[] = [
   {
     name: "黑边白字",

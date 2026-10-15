@@ -89,6 +89,15 @@ try {
   await expect(
     page.getByLabel("填充不透明度 (%)", { exact: true }),
   ).toHaveValue("75");
+  await expect(page.getByLabel("水平内边距 (px)", { exact: true })).toHaveValue(
+    "12",
+  );
+  await expect(page.getByLabel("垂直内边距 (px)", { exact: true })).toHaveValue(
+    "6",
+  );
+  await expect(page.getByLabel("填充圆角 (px)", { exact: true })).toHaveValue(
+    "6",
+  );
   await page.locator("#inspector-text select").selectOption("3");
   await expect(page.getByLabel("字号", { exact: true })).toHaveValue("30");
   const preset = await save();
@@ -108,6 +117,9 @@ try {
   });
   await page.getByLabel("填充不透明度 (%)", { exact: true }).fill("50");
   await page.getByLabel("字号", { exact: true }).fill("48");
+  await page.getByLabel("水平内边距 (px)", { exact: true }).fill("20");
+  await page.getByLabel("垂直内边距 (px)", { exact: true }).fill("10");
+  await page.getByLabel("填充圆角 (px)", { exact: true }).fill("8");
   const styled = await save();
   assert(
     styled.clips
@@ -121,14 +133,33 @@ try {
         (clip) =>
           clip.style.fill === "#123456" &&
           clip.style.fillOpacity === 0.5 &&
+          clip.style.fillPaddingX === 20 &&
+          clip.style.fillPaddingY === 10 &&
+          clip.style.fillRadius === 8 &&
           clip.transform.opacity === 1,
       ),
   );
   const background = await page
     .locator(".preview-layer.text")
     .filter({ hasText: "字幕甲" })
+    .locator(".preview-text-fill")
     .evaluate((layer) => getComputedStyle(layer).backgroundColor);
   assert.match(background, /rgba\(18, 52, 86, 0\.50?\d*\)/);
+  const geometry = await page
+    .locator(".preview-layer.text")
+    .filter({ hasText: "字幕甲" })
+    .evaluate((layer) => {
+      const background = layer.querySelector(".preview-text-fill");
+      const frame = layer.getBoundingClientRect(),
+        fill = background.getBoundingClientRect();
+      return {
+        extraX: fill.width - frame.width,
+        extraY: fill.height - frame.height,
+        radius: parseFloat(getComputedStyle(background).borderRadius),
+      };
+    });
+  assert(geometry.extraX > 0 && geometry.extraY > 0 && geometry.radius > 0);
+  assert(Math.abs(geometry.extraX / geometry.extraY - 2) < 0.1);
   for (const clip of project.clips.filter(
     (clip) => !first.ids.includes(clip.id),
   ))

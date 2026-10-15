@@ -36,6 +36,7 @@ import {
   resizeTextBox,
   textLineHeight,
   textFillCss,
+  textFillGeometry,
   type TextBox,
 } from "../shared/text";
 import { textBoxFor, fittedTextFont } from "./text";
@@ -236,6 +237,7 @@ function PreviewLayer({
         editor.playhead,
       );
   const textBox = clip.kind === "text" ? (drag?.box ?? textBoxFor(clip)) : null;
+  const fill = textBox ? textFillGeometry(clip.style, textBox) : null;
   const style: CSSProperties = {
     left: `${displayed.x * 100}%`,
     top: `${displayed.y * 100}%`,
@@ -244,7 +246,6 @@ function PreviewLayer({
     "--canvas-scale": scale,
   } as CSSProperties;
   if (textBox) {
-    style.backgroundColor = textFillCss(clip.style);
     style.width = textBox.width * scale;
     style.height = textBox.height * scale;
     style.display = "flex";
@@ -491,6 +492,22 @@ function PreviewLayer({
       onPointerCancel={() => setGesture(null)}
       onLostPointerCapture={() => setGesture(null)}
     >
+      {fill && (
+        <div
+          className="preview-text-fill"
+          aria-hidden="true"
+          style={{
+            position: "absolute",
+            left: -fill.paddingX * scale,
+            top: -fill.paddingY * scale,
+            width: fill.width * scale,
+            height: fill.height * scale,
+            borderRadius: fill.radius * scale,
+            backgroundColor: textFillCss(clip.style),
+            zIndex: -1,
+          }}
+        />
+      )}
       {asset ? (
         <div
           style={{
