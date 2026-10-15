@@ -1,6 +1,8 @@
 # SenseVoice 字幕引擎
 
-当前字幕已改用 sherpa-onnx，默认 SenseVoiceSmall ONNX，也可选择 Paraformer 中文 ONNX。字幕面板支持手动指定模型目录与严格离线模式；默认仅从 TronCut 自己的 `models/onnx/` 缓存读取，缺少模型时下载。模型目录需要 `model.int8.onnx` 与 `tokens.txt`，Silero VAD 单独缓存为 `models/onnx/silero_vad.onnx`，也可放在手动选择的识别模型目录内。
+当前字幕已改用 sherpa-onnx，默认 SenseVoiceSmall ONNX，也可选择 Paraformer 中文 ONNX。字幕面板的“语音转文本”弹窗只需要选择模型；TronCut 自动复用自己的 `models/onnx/` 缓存，缺少模型时下载。SenseVoice 与 Paraformer 需要 `model.int8.onnx` 和 `tokens.txt`，Silero VAD 单独缓存为 `models/onnx/silero_vad.onnx`。
+
+字幕面板只显示按时间排列、可直接修改的字幕。右上角菜单提供导入、导出、语音转文本、字幕转普通文本及搜索替换；底部可在播放头处添加字幕。所有新字幕进入独立字幕轨道，统一样式按钮可批量修改字体、字号、颜色、描边、位置和不透明度。
 
 音频流式进入 Silero VAD，再按真实语音段识别；有 token 时间戳时细分字幕，否则保留完整语音段。当前为 CPU 环境，片段裁剪和变速时间映射保持不变。工作进程与真实验证命令见 [本地 ONNX 语音说明](TTS.md)。
 

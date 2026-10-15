@@ -46,11 +46,51 @@ try {
   );
   await page.screenshot({ path: path.join(root, "editor.png") });
   await page.getByRole("button", { name: "字幕", exact: true }).click();
-  await page.getByLabel("识别引擎").selectOption("sensevoice");
-  await expect(page.getByLabel("计算设备")).toHaveValue("auto");
-  await page.getByLabel("语言").selectOption("yue");
-  await page.getByLabel("识别引擎").selectOption("paraformer");
-  await expect(page.getByLabel("语言")).toHaveValue("auto");
+  await expect(
+    page.getByRole("button", { name: "添加字幕", exact: true }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "字幕操作", exact: true }).click();
+  for (const name of [
+    "导入字幕",
+    "导出字幕",
+    "语音转文本",
+    "字幕转普通文本",
+    "搜索和替换",
+  ])
+    await expect(
+      page.getByRole("menuitem", { name, exact: true }),
+    ).toBeVisible();
+  await page.getByRole("menuitem", { name: "语音转文本", exact: true }).click();
+  await page.getByLabel("识别模型").selectOption("paraformer");
+  await expect(page.getByLabel("识别模型")).toHaveValue("paraformer");
+  await page.getByRole("button", { name: "关闭", exact: true }).click();
+  await page.getByRole("button", { name: "添加字幕", exact: true }).click();
+  await expect(
+    page.locator(".track-header.caption-track .track-name"),
+  ).toHaveText("字幕");
+  const captionEditor = page.locator(".caption-row textarea");
+  await captionEditor.fill("需要替换的字幕");
+  await page.getByRole("button", { name: "字幕操作", exact: true }).click();
+  await page.getByRole("menuitem", { name: "搜索和替换", exact: true }).click();
+  await page.getByLabel("搜索", { exact: true }).fill("需要替换");
+  await page.getByLabel("替换为", { exact: true }).fill("已经修改");
+  await page.getByRole("button", { name: "全部替换", exact: true }).click();
+  await expect(captionEditor).toHaveValue("已经修改的字幕");
+  await page.getByRole("button", { name: "统一字幕样式", exact: true }).click();
+  await page
+    .getByRole("button", { name: "应用到全部字幕", exact: true })
+    .click();
+  await page.screenshot({ path: path.join(root, "captions.png") });
+  await page.locator(".timeline-clip.caption").click({ button: "right" });
+  await expect(
+    page.getByRole("button", { name: "与上一字幕合并", exact: true }),
+  ).toBeDisabled();
+  await page
+    .getByRole("button", { name: "转换为普通文本", exact: true })
+    .click();
+  await expect(page.locator(".caption-row")).toHaveCount(0);
+  await page.locator(".timeline-clip.selected").click({ button: "right" });
+  await page.getByRole("button", { name: "删除片段", exact: true }).click();
   await page.getByRole("button", { name: "媒体", exact: true }).click();
   await page.getByRole("button", { name: "添加文本", exact: true }).click();
   await page.getByLabel("文本内容").fill("TronCut：中文文本与动画");
@@ -68,7 +108,9 @@ try {
     "TronCut：中文文本与动画",
   );
   await expect(page.getByLabel("配音模型目录")).toHaveValue("C:/我的模型/vits");
-  await page.getByLabel("配音模型", { exact: true }).selectOption("kokoro-onnx");
+  await page
+    .getByLabel("配音模型", { exact: true })
+    .selectOption("kokoro-onnx");
   await expect(page.getByLabel("配音音色")).toHaveValue("10");
   await expect(page.getByLabel("配音模型目录")).toHaveValue("");
   await expect(page.getByLabel("语气指令")).toHaveCount(0);
@@ -111,8 +153,6 @@ try {
     .nth(1)
     .click({ modifiers: ["Control"] });
   await expect(page.locator(".timeline-clip.selected")).toHaveCount(2);
-  await page.getByRole("button", { name: "组合", exact: true }).click();
-  await page.getByTitle("撤销 Ctrl+Z").click();
   await page.locator(".timeline-clip.video").click();
   await expect(page.getByLabel("裁切左侧 (%)")).toHaveCount(0);
   await page.getByLabel("旋转 Z (度)").fill("15");

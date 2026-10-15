@@ -10,7 +10,6 @@ import {
   Film,
   Music2,
   Image,
-  Upload,
   WandSparkles,
   Diamond,
   AlignCenter,
@@ -25,19 +24,11 @@ import {
   Paintbrush,
   ArrowRightLeft,
 } from "lucide-react";
-import {
-  type Clip,
-  textPresets,
-  defaultTransform,
-  newText,
-  newTrack,
-} from "../shared/model";
+import { type Clip, textPresets, defaultTransform } from "../shared/model";
 import { animation, transformAt } from "../shared/editor";
-import type { Cue } from "../shared/subtitles";
 import type { Capabilities } from "../shared/bridge";
 import type { Editor } from "./useEditor";
 import { timeLabel } from "./Preview";
-import type { SpeechEngine } from "../shared/asr";
 import { defaultCrop, defaultEffects } from "../shared/effects";
 import { textBoxFor } from "./text";
 import { MediaThumbnail } from "./MediaThumbnail";
@@ -56,6 +47,7 @@ import BehaviorsPanel from "./BehaviorsPanel";
 import BehaviorProperties from "./BehaviorProperties";
 import TransitionsPanel from "./TransitionsPanel";
 import TransitionProperties from "./TransitionProperties";
+import CaptionsPanel from "./CaptionsPanel";
 
 export type Tab =
   | "media"
@@ -94,50 +86,10 @@ interface Props {
   refreshCapabilities: () => void;
   busy: boolean;
 }
-export function addCues(editor: Editor, cues: Cue[], selected?: Clip) {
-  const project = editor.project;
-  const track =
-    project.tracks.find(
-      (track) =>
-        !track.locked &&
-        !track.hidden &&
-        project.clips.some((clip) => clip.trackId === track.id && clip.caption),
-    ) ?? newTrack(project.tracks.length);
-  const clips = cues.flatMap((cue) => {
-    let start = cue.start,
-      end = cue.end;
-    if (selected) {
-      const sourceEnd = selected.sourceIn + selected.duration * selected.speed;
-      start = Math.max(cue.start, selected.sourceIn);
-      end = Math.min(cue.end, sourceEnd);
-      if (end <= start) return [];
-      start = selected.start + (start - selected.sourceIn) / selected.speed;
-      end = selected.start + (end - selected.sourceIn) / selected.speed;
-    }
-    const c = newText(track.id, start, 0, cue.text);
-    c.duration = end - start;
-    c.caption = true;
-    c.transform.y = 0.85;
-    c.style!.fontSize = 56;
-    return [c];
-  });
-  editor.apply((p) => ({
-    ...p,
-    tracks: p.tracks.some((t) => t.id === track.id)
-      ? p.tracks
-      : [track, ...p.tracks],
-    clips: [...p.clips, ...clips],
-  }));
-}
 export default function Panels(props: Props) {
   const { editor, tab, setTab, run, toast } = props,
     { project, selected, updateClip } = editor;
-  const [query, setQuery] = useState(""),
-    [engine, setEngine] = useState<SpeechEngine>("sensevoice"),
-    [language, setLanguage] = useState("auto");
-  const [device, setDevice] = useState<"auto" | "cpu">("auto");
-  const [modelDir, setModelDir] = useState("");
-  const [offlineAsr, setOfflineAsr] = useState(false);
+  const [query, setQuery] = useState("");
   const bridge = () => {
     if (!window.framecraft)
       throw new Error("此功能需要运行桌面版，请使用 pnpm dev");
@@ -164,19 +116,23 @@ export default function Panels(props: Props) {
           </button>
         ))}
       </nav>
-      <div className="library-content">
-        <div className="library-heading">
-          <h2>
-            {tabs.find((t) => t.id === tab)?.name === "媒体"
-              ? "素材库"
-              : tabs.find((t) => t.id === tab)?.name}
-          </h2>
-          <span>
-            {tab === "media"
-              ? `${project.assets.length} 个素材`
-              : "为表达加一点灵感"}
-          </span>
-        </div>
+      <div
+        className={`library-content ${tab === "captions" ? "captions-library" : ""}`}
+      >
+        {tab !== "captions" && (
+          <div className="library-heading">
+            <h2>
+              {tabs.find((t) => t.id === tab)?.name === "媒体"
+                ? "素材库"
+                : tabs.find((t) => t.id === tab)?.name}
+            </h2>
+            <span>
+              {tab === "media"
+                ? `${project.assets.length} 个素材`
+                : "为表达加一点灵感"}
+            </span>
+          </div>
+        )}
         {tab === "media" && (
           <>
             <button
@@ -303,196 +259,12 @@ export default function Panels(props: Props) {
           />
         </div>
         {tab === "captions" && (
-          <>
-            <p className="panel-intro">
-              字幕也是文本图层。
-              <br />
-              放在底部、居中，或任何你想的位置。
-            </p>
-            <label className="field vertical">
-              识别引擎
-              <select
-                aria-label="识别引擎"
-                value={engine}
-                onChange={(e) => {
-                  setEngine(e.target.value as SpeechEngine);
-                  setModelDir("");
-                  if (e.target.value === "paraformer" && language !== "zh")
-                    setLanguage("auto");
-                }}
-              >
-                <option value="sensevoice">
-                  SenseVoiceSmall · 多语言 ONNX
-                </option>
-                <option value="paraformer">Paraformer · 中文 ONNX</option>
-              </select>
-            </label>
-            <label className="field">
-              语言
-              <select
-                aria-label="语言"
-                value={language}
-                onChange={(e) => setLanguage(e.target.value)}
-              >
-                <option value="auto">自动识别</option>
-                <option value="zh">中文</option>
-                {engine === "sensevoice" && (
-                  <>
-                    <option value="en">英语</option>
-                    <option value="ja">日语</option>
-                    <option value="ko">韩语</option>
-                    <option value="yue">粤语</option>
-                  </>
-                )}
-              </select>
-            </label>
-            <label className="field">
-              计算设备
-              <select
-                aria-label="计算设备"
-                value={device}
-                onChange={(e) => setDevice(e.target.value as typeof device)}
-              >
-                <option value="auto">自动 · CPU</option>
-                <option value="cpu">CPU · sherpa-onnx</option>
-              </select>
-            </label>
-            <label className="field vertical">
-              识别模型目录
-              <input
-                value={modelDir}
-                placeholder="留空自动查找本机模型"
-                onChange={(e) => setModelDir(e.target.value)}
-              />
-            </label>
-            <label className="narration-offline">
-              <input
-                type="checkbox"
-                checked={offlineAsr}
-                onChange={(e) => setOfflineAsr(e.target.checked)}
-              />
-              仅使用已下载的依赖和模型
-            </label>
-            <button
-              className="wide-button"
-              disabled={props.busy}
-              onClick={() =>
-                run(async () => {
-                  const prepared = await bridge().downloadSpeechModel(engine);
-                  setModelDir("");
-                  toast(`识别模型已就绪：${prepared.directory}`);
-                })
-              }
-            >
-              下载识别模型
-            </button>
-            <button
-              className="wide-button primary"
-              disabled={props.busy}
-              onClick={() =>
-                run(async () => {
-                  if (!selected?.assetId)
-                    throw new Error("请先选中有声音的音视频片段");
-                  const target = selected;
-                  const cues = await bridge().transcribe(
-                    selected.assetId,
-                    engine,
-                    language,
-                    {
-                      device,
-                      modelDir,
-                      offline: offlineAsr,
-                      sourceIn: target.sourceIn,
-                      sourceDuration: target.duration * target.speed,
-                    },
-                  );
-                  addCues(editor, cues, target);
-                  toast(
-                    `已生成 ${cues.length} 条字幕，按选中片段的裁剪与速度对齐`,
-                  );
-                })
-              }
-            >
-              <WandSparkles size={16} />
-              从选中片段生成字幕
-            </button>
-            <p className="small-note">
-              sherpa-onnx 在本机识别，默认使用 TronCut
-              已下载的模型，也可指定包含 model.int8.onnx 和 tokens.txt
-              的目录。首次准备环境，缺少模型时下载；有词时间戳时细分字幕，否则保留真实语音段。离线识别还需本地
-              Silero VAD 模型。
-            </p>
-            <div className="two-buttons">
-              <button
-                onClick={() =>
-                  run(async () => {
-                    const cues = await bridge().importSubtitles();
-                    if (cues) addCues(editor, cues);
-                  })
-                }
-              >
-                <Upload size={14} />
-                导入 SRT
-              </button>
-              <button
-                onClick={() =>
-                  run(async () => {
-                    const cues = project.clips
-                      .filter((c) => c.caption)
-                      .map((c) => ({
-                        start: c.start,
-                        end: c.start + c.duration,
-                        text: c.text ?? "",
-                      }));
-                    if (!cues.length) throw new Error("没有可导出的字幕");
-                    const file = await bridge().exportSubtitles(cues);
-                    if (file) toast("字幕已导出");
-                  })
-                }
-              >
-                导出 SRT
-              </button>
-            </div>
-            <button
-              className="wide-button"
-              onClick={() =>
-                editor.apply((p) => ({
-                  ...p,
-                  clips: p.clips.map((c) =>
-                    c.caption &&
-                    !p.tracks.find((t) => t.id === c.trackId)?.locked
-                      ? {
-                          ...c,
-                          transform: { ...c.transform, x: 0.5, y: 0.5 },
-                          keyframes: [],
-                        }
-                      : c,
-                  ),
-                }))
-              }
-            >
-              <AlignCenter size={15} />
-              全部字幕居中
-            </button>
-            <div className="caption-list">
-              {project.clips
-                .filter((c) => c.caption)
-                .sort((a, b) => a.start - b.start)
-                .map((c) => (
-                  <button
-                    key={c.id}
-                    className={selected?.id === c.id ? "active" : ""}
-                    onClick={() => {
-                      editor.select(c.id);
-                      editor.seek(c.start);
-                    }}
-                  >
-                    <small>{timeLabel(c.start)}</small>
-                    <span>{c.text}</span>
-                  </button>
-                ))}
-            </div>
-          </>
+          <CaptionsPanel
+            editor={editor}
+            run={run}
+            toast={toast}
+            busy={props.busy}
+          />
         )}
         {tab === "zoompan" && <ZoomPanPanel editor={editor} />}
         {tab === "animations" && (

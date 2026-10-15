@@ -11,10 +11,26 @@ if (!kokoro || !sensevoice)
   );
 const root = path.resolve("test-output/onnx-ui");
 await fs.mkdir(root, { recursive: true });
+const profile = path.resolve("test-output/onnx-integration/profile");
+const modelCache = path.join(profile, "models/onnx");
+await fs.mkdir(modelCache, { recursive: true });
+await fs.cp(sensevoice, path.join(modelCache, "sensevoice-small"), {
+  recursive: true,
+});
+for (const candidate of [
+  path.join(sensevoice, "silero_vad.onnx"),
+  path.join(sensevoice, "..", "silero-vad", "silero_vad.onnx"),
+])
+  try {
+    await fs.copyFile(candidate, path.join(modelCache, "silero_vad.onnx"));
+    break;
+  } catch {
+    /* Try the next common local model layout. */
+  }
 const env = {
   ...process.env,
   FRAMECRAFT_SMOKE: "1",
-  FRAMECRAFT_USER_DATA: path.resolve("test-output/onnx-integration/profile"),
+  FRAMECRAFT_USER_DATA: profile,
 };
 delete env.ELECTRON_RUN_AS_NODE;
 const app = await electron.launch({ args: ["."], env });
@@ -76,20 +92,13 @@ try {
   );
   await page.locator(".timeline-clip.audio").click();
   await page.getByRole("button", { name: "字幕", exact: true }).click();
-  await expect(page.getByLabel("识别引擎", { exact: true })).toHaveValue(
+  await page.getByRole("button", { name: "字幕操作", exact: true }).click();
+  await page.getByRole("menuitem", { name: "语音转文本", exact: true }).click();
+  await expect(page.getByLabel("识别模型", { exact: true })).toHaveValue(
     "sensevoice",
   );
-  await page.getByLabel("语言", { exact: true }).selectOption("yue");
-  await page.getByLabel("识别引擎", { exact: true }).selectOption("paraformer");
-  await expect(page.getByLabel("语言", { exact: true })).toHaveValue("auto");
-  await page.getByLabel("识别引擎", { exact: true }).selectOption("sensevoice");
-  await page.getByLabel("语言", { exact: true }).selectOption("zh");
-  await page.getByLabel("识别模型目录", { exact: true }).fill(sensevoice);
   await page
-    .getByRole("checkbox", { name: "仅使用已下载的依赖和模型", exact: true })
-    .check();
-  await page
-    .getByRole("button", { name: "从选中片段生成字幕", exact: true })
+    .getByRole("button", { name: "开始识别选中片段", exact: true })
     .click();
   await expect(page.getByRole("status")).toContainText("已生成", {
     timeout: 90000,
@@ -122,7 +131,7 @@ try {
     JSON.stringify({ projectFile: file, rendererErrors: errors }, null, 2),
   );
   console.log(
-    "ONNX 桌面生成、试听停止、参数保留、语言切换、字幕与工程保存通过",
+    "ONNX 桌面生成、试听停止、参数保留、自动模型缓存、字幕与工程保存通过",
   );
 } finally {
   await app.close();

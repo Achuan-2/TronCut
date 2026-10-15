@@ -105,6 +105,7 @@ export const projectSchema = z.object({
         hidden: z.boolean(),
         muted: z.boolean(),
         locked: z.boolean(),
+        captionTrack: z.boolean().optional(),
       }),
     )
     .max(128),

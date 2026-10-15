@@ -201,6 +201,7 @@ export function addCaptionCues(
   if (!cues.length) return input;
   const project = structuredClone(input),
     track = newTrack(project.tracks.length);
+  track.captionTrack = true;
   project.tracks.unshift(track);
   for (const cue of cues) {
     const clip = newText(track.id, cue.start, 0, cue.text);

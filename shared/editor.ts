@@ -23,6 +23,7 @@ export function availableTrack(
     (track) =>
       !track.locked &&
       !track.hidden &&
+      !track.captionTrack &&
       !project.clips.some(
         (clip) =>
           clip.trackId === track.id &&
@@ -62,7 +63,10 @@ export function addMediaAssets(
           : availableTrack({ tracks, clips }, start, duration);
       const target = tracks.find(
         (track) =>
-          track.id === options.trackId && !track.locked && !track.hidden,
+          track.id === options.trackId &&
+          !track.locked &&
+          !track.hidden &&
+          !track.captionTrack,
       );
       if (
         target &&

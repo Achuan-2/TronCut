@@ -410,7 +410,10 @@ export function useEditor() {
       const p = current.current;
       // Keep new text above existing visual layers when the top track is busy.
       let track = availableTrack(
-        { tracks: p.tracks.slice(0, 1), clips: p.clips },
+        {
+          tracks: p.tracks.filter((track) => !track.captionTrack).slice(0, 1),
+          clips: p.clips,
+        },
         playhead,
         5,
       );
@@ -434,8 +437,10 @@ export function useEditor() {
     ) => {
       const p = current.current;
       const preferred = trackId
-        ? p.tracks.filter((track) => track.id === trackId)
-        : p.tracks.slice(0, 1);
+        ? p.tracks.filter(
+            (track) => track.id === trackId && !track.captionTrack,
+          )
+        : p.tracks.filter((track) => !track.captionTrack).slice(0, 1);
       let track = availableTrack(
         { tracks: preferred, clips: p.clips },
         time,
