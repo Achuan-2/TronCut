@@ -29,6 +29,32 @@ export function selectionWithGroups(
     .map((c) => c.id);
 }
 
+/** Return editable clips intersecting a time range on the requested tracks. */
+export function clipsInTimelineRange(
+  project: Project,
+  start: number,
+  end: number,
+  trackIds: readonly string[],
+): string[] {
+  const from = Math.min(start, end);
+  const to = Math.max(start, end);
+  const tracks = new Set(trackIds);
+  const lockedOrHidden = new Set(
+    project.tracks
+      .filter((track) => track.locked || track.hidden)
+      .map((track) => track.id),
+  );
+  return project.clips
+    .filter(
+      (clip) =>
+        tracks.has(clip.trackId) &&
+        !lockedOrHidden.has(clip.trackId) &&
+        clip.start <= to &&
+        clip.start + clip.duration >= from,
+    )
+    .map((clip) => clip.id);
+}
+
 /** Move every selected unlocked clip by the same delta, preserving synchronization. */
 export function moveClips(
   project: Project,

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createProject, newText, validateProject } from "../shared/model";
 import {
+  clipsInTimelineRange,
   deleteClips,
   groupSelection,
   moveClips,
@@ -66,6 +67,25 @@ describe("多片段编辑与波纹时间映射", () => {
       pasted.project.clips[3].groupId,
     );
     expect(validateProject(pasted.project).clips).toHaveLength(4);
+  });
+  it("框选按时间与轨道相交范围选中片段，并跳过锁定和隐藏轨", () => {
+    const p = createProject();
+    const first = newText("titles", 1);
+    const second = newText("video", 4);
+    const locked = newText("audio", 2);
+    first.duration = 2;
+    second.duration = 2;
+    locked.duration = 2;
+    p.clips = [first, second, locked];
+    p.tracks[2].locked = true;
+
+    expect(
+      clipsInTimelineRange(p, 2.5, 4.5, ["titles", "video", "audio"]),
+    ).toEqual([first.id, second.id]);
+    p.tracks[1].hidden = true;
+    expect(
+      clipsInTimelineRange(p, 2.5, 4.5, ["titles", "video", "audio"]),
+    ).toEqual([first.id]);
   });
   it("同时拆分穿过播放头的片段，不改动不相交和锁定片段", () => {
     const p = createProject();

@@ -38,6 +38,7 @@ import {
   groupSelection,
   pasteClips,
   selectionWithGroups,
+  clipsInTimelineRange,
 } from "../shared/timeline";
 import { MediaThumbnail } from "./MediaThumbnail";
 import { TimelineAnimations } from "./TimelineAnimations";
@@ -75,6 +76,14 @@ interface Drag {
   delta: number;
   trackId: string;
   ids: string[];
+}
+interface Marquee {
+  pointerId: number;
+  startX: number;
+  startY: number;
+  x: number;
+  y: number;
+  baseIds: string[];
 }
 export default function Timeline({
   editor,
@@ -117,6 +126,8 @@ export default function Timeline({
   const [speedDraft, setSpeedDraft] = useState<Clip | null>(null);
   const [activeSpeed, setActiveSpeed] = useState<string | null>(null);
   const [effectDrop, setEffectDrop] = useState<string | null>(null);
+  const [marquee, setMarquee] = useState<Marquee | null>(null);
+  const marqueeMoved = useRef(false);
   const [transitionDrop, setTransitionDrop] = useState<TransitionTarget | null>(
     null,
   );
@@ -158,6 +169,32 @@ export default function Timeline({
     return trackHeights
       .slice(0, Math.max(0, index))
       .reduce((sum, height) => sum + height, 0);
+  };
+  const captionTracks = project.tracks.filter((track) => track.captionTrack);
+  const captionTrackName = (id: string) => {
+    if (captionTracks.length < 2) return "字幕";
+    const index = captionTracks.findIndex((track) => track.id === id);
+    return `字幕 ${captionTracks.length - index}`;
+  };
+  const marqueeSelection = (next: Marquee) => {
+    const left = Math.min(next.startX, next.x);
+    const right = Math.max(next.startX, next.x);
+    const top = Math.min(next.startY, next.y);
+    const bottom = Math.max(next.startY, next.y);
+    const trackIds = project.tracks.flatMap((track, index) => {
+      const clipTop = 36 + trackTop(track.id) + 8;
+      const clipBottom = 36 + trackTop(track.id) + trackHeights[index] - 9;
+      return clipTop <= bottom && clipBottom >= top ? [track.id] : [];
+    });
+    const hits = clipsInTimelineRange(
+      project,
+      left / zoom,
+      right / zoom,
+      trackIds,
+    );
+    return [
+      ...new Set([...next.baseIds, ...selectionWithGroups(project, hits)]),
+    ];
   };
   const selectSpeed = (id: string) => {
     editor.clearKeyframeEdit();
@@ -594,7 +631,7 @@ export default function Timeline({
               <div>
                 <span className="track-name">
                   {track.captionTrack
-                    ? "字幕"
+                    ? captionTrackName(track.id)
                     : trackName(index, project.tracks.length)}
                 </span>
               </div>
@@ -717,10 +754,64 @@ export default function Timeline({
           }}
         >
           <div
-            className="timeline-content"
+            className={`timeline-content ${marquee ? "marquee-active" : ""}`}
             style={{
               width,
               minHeight: trackHeights.reduce((sum, height) => sum + height, 36),
+            }}
+            onPointerDown={(event) => {
+              if (
+                event.button !== 0 ||
+                !(event.target as HTMLElement).closest(".track-lane") ||
+                (event.target as HTMLElement).closest(
+                  ".timeline-clip, .timeline-transition, .transition-drop-edge, button, input",
+                )
+              )
+                return;
+              const bounds = event.currentTarget.getBoundingClientRect();
+              const next = {
+                pointerId: event.pointerId,
+                startX: event.clientX - bounds.left,
+                startY: event.clientY - bounds.top,
+                x: event.clientX - bounds.left,
+                y: event.clientY - bounds.top,
+                baseIds:
+                  event.ctrlKey || event.metaKey || event.shiftKey
+                    ? editor.selectedIds
+                    : [],
+              };
+              marqueeMoved.current = false;
+              event.currentTarget.setPointerCapture(event.pointerId);
+              setMarquee(next);
+            }}
+            onPointerMove={(event) => {
+              if (!marquee || marquee.pointerId !== event.pointerId) return;
+              const bounds = event.currentTarget.getBoundingClientRect();
+              const next = {
+                ...marquee,
+                x: Math.max(0, event.clientX - bounds.left),
+                y: Math.max(36, event.clientY - bounds.top),
+              };
+              if (
+                Math.abs(next.x - next.startX) >= 4 ||
+                Math.abs(next.y - next.startY) >= 4
+              ) {
+                marqueeMoved.current = true;
+                editor.selectMany(marqueeSelection(next));
+              }
+              setMarquee(next);
+            }}
+            onPointerUp={(event) => {
+              if (!marquee || marquee.pointerId !== event.pointerId) return;
+              setMarquee(null);
+              if (marqueeMoved.current)
+                window.setTimeout(() => {
+                  marqueeMoved.current = false;
+                }, 0);
+            }}
+            onPointerCancel={() => {
+              marqueeMoved.current = false;
+              setMarquee(null);
             }}
           >
             <div
@@ -799,6 +890,10 @@ export default function Timeline({
                 }}
                 onClick={(event) => {
                   if (event.target === event.currentTarget) {
+                    if (marqueeMoved.current) {
+                      marqueeMoved.current = false;
+                      return;
+                    }
                     select(null);
                     seek(timeFromEvent(event));
                   }
@@ -1312,6 +1407,17 @@ export default function Timeline({
                   })}
               </div>
             ))}
+            {marquee && marqueeMoved.current && (
+              <div
+                className="timeline-marquee"
+                style={{
+                  left: Math.min(marquee.startX, marquee.x),
+                  top: Math.min(marquee.startY, marquee.y),
+                  width: Math.abs(marquee.x - marquee.startX),
+                  height: Math.abs(marquee.y - marquee.startY),
+                }}
+              />
+            )}
             <div className="playhead" style={{ left: playhead * zoom }}>
               <i />
             </div>

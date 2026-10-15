@@ -31,7 +31,12 @@ interface Props {
 
 type Dialog = "transcribe" | "replace" | "style" | null;
 
-export function addCues(editor: Editor, cues: Cue[], selected?: Clip) {
+export function addCues(
+  editor: Editor,
+  cues: Cue[],
+  selected?: Clip,
+  options: { newTrack?: boolean } = {},
+) {
   const mapped = cues.flatMap((cue) => {
     if (!selected) return [cue];
     const sourceEnd = selected.sourceIn + selected.duration * selected.speed;
@@ -48,7 +53,7 @@ export function addCues(editor: Editor, cues: Cue[], selected?: Clip) {
   });
   let ids: string[] = [];
   editor.apply((project) => {
-    const result = appendCaptionCues(project, mapped);
+    const result = appendCaptionCues(project, mapped, options);
     ids = result.ids;
     return result.project;
   });
@@ -341,7 +346,7 @@ export default function CaptionsPanel({ editor, run, toast, busy }: Props) {
                           sourceDuration: target.duration * target.speed,
                         },
                       );
-                      addCues(editor, cues, target);
+                      addCues(editor, cues, target, { newTrack: true });
                       toast(`已生成 ${cues.length} 条字幕`);
                     });
                   }}

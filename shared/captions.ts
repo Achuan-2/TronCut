@@ -14,21 +14,7 @@ export function ensureCaptionTrack(project: Project): {
   const dedicated = project.tracks.find((track) => track.captionTrack);
   if (dedicated)
     return {
-      project: {
-        ...project,
-        tracks: project.tracks.map((track) =>
-          track.id === dedicated.id
-            ? track
-            : track.captionTrack
-              ? { ...track, captionTrack: undefined }
-              : track,
-        ),
-        clips: project.clips.map((clip) =>
-          clip.caption && clip.trackId !== dedicated.id
-            ? { ...clip, trackId: dedicated.id }
-            : clip,
-        ),
-      },
+      project,
       trackId: dedicated.id,
     };
 
@@ -48,12 +34,19 @@ export function ensureCaptionTrack(project: Project): {
       trackId: reusable.id,
     };
 
+  return createCaptionTrack(project, captions.length > 0);
+}
+
+export function createCaptionTrack(
+  project: Project,
+  moveExistingCaptions = false,
+): { project: Project; trackId: string } {
   const track = { ...newTrack(project.tracks.length), captionTrack: true };
   return {
     project: {
       ...project,
       tracks: [track, ...project.tracks],
-      clips: captions.length
+      clips: moveExistingCaptions
         ? project.clips.map((clip) =>
             clip.caption ? { ...clip, trackId: track.id } : clip,
           )
@@ -66,9 +59,12 @@ export function ensureCaptionTrack(project: Project): {
 export function appendCaptionCues(
   input: Project,
   cues: Cue[],
+  options: { newTrack?: boolean } = {},
 ): { project: Project; ids: string[] } {
   if (!cues.length) return { project: input, ids: [] };
-  const ensured = ensureCaptionTrack(input);
+  const ensured = options.newTrack
+    ? createCaptionTrack(input)
+    : ensureCaptionTrack(input);
   const track = ensured.project.tracks.find(
     (item) => item.id === ensured.trackId,
   )!;

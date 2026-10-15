@@ -49,6 +49,33 @@ describe("字幕轨道与批量编辑", () => {
     expect(validateProject(second.project).clips).toHaveLength(4);
   });
 
+  it("每次语音识别都新建字幕轨道，已有识别结果保持原轨", () => {
+    const first = appendCaptionCues(
+      createProject(),
+      [{ start: 0, end: 1, text: "第一次识别" }],
+      { newTrack: true },
+    );
+    const firstTrackId = first.project.clips.find(
+      (clip) => clip.id === first.ids[0],
+    )!.trackId;
+    const second = appendCaptionCues(
+      first.project,
+      [{ start: 0, end: 1, text: "第二次识别" }],
+      { newTrack: true },
+    );
+    const secondTrackId = second.project.clips.find(
+      (clip) => clip.id === second.ids[0],
+    )!.trackId;
+
+    expect(
+      second.project.tracks.filter((track) => track.captionTrack),
+    ).toHaveLength(2);
+    expect(secondTrackId).not.toBe(firstTrackId);
+    expect(
+      second.project.clips.find((clip) => clip.id === first.ids[0])!.trackId,
+    ).toBe(firstTrackId);
+  });
+
   it("搜索替换跳过锁定轨道，并支持将单条字幕转成普通文本", () => {
     const base = appendCaptionCues(createProject(), [
       { start: 0, end: 1, text: "需要替换" },
