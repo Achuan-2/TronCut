@@ -62,6 +62,15 @@ const bridge: FrameCraftBridge = {
   downloadSpeechModel: (engine) =>
     ipcRenderer.invoke("speech:downloadModel", engine),
   selectNarrationReference: () => ipcRenderer.invoke("audio:reference"),
+  releaseNarrationReference: (id) =>
+    ipcRenderer.invoke("audio:reference:release", id),
+  transcribeNarrationReference: (id) =>
+    ipcRenderer.invoke("audio:reference:transcribe", id),
+  clonedVoices: () => ipcRenderer.invoke("audio:cloned-voices:list"),
+  createClonedVoice: (options) =>
+    ipcRenderer.invoke("audio:cloned-voices:create", options),
+  deleteClonedVoice: (id) =>
+    ipcRenderer.invoke("audio:cloned-voices:delete", id),
   cancelTask: () => ipcRenderer.invoke("task:cancel"),
   onProgress: (callback) => {
     const fn = (_: unknown, event: Parameters<typeof callback>[0]) =>

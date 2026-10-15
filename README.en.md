@@ -27,6 +27,7 @@ TronCut brings screen recording, editing, text, captions, and audio processing i
 | **Add text beside the timeline**             | Insert text in one click with white text with black outlines, black text with white outlines, and yellow text with black outlines. Center captions on the canvas to create text-based videos. |
 | **Animate without drag-only controls**       | Add fade, zoom, and slide animations from the context menu or presets. Auto animation records keyframes when you change position, scale, or opacity.                                          |
 | **Local speech captions**                    | Qwen3-ASR 0.6B and SenseVoiceSmall transcribe the whole timeline mix, preserving trimming, speed, gaps, and volume, and create a separate caption track. |
+| **Local narration and voice cloning**        | Windows voices, Kokoro/VITS ONNX, and LuxTTS ONNX. Import or record a reference voice, save it locally, and reuse it for previews and narration. |
 | **Pitch-preserving speed and podcast audio** | Export prefers Rubber Band for pitch preservation. Audio processing includes noise reduction, EQ, compression, loudness adjustment, and a processed audition.                                 |
 | **Readable, portable projects**              | Readable JSON projects collect media and cursor data in one folder using relative paths, with a custom folder icon on Windows.                                                                |
 
@@ -56,7 +57,7 @@ See the [user documentation](docs/README.md) for media, recording cursors, timel
 | macOS                            | Apple Silicon and Intel DMGs are provided unsigned and unnotarized; installation, permissions, recording, and export remain for users to validate.                                                   |
 | Camtasia `.tscproj`              | Converts common media references, flat clips, timing, speed, and some transforms. An import report and the original JSON are retained.                                                               |
 | TREC and proprietary backgrounds | **Complete import is not supported.** A real project test skipped three TREC recordings and a water-ripple background; only the music was converted.                                                 |
-| Speech engines                   | Qwen3-ASR 0.6B INT8 and SenseVoiceSmall recognition, plus Kokoro/VITS narration, use sherpa-onnx on CPU. |
+| Speech engines                   | Qwen3-ASR 0.6B INT8, SenseVoiceSmall and Kokoro/VITS use sherpa-onnx on CPU; LuxTTS voice cloning uses ONNX Runtime on CPU, without PyTorch. |
 | Voice enhancement                | DSP processing is available. Canvas playback uses the original audio; processed audition and export use the filters. AI voice reconstruction is not included.                                        |
 
 A complete effects library, nested sequences, TREC cursor metadata, proxy media, a shared GPU compositor, and GIF/audio/interactive exports remain unfinished. Hardware encoding does not mean the entire pipeline is GPU accelerated. Professional audio blind tests and large-project performance comparisons have not been completed.

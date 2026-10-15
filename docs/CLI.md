@@ -122,7 +122,7 @@ pnpm --silent cli models --engine sensevoice
 pnpm --silent cli models --engine vits-onnx
 ```
 
-识别支持 `qwen3-asr`（默认）、`sensevoice`，配音支持 `kokoro-onnx`、`vits-onnx`。默认识别整个时间线的混音，保留空白、裁剪、变速、音量和音频效果，跳过静音与隐藏轨道，每次生成新的字幕轨道。模型缺失时自动下载，缓存与 GUI 共用。`--offline` 仅使用已有环境和模型；转录可用 `--model-dir` 指定目录，文案配音可在脚本中填写 `modelDir`。`--clips id1,id2` 可显式限制参与混音的片段。
+识别支持 `qwen3-asr`（默认）、`sensevoice`，配音支持 `windows-sapi`、`kokoro-onnx`、`vits-onnx` 和 `lux-onnx`。LuxTTS 脚本的 `voice` 必须填写本机已保存克隆音色的 UUID；音色在桌面“AI 配音设置”中创建，索引位于应用数据目录的 `cloned-voices/<UUID>/voice.json`。默认识别整个时间线的混音，保留空白、裁剪、变速、音量和音频效果，跳过静音与隐藏轨道，每次生成新的字幕轨道。模型缺失时自动下载，缓存与 GUI 共用。`--offline` 仅使用已有环境和模型；转录可用 `--model-dir` 指定目录，文案配音可在脚本中填写 `modelDir`。`--clips id1,id2` 可显式限制参与混音的片段。
 
 Qwen3-ASR 和 SenseVoiceSmall 均使用 CPU。`--device` 及计划文件的 `transcribe.device` 接受 `cpu` 和 `auto`，两者均使用 CPU；已移除的 `cuda` 会被拒绝。Qwen3-ASR 的 `--model-dir` 应指向完整的 INT8 ONNX 模型目录。
 

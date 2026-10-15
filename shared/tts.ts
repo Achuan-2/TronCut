@@ -41,6 +41,11 @@ export const availableTtsModels = {
     voices: [{ id: "auto", name: "自动 · 优先微软云希" }],
   },
   ...onnxTtsModels,
+  "lux-onnx": {
+    name: "LuxTTS · 声音克隆 ONNX",
+    repo: "YatharthS/LuxTTS",
+    voices: [] as { id: string; name: string }[],
+  },
 } as const;
 export type AvailableTtsEngine = keyof typeof availableTtsModels;
 
@@ -100,6 +105,7 @@ export const ttsOptionsSchema = z
       "windows-sapi",
       "kokoro-onnx",
       "vits-onnx",
+      "lux-onnx",
       "kokoro",
       "qwen-small",
       "qwen-quality",
@@ -120,7 +126,7 @@ export const ttsOptionsSchema = z
   })
   .superRefine((options, context) => {
     if (
-      options.engine in onnxTtsModels &&
+      (options.engine in onnxTtsModels || options.engine === "lux-onnx") &&
       !["cpu", "auto"].includes(options.device)
     )
       context.addIssue({
@@ -157,12 +163,22 @@ export const ttsOptionsSchema = z
       });
     if (
       options.engine !== "windows-sapi" &&
+      options.engine !== "lux-onnx" &&
       !ttsModels[options.engine].voices.some((v) => v.id === options.voice)
     )
       context.addIssue({
         code: "custom",
         path: ["voice"],
         message: "请选择该模型支持的音色",
+      });
+    if (
+      options.engine === "lux-onnx" &&
+      !z.string().uuid().safeParse(options.voice).success
+    )
+      context.addIssue({
+        code: "custom",
+        path: ["voice"],
+        message: "请创建或选择已保存的克隆音色",
       });
     if (options.engine === "kokoro" && options.language !== "zh")
       context.addIssue({
@@ -185,7 +201,7 @@ export function ttsWorkerArguments(
   request: string,
   output: string,
 ): string[] {
-  if (options.engine in onnxTtsModels)
+  if (options.engine in onnxTtsModels || options.engine === "lux-onnx")
     return onnxWorkerArguments(
       workers,
       "synthesize.py",

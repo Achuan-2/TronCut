@@ -2,6 +2,7 @@ import type { Asset, Project } from "./model";
 import type { Cue } from "./subtitles";
 import type { SpeechEngine, SpeechOptions } from "./asr";
 import type { TtsOptions, WindowsSpeechVoice } from "./tts";
+import type { ClonedVoice, CreateClonedVoice } from "./cloned-voices";
 import type { OnnxModel, PreparedOnnxModel } from "./onnx";
 import type { RecentProject, RecoveryInfo } from "./recent-projects";
 import type { Preferences, PreferencesUpdate } from "./preferences";
@@ -78,6 +79,11 @@ export interface FrameCraftBridge {
   windowsSpeechVoices(): Promise<WindowsSpeechVoice[]>;
   downloadSpeechModel(engine: OnnxModel): Promise<PreparedOnnxModel>;
   selectNarrationReference(): Promise<Asset | null>;
+  releaseNarrationReference(id: string): Promise<void>;
+  transcribeNarrationReference(id: string): Promise<string>;
+  clonedVoices(): Promise<ClonedVoice[]>;
+  createClonedVoice(options: CreateClonedVoice): Promise<ClonedVoice>;
+  deleteClonedVoice(id: string): Promise<void>;
   cancelTask(): Promise<void>;
   onProgress(
     callback: (event: { percent: number; label: string }) => void,
@@ -101,7 +107,9 @@ export interface FrameCraftBridge {
   ): Promise<void>;
   nativeRecordingPause(paused: boolean): Promise<void>;
   nativeRecordingStop(): Promise<Asset>;
-  recordingStart(kind: "screen" | "camera" | "microphone"): Promise<string>;
+  recordingStart(
+    kind: "screen" | "camera" | "microphone" | "voice-reference",
+  ): Promise<string>;
   recordingChunk(id: string, chunk: Uint8Array): Promise<void>;
   recordingStop(id: string, duration: number): Promise<Asset>;
   recordingAbort(id: string): Promise<void>;

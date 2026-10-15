@@ -918,6 +918,34 @@ fieldset:disabled {
   margin: 0;
   min-width: 0;
 }
+.clone-create {
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid #46534b;
+  border-radius: 8px;
+}
+.clone-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.clone-recorder > button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.clone-create audio {
+  width: 100%;
+  margin-top: 8px;
+  height: 36px;
+}
+.clone-create .field input {
+  width: 100%;
+}
+.clone-delete-confirm {
+  padding: 8px 0;
+  font-size: 12px;
+}
 .narration-dialog-actions {
   display: flex;
   gap: 10px;

@@ -27,7 +27,7 @@ export const transcriptionSchema = z
 export const narrationSchema = z
   .object({
     engine: z
-      .enum(["windows-sapi", "kokoro-onnx", "vits-onnx"])
+      .enum(["windows-sapi", "kokoro-onnx", "vits-onnx", "lux-onnx"])
       .default("kokoro-onnx"),
     voice: z.string().optional(),
     modelDir: z.string().default(""),
@@ -55,6 +55,15 @@ export const narrationSchema = z
     voice: value.voice ?? (value.engine === "windows-sapi" ? "auto" : "10"),
   }))
   .superRefine((value, context) => {
+    if (
+      value.engine === "lux-onnx" &&
+      !z.string().uuid().safeParse(value.voice).success
+    )
+      context.addIssue({
+        code: "custom",
+        path: ["voice"],
+        message: "LuxTTS 需要填写已保存克隆音色的 ID",
+      });
     let previousEnd = 0;
     for (const [index, segment] of value.segments.entries()) {
       if (segment.end <= segment.start || segment.start < previousEnd)
@@ -174,7 +183,8 @@ export const cliHelp = {
       "--project 工程 --script 分段文案.json --output 新工程 [--srt 字幕.srt]",
     export: "--project 工程 --output 视频.mp4 [--software]",
     run: "--plan 计划.json；剪辑→转录或文案配音→字幕→保存工程→导出；无语音且未提供文案时返回 needs_script 与抽帧",
-    models: "--engine qwen3-asr|sensevoice|kokoro-onnx|vits-onnx；下载模型",
+    models:
+      "--engine qwen3-asr|sensevoice|kokoro-onnx|vits-onnx|lux-onnx；下载模型",
   },
   common:
     "--overwrite 允许替换已有输出；--result 结果.json 保存机器可读结果；--cancel-file 文件：创建该文件取消任务；进度为 stderr JSONL，最终结果为 stdout JSON",

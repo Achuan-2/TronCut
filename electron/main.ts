@@ -29,7 +29,7 @@ import { openProject, saveProject } from "./project-store";
 import { importCamtasia } from "./camtasia";
 import { audioFilters, exportVideo, exportFrame } from "./export";
 import { speechEngineSchema, speechOptionsSchema } from "../shared/asr";
-import { transcribeProject } from "./transcription";
+import { transcribeProject, transcribeAsset } from "./transcription";
 import { synthesizeSpeech } from "./synthesis";
 import { SpeechVoicePreviews } from "./speech-preview";
 import { windowsSpeechVoices } from "./windows-speech";
@@ -37,6 +37,8 @@ import { ttsOptionsSchema } from "../shared/tts";
 import { onnxModelSchema } from "../shared/onnx";
 import { downloadOnnxModel } from "./onnx";
 import { closeOnnxSessions } from "./onnx-session";
+import { ClonedVoices, validateVoiceReference } from "./cloned-voices";
+import { createClonedVoiceSchema } from "../shared/cloned-voices";
 import { mediaThumbnail } from "./thumbnails";
 import { serveMediaFile } from "./media-protocol";
 import { NativeRecording } from "./native-recording";
@@ -102,6 +104,8 @@ let task: AbortController | null = null;
 let nativeRecording: NativeRecording | null = null;
 const assets = new Map<string, Asset>();
 const speechVoicePreviews = new SpeechVoicePreviews();
+const clonedVoices = new ClonedVoices(app.getPath("userData"));
+const temporaryReferences = new Set<string>();
 const approvedPaths = new Set<string>();
 const recordings = new Map<
   string,
@@ -680,12 +684,58 @@ function installHandlers() {
     }
   });
   handle("audio:reference", async () => {
-    const file = await chooseFile("选择参考音频（1–30 秒）", ["wav", "mp3", "m4a", "flac", "ogg", "aac"]);
+    const file = await chooseFile("选择克隆参考音频（3–30 秒）", ["wav", "mp3", "m4a", "flac", "ogg", "aac", "webm"]);
     if (!file) return null;
     const asset = await probeMedia(file, process.resourcesPath);
-    if (asset.kind !== "audio" || !asset.hasAudio || asset.duration < 1 || asset.duration > 30)
-      throw new Error("请选择 1–30 秒的参考音频");
+    validateVoiceReference(asset);
+    temporaryReferences.add(asset.id);
     return register(asset);
+  });
+  handle("audio:reference:release", async (input: unknown) => {
+    const id = z.string().uuid().parse(input);
+    if (!temporaryReferences.has(id)) return;
+    const asset = assets.get(id);
+    if (!asset) return;
+    const recordingsRoot = path.resolve(app.getPath("userData"), "recordings");
+    if (path.dirname(path.resolve(asset.path)) === recordingsRoot && path.basename(asset.path).startsWith("voice-reference-"))
+      await fs.rm(asset.path, { force: true });
+    temporaryReferences.delete(id);
+    assets.delete(id);
+    if (![...assets.values()].some((item) => path.resolve(item.path) === path.resolve(asset.path)))
+      approvedPaths.delete(path.resolve(asset.path));
+  });
+  handle("audio:reference:transcribe", async (input: unknown) => {
+    if (task) throw new Error("已有后台任务正在执行");
+    const asset = assetById(input);
+    validateVoiceReference(asset);
+    task = new AbortController();
+    const temp = await fs.mkdtemp(path.join(app.getPath("temp"), "troncut-reference-"));
+    try {
+      const cues = await transcribeAsset(asset, "sensevoice", "auto", { device: "cpu" }, {
+        userData: app.getPath("userData"),
+        workers: app.isPackaged ? path.join(process.resourcesPath, "workers", "onnx") : path.resolve("workers/onnx"),
+        resources: process.resourcesPath, temp,
+      }, task.signal, notify);
+      return cues.map((cue) => cue.text).join("");
+    } finally { task = null; await fs.rm(temp, { recursive: true, force: true }); }
+  });
+  handle("audio:cloned-voices:list", () => clonedVoices.list());
+  handle("audio:cloned-voices:delete", async (input: unknown) => {
+    if (task) throw new Error("已有后台任务正在执行");
+    await clonedVoices.remove(z.string().uuid().parse(input));
+  });
+  handle("audio:cloned-voices:create", async (input: unknown) => {
+    if (task) throw new Error("已有后台任务正在执行");
+    const options = createClonedVoiceSchema.parse(input);
+    const reference = assetById(options.referenceAssetId);
+    task = new AbortController();
+    try {
+      return await clonedVoices.create(options, reference, {
+        userData: app.getPath("userData"),
+        workers: app.isPackaged ? path.join(process.resourcesPath, "workers", "onnx") : path.resolve("workers/onnx"),
+        resources: process.resourcesPath,
+      }, task.signal, notify);
+    } finally { task = null; }
   });
   handle("app:capabilities", () => capabilities(process.resourcesPath));
   handle("speech:downloadModel", async (input: unknown) => {
@@ -800,7 +850,7 @@ function installHandlers() {
     };
   });
   handle("recording:start", async (kind: unknown) => {
-    const label = z.enum(["screen", "camera", "microphone"]).parse(kind);
+    const label = z.enum(["screen", "camera", "microphone", "voice-reference"]).parse(kind);
     const id = uid(),
       folder = path.join(app.getPath("userData"), "recordings");
     await fs.mkdir(folder, { recursive: true });
@@ -851,6 +901,7 @@ function installHandlers() {
       output,
     ]);
     const asset = register(await probeMedia(output, process.resourcesPath));
+    if (path.basename(rec.file).startsWith("voice-reference-")) temporaryReferences.add(asset.id);
     await fs.rm(rec.file, { force: true });
     return asset;
   });

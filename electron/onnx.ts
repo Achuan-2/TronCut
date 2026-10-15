@@ -19,6 +19,8 @@ export async function prepareOnnxWorker(source: string, userData: string) {
     "caption_utils.py",
     "model_cache.py",
     "server.py",
+    "lux.py",
+    "clone.py",
     "transcribe.py",
     "synthesize.py",
     "prepare.py",

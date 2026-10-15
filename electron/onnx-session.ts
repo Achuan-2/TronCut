@@ -148,7 +148,9 @@ class OnnxSession {
         const id = randomUUID();
         this.active = { id, onLine: options.onLine, resolve, reject };
         const script = args.find((arg) =>
-          ["synthesize.py", "transcribe.py"].includes(path.basename(arg)),
+          ["synthesize.py", "transcribe.py", "clone.py"].includes(
+            path.basename(arg),
+          ),
         );
         child.stdin.write(
           JSON.stringify({

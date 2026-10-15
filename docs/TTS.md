@@ -1,10 +1,20 @@
 # 文本转语音
 
-Windows 默认使用本机 Windows 系统语音，自动优先微软云希；也可切换至 Kokoro/VITS 本地 ONNX 模型。系统音色的安装与调用见文末“Windows 系统语音”。
+Windows 默认使用本机 Windows 系统语音，自动优先微软云希；也可切换至 Kokoro/VITS 或 LuxTTS 本地 ONNX 模型。系统音色的安装与调用见文末“Windows 系统语音”。
 
 在“旁白”面板输入文稿，从右上角更多菜单打开“AI 配音设置”弹窗，选择模型、音色和 0.5–2 倍语速。点击“试听音色”播放独立示例，试听不会加入时间线或媒体库；更换音色、语速或关闭弹窗时停止播放并清理临时音频。完成设置后，在面板点击“生成音频”将正式配音加入时间线。更多菜单也可读取选中的文本或字幕，原来的读取配音参数、模型目录、设备和下载按钮已从界面移除。Kokoro 支持中英文混读；VITS 仅支持中文。生成音频统一为 48 kHz、单声道、PCM16 WAV，语速仅在最终 FFmpeg 转换时应用一次。
 
-两种配音模型均通过 sherpa-onnx 调用，使用 CPU 运行环境，无需 PyTorch 或 CUDA。字幕与配音共用 `workers/onnx/.venv/` 下的 Python 3.12 环境，`uv.lock` 锁定 `sherpa-onnx` 和配套 `sherpa-onnx-core` 原生库。应用数据目录的 `models/onnx/` 保存下载模型；生成记录保留实际模型目录、精度、采样率、加载和推理耗时。
+Kokoro/VITS 通过 sherpa-onnx 调用，LuxTTS 通过 `luxtts-onnx` 与 ONNX Runtime 调用，均使用 CPU 运行环境，无需 PyTorch 或 CUDA。字幕与配音共用 `workers/onnx/.venv/` 下的 Python 3.12 环境，`uv.lock` 锁定依赖。应用数据目录的 `models/onnx/` 保存下载模型；生成记录保留实际模型目录、精度、采样率、加载和推理耗时。
+
+选择“LuxTTS · 声音克隆 ONNX”后，可导入 3–30 秒的参考音频，也可在弹窗直接录制参考声音。参考录音使用所选麦克风，最多 30 秒，不加入时间线；可先试听原声。填写音色名称和参考音频中说出的文字，也可点击“自动识别参考文字”，由 SenseVoice 在本地识别后校对。点击“克隆并保存音色”生成声音特征，之后在“配音音色”中直接选择，供试听或正式配音使用；关闭弹窗及重启应用后仍可读取。
+
+音色库位于应用数据目录的 `cloned-voices/<音色 ID>/`，包含 `voice.json`、独立的 `reference.wav` 和不含 pickle 的 `prompt.npz`。导入文件保持原样，录音和导入引用在弹窗结束后清理；音色持有自己的音频副本。音色创建失败或取消不发布半成品。删除音色前需在界面确认，删除后已生成、已归档的工程音频仍可播放；重新生成则需要音色仍存在。音色库属于本机，不随工程自动迁移。
+
+LuxTTS 使用官方仓库列出的 [luxtts-onnx 社区实现](https://github.com/ningyos/luxtts-onnx)，固定源码提交 `d29f673417d3bd8f82b8a2dda0131eb3eb6078e2`。从 [YatharthS/LuxTTS](https://huggingface.co/YatharthS/LuxTTS) 下载 `text_encoder.onnx`、`fm_decoder.onnx` 和 `tokens.txt`，从 [ProgCat/luxtts-onnx](https://huggingface.co/ProgCat/luxtts-onnx) 下载 `vocos.onnx`，版本与 SHA256 均固定，总计约 541 MiB。模型仅从 TronCut 自己的缓存或显式目录加载；不调用依赖库的隐式 Hugging Face 下载流程。声音特征另有最多 16 项内存缓存。推理使用四步采样，输出 48 kHz；对上游内部的 1.3 倍时长因子做补偿，避免固定参考段也被压缩后截短生成句子，用户语速仍仅由 FFmpeg 应用一次。
+
+真实验证命令：`node scripts/verify-lux-tts.mjs`。设置 `TRONCUT_LUX_TEST_USER_DATA` 可使用指定的 TronCut 缓存；脚本生成独立参考音频、克隆和保存音色、验证连续合成命中缓存、关闭进程后重新读取音色，并检查删除音色后工程内的归档音频仍存在。2026-10-15 Windows CPU 验证结果在 `test-output/lux-tts/1792063347167/result.json`：测试句“你好，这是保存音色后的克隆配音。”生成原始时长 4.128 秒，以 1.25 倍语速转换后约 3.30 秒，本地 SenseVoice 回读全文一致，两次合成均命中内存模型。该样本验证内容完整性和调用流程，不代表克隆相似度评测或所有参考声音的质量。
+
+`node scripts/smoke-lux-tts.mjs` 使用已有模型缓存和 `TRONCUT_LUX_TEST_AUDIO` 指定的测试 WAV，通过 Chromium 虚拟麦克风验证导入、录音、参考文字识别、音色保存/删除、试听和配音；临时测试音色会清理。真实麦克风设备与不同录音环境仍由用户实际试听。
 
 本地 ONNX 模型仅从 TronCut 自己的缓存读取；缺少时自动下载官方完整模型包。CLI 仍可用 `modelDir` 指定完整模型文件夹，不会自动检查其他应用目录。Kokoro 需要 `model.int8.onnx`、`voices.bin`、`tokens.txt`、中英文词典、`espeak-ng-data/` 和中文规范化 FST；VITS 需要 `model.onnx`、`tokens.txt`、`lexicon.txt` 与规范化 FST。指定目录不完整时直接提示缺失文件，应用不会修改该目录或自动替换成其他模型。
 
@@ -16,7 +26,7 @@ CLI 的 `offline:true` 同时禁止 uv 与模型下载；环境或模型不完�
 
 生成结果可以试听，离开面板停止试听，返回时保留文稿和参数。保存工程会归档 WAV，`narration` 保留模型、音色、目录、语速和离线选项；已经生成的配音可在没有模型环境的电脑上继续播放和编辑。
 
-旧 Kokoro、Qwen3-TTS 与 IndexTTS 工程仍可打开、播放已有音频。新配音从设置弹窗选择当前支持的模型和音色，不再提供旧模型的语气指令、参考声音克隆或读取片段配音参数按钮。
+旧 Kokoro、Qwen3-TTS 与 IndexTTS 工程仍可打开、播放已有音频。新配音从设置弹窗选择当前支持的模型和音色；声音克隆使用 LuxTTS，不恢复旧模型的语气指令或读取片段配音参数按钮。
 
 开发验证：
 

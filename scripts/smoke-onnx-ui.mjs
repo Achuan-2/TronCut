@@ -60,6 +60,7 @@ try {
     ...(process.platform === "win32" ? ["windows-sapi"] : []),
     "kokoro-onnx",
     "vits-onnx",
+    "lux-onnx",
   ]);
   await page.getByLabel("配音模型", { exact: true }).selectOption("vits-onnx");
   await expect(page.getByLabel("配音模型目录", { exact: true })).toHaveCount(0);

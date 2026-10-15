@@ -17,6 +17,9 @@ def serve():
             if message["script"] == "synthesize.py":
                 from synthesize import synthesize
                 synthesize(request, output)
+            elif message["script"] == "clone.py":
+                from lux import clone_voice
+                clone_voice(request, output)
             elif message["script"] == "transcribe.py":
                 from transcribe import transcribe
                 cues = transcribe(request)

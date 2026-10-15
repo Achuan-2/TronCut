@@ -12,6 +12,7 @@ import { findBinary, runProcess } from "./process";
 import { probeMedia } from "./media";
 import { onnxEnvironment, prepareOnnxWorker, runOnnxWorker } from "./onnx";
 import { synthesizeWindowsSpeech } from "./windows-speech";
+import { ClonedVoices } from "./cloned-voices";
 
 const progressSchema = z.object({
   percent: z.number().finite().min(0).max(100),
@@ -49,11 +50,19 @@ export async function synthesizeSpeech(
 ) {
   const options = ttsOptionsSchema.parse(input);
   const windows = options.engine === "windows-sapi";
-  if (!windows && !(options.engine in onnxTtsModels))
+  if (
+    !windows &&
+    options.engine !== "lux-onnx" &&
+    !(options.engine in onnxTtsModels)
+  )
     throw new Error(
       "配音已改用 ONNX，请重新选择 Kokoro 或 VITS；已有配音仍可播放",
     );
   if (signal.aborted) throw new Error("配音已取消");
+  const cloned =
+    options.engine === "lux-onnx"
+      ? await new ClonedVoices(paths.userData).get(options.voice)
+      : undefined;
   progress(
     0,
     windows ? "正在准备 Windows 系统语音" : "正在检查 sherpa-onnx 配音运行环境",
@@ -90,7 +99,11 @@ export async function synthesizeSpeech(
     } else {
       await fs.writeFile(
         request,
-        JSON.stringify({ ...options, device: "cpu" }),
+        JSON.stringify({
+          ...options,
+          device: "cpu",
+          ...(cloned ? { promptFile: cloned.prompt } : {}),
+        }),
         "utf8",
       );
       progress(

@@ -7,6 +7,7 @@ import {
   type WindowsSpeechVoice,
 } from "../shared/tts";
 import type { Asset } from "../shared/model";
+import ClonedVoiceFields from "./ClonedVoiceFields";
 
 interface Props {
   options: TtsOptions;
@@ -27,6 +28,8 @@ export default function NarrationSettingsDialog({
 }: Props) {
   const engine = options.engine as AvailableTtsEngine;
   const windows = engine === "windows-sapi";
+  const cloning = engine === "lux-onnx";
+  const [referenceRecording, setReferenceRecording] = useState(false);
   const [voices, setVoices] = useState<WindowsSpeechVoice[]>([]);
   const [loading, setLoading] = useState(false);
   const [voiceError, setVoiceError] = useState("");
@@ -173,7 +176,7 @@ export default function NarrationSettingsDialog({
         if (event.key === "Tab") {
           const fields = Array.from(
             dialog.current?.querySelectorAll<HTMLElement>(
-              "button:not(:disabled), select:not(:disabled)",
+              "button:not(:disabled), select:not(:disabled), input:not(:disabled), textarea:not(:disabled)",
             ) ?? [],
           );
           const first = fields[0],
@@ -211,16 +214,19 @@ export default function NarrationSettingsDialog({
             <select
               aria-label="配音模型"
               value={engine}
+              disabled={referenceRecording}
               onChange={(event) => {
                 const next = event.target.value as AvailableTtsEngine;
                 update({
                   engine: next,
                   voice:
-                    next === "windows-sapi"
-                      ? "auto"
-                      : next === "kokoro-onnx"
-                        ? "10"
-                        : "0",
+                    next === "lux-onnx"
+                      ? ""
+                      : next === "windows-sapi"
+                        ? "auto"
+                        : next === "kokoro-onnx"
+                          ? "10"
+                          : "0",
                   language: "zh",
                   device: "cpu",
                   modelDir: "",
@@ -242,42 +248,59 @@ export default function NarrationSettingsDialog({
                 ))}
             </select>
           </label>
-          <label className="field vertical">
-            配音音色
-            <select
-              aria-label="配音音色"
-              value={options.voice}
-              disabled={windows && loading}
-              onChange={(event) => update({ voice: event.target.value })}
-            >
-              {availableTtsModels[engine].voices.map((voice) => (
-                <option key={voice.id} value={voice.id}>
-                  {voice.name}
-                </option>
-              ))}
-              {windows &&
-                voices.map((voice) => (
+          {cloning ? (
+            <ClonedVoiceFields
+              voiceId={options.voice}
+              busy={busy}
+              onSelect={(voice) => update({ voice })}
+              onActivity={(active) => {
+                setReferenceRecording(active);
+                if (active) {
+                  clearPreview();
+                  onPreviewStart();
+                }
+              }}
+              run={run}
+            />
+          ) : (
+            <label className="field vertical">
+              配音音色
+              <select
+                aria-label="配音音色"
+                value={options.voice}
+                disabled={windows && loading}
+                onChange={(event) => update({ voice: event.target.value })}
+              >
+                {availableTtsModels[engine].voices.map((voice) => (
                   <option key={voice.id} value={voice.id}>
-                    {voice.name} · {voice.language} ·{" "}
-                    {voice.gender === "Male"
-                      ? "男声"
-                      : voice.gender === "Female"
-                        ? "女声"
-                        : voice.gender}
+                    {voice.name}
                   </option>
                 ))}
-              {windows &&
-                options.voice !== "auto" &&
-                !voices.some((voice) => voice.id === options.voice) && (
-                  <option value={options.voice}>原音色不可用</option>
-                )}
-            </select>
-          </label>
+                {windows &&
+                  voices.map((voice) => (
+                    <option key={voice.id} value={voice.id}>
+                      {voice.name} · {voice.language} ·{" "}
+                      {voice.gender === "Male"
+                        ? "男声"
+                        : voice.gender === "Female"
+                          ? "女声"
+                          : voice.gender}
+                    </option>
+                  ))}
+                {windows &&
+                  options.voice !== "auto" &&
+                  !voices.some((voice) => voice.id === options.voice) && (
+                    <option value={options.voice}>原音色不可用</option>
+                  )}
+              </select>
+            </label>
+          )}
           <label className="field vertical">
             配音语速
             <select
               aria-label="配音语速"
               value={options.speed}
+              disabled={referenceRecording}
               onChange={(event) =>
                 update({ speed: Number(event.target.value) })
               }
@@ -319,7 +342,10 @@ export default function NarrationSettingsDialog({
         <div className="narration-dialog-actions">
           <button
             disabled={
-              busy || (windows && (loading || !!voiceError || !voices.length))
+              busy ||
+              (windows && (loading || !!voiceError || !voices.length)) ||
+              referenceRecording ||
+              (cloning && !options.voice)
             }
             onClick={audition}
           >

@@ -42,6 +42,9 @@ def text_chunks(text, limit=100):
 
 def synthesize(request, output):
     engine = request["engine"]
+    if engine == "lux-onnx":
+        from lux import synthesize as synthesize_lux
+        return synthesize_lux(request, output)
     if engine not in ("kokoro-onnx", "vits-onnx"):
         raise ValueError("请选择 Kokoro 或 VITS ONNX 模型")
     if request.get("device", "cpu") not in ("auto", "cpu"):

@@ -1,5 +1,6 @@
 """Resolve ONNX models from TronCut's cache or an explicitly selected directory."""
 import os
+import hashlib
 from pathlib import Path
 import shutil
 import tarfile
@@ -8,6 +9,16 @@ import urllib.request
 
 RELEASE = "https://github.com/k2-fsa/sherpa-onnx/releases/download"
 MODELS = {
+    "lux-onnx": {
+        "directory": "luxtts-onnx",
+        "files": ("text_encoder.onnx", "fm_decoder.onnx", "tokens.txt", "vocos.onnx"),
+        "sources": {
+            "text_encoder.onnx": ("YatharthS/LuxTTS", "527f245a276a0eb42ea103a7a512bcfd771eb9b6", "495eca2d5f8a911f5c361bcce5bd55cdd2508ccdd26ce3e9bf1d3c29eb974861"),
+            "fm_decoder.onnx": ("YatharthS/LuxTTS", "527f245a276a0eb42ea103a7a512bcfd771eb9b6", "4510d4f5f049f14ef80207fca695e13c820e2cea61635f402954950bc62b1e3c"),
+            "tokens.txt": ("YatharthS/LuxTTS", "527f245a276a0eb42ea103a7a512bcfd771eb9b6", "ce98c1afc5f7a20c2484dffdd68a1fff0a4a2cc707328833750c4476c37cdbda"),
+            "vocos.onnx": ("ProgCat/luxtts-onnx", "454a62c256d65e2afeb644d95e9fde16b09f590c", "8c00bfefb2ceb64247abd0a70b3ea4552e49c19fae60cbb037dbaf49cec3fd68"),
+        },
+    },
     "qwen3-asr": {
         "directory": "qwen3-asr-0.6b",
         "release": "asr-models",
@@ -108,7 +119,15 @@ def resolve_model(engine, model_dir, offline, progress):
     # Download into our own staging directory, never into the user's supplied directory.
     with tempfile.TemporaryDirectory(prefix=".prepare-", dir=staging_root()) as staging:
         staging = Path(staging)
-        if "repo" in spec:
+        if "sources" in spec:
+            directory = staging / spec["directory"]
+            for name, (repo, revision, expected) in spec["sources"].items():
+                target = directory / name
+                download(f"https://huggingface.co/{repo}/resolve/{revision}/{name}", target, progress)
+                with target.open("rb") as source:
+                    if hashlib.file_digest(source, "sha256").hexdigest() != expected:
+                        raise RuntimeError(f"模型文件校验失败：{name}")
+        elif "repo" in spec:
             directory = staging / spec["directory"]
             for name in spec["files"]:
                 download(f"https://huggingface.co/{spec['repo']}/resolve/main/{name}", directory / name, progress)

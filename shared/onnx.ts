@@ -5,6 +5,7 @@ export const onnxModelSchema = z.enum([
   "sensevoice",
   "kokoro-onnx",
   "vits-onnx",
+  "lux-onnx",
 ]);
 export type OnnxModel = z.infer<typeof onnxModelSchema>;
 export interface PreparedOnnxModel {
@@ -15,7 +16,7 @@ export interface PreparedOnnxModel {
 /** Recognition and synthesis share the same CPU runtime. */
 export function onnxWorkerArguments(
   workers: string,
-  script: "transcribe.py" | "synthesize.py" | "prepare.py",
+  script: "transcribe.py" | "synthesize.py" | "prepare.py" | "clone.py",
   request: string,
   output: string,
   offline = false,
