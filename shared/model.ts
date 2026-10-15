@@ -33,6 +33,8 @@ export const transformSchema = z.object({
   rotation: finite.min(-3600).max(3600).optional(),
   rotationX: finite.min(-3600).max(3600).optional(),
   rotationY: finite.min(-3600).max(3600).optional(),
+  skew: finite.min(-80).max(80).optional(),
+  z: finite.min(-10000).max(1000).optional(),
   contentX: finite.min(-4).max(4).optional(),
   contentY: finite.min(-4).max(4).optional(),
   contentScale: finite.min(0.05).max(8).optional(),
@@ -207,7 +209,14 @@ export const projectSchema = z.object({
         fadeIn: finite.min(0).max(86400).optional(),
         fadeOut: finite.min(0).max(86400).optional(),
         cursorStyle: cursorStyleSchema.optional(),
-        mediaFrame: z.object({ radius: finite.min(0).max(200) }).optional(),
+        mediaFrame: z.object({
+          radius: finite.min(0).max(200),
+          enabled: z.boolean().optional(),
+          corners: z.object({
+            topLeft: z.boolean(), topRight: z.boolean(),
+            bottomRight: z.boolean(), bottomLeft: z.boolean(),
+          }).optional(),
+        }).optional(),
       }),
     )
     .max(100000),

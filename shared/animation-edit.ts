@@ -173,6 +173,8 @@ export function pasteAnimation(
     rotation: [-3600, 3600],
     rotationX: [-3600, 3600],
     rotationY: [-3600, 3600],
+    skew: [-80, 80],
+    z: [-10000, 1000],
     contentX: [-4, 4],
     contentY: [-4, 4],
     contentScale: [0.05, 8],

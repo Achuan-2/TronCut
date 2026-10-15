@@ -1,3 +1,4 @@
+import { addMediaFrame as addFrameEffect, supportsMediaFrame } from "../shared/media-frame";
 import {
   useCallback,
   useEffect,
@@ -593,6 +594,18 @@ export function useEditor(
     },
     [apply, playhead, select, setPlaying],
   );
+  const addRoundedCorners = useCallback((id?: string) => {
+    const project = current.current;
+    const ids = id ? [id] : selectedIds;
+    const clips = project.clips.map((clip) =>
+      ids.includes(clip.id) && !project.tracks.find((track) => track.id === clip.trackId)?.locked
+        ? addFrameEffect(clip) : clip,
+    );
+    if (clips.some((clip, index) => clip !== project.clips[index])) apply({ ...project, clips });
+    if (id && project.clips.some((clip) => clip.id === id && supportsMediaFrame(clip))) select(id);
+    clearKeyframeEdit();
+    setPlaying(false);
+  }, [apply, selectedIds, select, clearKeyframeEdit, setPlaying]);
   const addSpeedEffect = useCallback(
     (id?: string) => {
       const p = current.current;
@@ -1006,6 +1019,7 @@ export function useEditor(
     addText,
     addAnnotation,
     addSpeedEffect,
+    addRoundedCorners,
     addBehavior,
     addTransition,
     updateTransition,

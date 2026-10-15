@@ -1,4 +1,4 @@
-import { RotateCcw, X } from "lucide-react";
+import EffectSection from "./EffectSection";
 import type { Clip } from "../shared/model";
 import { durationParts, speedLimits } from "../shared/clip-speed";
 import type { Editor } from "./useEditor";
@@ -13,26 +13,7 @@ export default function SpeedProperties({
   const fps = editor.project.canvas.fps;
   const parts = durationParts(clip.duration, fps);
   return (
-    <section className="speed-properties" aria-label="剪辑速度属性">
-      <div className="speed-heading">
-        <h3>剪辑速度</h3>
-        <button
-          type="button"
-          title="恢复正常速度"
-          aria-label="恢复正常速度"
-          onClick={() => editor.changeClipSpeed(clip.id, 1)}
-        >
-          <RotateCcw size={14} />
-        </button>
-        <button
-          type="button"
-          title="移除剪辑速度"
-          aria-label="移除剪辑速度"
-          onClick={() => editor.removeSpeedEffect(clip.id)}
-        >
-          <X size={15} />
-        </button>
-      </div>
+    <EffectSection title="剪辑速度" onReset={() => editor.changeClipSpeed(clip.id, 1)} onRemove={() => editor.removeSpeedEffect(clip.id)}>
       <label className="field">
         速度
         <div className="speed-number">
@@ -80,6 +61,6 @@ export default function SpeedProperties({
         </div>
       </div>
       <p className="small-note">音视频同步变速，保留原始音调。</p>
-    </section>
+    </EffectSection>
   );
 }

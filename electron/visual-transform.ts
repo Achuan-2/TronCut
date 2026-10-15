@@ -1,20 +1,24 @@
 import type { Clip } from "../shared/model";
 import { contentOrigin, defaultContentTransform } from "../shared/crop";
 import type { VisualKey } from "../shared/visual-state";
+import { mediaFrameRadii } from "../shared/media-frame";
 
 export function mediaFrameFilters(
   clip: Clip,
   fit: number,
   cropExpression?: (key: VisualKey) => string,
 ) {
-  if (!clip.mediaFrame?.radius) return [];
+  const radii = mediaFrameRadii(clip);
+  if (!radii.some(Boolean)) return [];
   const width = cropExpression
     ? `W*(1-(${cropExpression("cropLeft")})-(${cropExpression("cropRight")}))`
     : "W";
   const height = cropExpression
     ? `H*(1-(${cropExpression("cropTop")})-(${cropExpression("cropBottom")}))`
     : "H";
-  const prefix = `st(0,(${width})/2);st(1,(${height})/2);st(2,min(${clip.mediaFrame.radius / fit},min(ld(0),ld(1))));`;
+  const [tl, tr, br, bl] = radii.map((radius) => radius / fit);
+  const radius = `if(lt(X,W/2),if(lt(Y,H/2),${tl},${bl}),if(lt(Y,H/2),${tr},${br}))`;
+  const prefix = `st(0,(${width})/2);st(1,(${height})/2);st(2,min(${radius},min(ld(0),ld(1))));`;
   const mask =
     "lte(pow(max(abs(X+0.5-W/2)-ld(0)+ld(2),0),2)+pow(max(abs(Y+0.5-H/2)-ld(1)+ld(2),0),2),ld(2)*ld(2))";
   return [
@@ -77,18 +81,21 @@ export function axisRotationFilters(angles: {
   x: string;
   y: string;
   z: string;
+  skew?: string;
+  maxSkew?: number;
 }) {
   const x = `(${angles.x})*PI/180`,
     y = `(${angles.y})*PI/180`,
     z = `(${angles.z})*PI/180`;
   const a = `cos(${z})*cos(${y})`,
     b = `sin(${z})*cos(${y})`;
-  const c = `(cos(${z})*sin(${y})*sin(${x})-sin(${z})*cos(${x}))`;
-  const d = `(sin(${z})*sin(${y})*sin(${x})+cos(${z})*cos(${x}))`;
+  const shear = `tan((${angles.skew ?? "0"})*PI/180)`;
+  const c = `((${a})*${shear}+cos(${z})*sin(${y})*sin(${x})-sin(${z})*cos(${x}))`;
+  const d = `((${b})*${shear}+sin(${z})*sin(${y})*sin(${x})+cos(${z})*cos(${x}))`;
   const determinant = `(cos(${x})*cos(${y}))`;
   const divisor = `if(gt(abs(${determinant}),0.000001),${determinant},1)`;
   return [
-    "pad=w='ceil(sqrt(iw*iw+ih*ih)/2)*2':h=ow:x=(ow-iw)/2:y=(oh-ih)/2:color=black@0:eval=frame",
+    `pad=w='ceil(sqrt(pow(iw+ih*${Math.abs(Math.tan(((angles.maxSkew ?? 0) * Math.PI) / 180))},2)+ih*ih)/2)*2':h=ow:x=(ow-iw)/2:y=(oh-ih)/2:color=black@0:eval=frame`,
     samplePlane(
       `((${d})*(X-W/2)-(${c})*(Y-H/2))/(${divisor})+W/2`,
       `((${a})*(Y-H/2)-(${b})*(X-W/2))/(${divisor})+H/2`,

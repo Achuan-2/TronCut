@@ -118,6 +118,8 @@ export function TimelineAnimations({
     editedEnd?.value.rotation,
     editedEnd?.value.rotationX,
     editedEnd?.value.rotationY,
+    editedEnd?.value.skew,
+    editedEnd?.value.z,
     editedEnd?.value.contentX,
     editedEnd?.value.contentY,
     editedEnd?.value.contentScale,

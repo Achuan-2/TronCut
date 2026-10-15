@@ -1,42 +1,82 @@
-import { Gauge } from "lucide-react";
+import { useState } from "react";
+import { Gauge, RectangleHorizontal, Search, X } from "lucide-react";
 import { supportsClipSpeed } from "../shared/clip-speed";
+import { supportsMediaFrame } from "../shared/media-frame";
 import type { Editor } from "./useEditor";
 
 export default function VisualEffectsPanel({ editor }: { editor: Editor }) {
+  const [query, setQuery] = useState("");
+  const [selected, setSelected] = useState("clip-speed");
+  const effects = [
+    {
+      id: "rounded-corners",
+      name: "圆角倒角",
+      icon: RectangleHorizontal,
+      supports: supportsMediaFrame,
+      apply: () => editor.addRoundedCorners(),
+    },
+    {
+      id: "clip-speed",
+      name: "剪辑速度",
+      icon: Gauge,
+      supports: supportsClipSpeed,
+      apply: () => editor.addSpeedEffect(),
+    },
+  ];
+  const selectedEffect = effects.find((effect) => effect.id === selected)!;
   const canApply = editor.project.clips.some(
     (clip) =>
       editor.selectedIds.includes(clip.id) &&
-      supportsClipSpeed(clip) &&
+      selectedEffect.supports(clip) &&
       !editor.project.tracks.find((track) => track.id === clip.trackId)?.locked,
   );
   return (
     <div className="visual-effects-panel">
-      <p className="panel-intro">将效果拖到时间线中的视频或音频上。</p>
-      <button
-        className="visual-effect-card"
-        draggable
-        title="拖到片段，或双击应用到所选片段"
-        onDragStart={(event) => {
-          event.dataTransfer.setData("troncut-effect", "clip-speed");
-          event.dataTransfer.effectAllowed = "copy";
-        }}
-        onDoubleClick={() => editor.addSpeedEffect()}
-      >
-        <Gauge size={52} />
-        <b>剪辑速度</b>
-        <span>加速 · 慢放</span>
-      </button>
+      <div className="media-search effect-search">
+        <Search size={15} />
+        <input
+          aria-label="搜索视觉效果"
+          placeholder="搜索视觉效果…"
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+        />
+        {query && (
+          <button aria-label="清除视觉效果搜索" onClick={() => setQuery("")}>
+            <X size={14} />
+          </button>
+        )}
+      </div>
+      <div className="visual-effects-grid">
+        {effects
+          .filter((effect) => effect.name.includes(query.trim()))
+          .map((effect) => (
+            <button
+              key={effect.id}
+              className={`visual-effect-card ${selected === effect.id ? "selected" : ""}`}
+              data-effect={effect.id}
+              draggable
+              title="拖到片段，或双击应用到所选片段"
+              onClick={() => setSelected(effect.id)}
+              onDragStart={(event) => {
+                event.dataTransfer.setData("troncut-effect", effect.id);
+                event.dataTransfer.effectAllowed = "copy";
+              }}
+              onDoubleClick={effect.apply}
+            >
+              <div className={`effect-card-preview ${effect.id}`}>
+                <effect.icon size={40} />
+              </div>
+              <b>{effect.name}</b>
+            </button>
+          ))}
+      </div>
       <button
         className="wide-button"
         disabled={!canApply}
-        onClick={() => editor.addSpeedEffect()}
+        onClick={selectedEffect.apply}
       >
-        <Gauge size={16} />
         应用到所选片段
       </button>
-      <p className="small-note">
-        展开片段底部的效果区，拖动剪辑速度条末端调整速度。属性面板可输入倍速或持续时间。
-      </p>
     </div>
   );
 }

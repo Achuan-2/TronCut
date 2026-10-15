@@ -1,10 +1,15 @@
 import type { Clip, Transform } from "./model";
 
 export const rotationKeys = ["rotation", "rotationX", "rotationY"] as const;
+export const optionalTransformKeys = [...rotationKeys, "skew", "z"] as const;
+// Z is measured in canvas pixels, with the virtual camera 2000px from the plane.
+export function depthScale(z = 0) {
+  return 2000 / (2000 - Math.max(-10000, Math.min(1000, z)));
+}
 export function normalizeRotationAxes(
   clip: Pick<Clip, "transform"> & Partial<Pick<Clip, "rotation">>,
   value: Transform,
-  keys: readonly (typeof rotationKeys)[number][],
+  keys: readonly (typeof optionalTransformKeys)[number][],
 ): Transform {
   return {
     ...value,
@@ -31,11 +36,13 @@ export function rotationMatrix(value: Transform, fallbackZ = 0) {
     sy = Math.sin(y),
     cz = Math.cos(z),
     sz = Math.sin(z);
+  const shear = Math.tan(((value.skew ?? 0) * Math.PI) / 180);
+  const depth = depthScale(value.z);
   return {
-    a: cz * cy,
-    b: sz * cy,
-    c: cz * sy * sx - sz * cx,
-    d: sz * sy * sx + cz * cx,
+    a: cz * cy * depth,
+    b: sz * cy * depth,
+    c: (cz * cy * shear + cz * sy * sx - sz * cx) * depth,
+    d: (sz * cy * shear + sz * sy * sx + cz * cx) * depth,
   };
 }
 

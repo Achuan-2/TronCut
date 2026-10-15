@@ -50,6 +50,7 @@ import {
 import type { Editor } from "./useEditor";
 import { timeLabel } from "./Preview";
 import { hasClipSpeed, supportsClipSpeed } from "../shared/clip-speed";
+import { supportsMediaFrame } from "../shared/media-frame";
 import TimelineSpeedEffect from "./TimelineSpeedEffect";
 import TimelineBehaviorEffect from "./TimelineBehaviorEffect";
 import BehaviorContextMenu from "./BehaviorContextMenu";
@@ -1149,7 +1150,7 @@ export default function Timeline({
                             event.preventDefault();
                             event.stopPropagation();
                             const allowed =
-                              !track.locked && supportsClipSpeed(c);
+                              !track.locked && (supportsClipSpeed(c) || supportsMediaFrame(c));
                             event.dataTransfer.dropEffect = allowed
                               ? "copy"
                               : "none";
@@ -1203,15 +1204,17 @@ export default function Timeline({
                               }
                               return;
                             }
-                            if (
-                              event.dataTransfer.getData("troncut-effect") !==
-                              "clip-speed"
-                            )
-                              return;
+                            const effect = event.dataTransfer.getData("troncut-effect");
+                            if (!["clip-speed", "rounded-corners"].includes(effect)) return;
                             event.preventDefault();
                             event.stopPropagation();
                             setEffectDrop(null);
-                            if (track.locked || !supportsClipSpeed(c)) return;
+                            if (track.locked) return;
+                            if (effect === "rounded-corners") {
+                              if (supportsMediaFrame(c)) editor.addRoundedCorners(c.id);
+                              return;
+                            }
+                            if (!supportsClipSpeed(c)) return;
                             editor.addSpeedEffect(c.id);
                             setActiveSpeed(c.id);
                             setExpandedEffects((previous) => ({

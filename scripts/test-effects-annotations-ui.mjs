@@ -142,7 +142,7 @@ try {
   await seek(3);
   await page.getByRole("button", { name: "视觉效果", exact: true }).click();
   const main = page.locator('.track-lane[data-track="main"] .timeline-clip');
-  const card = page.locator(".visual-effect-card");
+  const card = page.locator('.visual-effect-card[data-effect="clip-speed"]');
   await card.dragTo(main, { targetPosition: { x: 40, y: 15 } });
   const speed = page.getByLabel("剪辑速度（倍）", { exact: true });
   const strip = page.locator(
@@ -168,6 +168,7 @@ try {
   await expect(speed).toHaveValue("1.5");
   await page.getByLabel("剪辑持续时间（帧）", { exact: true }).fill("15");
   await expect(speed).toHaveValue("1.3333");
+  await page.getByLabel("剪辑速度选项", { exact: true }).click();
   await page.getByRole("button", { name: "恢复正常速度", exact: true }).click();
   await expect(speed).toHaveValue("1");
   await main
@@ -199,6 +200,7 @@ try {
   await expect(main).toHaveCSS("width", "130px");
   await expect(speed).toHaveValue("2");
   await page.getByTitle("撤销 Ctrl+Z", { exact: true }).click();
+  await page.getByLabel("剪辑速度选项", { exact: true }).click();
   await page.getByRole("button", { name: "移除剪辑速度", exact: true }).click();
   await expect(speed).toHaveCount(0);
   await expect(strip).toHaveCount(0);
@@ -270,7 +272,7 @@ try {
   const text = page.locator(".preview-panel .preview-layer.text");
   await expect(text).toBeVisible();
   expect(
-    Number(await page.getByLabel("位置 X (%)", { exact: true }).inputValue()),
+    Number(await page.getByLabel("位置 X (px)", { exact: true }).inputValue()),
   ).toBeCloseTo(25, 0);
   await text.dblclick();
   const input = page.getByLabel("画布文本内容", { exact: true });

@@ -533,7 +533,7 @@ async function renderProject(
           : name;
       const pose = (key: keyof Transform, name = "t") =>
         expression(clip, key, clock(name));
-      const scale = pose("scale");
+      const scale = `(${pose("scale")})*2000/(2000-clip((${pose("z")}),-10000,1000))`;
       const transform = `scale=w='max(2,trunc(${cropWidth * fit}*(${scale})/2)*2)':h='max(2,trunc(${cropHeight * fit}*(${scale})/2)*2)':eval=frame`;
       const alphaAnimated =
         !!clip.behaviors?.some((behavior) => behavior.enabled) ||
@@ -560,12 +560,14 @@ async function renderProject(
       const hasAxisRotation = [
         clip.transform,
         ...clip.keyframes.map((frame) => frame.value),
-      ].some((value) => value.rotationX || value.rotationY);
+      ].some((value) => value.rotationX || value.rotationY || value.skew);
       const rotate = hasAxisRotation
         ? axisRotationFilters({
             x: pose("rotationX", "T"),
             y: pose("rotationY", "T"),
             z: pose("rotation", "T"),
+            skew: pose("skew", "T"),
+            maxSkew: Math.max(Math.abs(clip.transform.skew ?? 0), ...clip.keyframes.map((frame) => Math.abs(frame.value.skew ?? clip.transform.skew ?? 0))),
           })
         : animatedRotation
           ? [

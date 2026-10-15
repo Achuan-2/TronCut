@@ -10,7 +10,7 @@ import {
 } from "./model";
 import { sameTransform } from "./animation-ranges";
 import { easeProgress } from "./easing";
-import { normalizeRotationAxes, rotationKeys } from "./rotation";
+import { normalizeRotationAxes, optionalTransformKeys } from "./rotation";
 import { visualKeys, visualValues } from "./visual-state";
 import { fitBehaviorDuration } from "./behaviors";
 
@@ -131,7 +131,7 @@ export function createTransformSampler(
     clip.rotation !== undefined ||
     clip.transform.rotation !== undefined ||
     frames.some((frame) => frame.value.rotation !== undefined);
-  const axes = (["rotationX", "rotationY"] as const).filter(
+  const axes = (["rotationX", "rotationY", "skew", "z"] as const).filter(
     (key) =>
       clip.transform[key] !== undefined ||
       frames.some((frame) => frame.value[key] !== undefined),
@@ -260,7 +260,7 @@ export function setKeyframeTransform<
   T extends Pick<Clip, "transform" | "keyframes"> &
     Partial<Pick<Clip, "rotation">>,
 >(clip: T, patch: Partial<Transform>, time: number, initialState = false): T {
-  const axes = rotationKeys.filter((key) => patch[key] !== undefined);
+  const axes = optionalTransformKeys.filter((key) => patch[key] !== undefined);
   const index = clip.keyframes.findIndex(
     (frame) => Math.abs(frame.time - time) < 1e-6,
   );

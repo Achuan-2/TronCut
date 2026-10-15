@@ -31,6 +31,8 @@ import {
   previewFilter,
 } from "../shared/effects";
 import { cursorAt, cursorSvg, defaultCursorStyle } from "../shared/cursor";
+import { depthScale } from "../shared/rotation";
+import { mediaFrameRadii } from "../shared/media-frame";
 import { cameraAt, resizeHandles, resizeTransform } from "../shared/canvas";
 import { setVideoZoomPan, unzoomVideoPreview } from "../shared/video-zoom-pan";
 import {
@@ -250,7 +252,7 @@ function PreviewLayer({
     left: `${displayed.x * 100}%`,
     top: `${displayed.y * 100}%`,
     opacity: editing ? 1 : displayed.opacity * fadeOpacity(clip, localTime),
-    transform: `translate(-50%, -50%) rotateZ(${displayed.rotation ?? clip.rotation ?? 0}deg) rotateY(${displayed.rotationY ?? 0}deg) rotateX(${displayed.rotationX ?? 0}deg) scale(${displayed.scale})`,
+    transform: `translate(-50%, -50%) rotateZ(${displayed.rotation ?? clip.rotation ?? 0}deg) rotateY(${displayed.rotationY ?? 0}deg) rotateX(${displayed.rotationX ?? 0}deg) scale(${displayed.scale * depthScale(displayed.z)}) skewX(${displayed.skew ?? 0}deg)`,
     "--canvas-scale": scale,
   } as CSSProperties;
   if (textBox) {
@@ -270,6 +272,9 @@ function PreviewLayer({
   }
   const crop = drag?.crop ?? clip.crop ?? defaultCrop,
     effects = clip.effects ?? defaultEffects;
+  let radii = mediaFrameRadii(clip);
+  if (effects.flipX) radii = [radii[1], radii[0], radii[3], radii[2]];
+  if (effects.flipY) radii = [radii[3], radii[2], radii[1], radii[0]];
   const cursor = asset
     ? cursorAt(asset, clip, clip.sourceIn + localTime * clip.speed)
     : null;
@@ -522,7 +527,7 @@ function PreviewLayer({
             width: "100%",
             height: "100%",
             overflow: "hidden",
-            borderRadius: (clip.mediaFrame?.radius ?? 0) * scale,
+            borderRadius: radii.map((radius) => `${radius * scale}px`).join(" "),
             position: "relative",
             transform: `scale(${effects.flipX ? -1 : 1}, ${effects.flipY ? -1 : 1})`,
           }}
@@ -676,7 +681,7 @@ function PreviewLayer({
             style={{
               left: `${(handle.x + 1) * 50}%`,
               top: `${(handle.y + 1) * 50}%`,
-              transform: `translate(-50%, -50%) scale(${1 / (displayed.scale * cameraScale)})`,
+              transform: `translate(-50%, -50%) scale(${1 / (displayed.scale * depthScale(displayed.z) * cameraScale)})`,
             }}
             onPointerDown={(event) => {
               if (event.button !== 0) return;

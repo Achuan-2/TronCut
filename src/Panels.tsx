@@ -9,10 +9,8 @@ import {
   Film,
   Music2,
   WandSparkles,
-  AlignCenter,
   Mic,
   MousePointer2,
-  Link2,
   Paintbrush,
   ArrowRightLeft,
 } from "lucide-react";
@@ -29,7 +27,8 @@ import NarrationPanel from "./NarrationPanel";
 import AnimationsPanel from "./AnimationsPanel";
 import { defaultContentTransform } from "../shared/crop";
 import { visualClipAt } from "../shared/visual-state";
-import { ScaleControl, RotationControls } from "./TransformControls";
+import FrameTransformProperties from "./FrameTransformProperties";
+import RoundedCornersProperties from "./RoundedCornersProperties";
 import AnnotationsPanel from "./AnnotationsPanel";
 import VisualEffectsPanel from "./VisualEffectsPanel";
 import SpeedProperties from "./SpeedProperties";
@@ -743,112 +742,16 @@ export function Inspector({ editor }: { editor: Editor }) {
                   />
                 </label>
               )}
-              {(c.kind === "video" || c.kind === "image") &&
-                numberField(
-                  "圆角 (px)",
-                  c.mediaFrame?.radius ?? 0,
-                  (radius) => update({ mediaFrame: { radius } }),
-                  0,
-                  200,
-                )}
               {c.kind !== "audio" && (
                 <>
-                  <h3 className="section-title">
-                    {editingContent ? "框内画面" : "变换"}
-                  </h3>
-                  {editingContent && (
-                    <p className="field-help">
-                      拖动画面或调整缩放，裁剪框的位置与大小保持不变。
-                    </p>
-                  )}
-                  <ScaleControl
-                    value={(editingContent ? content.scale : value.scale) * 100}
-                    onChange={(scale) => contentOrFrame("scale", scale / 100)}
-                    disabled={locked}
+                  <FrameTransformProperties
+                    clip={c} value={value} canvas={editor.project.canvas} size={size}
+                    editingContent={!!editingContent} content={content} disabled={locked}
+                    onTransform={transform} onContentOrFrame={contentOrFrame} onResize={resize}
+                    onCenter={() => editingContent
+                      ? editor.updateContentTransform(c.id, { x: 0, y: 0 })
+                      : editor.updateTransform(c.id, { x: 0.5, y: 0.5, z: 0 })}
                   />
-                  <label className="field">
-                    不透明度
-                    <input
-                      type="range"
-                      min="0"
-                      max="1"
-                      step="0.01"
-                      value={value.opacity}
-                      onChange={(e) =>
-                        transform("opacity", Number(e.target.value))
-                      }
-                    />
-                    <span className="range-value">
-                      {Math.round(value.opacity * 100)}%
-                    </span>
-                  </label>
-                  {!editingContent && (
-                    <RotationControls
-                      value={value}
-                      fallbackZ={c.rotation}
-                      onChange={transform}
-                      disabled={locked}
-                    />
-                  )}
-                  <h3 className="section-title">
-                    {editingContent ? "内容位置" : "位置"}
-                    <button
-                      type="button"
-                      className="center-layer"
-                      title={editingContent ? "内容居中" : "画布居中"}
-                      aria-label={editingContent ? "内容居中" : "画布居中"}
-                      onClick={() =>
-                        editingContent
-                          ? editor.updateContentTransform(c.id, { x: 0, y: 0 })
-                          : editor.updateTransform(c.id, { x: 0.5, y: 0.5 })
-                      }
-                    >
-                      <AlignCenter size={14} />
-                    </button>
-                  </h3>
-                  {numberField(
-                    editingContent ? "内容位置 X (%)" : "位置 X (%)",
-                    (editingContent ? content.x : value.x) * 100,
-                    (x) => contentOrFrame("x", x / 100),
-                    -400,
-                    400,
-                  )}
-                  {numberField(
-                    editingContent ? "内容位置 Y (%)" : "位置 Y (%)",
-                    (editingContent ? content.y : value.y) * 100,
-                    (y) => contentOrFrame("y", y / 100),
-                    -400,
-                    400,
-                  )}
-                  <h3 className="section-title">
-                    {editingContent ? "裁剪框尺寸" : "尺寸"}
-                  </h3>
-                  {size.width > 0 &&
-                    numberField(
-                      "宽度 (px)",
-                      size.width * value.scale,
-                      (pixels) => resize("width", pixels),
-                      1,
-                      262144,
-                      1,
-                      !!editingContent,
-                    )}
-                  {size.height > 0 &&
-                    numberField(
-                      "高度 (px)",
-                      size.height * value.scale,
-                      (pixels) => resize("height", pixels),
-                      1,
-                      262144,
-                      1,
-                      !!editingContent,
-                    )}
-                  {c.kind !== "text" && (
-                    <p className="size-ratio">
-                      <Link2 size={12} />
-                      宽高保持比例
-                    </p>
-                  )}
                   <div className="flip-controls">
                     {(["flipX", "flipY"] as const).map((key, index) => (
                       <label className="check-field" key={key}>
@@ -870,6 +773,8 @@ export function Inspector({ editor }: { editor: Editor }) {
                   </div>
                 </>
               )}
+              {c.mediaFrame && <RoundedCornersProperties key={c.id} clip={c} editor={editor} />}
+              {hasClipSpeed(c) && <SpeedProperties key={c.id} clip={c} editor={editor} />}
             </div>
             <div
               id="inspector-audio"
@@ -909,7 +814,7 @@ export function Inspector({ editor }: { editor: Editor }) {
                   </>
                 )}
             </div>
-            {hasClipSpeed(c) && activeTab !== "behaviors" && (
+            {c.kind === "audio" && hasClipSpeed(c) && activeTab === "audio" && (
               <SpeedProperties clip={c} editor={editor} />
             )}
             {hasBehaviors(c) && (

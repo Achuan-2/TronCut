@@ -167,6 +167,84 @@ function RotationAxis({
         />
         <span>°</span>
       </div>
+      <button
+        className="property-reset"
+        aria-label={`重置旋转 ${axis}`}
+        title={`重置旋转 ${axis}`}
+        disabled={disabled}
+        onClick={() => change(0)}
+      >
+        <RotateCcw size={14} />
+      </button>
+    </div>
+  );
+}
+
+export function PropertySlider({
+  label,
+  ariaLabel,
+  value,
+  min,
+  max,
+  step = 1,
+  unit,
+  onChange,
+  onReset,
+  disabled,
+}: {
+  label: string;
+  ariaLabel: string;
+  value: number;
+  min: number;
+  max: number;
+  step?: number;
+  unit?: string;
+  onChange: (value: number) => void;
+  onReset?: () => void;
+  disabled?: boolean;
+}) {
+  const change = (value: number) => {
+    if (Number.isFinite(value) && value >= min && value <= max) onChange(value);
+  };
+  return (
+    <div className="property-slider-row">
+      <span>{label}</span>
+      <input
+        type="range"
+        aria-label={`${label}滑条`}
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        disabled={disabled}
+        onChange={(event) => change(Number(event.target.value))}
+      />
+      <div className="transform-number">
+        <input
+          type="number"
+          aria-label={ariaLabel}
+          min={min}
+          max={max}
+          step={step}
+          value={Number(value.toFixed(3))}
+          disabled={disabled}
+          onChange={(event) => change(Number(event.target.value))}
+        />
+        {unit && <span>{unit}</span>}
+      </div>
+      {onReset ? (
+        <button
+          className="property-reset"
+          aria-label={`重置${label}`}
+          title={`重置${label}`}
+          disabled={disabled}
+          onClick={onReset}
+        >
+          <RotateCcw size={14} />
+        </button>
+      ) : (
+        <span className="property-reset-spacer" />
+      )}
     </div>
   );
 }

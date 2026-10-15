@@ -149,7 +149,7 @@ try {
   await page.getByRole("tab", { name: "画面", exact: true }).click();
   const ruler = await page.locator(".ruler").boundingBox();
   await page.mouse.click(ruler.x + 65 * 3, ruler.y + 12);
-  await page.getByLabel("位置 X (%)").fill("70");
+  await page.getByLabel("位置 X (px)").fill("70");
   await expect(
     page.locator(".timeline-clip.selected .clip-animation"),
   ).toHaveCount(1);
