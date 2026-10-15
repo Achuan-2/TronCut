@@ -61,8 +61,17 @@ try {
       page.getByRole("menuitem", { name, exact: true }),
     ).toBeVisible();
   await page.getByRole("menuitem", { name: "语音转文本", exact: true }).click();
-  await page.getByLabel("识别模型").selectOption("paraformer");
-  await expect(page.getByLabel("识别模型")).toHaveValue("paraformer");
+  await expect(page.getByLabel("识别模型")).toHaveValue("qwen3-asr");
+  await expect(page.getByLabel("识别模型").locator("option")).toHaveCount(2);
+  await expect(
+    page.getByRole("button", { name: "开始识别", exact: true }),
+  ).toBeEnabled();
+  await page.getByRole("button", { name: "开始识别", exact: true }).click();
+  await expect(page.getByRole("status")).toContainText("时间线上没有可识别的声音");
+  await page.getByRole("button", { name: "字幕操作", exact: true }).click();
+  await page.getByRole("menuitem", { name: "语音转文本", exact: true }).click();
+  await page.getByLabel("识别模型").selectOption("sensevoice");
+  await expect(page.getByLabel("识别模型")).toHaveValue("sensevoice");
   await page.getByRole("button", { name: "关闭", exact: true }).click();
   await page.getByRole("button", { name: "添加字幕", exact: true }).click();
   await expect(

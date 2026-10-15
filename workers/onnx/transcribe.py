@@ -12,6 +12,13 @@ from caption_utils import result_cues
 from models import resolve_model, resolve_vad
 
 SAMPLE_RATE = 16000
+QWEN_LANGUAGES = {
+    "zh": "Chinese",
+    "en": "English",
+    "ja": "Japanese",
+    "ko": "Korean",
+    "yue": "Cantonese",
+}
 
 
 def progress(percent, label):
@@ -20,23 +27,35 @@ def progress(percent, label):
 
 def transcribe(request):
     engine = request["engine"]
-    if engine not in ("sensevoice", "paraformer"):
-        raise ValueError("请选择 SenseVoiceSmall 或 Paraformer ONNX 模型")
+    if engine not in ("qwen3-asr", "sensevoice"):
+        raise ValueError("请选择 Qwen3-ASR 或 SenseVoiceSmall ONNX 模型")
     if request.get("device", "cpu") not in ("auto", "cpu"):
         raise ValueError("当前 sherpa-onnx 运行环境仅支持 CPU")
     language = request.get("language", "auto")
-    if engine == "paraformer" and language not in ("auto", "zh"):
-        raise ValueError("Paraformer 仅支持中文，其他语言请选择 SenseVoiceSmall")
     directory = resolve_model(engine, request.get("modelDir"), request.get("offline", False), progress)
     vad_model = resolve_vad(request.get("modelDir"), request.get("offline", False), progress)
     threads = min(4, os.cpu_count() or 1)
-    common = dict(tokens=str(directory / "tokens.txt"),
-                  num_threads=threads, provider="cpu")
+    common = dict(num_threads=threads, provider="cpu")
     progress(8, f"正在加载 {engine} ONNX 模型（CPU）")
-    recognizer = (sherpa_onnx.OfflineRecognizer.from_sense_voice(
-        **common, model=str(directory / "model.int8.onnx"), language="" if language == "auto" else language, use_itn=True)
-        if engine == "sensevoice" else sherpa_onnx.OfflineRecognizer.from_paraformer(
-            **common, paraformer=str(directory / "model.int8.onnx")))
+    if engine == "qwen3-asr":
+        recognizer = sherpa_onnx.OfflineRecognizer.from_qwen3_asr(
+            **common,
+            conv_frontend=str(directory / "conv_frontend.onnx"),
+            encoder=str(directory / "encoder.int8.onnx"),
+            decoder=str(directory / "decoder.int8.onnx"),
+            tokenizer=str(directory / "tokenizer"),
+            feature_dim=128,
+            max_total_len=512,
+            max_new_tokens=128,
+            temperature=1e-6,
+            top_p=0.8,
+            seed=42,
+        )
+    else:
+        recognizer = sherpa_onnx.OfflineRecognizer.from_sense_voice(
+            **common, tokens=str(directory / "tokens.txt"),
+            model=str(directory / "model.int8.onnx"),
+            language="" if language == "auto" else language, use_itn=True)
     config = sherpa_onnx.VadModelConfig()
     config.silero_vad.model = str(vad_model)
     config.silero_vad.min_silence_duration = 0.35
@@ -59,6 +78,8 @@ def transcribe(request):
             end = min(total_samples / SAMPLE_RATE, start + len(samples) / SAMPLE_RATE)
             if len(samples) and end > start:
                 stream = recognizer.create_stream()
+                if engine == "qwen3-asr" and language != "auto":
+                    stream.set_option("language", QWEN_LANGUAGES[language])
                 stream.accept_waveform(SAMPLE_RATE, samples)
                 recognizer.decode_stream(stream)
                 cues.extend(result_cues(stream.result, start, end))

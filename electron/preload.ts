@@ -65,8 +65,14 @@ const bridge: FrameCraftBridge = {
   },
   capabilities: () => ipcRenderer.invoke("app:capabilities"),
   selectBinary: (name) => ipcRenderer.invoke("app:selectBinary", name),
-  transcribe: (id, engine, language, options) =>
-    ipcRenderer.invoke("subtitles:transcribe", id, engine, language, options),
+  transcribe: (project, engine, language, options) =>
+    ipcRenderer.invoke(
+      "subtitles:transcribe",
+      project,
+      engine,
+      language,
+      options,
+    ),
   captureSources: () => ipcRenderer.invoke("capture:sources"),
   selectCapture: (id, audio) => ipcRenderer.invoke("capture:select", id, audio),
   nativeCaptureAvailable: () => ipcRenderer.invoke("capture:native:available"),

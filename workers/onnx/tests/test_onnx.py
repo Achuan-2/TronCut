@@ -47,7 +47,7 @@ class OnnxTests(unittest.TestCase):
             with patch("models.download") as network:
                 self.assertEqual(resolve_model("sensevoice", "", True, lambda *_: None), directory)
                 with self.assertRaisesRegex(RuntimeError, "本地缺少"):
-                    resolve_model("paraformer", "", True, lambda *_: None)
+                    resolve_model("qwen3-asr", "", True, lambda *_: None)
                 with self.assertRaisesRegex(RuntimeError, "silero_vad"):
                     resolve_vad("", True, lambda *_: None)
                 network.assert_not_called()
@@ -65,6 +65,15 @@ class OnnxTests(unittest.TestCase):
             self.assertEqual(resolve_model("sensevoice", folder, True, lambda *_: None), directory.resolve())
             (directory / "silero_vad.onnx").write_bytes(b"vad")
             self.assertEqual(resolve_vad(folder, True, lambda *_: None), directory / "silero_vad.onnx")
+
+    def test_qwen3_asr_model_requires_onnx_components_and_tokenizer(self):
+        spec = MODELS["qwen3-asr"]
+        self.assertEqual(spec["directory"], "qwen3-asr-0.6b")
+        self.assertIn("conv_frontend.onnx", spec["files"])
+        self.assertIn("encoder.int8.onnx", spec["files"])
+        self.assertIn("decoder.int8.onnx", spec["files"])
+        self.assertIn("tokenizer/chat_template.json", spec["files"])
+        self.assertIn("tokenizer/vocab.json", spec["files"])
 
     def test_missing_asr_downloads_once_into_own_cache(self):
         with tempfile.TemporaryDirectory() as folder, patch.dict(os.environ, {"TRONCUT_ONNX_MODELS": folder}):
@@ -98,6 +107,24 @@ class OnnxTests(unittest.TestCase):
                 self.assertTrue(installed(directory, spec))
                 self.assertEqual(directory, Path(folder) / spec["directory"])
                 resolve_model("vits-onnx", "", True, lambda *_: None)
+                self.assertEqual(network.call_count, 1)
+
+    def test_qwen3_asr_download_uses_official_asr_archive(self):
+        with tempfile.TemporaryDirectory() as folder, patch.dict(os.environ, {"TRONCUT_ONNX_MODELS": folder}):
+            spec = MODELS["qwen3-asr"]
+            def fetch(url, destination, _progress):
+                self.assertIn("/asr-models/", url)
+                inner = destination.parent / "fixture" / spec["inner"]
+                for name in spec["files"]:
+                    file = inner / name
+                    file.parent.mkdir(parents=True, exist_ok=True)
+                    file.write_bytes(b"model")
+                with tarfile.open(destination, "w:bz2") as bundle:
+                    bundle.add(inner, arcname=spec["inner"])
+            with patch("models.download", side_effect=fetch) as network:
+                directory = resolve_model("qwen3-asr", "", False, lambda *_: None)
+                self.assertEqual(directory, Path(folder) / "qwen3-asr-0.6b")
+                self.assertTrue(installed(directory, spec))
                 self.assertEqual(network.call_count, 1)
 
     def test_long_text_is_preserved_and_chunks_are_bounded(self):

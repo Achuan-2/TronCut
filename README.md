@@ -26,7 +26,7 @@ TronCut 将录屏、剪辑、文字、字幕和声音处理放在同一个工作
 | **录屏后继续编辑鼠标** | Windows 原生录制将鼠标与画面分开；更换箭头、圆形或十字，调整大小和颜色，隐藏光标，启用平滑移动与点击高亮。 |
 | **文字就在时间线旁**   | 一键添加文本，使用黑边白字、白边黑字、黑边黄字等模板；字幕可以放在画布中央，制作纯文字视频。               |
 | **动画不必只靠拖拽**   | 右键或点击添加淡入、缩放、滑入动画；开启自动动画后，修改位置、缩放和透明度即可生成关键帧。                 |
-| **本地语音字幕**       | sherpa-onnx 调用 SenseVoiceSmall / Paraformer ONNX 模型，按真实词时间或语音段生成字幕，并映射片段裁剪与变速。 |
+| **本地语音字幕**       | Qwen3-ASR 0.6B / SenseVoiceSmall 全局识别时间线混音，保留裁剪、变速、空白和音量，按真实词时间或语音段生成独立字幕轨道。 |
 | **文字生成本地配音**   | sherpa-onnx 调用 Kokoro 中英文 / VITS 中文 ONNX 模型；调节语速、试听并加入时间线，支持指定模型目录与离线模式。 |
 | **保调变速与播客声音** | 导出优先使用 Rubber Band 保持音调；提供降噪、均衡、压缩、响度处理与处理后试听。                            |
 | **工程透明、素材随行** | 可读 JSON 工程，媒体与鼠标轨迹归档到同一目录；相对路径方便迁移，Windows 工程文件夹带软件图标。             |
@@ -57,7 +57,7 @@ TronCut 将录屏、剪辑、文字、字幕和声音处理放在同一个工作
 | macOS               | 提供 Apple Silicon 与 Intel DMG；未签名、未公证，也未进行安装、权限、录制和导出真机验收，由使用者自行验证并反馈。        |
 | Camtasia `.tscproj` | 转换常见媒体引用、平面片段、时间、速度与部分变换；附导入报告并保留原 JSON。                                              |
 | TREC 与专有背景     | **暂不支持完整导入。** 实际工程测试中 3 段 TREC 与水波背景被跳过，仅音乐转换成功。                                       |
-| 字幕引擎            | 使用 SenseVoiceSmall / Paraformer ONNX 与 Silero VAD；旧 FunASR / Whisper 调用已退出当前字幕流程。 |
+| 字幕引擎            | 默认使用 Qwen3-ASR 0.6B INT8，也可选择 SenseVoiceSmall ONNX；使用 Silero VAD。 |
 | 声音增强            | 当前为 DSP 处理；画布播放原音，处理后试听与导出使用滤镜结果，不包含 AI 人声重建。                                        |
 
 完整效果库、嵌套序列、TREC 鼠标元数据、代理媒体、统一 GPU 合成及 GIF/音频/交互导出尚未完成。硬件编码不等于全流程 GPU 加速；本版未经过专业软件音质盲测或大工程性能对比。
@@ -94,7 +94,7 @@ pnpm test:smoke     # Electron 桌面回归，先执行 build 和 test
 - [使用文档与功能模块](docs/README.md) · [开始使用](docs/GETTING-STARTED.md)
 - [功能清单与路线图](docs/FEATURES.md) · [架构与工程协议](docs/ARCHITECTURE.md)
 - [构建与发布](docs/BUILDING.md) · [验证记录](docs/VALIDATION.md)
-- [SenseVoice 实测](docs/SENSEVOICE.md) · [真实 Camtasia 工程测试](docs/CAMTASIA-REAL-PROJECT-TEST.md)
+- [本地语音字幕](docs/SENSEVOICE.md) · [真实 Camtasia 工程测试](docs/CAMTASIA-REAL-PROJECT-TEST.md)
 - [贡献指南](CONTRIBUTING.md) · [提交问题](https://github.com/Achuan-2/TronCut/issues/new/choose)
 
 欢迎提供可复现的问题、兼容样本、测试结果和改进代码。提交工程或日志前，请移除私人素材与敏感信息。
@@ -103,4 +103,4 @@ pnpm test:smoke     # Electron 桌面回归，先执行 build 和 test
 
 TronCut 原创代码采用 **[AGPL-3.0](LICENSE)**。第三方源码、二进制与模型保留各自许可证，详见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
 
-感谢 [OpenScreen](https://github.com/getopenscreen/openscreen) 的 MIT 原生捕获组件，以及 [FFmpeg](https://ffmpeg.org/)、[Rubber Band](https://breakfastquay.com/rubberband/)、[SenseVoice](https://github.com/QwenAudio/SenseVoice)、[FunASR](https://github.com/modelscope/FunASR)、[uv](https://github.com/astral-sh/uv)、Electron、React 和 sharp。其他学习参考及固定提交见 [references/README.md](references/README.md)。
+感谢 [OpenScreen](https://github.com/getopenscreen/openscreen) 的 MIT 原生捕获组件，以及 [FFmpeg](https://ffmpeg.org/)、[Rubber Band](https://breakfastquay.com/rubberband/)、[Qwen3-ASR](https://github.com/QwenLM/Qwen3-ASR)、[SenseVoice](https://github.com/QwenAudio/SenseVoice)、[FunASR](https://github.com/modelscope/FunASR)、[uv](https://github.com/astral-sh/uv)、Electron、React 和 sharp。其他学习参考及固定提交见 [references/README.md](references/README.md)。

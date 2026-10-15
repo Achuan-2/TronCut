@@ -94,12 +94,8 @@ try {
   await page.getByRole("button", { name: "字幕", exact: true }).click();
   await page.getByRole("button", { name: "字幕操作", exact: true }).click();
   await page.getByRole("menuitem", { name: "语音转文本", exact: true }).click();
-  await expect(page.getByLabel("识别模型", { exact: true })).toHaveValue(
-    "sensevoice",
-  );
-  await page
-    .getByRole("button", { name: "开始识别选中片段", exact: true })
-    .click();
+  await page.getByLabel("识别模型", { exact: true }).selectOption("sensevoice");
+  await page.getByRole("button", { name: "开始识别", exact: true }).click();
   await expect(page.getByRole("status")).toContainText("已生成", {
     timeout: 90000,
   });

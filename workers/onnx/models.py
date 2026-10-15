@@ -8,14 +8,26 @@ import urllib.request
 
 RELEASE = "https://github.com/k2-fsa/sherpa-onnx/releases/download"
 MODELS = {
+    "qwen3-asr": {
+        "directory": "qwen3-asr-0.6b",
+        "release": "asr-models",
+        "archive": "sherpa-onnx-qwen3-asr-0.6B-int8-2026-03-25.tar.bz2",
+        "inner": "sherpa-onnx-qwen3-asr-0.6B-int8-2026-03-25",
+        "files": (
+            "conv_frontend.onnx",
+            "encoder.int8.onnx",
+            "decoder.int8.onnx",
+            "tokenizer/chat_template.json",
+            "tokenizer/config.json",
+            "tokenizer/vocab.json",
+            "tokenizer/merges.txt",
+            "tokenizer/preprocessor_config.json",
+            "tokenizer/tokenizer_config.json",
+        ),
+    },
     "sensevoice": {
         "directory": "sensevoice-small",
         "repo": "csukuangfj/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17",
-        "files": ("model.int8.onnx", "tokens.txt"),
-    },
-    "paraformer": {
-        "directory": "paraformer-zh",
-        "repo": "csukuangfj/sherpa-onnx-paraformer-zh-2024-03-09",
         "files": ("model.int8.onnx", "tokens.txt"),
     },
     "kokoro-onnx": {
@@ -102,7 +114,7 @@ def resolve_model(engine, model_dir, offline, progress):
                 download(f"https://huggingface.co/{spec['repo']}/resolve/main/{name}", directory / name, progress)
         else:
             archive = staging / spec["archive"]
-            download(f"{RELEASE}/tts-models/{spec['archive']}", archive, progress)
+            download(f"{RELEASE}/{spec.get('release', 'tts-models')}/{spec['archive']}", archive, progress)
             progress(3, "正在解压 ONNX 模型")
             with tarfile.open(archive) as bundle:
                 bundle.extractall(staging / "unpacked", filter="data")

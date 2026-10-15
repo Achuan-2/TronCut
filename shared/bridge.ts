@@ -71,7 +71,7 @@ export interface FrameCraftBridge {
   capabilities(): Promise<Capabilities>;
   selectBinary(name: "ffmpeg" | "ffprobe" | "videocaptioner"): Promise<void>;
   transcribe(
-    assetId: string,
+    project: Project,
     engine: SpeechEngine,
     language: string,
     options?: SpeechOptions,

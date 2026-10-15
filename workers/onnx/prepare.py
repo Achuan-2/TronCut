@@ -19,7 +19,7 @@ def main():
     if engine not in MODELS:
         raise ValueError("请选择支持的 ONNX 模型")
     directory = resolve_model(engine, "", False, progress)
-    if engine in ("sensevoice", "paraformer"):
+    if engine in ("qwen3-asr", "sensevoice"):
         resolve_vad("", False, progress)
     Path(args.output).write_text(json.dumps({"engine": engine, "directory": str(directory)}, ensure_ascii=False), encoding="utf-8")
     progress(100, "ONNX 模型已就绪")

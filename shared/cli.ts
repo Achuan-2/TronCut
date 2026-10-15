@@ -15,7 +15,7 @@ export const cutSchema = z
   .strict();
 export const transcriptionSchema = z
   .object({
-    engine: speechEngineSchema.default("sensevoice"),
+    engine: speechEngineSchema.default("qwen3-asr"),
     language: z.enum(["auto", "zh", "en", "ja", "ko", "yue"]).default("auto"),
     modelDir: z.string().default(""),
     offline: z.boolean().default(false),
@@ -161,12 +161,12 @@ export const cliHelp = {
     build: "--plan 剪辑计划.json；创建可编辑工程，不执行语音或导出",
     edit: "--project 工程 --edits 编辑操作.json --output 新工程",
     transcribe:
-      "--project 工程 --output 新工程 [--engine sensevoice --language auto --model-dir 路径 --offline --srt 字幕.srt]",
+      "--project 工程 --output 新工程 [--engine qwen3-asr --language auto --model-dir 路径 --offline --srt 字幕.srt]",
     narrate:
       "--project 工程 --script 分段文案.json --output 新工程 [--srt 字幕.srt]",
     export: "--project 工程 --output 视频.mp4 [--software]",
     run: "--plan 计划.json；剪辑→转录或文案配音→字幕→保存工程→导出；无语音且未提供文案时返回 needs_script 与抽帧",
-    models: "--engine sensevoice|paraformer|kokoro-onnx|vits-onnx；下载模型",
+    models: "--engine qwen3-asr|sensevoice|kokoro-onnx|vits-onnx；下载模型",
   },
   common:
     "--overwrite 允许替换已有输出；--result 结果.json 保存机器可读结果；--cancel-file 文件：创建该文件取消任务；进度为 stderr JSONL，最终结果为 stdout JSON",

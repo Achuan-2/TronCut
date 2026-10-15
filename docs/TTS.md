@@ -6,7 +6,7 @@
 
 “配音模型目录”留空时，仅检查 TronCut 自己的模型缓存；缺少模型时下载官方完整模型包。也可以手动指定完整模型文件夹，不会自动检查其他应用目录。Kokoro 需要 `model.int8.onnx`、`voices.bin`、`tokens.txt`、中英文词典、`espeak-ng-data/` 和中文规范化 FST；VITS 需要 `model.onnx`、`tokens.txt`、`lexicon.txt` 与规范化 FST。指定目录不完整时直接提示缺失文件，应用不会修改该目录或自动替换成其他模型。
 
-配音面板仍可单独准备配音模型。字幕识别不再显示下载按钮或模型目录：用户在“语音转文本”弹窗中选择模型后直接识别，TronCut 自动复用自己的缓存，缺少识别模型或 Silero VAD 时自动下载并显示进度，完整模型不会重复下载。
+配音面板仍可单独准备配音模型。字幕识别不再显示下载按钮或模型目录：用户在“语音转文本”弹窗中选择 Qwen3-ASR 或 SenseVoiceSmall 后直接识别整个时间线，无需选中片段。TronCut 自动复用自己的缓存，缺少识别模型或 Silero VAD 时自动下载并显示进度，完整模型不会重复下载。Qwen3-ASR 默认使用 0.6B INT8 模型，在 TronCut 自己的 `models/onnx/qwen3-asr-0.6b/` 目录运行。
 
 勾选“仅使用已下载的依赖和模型”后，生成流程同时禁止 uv 与模型下载；环境或模型不完整时明确报错。主动点击下载按钮仍会联网准备所选模型。下载与生成均可通过任务栏取消，生成失败或取消会清理本次配音输出。文稿与音频在本地处理。
 
@@ -23,7 +23,7 @@ pnpm exec vitest run tests/asr.test.ts tests/tts.test.ts tests/onnx.test.ts
 node scripts/verify-onnx.mjs
 ```
 
-真实验证脚本支持 `TRONCUT_TEST_KOKORO_DIR`、`TRONCUT_TEST_SENSEVOICE_DIR` 和 `TRONCUT_TEST_PARAFORMER_DIR` 指定模型目录；默认从 TronCut 测试缓存下载模型。结果写入 `test-output/onnx-integration/result.json`，涵盖配音、一次语速转换、字幕、工程保存重开和离线生成。
+真实验证脚本支持 `TRONCUT_TEST_KOKORO_DIR`、`TRONCUT_TEST_SENSEVOICE_DIR` 和 `TRONCUT_TEST_QWEN3_ASR_DIR` 指定模型目录；默认从 TronCut 测试缓存下载模型。结果写入 `test-output/onnx-integration/result.json`，涵盖配音、一次语速转换、字幕、工程保存重开和离线生成。
 
 设置 `TRONCUT_TEST_DOWNLOAD=1` 可额外验证 VITS 的真实下载、完整解压与缓存离线推理；`TRONCUT_TEST_DOWNLOAD_ONLY=1` 只运行此项。`node scripts/smoke-onnx-ui.mjs` 使用上述 Kokoro/SenseVoice 目录设置与已准备好的验证环境，检查实际 Electron 配音、试听、字幕及保存。
 

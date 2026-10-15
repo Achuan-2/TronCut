@@ -26,7 +26,7 @@
 | [架构与工程协议](ARCHITECTURE.md) | 分层、时间与空间模型、预览边界 |
 | [构建与发布](BUILDING.md) | 开发环境、媒体引擎与安装包 |
 | [验证记录](VALIDATION.md) | 自动检查、真实数据与桌面验证证据 |
-| [SenseVoice 实测](SENSEVOICE.md) | 中文语音识别与词时间验证 |
+| [本地语音字幕](SENSEVOICE.md) | Qwen3-ASR、SenseVoice 与全局字幕识别说明 |
 | [Camtasia 工程测试](CAMTASIA-REAL-PROJECT-TEST.md) | 实际工程转换结果与限制 |
 | [0.2 交付记录](TRONCUT-0.2.md) | 版本实现、修复和交付边界 |
 

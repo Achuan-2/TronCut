@@ -95,7 +95,7 @@ assert.ok(
 );
 const temp = await fs.mkdtemp(path.join(root, "asr-"));
 const transcripts = {};
-for (const engine of ["sensevoice", "paraformer"]) {
+for (const engine of ["qwen3-asr", "sensevoice"]) {
   const cues = await transcribeAsset(
     asset,
     engine,
@@ -105,7 +105,7 @@ for (const engine of ["sensevoice", "paraformer"]) {
         process.env[
           engine === "sensevoice"
             ? "TRONCUT_TEST_SENSEVOICE_DIR"
-            : "TRONCUT_TEST_PARAFORMER_DIR"
+            : "TRONCUT_TEST_QWEN3_ASR_DIR"
         ] ?? "",
     },
     { ...paths, temp },

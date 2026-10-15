@@ -3,7 +3,8 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { speechEngineSchema, speechOptionsSchema } from "../shared/asr";
 import { onnxWorkerArguments } from "../shared/onnx";
-import { transcribeAsset } from "../electron/transcription";
+import { transcribeAsset, transcribeProject } from "../electron/transcription";
+import { createProject, newText } from "../shared/model";
 import { runProcess } from "../electron/process";
 vi.mock("../electron/process", () => ({
   findBinary: (name: string) => name,
@@ -11,9 +12,10 @@ vi.mock("../electron/process", () => ({
 }));
 
 describe("字幕引擎与源时间映射", () => {
-  it("SenseVoice 与 Paraformer 使用同一个 ONNX 环境，保留带空格的参数", () => {
+  it("Qwen3-ASR 与 SenseVoice 使用同一个 ONNX 环境，已移除 Paraformer", () => {
+    expect(speechEngineSchema.parse("qwen3-asr")).toBe("qwen3-asr");
     expect(speechEngineSchema.parse("sensevoice")).toBe("sensevoice");
-    expect(speechEngineSchema.parse("paraformer")).toBe("paraformer");
+    expect(speechEngineSchema.safeParse("paraformer").success).toBe(false);
     expect(speechEngineSchema.safeParse("faster-whisper").success).toBe(false);
     const args = onnxWorkerArguments(
       "my workers",
@@ -109,24 +111,74 @@ describe("字幕引擎与源时间映射", () => {
       ),
     ).toContain("from_sense_voice");
   });
-  it("Paraformer 在提取音频前拒绝非中文模式", async () => {
-    vi.mocked(runProcess).mockClear();
-    await expect(
-      transcribeAsset(
-        { duration: 2 } as never,
-        "paraformer",
-        "yue",
-        {},
-        {
-          userData: "unused",
-          workers: "unused",
-          temp: "unused",
-          resources: "",
-        },
-        new AbortController().signal,
-        () => {},
-      ),
-    ).rejects.toThrow("仅支持中文");
-    expect(runProcess).not.toHaveBeenCalled();
+  it("全局识别混音一次并返回工程时间，不使用传入的源区间限制", async () => {
+    const temp = path.resolve(`test-output/project-asr-contract-${Date.now()}`);
+    await fs.mkdir(temp, { recursive: true });
+    const project = createProject();
+    project.assets = [
+      {
+        id: "sound",
+        path: "source.wav",
+        name: "音频",
+        kind: "audio",
+        duration: 20,
+        width: 0,
+        height: 0,
+        hasAudio: true,
+      },
+    ];
+    project.clips = [
+      {
+        ...newText("video", 2),
+        kind: "audio",
+        assetId: "sound",
+        sourceIn: 4,
+        duration: 2,
+        speed: 2,
+      },
+      { ...newText("audio", 8), kind: "audio", assetId: "sound", duration: 2 },
+    ];
+    const requests: unknown[] = [];
+    vi.mocked(runProcess).mockImplementation(async (_binary, args) => {
+      if (args.includes("--request")) {
+        requests.push(
+          JSON.parse(
+            await fs.readFile(args[args.indexOf("--request") + 1], "utf8"),
+          ),
+        );
+        await fs.writeFile(
+          args.at(-1)!,
+          JSON.stringify([
+            { start: 2.2, end: 3.8, text: "前一句" },
+            { start: 8.1, end: 10.5, text: "后一句" },
+          ]),
+        );
+      }
+      return args.includes("-version") ? "ffmpeg version 8.0" : "";
+    });
+    const result = await transcribeProject(
+      project,
+      "qwen3-asr",
+      "auto",
+      { sourceIn: 4, sourceDuration: 1 },
+      {
+        temp,
+        userData: path.join(temp, "profile"),
+        workers: path.resolve("workers/onnx"),
+        resources: "",
+      },
+      new AbortController().signal,
+      () => {},
+    );
+    expect(requests).toHaveLength(1);
+    expect(requests[0]).toMatchObject({
+      input: path.join(temp, "timeline.wav"),
+      engine: "qwen3-asr",
+      sourceIn: 0,
+    });
+    expect(result).toEqual([
+      { start: 2.2, end: 3.8, text: "前一句" },
+      { start: 8.1, end: 10, text: "后一句" },
+    ]);
   });
 });

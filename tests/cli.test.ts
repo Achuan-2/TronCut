@@ -3,7 +3,12 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { executeCli, runCli } from "../electron/cli";
 import { editCliProject, sourceCuesToTimeline } from "../electron/cli-project";
-import { cliPlanSchema, editSchema, narrationSchema } from "../shared/cli";
+import {
+  cliPlanSchema,
+  editSchema,
+  narrationSchema,
+  transcriptionSchema,
+} from "../shared/cli";
 import { createProject, defaultTransform } from "../shared/model";
 import { openProject } from "../electron/project-store";
 import { probeMedia } from "../electron/media";
@@ -22,6 +27,7 @@ function context(root: string) {
 
 describe("Codex CLI 工程与命令协议", () => {
   it("拒绝未知计划字段、重叠文案、无效裁剪与锁定轨道编辑", () => {
+    expect(transcriptionSchema.parse({}).engine).toBe("qwen3-asr");
     expect(
       cliPlanSchema.safeParse({
         version: 1,

@@ -30,7 +30,7 @@ import { openProject, saveProject } from "./project-store";
 import { importCamtasia } from "./camtasia";
 import { audioFilters, exportVideo, exportFrame } from "./export";
 import { speechEngineSchema, speechOptionsSchema } from "../shared/asr";
-import { transcribeAsset } from "./transcription";
+import { transcribeProject } from "./transcription";
 import { synthesizeSpeech } from "./synthesis";
 import { ttsOptionsSchema } from "../shared/tts";
 import { onnxModelSchema } from "../shared/onnx";
@@ -674,26 +674,25 @@ function installHandlers() {
   handle(
     "subtitles:transcribe",
     async (
-      assetId: unknown,
+      inputProject: unknown,
       inputEngine: unknown,
       inputLanguage: unknown,
       inputOptions: unknown,
     ) => {
       if (task) throw new Error("已有后台任务正在执行");
-      const asset = assetById(assetId);
+      const project = authorizedProject(inputProject);
       const engine = speechEngineSchema.parse(inputEngine);
       const language = z
         .enum(["auto", "zh", "en", "ja", "ko", "yue"])
         .parse(inputLanguage);
       const options = speechOptionsSchema.parse(inputOptions ?? {});
-      if (!asset.hasAudio) throw new Error("该素材没有音频");
       task = new AbortController();
       const temp = await fs.mkdtemp(
         path.join(app.getPath("temp"), "framecraft-asr-"),
       );
       try {
-        const cues = await transcribeAsset(
-          asset,
+        const cues = await transcribeProject(
+          project,
           engine,
           language,
           options,

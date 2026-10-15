@@ -1,8 +1,8 @@
 import { z } from "zod";
 
 export const onnxModelSchema = z.enum([
+  "qwen3-asr",
   "sensevoice",
-  "paraformer",
   "kokoro-onnx",
   "vits-onnx",
 ]);

@@ -10,7 +10,7 @@ import {
   Upload,
   X,
 } from "lucide-react";
-import { type Clip, type TextStyle, textPresets } from "../shared/model";
+import { type TextStyle, textPresets } from "../shared/model";
 import type { Cue } from "../shared/subtitles";
 import type { SpeechEngine } from "../shared/asr";
 import {
@@ -34,26 +34,11 @@ type Dialog = "transcribe" | "replace" | "style" | null;
 export function addCues(
   editor: Editor,
   cues: Cue[],
-  selected?: Clip,
   options: { newTrack?: boolean } = {},
 ) {
-  const mapped = cues.flatMap((cue) => {
-    if (!selected) return [cue];
-    const sourceEnd = selected.sourceIn + selected.duration * selected.speed;
-    const start = Math.max(cue.start, selected.sourceIn);
-    const end = Math.min(cue.end, sourceEnd);
-    if (end <= start) return [];
-    return [
-      {
-        start: selected.start + (start - selected.sourceIn) / selected.speed,
-        end: selected.start + (end - selected.sourceIn) / selected.speed,
-        text: cue.text,
-      },
-    ];
-  });
   let ids: string[] = [];
   editor.apply((project) => {
-    const result = appendCaptionCues(project, mapped, options);
+    const result = appendCaptionCues(project, cues, options);
     ids = result.ids;
     return result.project;
   });
@@ -65,7 +50,7 @@ export default function CaptionsPanel({ editor, run, toast, busy }: Props) {
   const captions = captionClips(project);
   const [menuOpen, setMenuOpen] = useState(false);
   const [dialog, setDialog] = useState<Dialog>(null);
-  const [engine, setEngine] = useState<SpeechEngine>("sensevoice");
+  const [engine, setEngine] = useState<SpeechEngine>("qwen3-asr");
   const [search, setSearch] = useState("");
   const [replacement, setReplacement] = useState("");
   const menu = useRef<HTMLDivElement>(null);
@@ -298,7 +283,7 @@ export default function CaptionsPanel({ editor, run, toast, busy }: Props) {
                 </h2>
                 <p>
                   {dialog === "transcribe"
-                    ? "选择识别模型；首次使用时软件会自动下载。"
+                    ? "识别整个时间线的声音并新增字幕轨道；首次使用时自动下载模型。"
                     : dialog === "replace"
                       ? "搜索并批量替换所有未锁定字幕。"
                       : `统一修改 ${captions.length} 条字幕的显示样式。`}
@@ -320,10 +305,10 @@ export default function CaptionsPanel({ editor, run, toast, busy }: Props) {
                       setEngine(event.target.value as SpeechEngine)
                     }
                   >
+                    <option value="qwen3-asr">Qwen3-ASR 0.6B · 多语言</option>
                     <option value="sensevoice">
                       SenseVoiceSmall · 中英日韩粤
                     </option>
-                    <option value="paraformer">Paraformer · 中文</option>
                   </select>
                 </label>
                 <button
@@ -332,27 +317,21 @@ export default function CaptionsPanel({ editor, run, toast, busy }: Props) {
                   onClick={() => {
                     setDialog(null);
                     run(async () => {
-                      const assetId = selected?.assetId;
-                      if (!assetId)
-                        throw new Error("请先选中有声音的音视频片段");
-                      const target = selected;
                       const cues = await bridge().transcribe(
-                        assetId,
+                        project,
                         engine,
                         "auto",
                         {
                           device: "auto",
-                          sourceIn: target.sourceIn,
-                          sourceDuration: target.duration * target.speed,
                         },
                       );
-                      addCues(editor, cues, target, { newTrack: true });
+                      addCues(editor, cues, { newTrack: true });
                       toast(`已生成 ${cues.length} 条字幕`);
                     });
                   }}
                 >
                   <AudioLines size={16} />
-                  开始识别选中片段
+                  开始识别
                 </button>
               </>
             )}

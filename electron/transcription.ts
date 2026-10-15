@@ -1,7 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { z } from "zod";
-import type { Asset } from "../shared/model";
+import type { Asset, Project } from "../shared/model";
 import {
   type SpeechEngine,
   type SpeechOptions,
@@ -10,6 +10,45 @@ import {
 import { onnxWorkerArguments } from "../shared/onnx";
 import { findBinary, runProcess } from "./process";
 import { onnxEnvironment, prepareOnnxWorker, runOnnxWorker } from "./onnx";
+import { renderTimelineAudio } from "./timeline-audio";
+
+type TranscriptionPaths = {
+  userData: string;
+  workers: string;
+  temp: string;
+  resources: string;
+};
+
+export async function transcribeProject(
+  project: Project,
+  engine: SpeechEngine,
+  language: string,
+  inputOptions: SpeechOptions,
+  paths: TranscriptionPaths,
+  signal: AbortSignal,
+  progress: (percent: number, label: string) => void,
+) {
+  const options = speechOptionsSchema.parse(inputOptions);
+  const audio = path.join(paths.temp, "timeline.wav");
+  progress(0, "正在合成整个时间线的声音");
+  const duration = await renderTimelineAudio(
+    project,
+    audio,
+    paths.temp,
+    signal,
+    paths.resources,
+  );
+  return recognizeAudio(
+    audio,
+    duration,
+    engine,
+    language,
+    { ...options, sourceIn: 0, sourceDuration: duration },
+    paths,
+    signal,
+    progress,
+  );
+}
 
 const cueSchema = z.object({
   start: z.number().finite().nonnegative(),
@@ -26,13 +65,11 @@ export async function transcribeAsset(
   engine: SpeechEngine,
   language: string,
   inputOptions: SpeechOptions,
-  paths: { userData: string; workers: string; temp: string; resources: string },
+  paths: TranscriptionPaths,
   signal: AbortSignal,
   progress: (percent: number, label: string) => void,
 ) {
   const options = speechOptionsSchema.parse(inputOptions);
-  if (engine === "paraformer" && !["auto", "zh"].includes(language))
-    throw new Error("Paraformer 仅支持中文，其他语言请选择 SenseVoiceSmall");
   const duration = options.sourceDuration ?? asset.duration - options.sourceIn;
   if (
     duration <= 0 ||
@@ -41,9 +78,7 @@ export async function transcribeAsset(
   )
     throw new Error("识别范围超出了源素材时长");
   const audio = path.join(paths.temp, "audio.wav");
-  const output = path.join(paths.temp, "captions.json");
-  const request = path.join(paths.temp, "request.json");
-  progress(0, "正在提取选中片段的音频");
+  progress(0, "正在提取音频");
   await runProcess(
     findBinary("ffmpeg", paths.resources),
     [
@@ -65,6 +100,30 @@ export async function transcribeAsset(
     ],
     { signal },
   );
+  return recognizeAudio(
+    audio,
+    duration,
+    engine,
+    language,
+    options,
+    paths,
+    signal,
+    progress,
+  );
+}
+
+async function recognizeAudio(
+  audio: string,
+  duration: number,
+  engine: SpeechEngine,
+  language: string,
+  options: ReturnType<typeof speechOptionsSchema.parse>,
+  paths: TranscriptionPaths,
+  signal: AbortSignal,
+  progress: (percent: number, label: string) => void,
+) {
+  const output = path.join(paths.temp, "captions.json");
+  const request = path.join(paths.temp, "request.json");
   const workers = await prepareOnnxWorker(paths.workers, paths.userData);
   await fs.writeFile(
     request,
@@ -74,8 +133,8 @@ export async function transcribeAsset(
   progress(
     0,
     options.offline
-      ? "正在加载本地 sherpa-onnx 识别环境与模型"
-      : "正在准备 sherpa-onnx；优先复用本地模型，缺少时下载",
+      ? `正在加载本地 ${engine} 识别环境与模型`
+      : `正在准备 ${engine}；优先复用本地模型，缺少时下载`,
   );
   await runOnnxWorker(
     findBinary("uv", paths.resources),
@@ -116,6 +175,6 @@ export async function transcribeAsset(
       end: Math.min(c.end, duration) + options.sourceIn,
     }));
   if (!converted.length)
-    throw new Error("转录没有产生有效字幕，可能是所选片段没有语音");
+    throw new Error("转录没有产生有效字幕，可能是音频中没有语音");
   return converted;
 }

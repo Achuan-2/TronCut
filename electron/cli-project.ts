@@ -18,7 +18,7 @@ import { setClipSpeed, supportsClipSpeed } from "../shared/clip-speed";
 import { deleteClips } from "../shared/timeline";
 import { probeMedia } from "./media";
 import { openProject } from "./project-store";
-import { transcribeAsset } from "./transcription";
+import { transcribeProject } from "./transcription";
 import { synthesizeSpeech } from "./synthesis";
 
 export interface CliContext {
@@ -229,57 +229,43 @@ export async function transcribeCliProject(
   context: CliContext,
   style: CliPlan["captions"],
 ) {
-  const muted = new Set(
-    project.tracks
-      .filter((track) => track.muted || track.hidden)
-      .map((track) => track.id),
-  );
   if (
     options.clipIds?.some((id) => !project.clips.some((clip) => clip.id === id))
   )
     throw new Error("指定转录片段不存在");
-  const clips = project.clips.filter(
-    (clip) =>
-      (!options.clipIds || options.clipIds.includes(clip.id)) &&
-      !muted.has(clip.trackId) &&
-      clip.volume > 0 &&
-      project.assets.some(
-        (asset) => asset.id === clip.assetId && asset.hasAudio,
-      ),
-  );
-  const cues: Cue[] = [];
-  for (const clip of clips) {
-    const asset = project.assets.find((asset) => asset.id === clip.assetId)!;
-    const tempRoot = path.join(context.userData, "cli-temp");
-    await fs.mkdir(tempRoot, { recursive: true });
-    const temp = await fs.mkdtemp(path.join(tempRoot, "asr-"));
-    try {
-      const result = await transcribeAsset(
-        asset,
-        options.engine,
-        options.language,
-        {
-          ...options,
-          sourceIn: clip.sourceIn,
-          sourceDuration: clip.duration * clip.speed,
-        },
-        { ...context, temp },
-        context.signal,
-        context.progress,
-      );
-      cues.push(...sourceCuesToTimeline(result, clip));
-    } catch (error) {
-      if (
-        !(error instanceof Error) ||
-        !error.message.includes("转录没有产生有效字幕")
-      )
-        throw error;
-      // A silent clip is valid; do not fabricate captions or suppress engine failures.
-    } finally {
-      await fs.rm(temp, { recursive: true, force: true });
-    }
+  const input = options.clipIds
+    ? {
+        ...project,
+        clips: project.clips.filter((clip) =>
+          options.clipIds!.includes(clip.id),
+        ),
+      }
+    : project;
+  const tempRoot = path.join(context.userData, "cli-temp");
+  await fs.mkdir(tempRoot, { recursive: true });
+  const temp = await fs.mkdtemp(path.join(tempRoot, "asr-"));
+  try {
+    const cues = await transcribeProject(
+      input,
+      options.engine,
+      options.language,
+      options,
+      { ...context, temp },
+      context.signal,
+      context.progress,
+    );
+    return { project: addCaptionCues(project, cues, style), cues };
+  } catch (error) {
+    if (
+      !(error instanceof Error) ||
+      (!error.message.includes("转录没有产生有效字幕") &&
+        !error.message.includes("时间线上没有可识别的声音"))
+    )
+      throw error;
+    return { project, cues: [] };
+  } finally {
+    await fs.rm(temp, { recursive: true, force: true });
   }
-  return { project: addCaptionCues(project, cues, style), cues };
 }
 
 export async function narrateCliProject(

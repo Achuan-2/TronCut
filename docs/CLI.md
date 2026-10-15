@@ -121,7 +121,7 @@ pnpm --silent cli models --engine sensevoice
 pnpm --silent cli models --engine vits-onnx
 ```
 
-识别支持 `sensevoice`、`paraformer`，配音支持 `kokoro-onnx`、`vits-onnx`。模型缺失时自动下载，缓存与 GUI 共用。`--offline` 仅使用已有环境和模型；转录可用 `--model-dir` 指定目录，文案配音可在脚本中填写 `modelDir`。`--clips id1,id2` 可限制转录范围，避免同时转录其他音轨。
+识别支持 `qwen3-asr`（默认）、`sensevoice`，配音支持 `kokoro-onnx`、`vits-onnx`。默认识别整个时间线的混音，保留空白、裁剪、变速、音量和音频效果，跳过静音与隐藏轨道，每次生成新的字幕轨道。模型缺失时自动下载，缓存与 GUI 共用。`--offline` 仅使用已有环境和模型；转录可用 `--model-dir` 指定目录，文案配音可在脚本中填写 `modelDir`。`--clips id1,id2` 可显式限制参与混音的片段。
 
 创建 `--cancel-file` 指定的文件可取消长任务；源码启动器还支持 Ctrl+C，并等待工作进程清理。`--software` 可让 `run` 或 `export` 使用软件编码，默认沿用软件的硬件探测与回退策略。
 

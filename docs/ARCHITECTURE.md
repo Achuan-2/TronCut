@@ -14,7 +14,7 @@
 
 模型准备通过 `speech:downloadModel` IPC 与 `workers/onnx/prepare.py` 执行，校验模型枚举后复用同一运行环境；ASR 准备时额外下载共享 VAD。完整文件以临时路径下载，TTS 模型包在暂存目录安全解压并检查必要文件，准备完成后才替换所选缓存模型。缓存完整时跳过下载，主进程共用后台任务互斥与进程树取消。
 
-`electron/transcription.ts` 只提取选中片段对应的 16 kHz 单声道 PCM16 源音频。Silero VAD 以 512 个样本为窗口流式读取，单段语音最多八秒，结尾调用 flush 保留尾句。SenseVoiceSmall / Paraformer 通过 sherpa-onnx 返回识别结果，优先采用真实 token 时间戳断句；时间信息缺失或不一致时保留完整文字与 VAD 边界。局部时间加回 `sourceIn`，再按剪辑速度映射到时间线。
+`electron/transcription.ts` 通过 `electron/timeline-audio.ts` 合成全时间线的 16 kHz 单声道 PCM16 混音，与视频导出共用音频滤镜，保留片段开始时间、裁剪、速度、音量和效果，跳过静音与隐藏轨道。Silero VAD 以 512 个样本为窗口流式读取，单段语音最多八秒，结尾调用 flush 保留尾句。Qwen3-ASR 0.6B 与 SenseVoiceSmall 通过 sherpa-onnx 返回识别结果；Qwen3-ASR 使用 128 维特征、卷积前端和 INT8 encoder/decoder。识别优先采用真实 token 时间戳断句；时间信息缺失或不一致时保留完整文字与 VAD 边界，结果直接使用工程时间。CLI 默认全局识别，也可显式通过 clipIds 限定参与混音的片段。
 
 `electron/synthesis.ts` 调用同一运行环境中的 Kokoro / VITS ONNX 工作进程，文稿通过 JSON 请求文件传递，分段写出 PCM16 WAV，再由 FFmpeg 应用一次语速并统一为 48 kHz 单声道。素材保留文稿、模型、音色、目录与语速参数，运行记录包含模型路径、CPU、精度、加载与生成耗时。旧 Kokoro/Qwen/IndexTTS 工程参数保留解析能力；新生成仅使用 ONNX，读取旧参数时提示重新选择音色。当前模型每次任务重新加载。
 
