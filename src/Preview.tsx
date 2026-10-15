@@ -52,6 +52,7 @@ import type { Editor } from "./useEditor";
 import { visualClipAt } from "../shared/visual-state";
 import { annotationMime, parseAnnotation } from "../shared/annotations";
 import { behaviorTransform, supportsBehaviors } from "../shared/behaviors";
+import { transitionRange, transitionTransform } from "../shared/transitions";
 import BehaviorText from "./BehaviorText";
 
 export function timeLabel(t: number): string {
@@ -156,7 +157,14 @@ function PreviewLayer({
   cameraScale?: number;
   mode?: CanvasMode;
 }) {
-  const transform = transformAt(clip, editor.playhead - clip.start),
+  const localTime = Math.max(
+    0,
+    Math.min(clip.duration, editor.playhead - clip.start),
+  );
+  const held =
+    editor.playhead < clip.start ||
+    editor.playhead >= clip.start + clip.duration;
+  const transform = transformAt(clip, localTime),
     asset = project.assets.find((a) => a.id === clip.assetId);
   clip = visualClipAt(clip, transform);
   const editing = interactive && editor.editingTextId === clip.id;
@@ -216,18 +224,17 @@ function PreviewLayer({
   };
   const displayed = editing
     ? (drag?.value ?? transform)
-    : behaviorTransform(
+    : transitionTransform(
+        project,
         clip,
-        drag?.value ?? transform,
-        editor.playhead - clip.start,
+        behaviorTransform(clip, drag?.value ?? transform, localTime),
+        editor.playhead,
       );
   const textBox = clip.kind === "text" ? (drag?.box ?? textBoxFor(clip)) : null;
   const style: CSSProperties = {
     left: `${displayed.x * 100}%`,
     top: `${displayed.y * 100}%`,
-    opacity: editing
-      ? 1
-      : displayed.opacity * fadeOpacity(clip, editor.playhead - clip.start),
+    opacity: editing ? 1 : displayed.opacity * fadeOpacity(clip, localTime),
     transform: `translate(-50%, -50%) rotateZ(${displayed.rotation ?? clip.rotation ?? 0}deg) rotateY(${displayed.rotationY ?? 0}deg) rotateX(${displayed.rotationX ?? 0}deg) scale(${displayed.scale})`,
     "--canvas-scale": scale,
   } as CSSProperties;
@@ -249,11 +256,7 @@ function PreviewLayer({
   const crop = drag?.crop ?? clip.crop ?? defaultCrop,
     effects = clip.effects ?? defaultEffects;
   const cursor = asset
-    ? cursorAt(
-        asset,
-        clip,
-        clip.sourceIn + (editor.playhead - clip.start) * clip.speed,
-      )
+    ? cursorAt(asset, clip, clip.sourceIn + localTime * clip.speed)
     : null;
   const cursorStyle = clip.cursorStyle ?? defaultCursorStyle;
   if (!asset) {
@@ -507,9 +510,19 @@ function PreviewLayer({
             <MediaLayer
               clip={clip}
               asset={asset}
-              localTime={editor.playhead - clip.start}
-              playing={editor.playing}
-              muted={muted}
+              localTime={
+                held
+                  ? Math.max(
+                      0,
+                      Math.min(
+                        clip.duration - 1 / project.canvas.fps,
+                        localTime,
+                      ),
+                    )
+                  : localTime
+              }
+              playing={editor.playing && !held}
+              muted={muted || held}
             />
             {cursor && (
               <>
@@ -589,11 +602,7 @@ function PreviewLayer({
               }}
             />
           ) : clip.behaviors?.length ? (
-            <BehaviorText
-              clip={clip}
-              time={editor.playhead - clip.start}
-              scale={scale}
-            />
+            <BehaviorText clip={clip} time={localTime} scale={scale} />
           ) : (
             clip.text || " "
           )}
@@ -683,13 +692,15 @@ export function ScenePreview({
       ? setVideoZoomPan(editor.project, editor.zoomPanDraft, playhead)
       : editor.project;
   const camera = applyCamera ? cameraAt(project, playhead) : null;
-  const active = project.clips.filter(
-    (clip) =>
-      playhead >= clip.start &&
-      (playhead < clip.start + clip.duration ||
+  const active = project.clips.filter((clip) => {
+    const range = transitionRange(project, clip);
+    return (
+      playhead >= range.start &&
+      (playhead < range.end ||
         (editor.selectedKeyframe?.clipId === clip.id &&
-          Math.abs(playhead - clip.start - clip.duration) < 1e-6)),
-  );
+          Math.abs(playhead - clip.start - clip.duration) < 1e-6))
+    );
+  });
   return (
     <div
       className="canvas-scene"

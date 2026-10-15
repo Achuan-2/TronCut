@@ -2,6 +2,7 @@ import { z } from "zod";
 import { ttsOptionsSchema } from "./tts";
 import { animationEasings } from "./easing";
 import { behaviorSchema } from "./behaviors";
+import { transitionSchema } from "./transitions";
 
 const finite = z.number().finite();
 const identifier = z
@@ -121,6 +122,12 @@ export const projectSchema = z.object({
         speed: finite.min(0.25).max(8),
         speedEffect: z.boolean().optional(),
         behaviors: z.array(behaviorSchema).max(32).optional(),
+        transitions: z
+          .object({
+            incoming: transitionSchema.optional(),
+            outgoing: transitionSchema.optional(),
+          })
+          .optional(),
         transform: transformSchema,
         animationOffset: finite.min(-86400).max(86400).optional(),
         keyframes: z

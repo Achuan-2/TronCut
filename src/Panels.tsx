@@ -23,6 +23,7 @@ import {
   Scan,
   Link2,
   Paintbrush,
+  ArrowRightLeft,
 } from "lucide-react";
 import {
   type Clip,
@@ -53,6 +54,8 @@ import { hasClipSpeed } from "../shared/clip-speed";
 import { hasBehaviors } from "../shared/behaviors";
 import BehaviorsPanel from "./BehaviorsPanel";
 import BehaviorProperties from "./BehaviorProperties";
+import TransitionsPanel from "./TransitionsPanel";
+import TransitionProperties from "./TransitionProperties";
 
 export type Tab =
   | "media"
@@ -64,6 +67,7 @@ export type Tab =
   | "narration"
   | "effects"
   | "behaviors"
+  | "transitions"
   | "settings";
 const tabs = [
   { id: "media", name: "媒体", icon: FolderOpen },
@@ -71,6 +75,7 @@ const tabs = [
   { id: "captions", name: "字幕", icon: Captions },
   { id: "animations", name: "动画", icon: Sparkles },
   { id: "behaviors", name: "行为", icon: Paintbrush },
+  { id: "transitions", name: "转换", icon: ArrowRightLeft },
   { id: "zoompan", name: "缩放与平移", icon: Scan },
   { id: "effects", name: "视觉效果", icon: WandSparkles },
   { id: "audio", name: "音频", icon: AudioLines },
@@ -286,6 +291,7 @@ export default function Panels(props: Props) {
         </div>
         {tab === "effects" && <VisualEffectsPanel editor={editor} />}
         {tab === "behaviors" && <BehaviorsPanel editor={editor} />}
+        {tab === "transitions" && <TransitionsPanel editor={editor} />}
         <div hidden={tab !== "narration"}>
           <NarrationPanel
             key={project.id}
@@ -784,6 +790,8 @@ export function Inspector({ editor }: { editor: Editor }) {
   const c = editor.selected,
     locked = editor.project.tracks.find((t) => t.id === c?.trackId)?.locked;
   const [tab, setTab] = useState({ clipId: "", name: "video" });
+  if (editor.selectedTransition)
+    return <TransitionProperties editor={editor} />;
   const hasCursor =
     c?.kind === "video" &&
     !!editor.project.assets.find((asset) => asset.id === c.assetId)?.cursor;

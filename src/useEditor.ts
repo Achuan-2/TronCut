@@ -24,6 +24,14 @@ import {
   setKeyframeTransform,
 } from "../shared/editor";
 import { selectionWithGroups } from "../shared/timeline";
+import {
+  addTransition as addProjectTransition,
+  updateTransition as updateProjectTransition,
+  normalizeTransitions,
+  type TransitionSelection,
+  type TransitionTarget,
+  type Transition,
+} from "../shared/transitions";
 import { setVideoZoomPan } from "../shared/video-zoom-pan";
 import { type ContentTransform } from "../shared/crop";
 import { animateContent, animateCrop } from "../shared/crop-animation";
@@ -111,6 +119,8 @@ export function useEditor() {
     setKeyframeSelection(null);
   }, []);
   const [selection, selectMany] = useState<string[]>([]);
+  const [transitionSelection, setTransitionSelection] =
+    useState<TransitionSelection | null>(null);
   const [behaviorSelection, setBehaviorSelection] = useState<{
     clipId: string;
     behaviorId: string;
@@ -130,6 +140,7 @@ export function useEditor() {
   const selectedId = selectedIds.at(-1) ?? null;
   const select = useCallback((id: string | null, additive = false) => {
     setBehaviorSelection(null);
+    setTransitionSelection(null);
     if (id && !additive && keyframeRef.current?.clipId === id) return;
     clearKeyframeEdit();
     if (!id) {
@@ -178,10 +189,11 @@ export function useEditor() {
       )
         ? fittedClips
         : result.clips;
-      const after =
+      const after = normalizeTransitions(
         tracks === result.tracks && clips === result.clips
           ? result
-          : { ...result, tracks, clips };
+          : { ...result, tracks, clips },
+      );
       if (after === before) return;
       past.current = [...past.current.slice(-99), before];
       future.current = [];
@@ -300,6 +312,7 @@ export function useEditor() {
       keepSelection = false,
     ) => {
       setBehaviorSelection(null);
+      setTransitionSelection(null);
       const clip = current.current.clips.find((clip) => clip.id === clipId);
       const track = current.current.tracks.find(
         (track) => track.id === clip?.trackId,
@@ -471,6 +484,35 @@ export function useEditor() {
       setPlaying(false);
     },
     [apply, selectedIds, select, clearKeyframeEdit, setPlaying],
+  );
+  const selectTransition = useCallback(
+    (selection: TransitionSelection) => {
+      select(selection.clipId);
+      clearKeyframeEdit();
+      setPlaying(false);
+      setTransitionSelection(selection);
+    },
+    [select, clearKeyframeEdit, setPlaying],
+  );
+  const addTransition = useCallback(
+    (target: TransitionTarget) => {
+      const before = current.current;
+      const next = addProjectTransition(before, target);
+      if (next === before) return;
+      apply(next);
+      selectTransition({ clipId: target.clipId, side: target.side });
+    },
+    [apply, selectTransition],
+  );
+  const updateTransition = useCallback(
+    (
+      selection: TransitionSelection,
+      patch: Partial<Omit<Transition, "pairId">> | null,
+    ) => {
+      apply((p) => updateProjectTransition(p, selection, patch));
+      if (patch === null) setTransitionSelection(null);
+    },
+    [apply],
   );
   const selectBehavior = useCallback(
     (clipId: string, behaviorId: string) => {
@@ -817,6 +859,16 @@ export function useEditor() {
     addAnnotation,
     addSpeedEffect,
     addBehavior,
+    addTransition,
+    updateTransition,
+    selectTransition,
+    selectedTransition:
+      transitionSelection &&
+      selectedIds.includes(transitionSelection.clipId) &&
+      project.clips.find((clip) => clip.id === transitionSelection.clipId)
+        ?.transitions?.[transitionSelection.side]
+        ? transitionSelection
+        : null,
     updateBehavior,
     removeBehavior,
     selectBehavior,

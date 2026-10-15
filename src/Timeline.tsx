@@ -53,6 +53,13 @@ import TimelineBehaviorEffect from "./TimelineBehaviorEffect";
 import BehaviorContextMenu from "./BehaviorContextMenu";
 import { hasBehaviors, supportsBehaviors } from "../shared/behaviors";
 import { annotationMime, parseAnnotation } from "../shared/annotations";
+import TimelineTransitions from "./TimelineTransitions";
+import {
+  transitionMime,
+  transitionDropTarget,
+  transitionTargets,
+  type TransitionTarget,
+} from "../shared/transitions";
 
 interface Drag {
   id: string;
@@ -103,6 +110,12 @@ export default function Timeline({
   const [speedDraft, setSpeedDraft] = useState<Clip | null>(null);
   const [activeSpeed, setActiveSpeed] = useState<string | null>(null);
   const [effectDrop, setEffectDrop] = useState<string | null>(null);
+  const [transitionDrop, setTransitionDrop] = useState<TransitionTarget | null>(
+    null,
+  );
+  const transitionHighlights = transitionDrop
+    ? transitionTargets(transitionDrop)
+    : [];
   const knownSpeedEffects = useRef(new Set<string>());
   useEffect(() => {
     const ids = project.clips
@@ -192,6 +205,11 @@ export default function Timeline({
       playhead <= clip.start + clip.duration,
   );
   const deleteSelection = (ripple = false) => {
+    if (editor.selectedTransition) {
+      editor.updateTransition(editor.selectedTransition, null);
+      setDeleteMenu(false);
+      return;
+    }
     if (editor.selectedBehavior) {
       editor.removeBehavior(
         editor.selectedBehavior.clipId,
@@ -726,7 +744,8 @@ export default function Timeline({
                   e.preventDefault();
                   if (
                     e.dataTransfer.types.includes("troncut-effect") ||
-                    e.dataTransfer.types.includes("troncut-behavior")
+                    e.dataTransfer.types.includes("troncut-behavior") ||
+                    e.dataTransfer.types.includes(transitionMime)
                   )
                     e.dataTransfer.dropEffect = "none";
                 }}
@@ -819,7 +838,7 @@ export default function Timeline({
                     return (
                       <Fragment key={c.id}>
                         <div
-                          className={`timeline-clip ${c.kind} ${animationRanges(c).length ? "has-animation" : ""} ${editor.selectedIds.includes(c.id) ? "selected" : ""} ${track.locked ? "locked" : ""} ${effectDrop === c.id ? "effect-drop-target" : ""}`}
+                          className={`timeline-clip ${c.kind} ${animationRanges(c).length ? "has-animation" : ""} ${editor.selectedIds.includes(c.id) ? "selected" : ""} ${track.locked ? "locked" : ""} ${effectDrop === c.id ? "effect-drop-target" : ""} ${transitionHighlights.some((item) => item.clipId === c.id) ? "transition-drop-target" : ""}`}
                           style={{
                             left: c.start * zoom,
                             width: Math.max(4, c.duration * zoom),
@@ -837,6 +856,25 @@ export default function Timeline({
                                 : undefined,
                           }}
                           onDragOver={(event) => {
+                            if (
+                              event.dataTransfer.types.includes(transitionMime)
+                            ) {
+                              event.preventDefault();
+                              event.stopPropagation();
+                              const bounds =
+                                event.currentTarget.getBoundingClientRect();
+                              const target = transitionDropTarget(
+                                project,
+                                c,
+                                event.clientX - bounds.left,
+                                bounds.width,
+                              );
+                              event.dataTransfer.dropEffect = target
+                                ? "copy"
+                                : "none";
+                              setTransitionDrop(target);
+                              return;
+                            }
                             if (
                               event.dataTransfer.types.includes(
                                 "troncut-behavior",
@@ -872,10 +910,34 @@ export default function Timeline({
                               !event.currentTarget.contains(
                                 event.relatedTarget as Node | null,
                               )
-                            )
+                            ) {
                               setEffectDrop(null);
+                              setTransitionDrop(null);
+                            }
                           }}
                           onDrop={(event) => {
+                            if (
+                              event.dataTransfer.types.includes(transitionMime)
+                            ) {
+                              event.preventDefault();
+                              event.stopPropagation();
+                              setTransitionDrop(null);
+                              if (
+                                event.dataTransfer.getData(transitionMime) !==
+                                "smooth-slide"
+                              )
+                                return;
+                              const bounds =
+                                event.currentTarget.getBoundingClientRect();
+                              const target = transitionDropTarget(
+                                project,
+                                c,
+                                event.clientX - bounds.left,
+                                bounds.width,
+                              );
+                              if (target) editor.addTransition(target);
+                              return;
+                            }
                             const behavior =
                               event.dataTransfer.getData("troncut-behavior");
                             if (behavior) {
@@ -911,7 +973,10 @@ export default function Timeline({
                             if (event.button !== 0 || track.locked) return;
                             event.stopPropagation();
                             editor.clearKeyframeEdit();
-                            if (editor.selectedBehavior?.clipId === c.id)
+                            if (
+                              editor.selectedBehavior?.clipId === c.id ||
+                              editor.selectedTransition?.clipId === c.id
+                            )
                               select(c.id);
                             if (
                               event.ctrlKey ||
@@ -1140,6 +1205,7 @@ export default function Timeline({
                                     activeSpeed === c.id &&
                                     selectedId === c.id &&
                                     !editor.selectedBehavior &&
+                                    !editor.selectedTransition &&
                                     !editor.selectedKeyframe
                                   }
                                   select={() => selectSpeed(c.id)}
@@ -1160,6 +1226,20 @@ export default function Timeline({
                               ))}
                             </div>
                           )}
+                          <TimelineTransitions
+                            clip={c}
+                            zoom={zoom}
+                            editor={editor}
+                            locked={track.locked}
+                          />
+                          {transitionHighlights
+                            .filter((item) => item.clipId === c.id)
+                            .map((item) => (
+                              <div
+                                key={item.side}
+                                className={`transition-drop-edge ${item.side}`}
+                              />
+                            ))}
                         </div>
                       </Fragment>
                     );

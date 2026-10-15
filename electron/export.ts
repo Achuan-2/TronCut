@@ -22,6 +22,10 @@ import {
 import { frameSnapshot } from "../shared/frame-snapshot";
 import { objectBehaviorExpressions } from "./behavior-export";
 import { rasterizeBehaviorText } from "./behavior-text-export";
+import {
+  transitionRange,
+  transitionOffsetExpression,
+} from "../shared/transitions";
 
 // Avoid lookahead buffering in short, delayed overlay graphs. Hardware failure
 // fallback and explicitly requested software encoding use identical settings.
@@ -470,18 +474,26 @@ async function renderProject(
         intrinsicHeight -
         (animatedViewport ? 0 : Math.floor(intrinsicHeight * crop.top)) -
         (animatedViewport ? 0 : Math.floor(intrinsicHeight * crop.bottom));
-      const scale = expression(clip, "scale");
+      const range = transitionRange(project, clip);
+      // Paired transitions hold boundary poses and source frames outside the clip.
+      const clock = (name: string) =>
+        range.before || range.after
+          ? `clip(${name},${clip.start},${clip.start + clip.duration})`
+          : name;
+      const pose = (key: keyof Transform, name = "t") =>
+        expression(clip, key, clock(name));
+      const scale = pose("scale");
       const transform = `scale=w='max(2,trunc(${cropWidth * fit}*(${scale})/2)*2)':h='max(2,trunc(${cropHeight * fit}*(${scale})/2)*2)':eval=frame`;
       const alphaAnimated =
         !!clip.behaviors?.some((behavior) => behavior.enabled) ||
         clip.keyframes.some((k) => k.value.opacity !== clip.transform.opacity);
       let alpha = alphaAnimated
-        ? `geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='alpha(X,Y)*(${expression(clip, "opacity", "T")})'`
+        ? `geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='alpha(X,Y)*(${pose("opacity", "T")})'`
         : `colorchannelmixer=aa=${clip.transform.opacity}`;
       const { incoming, outgoing } = fadeDurations(clip);
       if (incoming || outgoing) {
-        const fade = `min(1,min(${incoming ? `(T-${clip.start})/${incoming}` : "1"},${outgoing ? `(${clip.start + clip.duration}-T)/${outgoing}` : "1"}))`;
-        alpha = `geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='alpha(X,Y)*(${expression(clip, "opacity", "T")})*max(0,${fade})'`;
+        const fade = `min(1,min(${incoming ? `(${clock("T")}-${clip.start})/${incoming}` : "1"},${outgoing ? `(${clip.start + clip.duration}-${clock("T")})/${outgoing}` : "1"}))`;
+        alpha = `geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='alpha(X,Y)*(${pose("opacity", "T")})*max(0,${fade})'`;
       }
       const visualEffects = visualFilters(
         animatedViewport ? { ...clip, crop: undefined } : clip,
@@ -500,13 +512,13 @@ async function renderProject(
       ].some((value) => value.rotationX || value.rotationY);
       const rotate = hasAxisRotation
         ? axisRotationFilters({
-            x: expression(clip, "rotationX", "T"),
-            y: expression(clip, "rotationY", "T"),
-            z: expression(clip, "rotation", "T"),
+            x: pose("rotationX", "T"),
+            y: pose("rotationY", "T"),
+            z: pose("rotation", "T"),
           })
         : animatedRotation
           ? [
-              `rotate=a='(${expression(clip, "rotation")})*PI/180':ow='ceil(sqrt(iw*iw+ih*ih)/2)*2':oh='ceil(sqrt(iw*iw+ih*ih)/2)*2':c=black@0`,
+              `rotate=a='(${pose("rotation")})*PI/180':ow='ceil(sqrt(iw*iw+ih*ih)/2)*2':oh='ceil(sqrt(iw*iw+ih*ih)/2)*2':c=black@0`,
             ]
           : rotation
             ? [
@@ -535,15 +547,19 @@ async function renderProject(
           source = cursor.label;
         }
       }
+      const padding =
+        range.before || range.after
+          ? `setpts=PTS-STARTPTS,tpad=start_mode=clone:start_duration=${range.before}:stop_mode=clone:stop_duration=${range.after},setpts=PTS+${range.start}/TB,`
+          : "";
       const timing =
         source === `${index}:v`
-          ? `trim=start=${sourceIn}:duration=${clip.duration * clip.speed},setpts=(PTS-STARTPTS)/${clip.speed}+${clip.start}/TB,`
-          : "";
+          ? `trim=start=${sourceIn}:duration=${clip.duration * clip.speed},setpts=(PTS-STARTPTS)/${clip.speed}${padding ? "," + padding : `+${clip.start}/TB,`}`
+          : padding;
       filters.push(
-        `[${source}]${timing}${animatedText ? `fps=${fps},` : ""}format=rgba,${[...(animatedViewport ? animatedViewportFilters((key) => expression(clip, key, "T")) : contentFilters(clip)), ...visualEffects, transform, "setsar=1", ...rotate, alpha].join(",")}[${visual}]`,
+        `[${source}]${timing}${animatedText ? `fps=${fps},` : ""}format=rgba,${[...(animatedViewport ? animatedViewportFilters((key) => pose(key, "T")) : contentFilters(clip)), ...visualEffects, transform, "setsar=1", ...rotate, alpha].join(",")}[${visual}]`,
       );
       filters.push(
-        `[${base}][${visual}]overlay=x='${width}*(${expression(clip, "x")})-overlay_w/2':y='${height}*(${expression(clip, "y")})-overlay_h/2':enable='gte(t,${clip.start})*lt(t,${clip.start + clip.duration})':eof_action=pass:repeatlast=0${still ? ":format=auto" : ""}[${output}]`,
+        `[${base}][${visual}]overlay=x='${width}*((${pose("x")})+(${transitionOffsetExpression(project, clip)}))-overlay_w/2':y='${height}*(${pose("y")})-overlay_h/2':enable='gte(t,${range.start})*lt(t,${range.end})':eof_action=pass:repeatlast=0${still ? ":format=auto" : ""}[${output}]`,
       );
       base = output;
     }

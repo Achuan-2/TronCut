@@ -3,6 +3,7 @@ import { transformAt } from "./editor";
 import { cameraAt } from "./canvas";
 import { fadeOpacity } from "./effects";
 import { shiftBehaviors } from "./behaviors";
+import { transitionRange, transitionTransform } from "./transitions";
 
 /** Freeze visible layers at one timeline instant while retaining source timestamps. */
 export function frameSnapshot(
@@ -19,23 +20,31 @@ export function frameSnapshot(
       ? { transform: cameraAt(project, time), keyframes: [] }
       : undefined,
     clips: project.clips
-      .filter(
-        (clip) =>
+      .filter((clip) => {
+        const range = transitionRange(project, clip);
+        return (
           clip.kind !== "audio" &&
           visible.has(clip.trackId) &&
-          time >= clip.start &&
-          (time < clip.start + clip.duration ||
+          time >= range.start &&
+          (time < range.end ||
             (clip.id === endpointClipId &&
-              Math.abs(time - clip.start - clip.duration) < 1e-6)),
-      )
+              Math.abs(time - clip.start - clip.duration) < 1e-6))
+        );
+      })
       .map((clip) => {
-        const local = time - clip.start;
-        const transform = transformAt(clip, local);
+        const local = Math.max(0, Math.min(clip.duration, time - clip.start));
+        const transform = transitionTransform(
+          project,
+          clip,
+          transformAt(clip, local),
+          time,
+        );
         return {
           ...clip,
           start: 0,
           duration: 1 / project.canvas.fps,
           sourceIn: clip.sourceIn + local * clip.speed,
+          transitions: undefined,
           speed: 1,
           transform: {
             ...transform,

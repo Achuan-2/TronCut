@@ -306,12 +306,18 @@ export function splitClip(
   const left: Clip = fitBehaviorDuration({
     ...clip,
     duration: cut,
+    transitions: clip.transitions
+      ? { incoming: clip.transitions.incoming }
+      : undefined,
   });
   const right: Clip = fitBehaviorDuration({
     ...clip,
     id: uid(),
     start: time,
     duration: clip.duration - cut,
+    transitions: clip.transitions
+      ? { outgoing: clip.transitions.outgoing }
+      : undefined,
     sourceIn: clip.sourceIn + cut * clip.speed,
     // Keep the original curve. Rebuilding a smooth curve at the cut would change its acceleration.
     animationOffset: (clip.animationOffset ?? 0) + cut,

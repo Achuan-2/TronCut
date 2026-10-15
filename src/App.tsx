@@ -408,6 +408,12 @@ export default function App() {
       )?.locked;
     const animation = editor.selectedAnimation;
     if (
+      editor.selectedTransition &&
+      ["Delete", "Backspace"].includes(event.key)
+    ) {
+      event.preventDefault();
+      if (!locked) editor.updateTransition(editor.selectedTransition, null);
+    } else if (
       editor.selectedBehavior &&
       ["Delete", "Backspace"].includes(event.key)
     ) {

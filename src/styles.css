@@ -2015,6 +2015,126 @@ fieldset:disabled {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
+.transitions-panel {
+  padding: 12px;
+}
+.transition-card {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+  color: #cde7dd;
+  background: #171c20;
+  border: 1px solid #333b42;
+  border-radius: 4px;
+}
+.transition-card-preview {
+  position: relative;
+  display: flex;
+  width: 100%;
+  height: 92px;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: #090c0e;
+}
+.transition-card-preview > span {
+  position: absolute;
+  display: grid;
+  width: 54%;
+  height: 58%;
+  place-items: center;
+  font-size: 25px;
+  color: #fff;
+  background: #426a61;
+  animation: transition-card-slide 2.4s ease-in-out infinite;
+}
+.transition-card-preview > span:first-child {
+  animation-name: transition-card-slide-out;
+}
+.transition-card > b {
+  width: 100%;
+  padding: 8px;
+  border-top: 2px solid #48cbb6;
+  text-align: left;
+  font-weight: 500;
+}
+@keyframes transition-card-slide {
+  0%,
+  20% {
+    translate: 110% 0;
+  }
+  55%,
+  100% {
+    translate: 0 0;
+  }
+}
+@keyframes transition-card-slide-out {
+  0%,
+  20% {
+    translate: 0 0;
+  }
+  55%,
+  100% {
+    translate: -110% 0;
+  }
+}
+.transition-heading-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.transition-heading-actions .icon-button {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  padding: 0;
+  color: #c7d0d3;
+}
+.transition-switch {
+  position: relative;
+  width: 42px;
+  height: 22px;
+  padding: 0;
+  border-radius: 999px;
+  background: #4d5b60;
+}
+.transition-switch i {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: white;
+  transition: translate 120ms ease-out;
+}
+.transition-switch[aria-checked="true"] {
+  background: var(--accent);
+}
+.transition-switch[aria-checked="true"] i {
+  translate: 20px 0;
+}
+.transition-fields {
+  padding: 14px 24px;
+  border: 0;
+}
+.transition-fields .field {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 10px;
+}
+.transition-reverse {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: 64px;
+}
 .behavior-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -2523,6 +2643,82 @@ fieldset:disabled {
 .timeline-clip.locked {
   cursor: not-allowed;
   opacity: 0.7;
+}
+.timeline-clip.transition-drop-target {
+  border-color: #f2df00;
+  box-shadow:
+    inset 0 0 0 1px #f2df00,
+    0 0 8px #f2df0066;
+  z-index: 8;
+}
+.timeline-transition,
+.transition-drop-edge {
+  position: absolute;
+  top: 0;
+  bottom: auto;
+  height: 48px;
+  z-index: 8;
+}
+.timeline-transition {
+  display: grid;
+  min-width: 8px;
+  place-items: center;
+  overflow: hidden;
+  color: #effff9;
+  border: 1px solid #40d6c6;
+  background: #218d84d9;
+  cursor: pointer;
+}
+.timeline-transition.incoming,
+.transition-drop-edge.incoming {
+  left: 0;
+  border-radius: 4px 0 0 4px;
+}
+.timeline-transition.outgoing,
+.transition-drop-edge.outgoing {
+  right: 0;
+  border-radius: 0 4px 4px 0;
+}
+.timeline-transition > span {
+  font-size: 7px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  pointer-events: none;
+}
+.timeline-transition.selected {
+  color: #382f00;
+  border-color: #fff000;
+  background: #a5aa36e6;
+  box-shadow: 0 0 8px #ffe60099;
+}
+.timeline-transition.disabled {
+  opacity: 0.48;
+}
+.transition-resize {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 7px;
+  cursor: ew-resize;
+  touch-action: none;
+}
+.timeline-transition.incoming .transition-resize {
+  right: -1px;
+}
+.timeline-transition.outgoing .transition-resize {
+  left: -1px;
+}
+.transition-drop-edge {
+  width: clamp(16px, 16%, 80px);
+  pointer-events: none;
+}
+.transition-drop-edge.incoming {
+  background: linear-gradient(90deg, #12a887dd, #dbdb0077 55%, transparent);
+  border-left: 2px solid #fff000;
+}
+.transition-drop-edge.outgoing {
+  background: linear-gradient(270deg, #12a887dd, #dbdb0077 55%, transparent);
+  border-right: 2px solid #fff000;
 }
 .clip-content {
   position: relative;
