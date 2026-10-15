@@ -115,7 +115,8 @@ jobs:
           FRAMECRAFT_PACKAGED_SMOKE: "1"
           FRAMECRAFT_PACKAGED_APP: release/win-unpacked/TronCut.exe
         run: |
-          node scripts/test-editing-ui.mjs
+          Copy-Item -LiteralPath ../ci/scripts/test-editing-ui.mjs -Destination .cache/test-editing-ui.mjs
+          node .cache/test-editing-ui.mjs
           if ($LASTEXITCODE -ne 0) { throw 'Packaged editing regression failed' }
       - name: Prepare portable ZIP and checksums
         run: node ../ci/scripts/prepare-release.mjs
@@ -206,6 +207,8 @@ jobs:
         run: node ../ci/scripts/check-packaging.mjs
       - name: Build application
         run: pnpm build
+      - name: Prepare macOS icon
+        run: cp ../ci/resources/icon.png resources/icon.png
       - name: Package unsigned macOS DMG
         run: pnpm exec electron-builder --mac dmg --${{ matrix.arch }} --publish never --config.artifactName='TronCut-${version}-macos-${arch}.${ext}'
       - name: Prepare DMG and checksums
