@@ -884,6 +884,7 @@ try {
   await seek(8);
   // Switching inspector tabs selects its current clip; enter the desired tab
   // before selecting all clips for the batch-animation check.
+  await page.locator(".timeline-clip.text").click();
   await page.getByRole("tab", { name: "画面", exact: true }).click();
   await page.locator(".timeline-toolbar").click({ position: { x: 2, y: 2 } });
   await page.keyboard.press("Control+a");
