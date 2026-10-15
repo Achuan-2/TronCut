@@ -8,6 +8,7 @@ import {
   type Asset,
 } from "../shared/model";
 import { addMediaAssets } from "../shared/editor";
+import { setTrackHeight } from "../shared/tracks";
 
 const image: Asset = {
   id: "image",
@@ -21,6 +22,19 @@ const image: Asset = {
 };
 
 describe("通用编号轨道与图片粘贴", () => {
+  it("单条轨道高度保存重开后保留，旧工程仍可使用默认高度", () => {
+    const project = createProject();
+    const id = project.tracks[0].id;
+    const changed = setTrackHeight(project, id, 135.6);
+    const reopened = validateProject(JSON.parse(JSON.stringify(changed)));
+    expect(reopened.tracks[0].height).toBe(136);
+    expect(reopened.tracks[1].height).toBeUndefined();
+    expect(project.tracks[0].height).toBeUndefined();
+    expect(setTrackHeight(changed, id, 136)).toBe(changed);
+    expect(setTrackHeight(project, id, 0).tracks[0].height).toBe(56);
+    expect(setTrackHeight(project, id, 1000).tracks[0].height).toBe(360);
+    expect(setTrackHeight(project, id, NaN)).toBe(project);
+  });
   it("默认轨道统一编号，旧类别与名称迁移时保留ID、状态、片段和动画", () => {
     const project = createProject();
     project.clips = [newText("audio", 2)];

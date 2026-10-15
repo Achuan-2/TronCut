@@ -2,6 +2,30 @@ import { type Project, newTrack, numberTracks } from "./model";
 
 export type Track = Project["tracks"][number];
 
+export const defaultTrackHeight = 70;
+export const minTrackHeight = 56;
+export const maxTrackHeight = 360;
+
+export function setTrackHeight(
+  project: Project,
+  id: string,
+  height: number,
+): Project {
+  if (!Number.isFinite(height)) return project;
+  const next = Math.max(
+    minTrackHeight,
+    Math.min(maxTrackHeight, Math.round(height)),
+  );
+  const track = project.tracks.find((track) => track.id === id);
+  if (!track || (track.height ?? defaultTrackHeight) === next) return project;
+  return {
+    ...project,
+    tracks: project.tracks.map((track) =>
+      track.id === id ? { ...track, height: next } : track,
+    ),
+  };
+}
+
 export function isTrackActive(tracks: Track[], id: string): boolean {
   const track = tracks.find((item) => item.id === id);
   return (

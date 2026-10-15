@@ -1,4 +1,5 @@
 import {
+  type CSSProperties,
   Fragment,
   useEffect,
   useLayoutEffect,
@@ -70,7 +71,14 @@ import {
   mergeWithPreviousCaption,
   previousCaption,
 } from "../shared/captions";
-import { displayTrackName, isTrackActive } from "../shared/tracks";
+import {
+  defaultTrackHeight,
+  displayTrackName,
+  isTrackActive,
+  minTrackHeight,
+  setTrackHeight,
+} from "../shared/tracks";
+import TrackResizeHandle from "./TrackResizeHandle";
 import TrackContextMenu, { type TrackMenuPosition } from "./TrackContextMenu";
 import { useViewportZoom, type ZoomPoint } from "./useViewportZoom";
 import { projectIndex } from "../shared/project-index";
@@ -189,17 +197,48 @@ export default function Timeline({
         ...Object.fromEntries(added.map((id) => [id, true])),
       }));
   }, [project.clips]);
-  const trackHeights = useMemo(() => {
+  const [trackHeightDraft, setTrackHeightDraft] = useState<{
+    projectId: string;
+    trackId: string;
+    height: number;
+  } | null>(null);
+  const trackLayouts = useMemo(() => {
     const rows = new Map<string, number>();
+    const animated = new Set<string>();
     for (const clip of project.clips) {
+      if (clip.keyframes.length > 1) animated.add(clip.trackId);
       if (expandedEffects[clip.id]) {
         const count =
           Number(hasClipSpeed(clip)) + (clip.behaviors?.length ?? 0);
         rows.set(clip.trackId, Math.max(rows.get(clip.trackId) ?? 0, count));
       }
     }
-    return project.tracks.map((track) => 70 + 24 * (rows.get(track.id) ?? 0));
-  }, [project.clips, project.tracks, expandedEffects]);
+    return project.tracks.map((track) => {
+      // Keep animation arrows and expanded effect rows inside the resized lane.
+      const minHeight = animated.has(track.id)
+        ? defaultTrackHeight
+        : minTrackHeight;
+      const baseHeight = Math.max(
+        minHeight,
+        trackHeightDraft?.projectId === project.id &&
+          trackHeightDraft.trackId === track.id
+          ? trackHeightDraft.height
+          : track.height ?? defaultTrackHeight,
+      );
+      return {
+        baseHeight,
+        minHeight,
+        height: baseHeight + 24 * (rows.get(track.id) ?? 0),
+      };
+    });
+  }, [
+    project.id,
+    project.clips,
+    project.tracks,
+    expandedEffects,
+    trackHeightDraft,
+  ]);
+  const trackHeights = trackLayouts.map((layout) => layout.height);
   const layoutKey = trackHeights.join(",");
   const trackTop = (id: string) => {
     const index = project.tracks.findIndex((track) => track.id === id);
@@ -302,6 +341,7 @@ export default function Timeline({
     setDeleteMenu(false);
   };
   useEffect(() => {
+    if (trackHeightDraft?.projectId === project.id) return;
     const element = scroll.current;
     const index = project.tracks.findIndex(
       (track) => track.id === selected?.trackId,
@@ -312,7 +352,7 @@ export default function Timeline({
     if (top < element.scrollTop + 36) element.scrollTop = Math.max(0, top - 36);
     else if (top + height > element.scrollTop + element.clientHeight)
       element.scrollTop = top + height - element.clientHeight;
-  }, [selected?.trackId, project.tracks.length, layoutKey]);
+  }, [selected?.trackId, project.tracks.length, layoutKey, trackHeightDraft]);
   const [viewport, setViewport] = useState({ left: 0, width: 1600 });
   const visibleClips = useMemo(() => {
     const index = projectIndex(project);
@@ -686,7 +726,7 @@ export default function Timeline({
           {project.tracks.map((track, index) => (
             <div
               className={`track-header ${track.locked ? "locked" : ""} ${track.captionTrack ? "caption-track" : ""} ${track.solo ? "solo-track" : ""} ${project.tracks.some((item) => item.solo) && !track.solo ? "inactive-solo-track" : ""}`}
-              key={track.id}
+              key={`${project.id}-${track.id}`}
               data-track-id={track.id}
               style={{ height: trackHeights[index] }}
               onContextMenu={(event) => {
@@ -760,6 +800,21 @@ export default function Timeline({
                   </button>
                 ))}
               </div>
+              <TrackResizeHandle
+                name={displayTrackName(project.tracks, track.id)}
+                height={trackLayouts[index].baseHeight}
+                minHeight={trackLayouts[index].minHeight}
+                preview={(height) =>
+                  setTrackHeightDraft(
+                    height === null
+                      ? null
+                      : { projectId: project.id, trackId: track.id, height },
+                  )
+                }
+                commit={(height) =>
+                  apply((project) => setTrackHeight(project, track.id, height))
+                }
+              />
             </div>
           ))}
         </div>
@@ -978,10 +1033,13 @@ export default function Timeline({
                     y: event.clientY,
                   });
                 }}
-                style={{
-                  backgroundSize: `${zoom * 2}px 100%`,
-                  height: trackHeights[trackIndex],
-                }}
+                style={
+                  {
+                    backgroundSize: `${zoom * 2}px 100%`,
+                    height: trackHeights[trackIndex],
+                    "--track-content-height": `${trackLayouts[trackIndex].baseHeight - 22}px`,
+                  } as CSSProperties
+                }
                 onClick={(event) => {
                   if (event.target === event.currentTarget) {
                     if (marqueeMoved.current) {
@@ -1094,7 +1152,7 @@ export default function Timeline({
                             left: c.start * zoom,
                             width: Math.max(4, c.duration * zoom),
                             height:
-                              50 +
+                              trackLayouts[trackIndex].baseHeight - 20 +
                               (editor.selectedIds.includes(c.id) ? 2 : 0) +
                               (expandedEffects[c.id]
                                 ? 24 *
@@ -1343,7 +1401,10 @@ export default function Timeline({
                             });
                           }}
                         >
-                          <div className="clip-content">
+                          <div
+                            className="clip-content"
+                            style={{ height: trackLayouts[trackIndex].baseHeight - 22 }}
+                          >
                             <span
                               className="trim-handle left"
                               data-trim="left"
@@ -1356,19 +1417,21 @@ export default function Timeline({
                               ) : (
                                 <span className="clip-media-icon">▣</span>
                               )}
-                              <span>
+                              <span title={c.kind === "text" ? c.text : c.name}>
                                 {c.groupId ? "▧ " : ""}
-                                {c.name}
+                                {c.kind === "text"
+                                  ? c.text?.replace(/\s+/g, " ").trim() || c.name
+                                  : c.name}
                               </span>
                               {c.speed !== 1 && (
                                 <b>{Number(c.speed.toFixed(2))}×</b>
                               )}
                             </div>
-                            <div className="clip-detail">
-                              {c.kind === "text"
-                                ? c.text
-                                : `${timeLabel(c.duration)}${c.podcast ? " · 播客人声" : ""}`}
-                            </div>
+                            {c.kind !== "text" && (
+                              <div className="clip-detail">
+                                {`${timeLabel(c.duration)}${c.podcast ? " · 播客人声" : ""}`}
+                              </div>
+                            )}
                             {editor.preferences.program.waveforms &&
                               c.assetId &&
                               assetsById.get(c.assetId)?.hasAudio &&

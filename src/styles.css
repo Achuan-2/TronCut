@@ -3263,6 +3263,7 @@ fieldset:disabled {
   color: #647d6b;
 }
 .track-header {
+  position: relative;
   height: 70px;
   padding: 11px 12px 8px 17px;
   border-bottom: 1px solid #333e36;
@@ -3277,6 +3278,21 @@ fieldset:disabled {
   font-size: 10px;
   color: #aec2b5;
 }
+.track-resize-handle {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  height: 6px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  cursor: ns-resize;
+  touch-action: none;
+  z-index: 2;
+}
+.track-resize-handle:hover, .track-resize-handle:focus-visible { background: #76e5b566; }
 .track-controls {
   display: flex;
   margin-left: 0;
@@ -3419,7 +3435,7 @@ fieldset:disabled {
   position: absolute;
   top: 0;
   bottom: auto;
-  height: 48px;
+  height: var(--track-content-height, 48px);
   z-index: 8;
 }
 .timeline-transition {
@@ -3503,9 +3519,12 @@ fieldset:disabled {
   pointer-events: none;
 }
 .clip-label span:not(.clip-media-icon) {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.clip-label > svg, .clip-label > .clip-media-icon, .clip-label > b { flex-shrink: 0; }
+.timeline-clip.text:not(.has-animation) .clip-label { height: 100%; padding: 0 10px; }
 .clip-label b {
   font-size: 8px;
   font-weight: 500;
