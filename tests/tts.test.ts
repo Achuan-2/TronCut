@@ -13,6 +13,10 @@ vi.mock("../electron/process", () => ({
   findBinary: (name: string) => name,
   runProcess: vi.fn(),
 }));
+vi.mock("../electron/onnx-session", async () => {
+  const { runProcess } = await import("../electron/process");
+  return { runOnnxSession: runProcess };
+});
 vi.mock("../electron/media", () => ({ probeMedia: vi.fn() }));
 
 const options = {

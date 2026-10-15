@@ -24,6 +24,7 @@ const runtimeSchema = z.object({
   sampleRate: z.number().int().positive(),
   duration: z.number().finite().positive(),
   loadSeconds: z.number().finite().nonnegative(),
+  modelCached: z.boolean().optional(),
   generationSeconds: z.number().finite().nonnegative(),
   modelDirectory: z.string().max(4096).optional(),
   voiceId: z.string().max(1024).optional(),
@@ -118,6 +119,7 @@ export async function synthesizeSpeech(
             }
           },
         },
+        true,
       );
     }
     if (signal.aborted) throw new Error("配音已取消");

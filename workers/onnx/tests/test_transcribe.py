@@ -11,9 +11,14 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from transcribe import transcribe, load_cpu_recognizer, recognize_wav
+from model_cache import models, vad_models
 
 
 class TranscribeTests(unittest.TestCase):
+    def setUp(self):
+        models.clear()
+        vad_models.clear()
+
     def test_streaming_keeps_vad_times_and_flushes_the_final_segment(self):
         samples = np.zeros(8000, dtype=np.float32)
 
@@ -38,6 +43,10 @@ class TranscribeTests(unittest.TestCase):
             def flush(self):
                 self.segments.append(SimpleNamespace(start=96000, samples=samples))
 
+            def reset(self):
+                self.segments = deque(SimpleNamespace(start=i * 16000, samples=samples)
+                                      for i in range(5))
+
         batches = []
 
         def recognize(batch, language):
@@ -50,10 +59,14 @@ class TranscribeTests(unittest.TestCase):
             with wave.open(audio, "wb") as output:
                 output.setparams((1, 2, 16000, 0, "NONE", ""))
                 output.writeframes(bytes(8 * 16000 * 2))
-            with patch("transcribe.sherpa_onnx.VoiceActivityDetector", return_value=Vad()), \
+            with patch("transcribe.sherpa_onnx.VoiceActivityDetector", return_value=Vad()) as create_vad, \
+                    patch("transcribe.file_key", return_value="vad"), \
                     patch("transcribe.progress"):
                 cues = recognize_wav(audio, recognize, "vad.onnx", "qwen3-asr", "CPU", "zh")
-        self.assertEqual(batches, [1] * 6)
+                repeated = recognize_wav(audio, recognize, "vad.onnx", "qwen3-asr", "CPU", "zh")
+                create_vad.assert_called_once()
+        self.assertEqual(cues, repeated)
+        self.assertEqual(batches, [1] * 12)
         self.assertEqual([(cue["start"], cue["end"]) for cue in cues],
                          [(i, i + 0.5) for i in (0, 1, 2, 3, 4, 6)])
 
@@ -66,6 +79,7 @@ class TranscribeTests(unittest.TestCase):
 
     def test_cpu_sensevoice_keeps_original_language_code(self):
         with patch("transcribe.resolve_model", return_value=Path("model")), \
+                patch("transcribe.model_key", return_value="sensevoice-zh"), \
                 patch("transcribe.sherpa_onnx.OfflineRecognizer.from_sense_voice") as factory:
             load_cpu_recognizer({"engine": "sensevoice", "language": "zh"})
             self.assertEqual(factory.call_args.kwargs["language"], "zh")

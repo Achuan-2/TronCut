@@ -158,6 +158,7 @@ async function recognizeAudio(
         }
       },
     },
+    true,
   );
   if (signal.aborted) throw new Error("字幕生成已取消");
   const cues = z

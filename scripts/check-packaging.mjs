@@ -40,6 +40,8 @@ for (const name of [
   "synthesize.py",
   "models.py",
   "caption_utils.py",
+  "model_cache.py",
+  "server.py",
 ]) {
   if (!fs.existsSync(path.resolve("workers/onnx", name)))
     throw new Error(`安装包缺少 sherpa-onnx worker：${name}`);

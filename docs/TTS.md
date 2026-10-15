@@ -12,7 +12,9 @@ Windows 默认使用本机 Windows 系统语音，自动优先微软云希；也
 
 CLI 的 `offline:true` 同时禁止 uv 与模型下载；环境或模型不完整时明确报错。下载与生成均可通过任务栏取消，生成失败或取消会清理本次配音输出。文稿与音频在本地处理。
 
-长文稿按标点和长度分块，每块不超过 100 个字符，逐块写入 WAV。当前每次任务重新加载模型，尚无常驻推理。生成结果可以试听，离开面板停止试听，返回时保留文稿和参数。保存工程会归档 WAV，`narration` 保留模型、音色、目录、语速和离线选项；已经生成的配音可在没有模型环境的电脑上继续播放和编辑。
+长文稿按标点和长度分块，每块不超过 100 个字符，逐块写入 WAV。字幕、TTS 试听与正式配音共用常驻 Python 进程；同一模型首次加载后留在内存，更换音色、文稿和语速不重新加载。缓存最多保留四个最近使用的模型配置，超过上限时淘汰最久未使用项。模型目录、必需文件的大小或修改时间变化会触发重新加载；SenseVoice 的识别语言也参与缓存键。Silero VAD 单独保留一个实例，每次识别前重置状态和时间。任务串行执行，普通任务失败保留进程，取消活动推理则结束进程并在下次请求重建；取消排队任务不影响当前推理。应用退出会释放缓存，独立 CLI 命令之间不共享内存。运行记录中的 `modelCached` 表示缓存命中，命中时 `loadSeconds` 为零，任务栏显示“复用已加载的”模型。
+
+生成结果可以试听，离开面板停止试听，返回时保留文稿和参数。保存工程会归档 WAV，`narration` 保留模型、音色、目录、语速和离线选项；已经生成的配音可在没有模型环境的电脑上继续播放和编辑。
 
 旧 Kokoro、Qwen3-TTS 与 IndexTTS 工程仍可打开、播放已有音频。新配音从设置弹窗选择当前支持的模型和音色，不再提供旧模型的语气指令、参考声音克隆或读取片段配音参数按钮。
 
@@ -26,6 +28,10 @@ node scripts/verify-onnx.mjs
 ```
 
 真实验证脚本支持 `TRONCUT_TEST_KOKORO_DIR`、`TRONCUT_TEST_SENSEVOICE_DIR` 和 `TRONCUT_TEST_QWEN3_ASR_DIR` 指定模型目录；默认从 TronCut 测试缓存下载模型。结果写入 `test-output/onnx-integration/result.json`，涵盖配音、一次语速转换、字幕、工程保存重开和离线生成。
+
+`node scripts/verify-onnx-cache.mjs` 额外验证首次/重复试听、更换音色、正式配音、两种 ASR 的重复识别及 VAD 时间重置，并记录实际耗时与缓存命中。默认使用独立验证缓存，设置 `TRONCUT_CACHE_TEST_USER_DATA` 可明确使用已有 TronCut 缓存；需要已经准备好的 CPU 环境、Kokoro、两种 ASR 和 VAD，验证期间不下载。`TRONCUT_CACHE_TEST_AUDIO` 可指定识别样本，默认使用 `test-output/sensevoice-zh.wav`。结果位于 `test-output/onnx-cache/<时间戳>/result.json`。
+
+2026-10-15 Windows 实测：Kokoro 首次试听 16.51 秒，重复试听 12.34 秒，其中模型加载由 2.83 秒降为零；更换音色及正式配音也命中同一模型缓存。对同一中文短样本，Qwen3-ASR 首次/重复调用为 7.59/1.33 秒，SenseVoice 为 2.82/0.36 秒，重复识别的字幕文字和时间戳一致；识别后再配音仍命中 TTS 缓存。证据位于 `test-output/onnx-cache/1792061843904/result.json`。这些是短样本服务调用耗时，TTS 音频仍需实际合成，不代表任意文稿、机器或长录音的固定倍率。
 
 Qwen3-ASR CUDA 识别已移除。退出应用后，可清理应用数据目录的 `workers/onnx/.venv-cuda/`、旧 `qwen_gpu.py` 和 `models/onnx/qwen3-asr-0.6b-cuda/`。保留 `workers/onnx/.venv/` 可复用当前 CPU 环境；删除整个 `workers/` 不会删除工程和 `models/` 中的模型，但下次使用本地语音时需要重新准备运行环境，离线时可能无法完成。
 

@@ -10,6 +10,7 @@ import sherpa_onnx
 
 from caption_utils import recognition_cues
 from models import resolve_model, resolve_vad
+from model_cache import models, vad_models, model_key, file_key
 
 SAMPLE_RATE = 16000
 QWEN_LANGUAGES = {
@@ -45,6 +46,26 @@ def load_cpu_recognizer(request):
     engine = request["engine"]
     language = request.get("language", "auto")
     directory = resolve_model(engine, request.get("modelDir"), request.get("offline", False), progress)
+    # SenseVoice fixes language at construction; Qwen sets it on each new stream.
+    key = model_key(engine, directory, language if engine == "sensevoice" else "")
+    recognizer, cached, _ = models.get(key, lambda: create_recognizer(engine, directory, language))
+    if cached:
+        progress(8, f"复用已加载的 {engine} ONNX 模型（CPU）")
+    def recognize(batch, language):
+        results = []
+        for samples in batch:
+            stream = recognizer.create_stream()
+            if engine == "qwen3-asr" and language:
+                stream.set_option("language", language)
+            stream.accept_waveform(SAMPLE_RATE, samples)
+            recognizer.decode_stream(stream)
+            results.append(stream.result)
+        return results
+
+    return recognize
+
+
+def create_recognizer(engine, directory, language):
     threads = min(4, os.cpu_count() or 1)
     common = dict(num_threads=threads, provider="cpu")
     progress(8, f"正在加载 {engine} ONNX 模型（CPU）")
@@ -67,18 +88,7 @@ def load_cpu_recognizer(request):
             **common, tokens=str(directory / "tokens.txt"),
             model=str(directory / "model.int8.onnx"),
             language="" if language == "auto" else language, use_itn=True)
-    def recognize(batch, language):
-        results = []
-        for samples in batch:
-            stream = recognizer.create_stream()
-            if engine == "qwen3-asr" and language:
-                stream.set_option("language", language)
-            stream.accept_waveform(SAMPLE_RATE, samples)
-            recognizer.decode_stream(stream)
-            results.append(stream.result)
-        return results
-
-    return recognize
+    return recognizer
 
 
 def recognize_wav(input_path, recognize, vad_model, engine, label, language):
@@ -92,7 +102,9 @@ def recognize_wav(input_path, recognize, vad_model, engine, label, language):
     config.sample_rate = SAMPLE_RATE
     config.num_threads = 1
     config.provider = "cpu"
-    vad = sherpa_onnx.VoiceActivityDetector(config, buffer_size_in_seconds=30)
+    vad, _, _ = vad_models.get(file_key(vad_model), lambda: sherpa_onnx.VoiceActivityDetector(config, buffer_size_in_seconds=30))
+    # A cached detector must never retain timestamps or queued segments from a prior task.
+    vad.reset()
     cues = []
     count = 0
     pending = []

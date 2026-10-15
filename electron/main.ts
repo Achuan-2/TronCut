@@ -36,6 +36,7 @@ import { windowsSpeechVoices } from "./windows-speech";
 import { ttsOptionsSchema } from "../shared/tts";
 import { onnxModelSchema } from "../shared/onnx";
 import { downloadOnnxModel } from "./onnx";
+import { closeOnnxSessions } from "./onnx-session";
 import { mediaThumbnail } from "./thumbnails";
 import { serveMediaFile } from "./media-protocol";
 import { NativeRecording } from "./native-recording";
@@ -1018,6 +1019,7 @@ app
         workers: app.isPackaged ? path.join(process.resourcesPath, "workers/onnx") : path.resolve(__dirname, "../workers/onnx"),
         version: app.getVersion(), signal: controller.signal,
       });
+      await closeOnnxSessions();
       app.exit(code);
       return;
     }
@@ -1076,4 +1078,13 @@ app.on("window-all-closed", () => {
   nativeRecording?.abort();
   globalShortcut.unregisterAll();
   app.quit();
+});
+let closingOnnx = false;
+app.on("will-quit", (event) => {
+  if (closingOnnx) return;
+  event.preventDefault();
+  closingOnnx = true;
+  task?.abort();
+  // Windows are already closed at will-quit; exit after the worker handles close.
+  void closeOnnxSessions().finally(() => app.exit(0));
 });

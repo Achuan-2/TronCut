@@ -7,6 +7,7 @@ import {
   type OnnxModel,
 } from "../shared/onnx";
 import { findBinary, runProcess } from "./process";
+import { runOnnxSession } from "./onnx-session";
 
 export async function prepareOnnxWorker(source: string, userData: string) {
   const workers = path.join(userData, "workers", "onnx");
@@ -16,6 +17,8 @@ export async function prepareOnnxWorker(source: string, userData: string) {
     "uv.lock",
     "models.py",
     "caption_utils.py",
+    "model_cache.py",
+    "server.py",
     "transcribe.py",
     "synthesize.py",
     "prepare.py",
@@ -44,6 +47,7 @@ export async function runOnnxWorker(
   binary: string,
   args: string[],
   options: NonNullable<Parameters<typeof runProcess>[2]>,
+  persistent = false,
 ) {
   const cache = options.env?.TRONCUT_ONNX_MODELS;
   if (!cache) throw new Error("缺少 ONNX 模型缓存目录");
@@ -51,7 +55,7 @@ export async function runOnnxWorker(
   await fs.mkdir(root, { recursive: true });
   const staging = await fs.mkdtemp(path.join(root, ".download-task-"));
   try {
-    return await runProcess(binary, args, {
+    return await (persistent ? runOnnxSession : runProcess)(binary, args, {
       ...options,
       env: { ...options.env, TRONCUT_ONNX_DOWNLOAD_TEMP: staging },
     });

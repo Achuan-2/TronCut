@@ -11,6 +11,10 @@ vi.mock("../electron/process", () => ({
   findBinary: (name: string) => name,
   runProcess: vi.fn(),
 }));
+vi.mock("../electron/onnx-session", async () => {
+  const { runProcess } = await import("../electron/process");
+  return { runOnnxSession: runProcess };
+});
 
 describe("字幕引擎与源时间映射", () => {
   it("Qwen3-ASR 与 SenseVoice 使用同一个 ONNX 环境，已移除 Paraformer", () => {

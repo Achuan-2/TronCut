@@ -14,13 +14,17 @@
 
 模型准备通过 `speech:downloadModel` IPC 与 `workers/onnx/prepare.py` 执行，校验模型枚举后复用同一运行环境；ASR 准备时额外下载共享 VAD。完整文件以临时路径下载，TTS 模型包在暂存目录安全解压并检查必要文件，准备完成后才替换所选缓存模型。缓存完整时跳过下载，主进程共用后台任务互斥与进程树取消。
 
+`electron/onnx-session.ts` 按应用数据运行环境维护常驻 Python 工作进程，首次用 uv sync 准备环境后直接启动 Python，通过私有 stdin/stdout JSON 行协议串行分发 `server.py` 请求。每次任务的请求文件、输出和下载暂存目录独立；取消活动任务时等待 Python 退出后再清理，取消排队请求不终止当前任务。普通任务异常返回错误而不退出进程，崩溃后下次请求自动重建。空闲进程不阻止独立脚本退出，桌面退出及 CLI 结束时显式关闭；独立 CLI 调用不共用常驻进程。
+
+`model_cache.py` 通过四项 LRU 缓存复用原生 ASR/TTS 模型实例，以引擎、绝对模型路径、必需文件大小/mtime 及 SenseVoice 语言为键；音色、文字与语速不影响 TTS 模型缓存。VAD 单独缓存一项并在处理新音频前 reset；ASR 每次新建识别 stream，防止文字和时间跨任务串入。缺失文件仍按当前任务的 offline 参数校验，不因进程已经运行而放宽下载限制。
+
 `electron/transcription.ts` 通过 `electron/timeline-audio.ts` 合成全时间线的 16 kHz 单声道 PCM16 混音，与视频导出共用音频滤镜，保留片段开始时间、裁剪、速度、音量和效果，跳过静音与隐藏轨道。Silero VAD 以 512 个样本为窗口流式读取，单段语音最多八秒，结尾调用 flush 保留尾句。Qwen3-ASR 0.6B 与 SenseVoiceSmall 通过 sherpa-onnx 返回识别结果；Qwen3-ASR 使用 128 维特征、卷积前端和 INT8 encoder/decoder。识别优先采用真实 token 时间戳断句；时间信息缺失或不一致时保留完整文字与 VAD 边界，结果直接使用工程时间。CLI 默认全局识别，也可显式通过 clipIds 限定参与混音的片段。
 
 字幕识别统一使用 sherpa-onnx CPU 后端，`device: "auto"` 为兼容已有 CLI 请求也使用 CPU。CUDA 入口、官方 FP16 模型下载与独立 GPU 依赖已移除。应用数据目录中的旧 `workers/onnx/.venv-cuda/` 和 `models/onnx/qwen3-asr-0.6b-cuda/` 可在退出应用后手动删除；当前字幕与 ONNX 配音仍共用 `workers/onnx/.venv/`。
 
 桌面字幕后处理由 `shared/caption-processing.ts` 和 `electron/caption-processing.ts` 执行，支持规则/字数/不限长/AI 语义断句，以及独立的纠错精修和润色。AI 按批次返回带 ID 的文字结果，程序校验内容与条目后再映射时间；缺少词时间时仅在原语音段内部估算。无效批次回退，取消时整次操作不落盘。`electron/ai.ts` 通过主进程发送有超时与响应大小限制的兼容 Chat Completions 请求；`electron/preferences.ts` 独立保存配置，密钥通过 Electron safeStorage 加密，渲染端只收到是否存在密钥，更换服务 origin 不复用旧密钥。AI 配置和密钥均不写入工程。
 
-`electron/synthesis.ts` 调用同一运行环境中的 Kokoro / VITS ONNX 工作进程，文稿通过 JSON 请求文件传递，分段写出 PCM16 WAV，再由 FFmpeg 应用一次语速并统一为 48 kHz 单声道。素材保留文稿、模型、音色、目录与语速参数，运行记录包含模型路径、CPU、精度、加载与生成耗时。旧 Kokoro/Qwen/IndexTTS 工程参数保留解析能力；新生成仅使用 ONNX，读取旧参数时提示重新选择音色。当前模型每次任务重新加载。
+`electron/synthesis.ts` 调用常驻进程中的 Kokoro / VITS ONNX 模型，文稿通过 JSON 请求文件传递，分段写出 PCM16 WAV，再由 FFmpeg 应用一次语速并统一为 48 kHz 单声道。素材保留文稿、模型、音色、目录与语速参数，运行记录包含模型路径、CPU、精度、缓存命中、加载与生成耗时。旧 Kokoro/Qwen/IndexTTS 工程参数保留解析能力；新生成仅使用 ONNX，读取旧参数时提示重新选择音色。
 
 ## 时间、空间与动画
 
