@@ -127,11 +127,7 @@ export default function Panels(props: Props) {
                 ? "素材库"
                 : tabs.find((t) => t.id === tab)?.name}
             </h2>
-            <span>
-              {tab === "media"
-                ? `${project.assets.length} 个素材`
-                : "为表达加一点灵感"}
-            </span>
+            {tab === "media" && <span>{project.assets.length} 个素材</span>}
           </div>
         )}
         {tab === "media" && (
