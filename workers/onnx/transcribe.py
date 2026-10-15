@@ -82,7 +82,14 @@ def transcribe(request):
                     stream.set_option("language", QWEN_LANGUAGES[language])
                 stream.accept_waveform(SAMPLE_RATE, samples)
                 recognizer.decode_stream(stream)
-                cues.extend(result_cues(stream.result, start, end))
+                processing = request.get("processing") or {}
+                mode = processing.get("segmentation", "standard")
+                # Unlimited/AI modes start from complete original speech intervals.
+                whole_segment = mode in ("unlimited", "ai")
+                max_chars = float("inf") if whole_segment else (processing.get("maxChars", 22) if mode == "custom" else 22)
+                cues.extend(result_cues(stream.result, start, end, max_chars=max_chars,
+                    split_sentences=not whole_segment,
+                    max_seconds=float("inf") if whole_segment else 5))
                 count += 1
             vad.pop()
 

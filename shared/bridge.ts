@@ -4,6 +4,11 @@ import type { SpeechEngine, SpeechOptions } from "./asr";
 import type { TtsOptions } from "./tts";
 import type { OnnxModel, PreparedOnnxModel } from "./onnx";
 import type { RecentProject, RecoveryInfo } from "./recent-projects";
+import type { Preferences, PreferencesUpdate } from "./preferences";
+import type {
+  CaptionProcessingOptions,
+  CaptionProcessingResult,
+} from "./caption-processing";
 export interface CaptureSource {
   id: string;
   name: string;
@@ -20,6 +25,13 @@ export interface WindowState {
   fullscreen: boolean;
 }
 export interface FrameCraftBridge {
+  preferences(): Promise<Preferences>;
+  savePreferences(update: PreferencesUpdate): Promise<Preferences>;
+  testAiConnection(update: PreferencesUpdate): Promise<void>;
+  refineCaptions(
+    cues: Cue[],
+    options: CaptionProcessingOptions,
+  ): Promise<CaptionProcessingResult>;
   platform: string;
   windowState(): Promise<WindowState>;
   minimizeWindow(): Promise<void>;
@@ -75,7 +87,7 @@ export interface FrameCraftBridge {
     engine: SpeechEngine,
     language: string,
     options?: SpeechOptions,
-  ): Promise<Cue[]>;
+  ): Promise<CaptionProcessingResult>;
   captureSources(): Promise<CaptureSource[]>;
   selectCapture(id: string, systemAudio: boolean): Promise<void>;
   nativeCaptureAvailable(): Promise<boolean>;

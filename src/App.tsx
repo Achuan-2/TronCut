@@ -13,6 +13,7 @@ import {
   Square,
   Copy,
   Home as HomeIcon,
+  Settings2,
 } from "lucide-react";
 import {
   createProject,
@@ -36,6 +37,7 @@ import Panels, { Inspector, type Tab } from "./Panels";
 import Recorder from "./Recorder";
 import Home from "./Home";
 import type { RecentProject, RecoveryInfo } from "../shared/recent-projects";
+import PreferencesDialog from "./PreferencesDialog";
 
 export default function App() {
   const editor = useEditor(),
@@ -61,6 +63,7 @@ export default function App() {
     }),
     [file, setFile] = useState(""),
     [importReport, setImportReport] = useState<string[] | null>(null);
+  const [preferencesOpen, setPreferencesOpen] = useState(false);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
       undefined,
     ),
@@ -311,6 +314,7 @@ export default function App() {
         'input, textarea, select, [contenteditable="true"]',
       ) ||
       busy ||
+      preferencesOpen ||
       recording ||
       screen === "home"
     )
@@ -355,7 +359,7 @@ export default function App() {
     });
   const commands = useRef<(command: string) => void>(() => {});
   commands.current = (command) => {
-    if (actionsBlocked) return;
+    if (actionsBlocked || preferencesOpen) return;
     if (command === "openPending") {
       void run(async () => {
         if (
@@ -398,6 +402,7 @@ export default function App() {
     if (
       target.closest('input, textarea, select, [contenteditable="true"]') ||
       busy ||
+      preferencesOpen ||
       recording ||
       screen === "home"
     )
@@ -728,6 +733,19 @@ export default function App() {
                   : "浏览器预览"}
           </span>
         </span>
+        <button
+          className="preferences-trigger"
+          title="首选项"
+          aria-label="首选项"
+          disabled={actionsBlocked}
+          onClick={() => {
+            editor.setPlaying(false);
+            setPreferencesOpen(true);
+          }}
+        >
+          <Settings2 size={16} />
+          <span>首选项</span>
+        </button>
         <div className="header-actions" hidden={screen === "home"}>
           <button
             className="record-button"
@@ -826,6 +844,7 @@ export default function App() {
               capabilities={caps}
               refreshCapabilities={refreshCapabilities}
               busy={busy || mediaImporting}
+              onPreferences={() => setPreferencesOpen(true)}
             />
             <Preview editor={editor} />
             <Inspector editor={editor} />
@@ -838,6 +857,14 @@ export default function App() {
             dropDisabled={busy || recording || mediaImporting}
           />
         </>
+      )}
+      {preferencesOpen && (
+        <PreferencesDialog
+          onClose={() => setPreferencesOpen(false)}
+          run={(fn) => void run(fn)}
+          toast={toast}
+          busy={busy}
+        />
       )}
       {toastMessage && (
         <div className="toast" role="status">

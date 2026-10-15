@@ -9,6 +9,7 @@ import {
   protocol,
   session,
   screen,
+  safeStorage,
 } from "electron";
 import fs from "node:fs/promises";
 import type { FileHandle } from "node:fs/promises";
@@ -40,6 +41,11 @@ import { copyClipClipboard, importClipboardMedia } from "./clipboard-media";
 import { importMediaPaths } from "./import-media";
 import { RecentProjects } from "./recent-projects";
 import { runCli } from "./cli";
+import { PreferencesStore } from "./preferences";
+import { preferencesUpdateSchema } from "../shared/preferences";
+import { captionProcessingSchema, cueSchema } from "../shared/caption-processing";
+import { processCaptionCues } from "./caption-processing";
+import { requestAi } from "./ai";
 
 const cliIndex = process.argv.indexOf("--cli");
 const cliMode = cliIndex >= 0;
@@ -68,6 +74,7 @@ const windowState = () => ({
 });
 let projectFile: string | null = null;
 const recentProjects = new RecentProjects(path.join(app.getPath("userData"), "recent-projects.json"));
+const preferences = new PreferencesStore(path.join(app.getPath("userData"), "preferences.json"), safeStorage);
 async function rememberProject(project: Project, file: string) {
   let thumbnail: string | null = null;
   const visible = new Set(project.tracks.filter((track) => !track.hidden).map((track) => track.id));
@@ -145,6 +152,27 @@ async function chooseFile(
   return result.canceled ? null : result.filePaths[0];
 }
 function installHandlers() {
+  handle("preferences:get", () => preferences.get());
+  handle("preferences:save", (input: unknown) => preferences.save(preferencesUpdateSchema.parse(input)));
+  handle("preferences:ai:test", async (input: unknown) => {
+    if (task) throw new Error("已有后台任务正在执行");
+    task = new AbortController();
+    try {
+      const settings = await preferences.resolveAi(preferencesUpdateSchema.parse(input));
+      notify(0, "正在测试 AI 连接");
+      await requestAi(settings, "Reply with OK.", "Connection test", task.signal);
+    } finally { task = null; }
+  });
+  handle("subtitles:refine", async (input: unknown, inputOptions: unknown) => {
+    if (task) throw new Error("已有后台任务正在执行");
+    const cues = z.array(cueSchema).max(10000).parse(input);
+    const options = captionProcessingSchema.parse(inputOptions);
+    task = new AbortController();
+    try {
+      notify(0, "正在处理字幕");
+      return await processCaptionCues(cues, options, () => preferences.resolveAi(), task.signal, notify);
+    } finally { task = null; }
+  });
   handle("window:state", windowState);
   handle("window:minimize", () => window.minimize());
   handle("window:maximize", () => {
@@ -690,11 +718,12 @@ function installHandlers() {
         path.join(app.getPath("temp"), "framecraft-asr-"),
       );
       try {
+        const processing = options.processing ?? (await preferences.get()).captions;
         const cues = await transcribeProject(
           project,
           engine,
           language,
-          options,
+          { ...options, processing },
           {
             userData: app.getPath("userData"),
             workers: app.isPackaged
@@ -704,10 +733,12 @@ function installHandlers() {
             resources: process.resourcesPath,
           },
           task.signal,
-          notify,
+          (percent, label) => notify(percent * 0.8, label),
         );
+        const result = await processCaptionCues(cues, processing, () => preferences.resolveAi(), task.signal,
+          (percent, label) => notify(80 + percent * 0.2, label));
         notify(100, "字幕生成完成");
-        return cues;
+        return result;
       } finally {
         task = null;
         await fs.rm(temp, { recursive: true, force: true });

@@ -14,6 +14,13 @@ from synthesize import text_chunks
 
 
 class OnnxTests(unittest.TestCase):
+    def test_unlimited_preserves_original_speech_interval_even_with_word_timestamps(self):
+        result = SimpleNamespace(text="第一句。第二句。", tokens=["第一句。", "第二句。"],
+            timestamps=[0, 6], durations=[2, 2])
+        self.assertEqual(result_cues(result, 2, 10, max_chars=float("inf"),
+            split_sentences=False, max_seconds=float("inf")),
+            [{"start": 2, "end": 10, "text": "第一句。第二句。"}])
+
     def test_missing_timestamps_keep_real_vad_boundaries(self):
         result = SimpleNamespace(text="<|zh|>完整的字幕", tokens=["完", "整"], timestamps=[])
         self.assertEqual(result_cues(result, 2, 5), [{"start": 2, "end": 5, "text": "完整的字幕"}])

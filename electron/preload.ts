@@ -2,6 +2,12 @@ import { contextBridge, ipcRenderer, webUtils } from "electron";
 import type { FrameCraftBridge } from "../shared/bridge";
 
 const bridge: FrameCraftBridge = {
+  preferences: () => ipcRenderer.invoke("preferences:get"),
+  savePreferences: (update) => ipcRenderer.invoke("preferences:save", update),
+  testAiConnection: (update) =>
+    ipcRenderer.invoke("preferences:ai:test", update),
+  refineCaptions: (cues, options) =>
+    ipcRenderer.invoke("subtitles:refine", cues, options),
   platform: process.platform,
   windowState: () => ipcRenderer.invoke("window:state"),
   minimizeWindow: () => ipcRenderer.invoke("window:minimize"),

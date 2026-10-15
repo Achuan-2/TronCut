@@ -6,6 +6,7 @@ import {
   Plus,
   Search,
   SlidersHorizontal,
+  Sparkles,
   Type,
   Upload,
   X,
@@ -21,15 +22,21 @@ import {
 } from "../shared/captions";
 import type { Editor } from "./useEditor";
 import { timeLabel } from "./Preview";
+import CaptionProcessingFields from "./CaptionProcessingFields";
+import {
+  captionProcessingSchema,
+  type CaptionProcessingOptions,
+} from "../shared/caption-processing";
 
 interface Props {
   editor: Editor;
   run: (fn: () => Promise<unknown>) => void;
   toast: (text: string) => void;
   busy: boolean;
+  onPreferences: () => void;
 }
 
-type Dialog = "transcribe" | "replace" | "style" | null;
+type Dialog = "transcribe" | "replace" | "style" | "refine" | null;
 
 export function addCues(
   editor: Editor,
@@ -45,7 +52,13 @@ export function addCues(
   return ids;
 }
 
-export default function CaptionsPanel({ editor, run, toast, busy }: Props) {
+export default function CaptionsPanel({
+  editor,
+  run,
+  toast,
+  busy,
+  onPreferences,
+}: Props) {
   const { project, selected } = editor;
   const captions = captionClips(project);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -53,8 +66,27 @@ export default function CaptionsPanel({ editor, run, toast, busy }: Props) {
   const [engine, setEngine] = useState<SpeechEngine>("qwen3-asr");
   const [search, setSearch] = useState("");
   const [replacement, setReplacement] = useState("");
+  const [processing, setProcessing] = useState<CaptionProcessingOptions>(() =>
+    captionProcessingSchema.parse({}),
+  );
+  const [manualProcessing, setManualProcessing] =
+    useState<CaptionProcessingOptions>(() =>
+      captionProcessingSchema.parse({
+        segmentation: "unlimited",
+        refinement: "polish",
+      }),
+    );
   const menu = useRef<HTMLDivElement>(null);
   const first = captions[0];
+  const selectedCaptions = captions.filter((clip) =>
+    editor.selectedIds.includes(clip.id),
+  );
+  const refineTargets = (
+    selectedCaptions.length ? selectedCaptions : captions
+  ).filter(
+    (clip) =>
+      !project.tracks.find((track) => track.id === clip.trackId)?.locked,
+  );
   const [style, setStyle] = useState<{
     text: TextStyle;
     opacity: number;
@@ -104,6 +136,11 @@ export default function CaptionsPanel({ editor, run, toast, busy }: Props) {
         y: first.transform.y,
       });
     setDialog(next);
+    if (next === "transcribe")
+      void window.framecraft
+        ?.preferences()
+        .then((value) => setProcessing(value.captions))
+        .catch((error) => toast(String(error)));
   };
   const importSubtitles = () => {
     setMenuOpen(false);
@@ -194,6 +231,14 @@ export default function CaptionsPanel({ editor, run, toast, busy }: Props) {
                 </button>
                 <button
                   role="menuitem"
+                  disabled={!refineTargets.length}
+                  onClick={() => open("refine")}
+                >
+                  <Sparkles size={14} />
+                  AI 精修与润色
+                </button>
+                <button
+                  role="menuitem"
                   disabled={!selected?.caption}
                   onClick={convertSelected}
                 >
@@ -279,14 +324,18 @@ export default function CaptionsPanel({ editor, run, toast, busy }: Props) {
                     ? "语音转文本"
                     : dialog === "replace"
                       ? "搜索和替换"
-                      : "统一字幕样式"}
+                      : dialog === "refine"
+                        ? "AI 精修与润色"
+                        : "统一字幕样式"}
                 </h2>
                 <p>
                   {dialog === "transcribe"
                     ? "识别整个时间线的声音并新增字幕轨道；首次使用时自动下载模型。"
                     : dialog === "replace"
                       ? "搜索并批量替换所有未锁定字幕。"
-                      : `统一修改 ${captions.length} 条字幕的显示样式。`}
+                      : dialog === "refine"
+                        ? `处理${selectedCaptions.length ? "选中的" : "全部"} ${refineTargets.length} 条未锁定字幕，保留时间和样式，支持撤销。`
+                        : `统一修改 ${captions.length} 条字幕的显示样式。`}
                 </p>
               </div>
               <button aria-label="关闭" onClick={() => setDialog(null)}>
@@ -311,27 +360,118 @@ export default function CaptionsPanel({ editor, run, toast, busy }: Props) {
                     </option>
                   </select>
                 </label>
+                <CaptionProcessingFields
+                  value={processing}
+                  onChange={setProcessing}
+                />
+                <button
+                  className="caption-preferences-link"
+                  onClick={() => {
+                    setDialog(null);
+                    onPreferences();
+                  }}
+                >
+                  配置 AI 模型…
+                </button>
                 <button
                   className="wide-button primary"
                   disabled={busy}
                   onClick={() => {
                     setDialog(null);
                     run(async () => {
-                      const cues = await bridge().transcribe(
+                      await bridge().savePreferences({ captions: processing });
+                      const result = await bridge().transcribe(
                         project,
                         engine,
                         "auto",
                         {
                           device: "auto",
+                          processing,
                         },
                       );
-                      addCues(editor, cues, { newTrack: true });
-                      toast(`已生成 ${cues.length} 条字幕`);
+                      addCues(editor, result.cues, { newTrack: true });
+                      toast(
+                        `已生成 ${result.cues.length} 条字幕${result.warnings.length ? `；${result.warnings.join("；")}` : ""}`,
+                      );
                     });
                   }}
                 >
                   <AudioLines size={16} />
                   开始识别
+                </button>
+              </>
+            )}
+
+            {dialog === "refine" && (
+              <>
+                <CaptionProcessingFields
+                  existing
+                  value={manualProcessing}
+                  onChange={setManualProcessing}
+                />
+                <button
+                  className="caption-preferences-link"
+                  onClick={() => {
+                    setDialog(null);
+                    onPreferences();
+                  }}
+                >
+                  配置 AI 模型…
+                </button>
+                <button
+                  className="wide-button primary"
+                  disabled={busy || !refineTargets.length}
+                  onClick={() => {
+                    const targets = refineTargets;
+                    setDialog(null);
+                    run(async () => {
+                      const result = await bridge().refineCaptions(
+                        targets.map((clip) => ({
+                          start: clip.start,
+                          end: clip.start + clip.duration,
+                          text: clip.text ?? "",
+                        })),
+                        manualProcessing,
+                      );
+                      const replacements = new Map(
+                        targets.map((clip, index) => [
+                          clip.id,
+                          { original: clip, cue: result.cues[index] },
+                        ]),
+                      );
+                      let changed = 0;
+                      editor.apply((project) => {
+                        const clips = project.clips.map((clip) => {
+                          const replacement = replacements.get(clip.id);
+                          if (
+                            !replacement?.cue ||
+                            !clip.caption ||
+                            clip.text !== replacement.original.text ||
+                            clip.start !== replacement.original.start ||
+                            clip.duration !== replacement.original.duration ||
+                            project.tracks.find(
+                              (track) => track.id === clip.trackId,
+                            )?.locked
+                          )
+                            return clip;
+                          if (clip.text === replacement.cue.text) return clip;
+                          changed++;
+                          return {
+                            ...clip,
+                            text: replacement.cue.text,
+                            name: replacement.cue.text.slice(0, 24),
+                          };
+                        });
+                        return changed ? { ...project, clips } : project;
+                      });
+                      toast(
+                        `已更新 ${changed} 条字幕${result.warnings.length ? `；${result.warnings.join("；")}` : ""}`,
+                      );
+                    });
+                  }}
+                >
+                  <Sparkles size={16} />
+                  开始精修
                 </button>
               </>
             )}

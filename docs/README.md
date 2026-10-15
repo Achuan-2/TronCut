@@ -27,6 +27,7 @@
 | [构建与发布](BUILDING.md) | 开发环境、媒体引擎与安装包 |
 | [验证记录](VALIDATION.md) | 自动检查、真实数据与桌面验证证据 |
 | [本地语音字幕](SENSEVOICE.md) | Qwen3-ASR、SenseVoice 与全局字幕识别说明 |
+| [字幕断句与 AI 精修](AI-CAPTIONS.md) | 首选项、AI 模型、断句、纠错精修与润色 |
 | [Camtasia 工程测试](CAMTASIA-REAL-PROJECT-TEST.md) | 实际工程转换结果与限制 |
 | [0.2 交付记录](TRONCUT-0.2.md) | 版本实现、修复和交付边界 |
 

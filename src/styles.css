@@ -1017,6 +1017,88 @@ fieldset:disabled {
 .caption-dialog .wide-button {
   margin-top: 18px;
 }
+.preferences-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+.preferences-dialog {
+  width: min(520px, calc(100vw - 40px));
+  max-height: calc(100vh - 50px);
+  overflow-y: auto;
+  padding: 22px 24px;
+  border: 1px solid #46534b;
+  border-radius: 10px;
+  background: #202724;
+  box-shadow: 0 25px 90px #0009;
+}
+.preferences-dialog fieldset,
+.caption-processing-fields {
+  min-width: 0;
+  border: 0;
+  padding: 0;
+  margin: 16px 0 0;
+}
+.preferences-dialog .field {
+  margin: 14px 0;
+}
+.preferences-dialog .field input:not([type="checkbox"]) {
+  width: 100%;
+}
+.caption-instruction {
+  margin: 10px 0;
+}
+.caption-instruction summary {
+  cursor: pointer;
+  color: #a3b6ab;
+  font-size: 12px;
+  padding: 5px 0;
+}
+.caption-instruction textarea {
+  margin-top: 6px;
+}
+.caption-processing-fields {
+  border-top: 1px solid #3a473f;
+  padding-top: 8px;
+}
+.caption-processing-fields legend {
+  color: #d6e4db;
+  font-weight: 600;
+  padding-right: 10px;
+}
+.caption-processing-fields textarea {
+  width: 100%;
+  resize: vertical;
+}
+.caption-processing-note {
+  font-size: 12px;
+  line-height: 1.6;
+  color: #a3b6ab;
+  margin: 10px 0;
+}
+.caption-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+.caption-preferences-link {
+  color: #94d9b1;
+  padding: 4px 0;
+  font-size: 12px;
+}
+.preferences-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 20px;
+}
+.preferences-actions button {
+  padding: 8px 14px;
+  border: 1px solid #50685a;
+  border-radius: 6px;
+}
 .animation-presets {
   display: grid;
   grid-template-columns: 1fr 1fr;

@@ -9,7 +9,7 @@ def clean_text(text):
     return TAG.sub("", str(text)).replace("▁", " ").strip()
 
 
-def result_cues(result, start, end, max_chars=22):
+def result_cues(result, start, end, max_chars=22, split_sentences=True, max_seconds=5):
     text = clean_text(result.text)
     if not text or end <= start:
         return []
@@ -45,14 +45,14 @@ def result_cues(result, start, end, max_chars=22):
             text_cursor = position + len(token)
         separator = " " if pending and spaced else ""
         punctuation_only = all(not char.isalnum() for char in token)
-        if pending and not punctuation_only and (len(pending + separator + token) > max_chars or token_end - pending_start > 5):
+        if pending and not punctuation_only and (len(pending + separator + token) > max_chars or token_end - pending_start > max_seconds):
             cues.append({"start": pending_start, "end": pending_end, "text": pending})
             pending, separator = "", ""
         if not pending:
             pending_start = token_start
         pending += separator + token
         pending_end = token_end
-        if token.endswith(("。", "！", "？", ".", "!", "?")):
+        if split_sentences and token.endswith(("。", "！", "？", ".", "!", "?")):
             cues.append({"start": pending_start, "end": pending_end, "text": pending})
             pending = ""
     if pending:

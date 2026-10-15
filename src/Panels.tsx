@@ -85,6 +85,7 @@ interface Props {
   toast: (text: string) => void;
   refreshCapabilities: () => void;
   busy: boolean;
+  onPreferences: () => void;
 }
 export default function Panels(props: Props) {
   const { editor, tab, setTab, run, toast } = props,
@@ -264,6 +265,7 @@ export default function Panels(props: Props) {
             run={run}
             toast={toast}
             busy={props.busy}
+            onPreferences={props.onPreferences}
           />
         )}
         {tab === "zoompan" && <ZoomPanPanel editor={editor} />}
