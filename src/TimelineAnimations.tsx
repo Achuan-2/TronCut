@@ -2,6 +2,7 @@ import type { Clip } from "../shared/model";
 import {
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type PointerEvent,
@@ -13,6 +14,7 @@ import {
 import { AnimationContextMenu } from "./AnimationContextMenu";
 import {
   animationRanges,
+  visibleAnimationRanges,
   retimeAnimation,
   type AnimationRange,
   type AnimationDragMode,
@@ -32,6 +34,8 @@ export function TimelineAnimations({
   selectedFrame,
   copy,
   remove,
+  viewportStart,
+  viewportEnd,
 }: {
   clip: Clip;
   zoom: number;
@@ -44,6 +48,8 @@ export function TimelineAnimations({
   selectedFrame: { time: number; side: "start" | "end" } | null;
   copy: (range: AnimationRange, cut?: boolean) => void;
   remove: (range: AnimationRange) => void;
+  viewportStart: number;
+  viewportEnd: number;
 }) {
   type Gesture = {
     x: number;
@@ -52,6 +58,7 @@ export function TimelineAnimations({
     mode: AnimationDragMode;
     value: Clip;
     moved: boolean;
+    index: number;
   };
   const [gesture, setGesture] = useState<Gesture | null>(null);
   const live = useRef<Gesture | null>(null);
@@ -128,6 +135,7 @@ export function TimelineAnimations({
     event: PointerEvent<HTMLButtonElement>,
     range: AnimationRange,
     mode: AnimationDragMode,
+    index: number,
   ) => {
     event.stopPropagation();
     suppressClick.current = false;
@@ -145,6 +153,7 @@ export function TimelineAnimations({
       mode,
       value: clip,
       moved: false,
+      index,
     });
   };
   const click = (
@@ -160,6 +169,17 @@ export function TimelineAnimations({
     locate(time, side);
   };
   const displayed = gesture?.value ?? clip;
+  const ranges = useMemo(() => animationRanges(displayed), [displayed]);
+  const visible = useMemo(
+    () =>
+      visibleAnimationRanges(
+        ranges,
+        viewportStart - clip.start,
+        viewportEnd - clip.start,
+        gesture?.index,
+      ),
+    [ranges, viewportStart, viewportEnd, clip.start, gesture?.index],
+  );
   return (
     <>
       <div
@@ -209,7 +229,7 @@ export function TimelineAnimations({
         onPointerCancel={() => setDrag(null)}
         onLostPointerCapture={() => setDrag(null)}
       >
-        {animationRanges(displayed).map((range, index) => {
+        {visible.map(({ range, index }) => {
           const start = clip.start + range.start,
             end = clip.start + range.end;
           const width = (range.end - range.start) * zoom;
@@ -244,7 +264,7 @@ export function TimelineAnimations({
                 className="animation-arrow"
                 aria-label={`动画 ${timeLabel(start)} 至 ${timeLabel(end)}`}
                 title={`${timeLabel(start)} → ${timeLabel(end)} · 持续 ${timeLabel(end - start)}`}
-                onPointerDown={(event) => begin(event, range, "move")}
+                onPointerDown={(event) => begin(event, range, "move", index)}
                 onClick={(event) => click(event, end, "end")}
               >
                 <svg
@@ -269,7 +289,7 @@ export function TimelineAnimations({
                   }
                   aria-label={`动画开始 ${timeLabel(start)}`}
                   title={`动画开始 ${timeLabel(start)}`}
-                  onPointerDown={(event) => begin(event, range, "start")}
+                  onPointerDown={(event) => begin(event, range, "start", index)}
                   onClick={(event) => click(event, start, "start")}
                 />
               )}
@@ -283,7 +303,7 @@ export function TimelineAnimations({
                   }
                   aria-label={`动画结束 ${timeLabel(end)}`}
                   title={`动画结束 ${timeLabel(end)}`}
-                  onPointerDown={(event) => begin(event, range, "end")}
+                  onPointerDown={(event) => begin(event, range, "end", index)}
                   onClick={(event) => click(event, end, "end")}
                 />
               )}

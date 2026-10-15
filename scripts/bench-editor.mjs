@@ -2,6 +2,7 @@ import { _electron as electron, expect } from "@playwright/test";
 import fs from "node:fs/promises";
 import path from "node:path";
 
+const animationScenario = process.argv.includes("--animation");
 const root = path.resolve("test-output/editor-benchmark", `run-${Date.now()}`);
 await fs.mkdir(root, { recursive: true });
 const project = {
@@ -42,6 +43,28 @@ const project = {
     },
   })),
 };
+if (animationScenario) {
+  project.name = "复杂动画性能验证";
+  project.clips = Array.from({ length: 4 }, (_, i) => {
+    const transform = {
+      x: 0.25 + (i % 2) * 0.5,
+      y: 0.25 + Math.floor(i / 2) * 0.5,
+      scale: 1,
+      opacity: 1,
+    };
+    return {
+      ...project.clips[i],
+      start: 0,
+      duration: 1000,
+      transform,
+      style: { ...project.clips[i].style, fontSize: 24 },
+      keyframes: Array.from({ length: 1000 }, (_, frame) => ({
+        time: frame,
+        value: { ...transform, x: transform.x + Math.sin(frame) * 0.02 },
+      })),
+    };
+  });
+}
 const file = path.join(root, "benchmark.troncut");
 await fs.writeFile(file, JSON.stringify(project));
 const env = {
@@ -55,13 +78,29 @@ const app = await electron.launch({ args: [".", file], env, timeout: 30000 });
 const errors = [];
 try {
   const page = await app.firstWindow();
+  page.setDefaultTimeout(30000);
   page.on("pageerror", (error) => errors.push(error.message));
-  await expect(page.locator(".preview-text-content")).toHaveText("片段0");
+  await expect(page.locator(".preview-text-content").first()).toHaveText(
+    animationScenario ? "片段3" : "片段0",
+    { timeout: 30000 },
+  );
   const openMs = performance.now() - openedAt;
   const mountedClips = await page.locator(".timeline-clip").count();
   expect(mountedClips).toBeLessThan(200);
-  await page.getByLabel("播放进度", { exact: true }).fill("8000.5");
-  await expect(page.locator(".preview-text-content")).toHaveText("片段8000");
+  await page
+    .getByLabel("播放进度", { exact: true })
+    .fill(animationScenario ? "800.5" : "8000.5");
+  await expect(page.locator(".preview-text-content").first()).toHaveText(
+    animationScenario ? "片段3" : "片段8000",
+  );
+  const mountedAnimations = await page.locator(".clip-animation").count();
+  const layerStyle = await page
+    .locator(".preview-layer.text")
+    .first()
+    .getAttribute("style");
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send("Performance.enable");
+  const beforeMetrics = await cdp.send("Performance.getMetrics");
   await page.locator(".play-button").click();
   const timings = await page.evaluate(async () => {
     const samples = [];
@@ -86,13 +125,27 @@ try {
     };
   });
   await page.locator(".play-button").click();
+  const afterMetrics = await cdp.send("Performance.getMetrics");
+  const metricDelta = (name) =>
+    ((afterMetrics.metrics.find((m) => m.name === name)?.value ?? 0) -
+      (beforeMetrics.metrics.find((m) => m.name === name)?.value ?? 0)) *
+    1000;
+  if (animationScenario)
+    expect(
+      await page.locator(".preview-layer.text").first().getAttribute("style"),
+    ).not.toBe(layerStyle);
   expect(errors).toEqual([]);
   const report = {
     recordedAt: new Date().toISOString(),
-    clips: 10000,
+    scenario: animationScenario ? "animation" : "text",
+    clips: project.clips.length,
     tracks: 32,
     openMs,
     mountedClips,
+    mountedAnimations,
+    taskMs: metricDelta("TaskDuration"),
+    scriptMs: metricDelta("ScriptDuration"),
+    measurementMs: metricDelta("Timestamp"),
     timings,
     errors,
     limits:

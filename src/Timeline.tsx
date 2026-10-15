@@ -110,6 +110,10 @@ export default function Timeline({
 }) {
   const { project, apply, playhead, seek, selected, selectedId, select } =
     editor;
+  const assetsById = useMemo(
+    () => new Map(project.assets.map((asset) => [asset.id, asset])),
+    [project.assets],
+  );
   const [zoom, setZoom] = useState(65),
     [snap, setSnap] = useState(true),
     [drag, setDrag] = useState<Drag | null>(null),
@@ -421,7 +425,7 @@ export default function Timeline({
   }
   function dragClip(d: Drag): Clip {
     const c = d.original,
-      asset = project.assets.find((a) => a.id === c.assetId),
+      asset = c.assetId ? assetsById.get(c.assetId) : undefined,
       minimum = 1 / project.canvas.fps;
     if (d.mode === "move") {
       const earliest = Math.min(
@@ -1020,8 +1024,8 @@ export default function Timeline({
                     editor.addAnnotation(template, time, track.id);
                     return;
                   }
-                  const asset = project.assets.find(
-                    (a) => a.id === e.dataTransfer.getData("framecraft-asset"),
+                  const asset = assetsById.get(
+                    e.dataTransfer.getData("framecraft-asset"),
                   );
                   if (!asset) return;
                   const start =
@@ -1364,12 +1368,9 @@ export default function Timeline({
                             </div>
                             {editor.preferences.program.waveforms &&
                               c.assetId &&
-                              project.assets.find((a) => a.id === c.assetId)
-                                ?.hasAudio &&
+                              assetsById.get(c.assetId)?.hasAudio &&
                               (() => {
-                                const asset = project.assets.find(
-                                  (a) => a.id === c.assetId,
-                                )!;
+                                const asset = assetsById.get(c.assetId!)!;
                                 return (
                                   <div className="clip-waveform">
                                     <MediaThumbnail
@@ -1385,6 +1386,10 @@ export default function Timeline({
                               })()}
                             <TimelineAnimations
                               clip={c}
+                              viewportStart={(viewport.left - 200) / zoom}
+                              viewportEnd={
+                                (viewport.left + viewport.width + 200) / zoom
+                              }
                               zoom={zoom}
                               playhead={playhead}
                               fps={project.canvas.fps}

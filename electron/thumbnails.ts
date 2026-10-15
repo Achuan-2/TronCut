@@ -3,8 +3,10 @@ import path from "node:path";
 import { createHash } from "node:crypto";
 import type { Asset } from "../shared/model";
 import { findBinary, runProcess } from "./process";
+import { ThumbnailMemoryCache } from "./thumbnail-cache";
 
 const pending = new Map<string, Promise<string>>();
+const memory = new ThumbnailMemoryCache();
 let queue = Promise.resolve();
 
 /** Serial thumbnail generation avoids opening dozens of simultaneous decoders on import. */
@@ -22,9 +24,14 @@ export async function mediaThumbnail(
     return null;
   const stat = await fs.stat(asset.path);
   const key = createHash("sha256")
-    .update(`${asset.path}|${stat.size}|${stat.mtimeMs}|${waveform}`)
+    .update(
+      `${asset.path}|${stat.size}|${stat.mtimeMs}|${waveform}|${asset.kind}|${waveform ? 0 : Math.min(1, asset.duration / 3)}`,
+    )
     .digest("hex");
-  if (pending.has(key)) return pending.get(key)!;
+  const cached = memory.get(key);
+  if (cached !== undefined) return cached;
+  const requestKey = `${path.resolve(cacheDir)}|${key}`;
+  if (pending.has(requestKey)) return pending.get(requestKey)!;
   const operation = queue.then(async () => {
     await fs.mkdir(cacheDir, { recursive: true });
     const file = path.join(cacheDir, `${key}.png`);
@@ -61,9 +68,11 @@ export async function mediaThumbnail(
         await fs.rm(temp, { force: true });
       }
     }
-    return `data:image/png;base64,${(await fs.readFile(file)).toString("base64")}`;
+    const data = `data:image/png;base64,${(await fs.readFile(file)).toString("base64")}`;
+    memory.set(key, data);
+    return data;
   });
-  pending.set(key, operation);
+  pending.set(requestKey, operation);
   queue = operation.then(
     () => {},
     () => {},
@@ -71,6 +80,6 @@ export async function mediaThumbnail(
   try {
     return await operation;
   } finally {
-    pending.delete(key);
+    pending.delete(requestKey);
   }
 }

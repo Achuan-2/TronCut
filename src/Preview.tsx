@@ -23,7 +23,7 @@ import {
   type Transform,
   projectDuration,
 } from "../shared/model";
-import { transformAt } from "../shared/editor";
+import { createTransformSampler } from "../shared/editor";
 import {
   defaultCrop,
   defaultEffects,
@@ -174,7 +174,8 @@ function PreviewLayer({
   const held =
     editor.playhead < clip.start ||
     editor.playhead >= clip.start + clip.duration;
-  const transform = transformAt(clip, localTime),
+  const sampleTransform = useMemo(() => createTransformSampler(clip), [clip]);
+  const transform = sampleTransform(localTime),
     asset = useMemo(
       () => project.assets.find((a) => a.id === clip.assetId),
       [project.assets, clip.assetId],

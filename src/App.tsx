@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowUpRight,
   ChevronDown,
@@ -150,15 +150,21 @@ export default function App() {
     () => editor.setCanvasMode(editorPreferences.program.defaultTool),
     [editorPreferences.program.defaultTool],
   );
+  const menuSelection = useMemo(() => {
+    const ids = new Set(editor.selectedIds);
+    const locked = new Set(
+      editor.project.tracks
+        .filter((track) => track.locked)
+        .map((track) => track.id),
+    );
+    const selected = editor.project.clips.filter((clip) => ids.has(clip.id));
+    return {
+      selected,
+      editable: selected.filter((clip) => !locked.has(clip.trackId)),
+    };
+  }, [editor.project.clips, editor.project.tracks, editor.selectedIds]);
   useEffect(() => {
-    const selected = editor.project.clips.filter((clip) =>
-      editor.selectedIds.includes(clip.id),
-    );
-    const editable = selected.filter(
-      (clip) =>
-        !editor.project.tracks.find((track) => track.id === clip.trackId)
-          ?.locked,
-    );
+    const { selected, editable } = menuSelection;
     const state = {
       blocked:
         busy ||
@@ -189,8 +195,7 @@ export default function App() {
       toast(String(error));
     });
   }, [
-    editor.project,
-    editor.selectedIds.join(","),
+    menuSelection,
     editor.playhead,
     editor.canUndo,
     editor.canRedo,

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   FolderOpen,
   Type,
@@ -21,7 +21,7 @@ import {
   ArrowRightLeft,
 } from "lucide-react";
 import { type Clip, textPresets, defaultTransform } from "../shared/model";
-import { transformAt } from "../shared/editor";
+import { createTransformSampler } from "../shared/editor";
 import type { Capabilities } from "../shared/bridge";
 import type { Editor } from "./useEditor";
 import { timeLabel } from "./Preview";
@@ -438,11 +438,29 @@ export function Inspector({ editor }: { editor: Editor }) {
   const c = editor.selected,
     locked = editor.project.tracks.find((t) => t.id === c?.trackId)?.locked;
   const [tab, setTab] = useState({ clipId: "", name: "video" });
+  const selectedAsset = useMemo(
+    () =>
+      c?.assetId
+        ? editor.project.assets.find((asset) => asset.id === c.assetId)
+        : undefined,
+    [editor.project.assets, c?.assetId],
+  );
+  const sampleTransform = useMemo(
+    () => (c ? createTransformSampler(c) : null),
+    [c],
+  );
+  const captionCount = useMemo(
+    () =>
+      c?.caption
+        ? editor.project.clips.filter(
+            (clip) => clip.caption && clip.trackId === c.trackId,
+          ).length
+        : 0,
+    [editor.project.clips, c?.caption, c?.trackId],
+  );
   if (editor.selectedTransition)
     return <TransitionProperties editor={editor} />;
-  const hasCursor =
-    c?.kind === "video" &&
-    !!editor.project.assets.find((asset) => asset.id === c.assetId)?.cursor;
+  const hasCursor = c?.kind === "video" && !!selectedAsset?.cursor;
   const hasText = c?.kind === "text";
   const tabs = [
     ...(c?.kind !== "audio"
@@ -473,9 +491,10 @@ export function Inspector({ editor }: { editor: Editor }) {
             : "video";
   const cursorActive = activeTab === "cursor";
   const textActive = activeTab === "text";
-  const value = c
-    ? transformAt(c, editor.playhead - c.start)
-    : defaultTransform;
+  const value =
+    c && sampleTransform
+      ? sampleTransform(editor.playhead - c.start)
+      : defaultTransform;
   const update = (patch: Partial<Clip>) => {
     if (!c || locked) return;
     if (patch.style || patch.textBox || patch.autoResizeText !== undefined)
@@ -495,7 +514,7 @@ export function Inspector({ editor }: { editor: Editor }) {
     if (editingContent) editor.updateContentTransform(c.id, { [key]: next });
     else transform(key, next);
   };
-  const asset = editor.project.assets.find((asset) => asset.id === c?.assetId);
+  const asset = selectedAsset;
   const fit = asset
     ? Math.min(
         editor.project.canvas.width / Math.max(1, asset.width),
@@ -639,7 +658,7 @@ export function Inspector({ editor }: { editor: Editor }) {
                     ? "轨道已锁定"
                     : c.kind === "text"
                       ? c.caption
-                        ? `字幕轨道 · ${editor.project.clips.filter((clip) => clip.caption && clip.trackId === c.trackId).length} 条字幕（样式与位置统一设置）`
+                        ? `字幕轨道 · ${captionCount} 条字幕（样式与位置统一设置）`
                         : "文本图层"
                       : c.kind === "shape"
                         ? "标注图层"

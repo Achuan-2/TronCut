@@ -54,6 +54,39 @@ export interface AnimationRange {
   hasEnd: boolean;
 }
 
+/** Ranges from animationRanges are ordered and do not overlap. Keep the global
+ * index as the React key so scrolling or a captured drag cannot retarget it.
+ */
+export function visibleAnimationRanges(
+  ranges: readonly AnimationRange[],
+  start: number,
+  end: number,
+  pinnedIndex = -1,
+): { range: AnimationRange; index: number }[] {
+  let lo = 0,
+    hi = ranges.length;
+  while (lo < hi) {
+    const mid = lo + ((hi - lo) >> 1);
+    if (ranges[mid].end < start) lo = mid + 1;
+    else hi = mid;
+  }
+  const result: { range: AnimationRange; index: number }[] = [];
+  for (
+    let index = lo;
+    index < ranges.length && ranges[index].start <= end;
+    index++
+  )
+    result.push({ range: ranges[index], index });
+  if (
+    ranges[pinnedIndex] &&
+    !result.some((entry) => entry.index === pinnedIndex)
+  ) {
+    result.push({ range: ranges[pinnedIndex], index: pinnedIndex });
+    result.sort((a, b) => a.index - b.index);
+  }
+  return result;
+}
+
 export type AnimationDragMode = "start" | "end" | "move";
 
 export function retimeAnimation(

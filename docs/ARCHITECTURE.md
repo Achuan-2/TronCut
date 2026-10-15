@@ -44,6 +44,8 @@ LuxTTS 同样复用常驻进程，由 `workers/onnx/lux.py` 调用固定版本�
 
 时间线视口筛选与预览活跃片段查询已迁移到 `crates/troncut-engine` 的 Rust 区间索引，通过同进程 WebAssembly 调用。索引在剪辑数组改变后重建，播放时仅查询命中区间；原有工程秒值、转场延伸和绘制顺序保持兼容。缓存最多两份片段数组的索引，淘汰时释放。构建、基准和后续媒体管线迁移范围见 [Rust 引擎](RUST-ENGINE.md)。
 
+转场成员和接点由独立的 `shared/transition-index.ts` 维护，接点查询复用 Rust 索引，缓存最多两份数组；整理入口使旧缓存失效，保留严格容差及原数组顺序。画布与属性面板按片段创建 `createTransformSampler`，排序和字段分析仅在编辑后重做，播放使用二分采样。时间线缓存动画区间并按视口筛选箭头，拖动目标单独保留。主进程缩略图缓存最多 512 项、32 MiB 字符载荷，源文件签名改变则失效，热命中不再读取 PNG 或编码 base64。
+
 Windows `electron/native-recording.ts` 启动 MIT 授权的独立 WGC / Media Foundation 捕获进程和鼠标采样进程，不通过渲染进程传输屏幕帧。主进程管理启动、暂停、停止及异常生命周期。鼠标按源归一化坐标与秒记录，静止跨度保留首尾点。`shared/cursor.ts` 二分定位并采样；`electron/cursor-export.ts` 为每层生成流式 sendcmd 文件，鼠标先叠加到源画面，再进入裁切/旋转/缩放。sendcmd 放在当前帧完成合成之后以设置下一帧坐标，防止 FFmpeg framesync 预读导致提前应用后续坐标。工程保存将数据写入 media/ 下独立 JSON，打开时继续验证路径和 schema。
 
 录制以一秒为间隔流式传到主进程写文件，不收集整段录屏为一个巨大 Blob。单条录制最多允许八个待写数据块，持续写入跟不上时停止并保留数据。结束时重新封装 WebM 修复时长元数据，不重新编码。

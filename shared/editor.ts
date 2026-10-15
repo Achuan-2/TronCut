@@ -116,7 +116,16 @@ export function transformAt(
     Partial<Pick<Clip, "crop" | "contentTransform">>,
   localTime: number,
 ): Transform {
-  localTime += clip.animationOffset ?? 0;
+  return createTransformSampler(clip)(localTime);
+}
+
+/** Prepare an immutable animation snapshot once, then sample it while playing.
+ * transformAt remains an uncached convenience for callers that mutate inputs.
+ */
+export function createTransformSampler(
+  clip: Pick<Clip, "transform" | "keyframes" | "animationOffset" | "rotation"> &
+    Partial<Pick<Clip, "crop" | "contentTransform">>,
+): (localTime: number) => Transform {
   const frames = [...clip.keyframes].sort((a, b) => a.time - b.time);
   const hasRotation =
     clip.rotation !== undefined ||
@@ -145,16 +154,26 @@ export function transformAt(
     ),
     ...(hasVisual ? visualValues(clip, value) : {}),
   });
-  if (!frames.length) return normalize(clip.transform);
   const points =
-    frames[0].time > 0
+    frames.length && frames[0].time > 0
       ? [{ time: 0, value: clip.transform }, ...frames]
       : frames;
-  if (localTime <= points[0].time) return normalize(points[0].value);
-  for (let i = 1; i < points.length; i++) {
-    const a = points[i - 1],
-      b = points[i];
-    if (localTime <= b.time) {
+  return (localTime) => {
+    localTime += clip.animationOffset ?? 0;
+    if (!points.length) return normalize(clip.transform);
+    if (localTime <= points[0].time) return normalize(points[0].value);
+    // Lower bound preserves the first matching endpoint, including duplicate
+    // keyframe times, and works for backward scrubbing without a cursor reset.
+    let lo = 1,
+      hi = points.length;
+    while (lo < hi) {
+      const mid = lo + ((hi - lo) >> 1);
+      if (localTime <= points[mid].time) hi = mid;
+      else lo = mid + 1;
+    }
+    if (lo < points.length) {
+      const a = points[lo - 1],
+        b = points[lo];
       const p = Math.max(
         0,
         Math.min(1, (localTime - a.time) / Math.max(0.00001, b.time - a.time)),
@@ -179,8 +198,8 @@ export function transformAt(
           : {}),
       };
     }
-  }
-  return normalize(points.at(-1)!.value);
+    return normalize(points.at(-1)!.value);
+  };
 }
 export function setTransform<
   T extends Pick<

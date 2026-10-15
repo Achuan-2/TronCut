@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { Clip, Project, Transform } from "./model";
+import { invalidateTransitionIndex, transitionIndex } from "./transition-index";
 
 export const transitionSchema = z.object({
   type: z.literal("smooth-slide"),
@@ -29,17 +30,7 @@ export function adjacentClip(
   clip: Clip,
   side: TransitionSide,
 ) {
-  return project.clips.find(
-    (other) =>
-      other.id !== clip.id &&
-      other.trackId === clip.trackId &&
-      supportsTransitions(other) &&
-      Math.abs(
-        side === "incoming"
-          ? other.start + other.duration - clip.start
-          : clip.start + clip.duration - other.start,
-      ) < 1e-6,
-  );
+  return transitionIndex(project).adjacent(clip, side);
 }
 
 /** Edge drops at a cut address both clips; middle drops address both ends. */
@@ -82,13 +73,7 @@ export function pairedTransition(
 ) {
   const transition = clip.transitions?.[side];
   if (!transition?.pairId) return undefined;
-  const members = project.clips.flatMap((c) =>
-    transitionSides.flatMap((s) =>
-      c.transitions?.[s]?.pairId === transition.pairId
-        ? [{ clip: c, side: s }]
-        : [],
-    ),
-  );
+  const members = transitionIndex(project).pairs.get(transition.pairId) ?? [];
   const neighbor = adjacentClip(project, clip, side);
   return members.length === 2 &&
     members.some(
@@ -128,6 +113,7 @@ export function transitionMarkerDuration(
 }
 
 export function normalizeTransitions(project: Project): Project {
+  invalidateTransitionIndex(project);
   let changed = false;
   const clips = project.clips.map((clip) => {
     if (!clip.transitions) return clip;
