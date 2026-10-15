@@ -37,6 +37,7 @@ const { project } = appendCaptionCues(
   { newTrack: true },
 );
 const trackId = project.clips.find((clip) => clip.id === first.ids[0]).trackId;
+project.clips.find((clip) => clip.id === first.ids[2]).style.fontSize = 36;
 for (const track of project.tracks.filter(
   (track) => track.captionTrack && track.id !== trackId,
 )) {
@@ -76,19 +77,58 @@ try {
   await expect(page.locator(".timeline-clip.selected")).toHaveCount(3);
   await expect(page.getByLabel("文本内容")).toHaveValue("字幕乙");
   await expect(page.getByLabel("字号", { exact: true })).toHaveValue("30");
-  await page.getByLabel("字号", { exact: true }).fill("48");
   const save = async () => {
     await page.getByRole("button", { name: "保存", exact: true }).click();
     await expect(page.getByRole("status")).toContainText("工程已保存");
     await expect(page.locator(".busy-overlay")).toHaveCount(0);
     return JSON.parse(await fs.readFile(file, "utf8"));
   };
+  await expect(page.getByLabel("填充颜色", { exact: true })).toHaveValue(
+    "#000000",
+  );
+  await expect(
+    page.getByLabel("填充不透明度 (%)", { exact: true }),
+  ).toHaveValue("75");
+  await page.locator("#inspector-text select").selectOption("3");
+  await expect(page.getByLabel("字号", { exact: true })).toHaveValue("30");
+  const preset = await save();
+  assert.deepEqual(
+    preset.clips
+      .filter((clip) => first.ids.includes(clip.id))
+      .map((clip) => clip.style.fontSize),
+    [30, 30, 36],
+  );
+  await page.getByLabel("填充颜色", { exact: true }).evaluate((input) => {
+    Object.getOwnPropertyDescriptor(
+      HTMLInputElement.prototype,
+      "value",
+    ).set.call(input, "#123456");
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  await page.getByLabel("填充不透明度 (%)", { exact: true }).fill("50");
+  await page.getByLabel("字号", { exact: true }).fill("48");
   const styled = await save();
   assert(
     styled.clips
       .filter((clip) => first.ids.includes(clip.id))
       .every((clip) => clip.style.fontSize === 48),
   );
+  assert(
+    styled.clips
+      .filter((clip) => first.ids.includes(clip.id))
+      .every(
+        (clip) =>
+          clip.style.fill === "#123456" &&
+          clip.style.fillOpacity === 0.5 &&
+          clip.transform.opacity === 1,
+      ),
+  );
+  const background = await page
+    .locator(".preview-layer.text")
+    .filter({ hasText: "字幕甲" })
+    .evaluate((layer) => getComputedStyle(layer).backgroundColor);
+  assert.match(background, /rgba\(18, 52, 86, 0\.50?\d*\)/);
   for (const clip of project.clips.filter(
     (clip) => !first.ids.includes(clip.id),
   ))
@@ -157,13 +197,26 @@ try {
     .locator(".track-name")
     .click();
   await expect(page.locator(".timeline-clip.selected")).toHaveCount(3);
+  // Templates preserve the fitted font size even when automatic text sizing is enabled.
+  await page.locator(".timeline-clip:not(.caption)").click();
+  await page.getByLabel("自动调整文本大小", { exact: true }).check();
+  const fontSize = await page.getByLabel("字号", { exact: true }).inputValue();
+  await page.locator("#inspector-text select").selectOption("2");
+  await expect(page.getByLabel("字号", { exact: true })).toHaveValue(fontSize);
+  await page.getByLabel("填充不透明度 (%)", { exact: true }).fill("0");
+  const final = await save();
+  assert.equal(
+    final.clips.find((clip) => clip.id === ordinary.id).style.fillOpacity,
+    0,
+  );
+  await page.screenshot({ path: path.join(root, "text-fill.png") });
   assert.deepEqual(errors, []);
   await fs.writeFile(
     path.join(root, "result.json"),
     JSON.stringify({ root, errors, position: captions[0].transform }, null, 2),
   );
   console.log(
-    "字幕整轨选择、默认样式、批量样式、独立文字编辑、画布整轨移动、撤销及轨道隔离通过",
+    "字幕整轨选择与移动、填充颜色和透明度、模板保留字号（含自动字号）、文字编辑及轨道隔离通过",
   );
 } finally {
   await app.close();

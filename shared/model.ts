@@ -66,6 +66,11 @@ export const styleSchema = z.object({
   outline: z.string().regex(/^#[\da-f]{6}$/i),
   outlineWidth: finite.min(0).max(20),
   fontFamily: z.string().max(100),
+  fill: z
+    .string()
+    .regex(/^#[\da-f]{6}$/i)
+    .optional(),
+  fillOpacity: finite.min(0).max(1).optional(),
 });
 export const projectSchema = z.object({
   format: z.enum(["troncut", "framecraft"]),
@@ -242,11 +247,13 @@ export const defaultTransform: Transform = {
   scale: 1,
   opacity: 1,
 };
+export const textFillDefaults = { fill: "#000000", fillOpacity: 0.75 } as const;
 export const textPresets: { name: string; style: TextStyle }[] = [
   {
     name: "黑边白字",
     style: {
       fontSize: 68,
+      ...textFillDefaults,
       color: "#ffffff",
       outline: "#111111",
       outlineWidth: 4,
@@ -258,6 +265,7 @@ export const textPresets: { name: string; style: TextStyle }[] = [
     style: {
       fontSize: 68,
       color: "#16181c",
+      ...textFillDefaults,
       outline: "#ffffff",
       outlineWidth: 4,
       fontFamily: "Microsoft YaHei",
@@ -268,6 +276,7 @@ export const textPresets: { name: string; style: TextStyle }[] = [
     style: {
       fontSize: 68,
       color: "#ffe465",
+      ...textFillDefaults,
       outline: "#111111",
       outlineWidth: 5,
       fontFamily: "Microsoft YaHei",
@@ -277,6 +286,7 @@ export const textPresets: { name: string; style: TextStyle }[] = [
     name: "简洁标题",
     style: {
       fontSize: 86,
+      ...textFillDefaults,
       color: "#ffffff",
       outline: "#000000",
       outlineWidth: 0,
@@ -288,6 +298,7 @@ export const textPresets: { name: string; style: TextStyle }[] = [
     style: {
       fontSize: 68,
       color: "#71e6b5",
+      ...textFillDefaults,
       outline: "#122e26",
       outlineWidth: 4,
       fontFamily: "Microsoft YaHei",
@@ -298,6 +309,7 @@ export const textPresets: { name: string; style: TextStyle }[] = [
     style: {
       fontSize: 68,
       color: "#d3bcff",
+      ...textFillDefaults,
       outline: "#392558",
       outlineWidth: 4,
       fontFamily: "Microsoft YaHei",

@@ -22,6 +22,8 @@ import {
 import { frameSnapshot } from "../shared/frame-snapshot";
 import { objectBehaviorExpressions } from "./behavior-export";
 import { rasterizeBehaviorText } from "./behavior-text-export";
+import { textFillRectangle } from "./text-fill";
+import { textFrameSize } from "../shared/text";
 import {
   transitionRange,
   transitionOffsetExpression,
@@ -241,10 +243,14 @@ async function rasterize(
     .png()
     .toBuffer();
   const info = await sharp(text).metadata();
-  const width = Math.max(16, (info.width ?? 16) + margin * 2),
+  const box = textFrameSize(clip, info.width ?? 16);
+  const width = Math.ceil(
+      Math.max(16, (info.width ?? 16) + margin * 2, box.width),
+    ),
     height = Math.max(
       16,
       (info.height ?? style.fontSize * lines.length) + margin * 2,
+      Math.ceil(box.height),
     );
   const alpha = await sharp(text).extractChannel(3).toBuffer();
   const coloredText = (color: string) =>
@@ -262,17 +268,28 @@ async function rasterize(
   const colored = await coloredText(style.color);
   // Composite offset alpha masks to form a readable outline around each glyph.
   const layers: sharp.OverlayOptions[] = [];
+  const fill = textFillRectangle(clip, box, { width, height });
+  if (fill)
+    layers.push({
+      input: Buffer.from(
+        `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">${fill}</svg>`,
+      ),
+      left: 0,
+      top: 0,
+    });
+  const textLeft = Math.floor((width - info.width!) / 2),
+    textTop = Math.floor((height - info.height!) / 2);
   if (style.outlineWidth > 0) {
     const radius = Math.ceil(style.outlineWidth);
     const outlined = await coloredText(style.outline);
     for (let angle = 0; angle < 360; angle += 30)
       layers.push({
         input: outlined,
-        left: margin + Math.round(Math.cos((angle * Math.PI) / 180) * radius),
-        top: margin + Math.round(Math.sin((angle * Math.PI) / 180) * radius),
+        left: textLeft + Math.round(Math.cos((angle * Math.PI) / 180) * radius),
+        top: textTop + Math.round(Math.sin((angle * Math.PI) / 180) * radius),
       });
   }
-  layers.push({ input: colored, left: margin, top: margin });
+  layers.push({ input: colored, left: textLeft, top: textTop });
   await sharp({
     create: { width, height, channels: 4, background: "#00000000" },
   })

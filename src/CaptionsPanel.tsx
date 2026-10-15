@@ -24,6 +24,7 @@ import {
 import type { Editor } from "./useEditor";
 import { timeLabel } from "./Preview";
 import CaptionProcessingFields from "./CaptionProcessingFields";
+import TextFillFields from "./TextFillFields";
 import {
   captionProcessingSchema,
   type CaptionProcessingOptions,
@@ -605,6 +606,15 @@ export default function CaptionsPanel({
                     }
                   />
                 </label>
+                <TextFillFields
+                  style={style.text}
+                  onChange={(patch) =>
+                    setStyle((value) => ({
+                      ...value,
+                      text: { ...value.text, ...patch },
+                    }))
+                  }
+                />
                 <label className="field">
                   位置
                   <select

@@ -45,6 +45,7 @@ import { hasClipSpeed } from "../shared/clip-speed";
 import { hasBehaviors } from "../shared/behaviors";
 import BehaviorsPanel from "./BehaviorsPanel";
 import BehaviorProperties from "./BehaviorProperties";
+import TextFillFields from "./TextFillFields";
 import TransitionsPanel from "./TransitionsPanel";
 import TransitionProperties from "./TransitionProperties";
 import CaptionsPanel from "./CaptionsPanel";
@@ -814,13 +815,18 @@ export function Inspector({ editor }: { editor: Editor }) {
                   花字
                   <select
                     value=""
-                    onChange={(e) =>
-                      update({
-                        style: {
-                          ...textPresets[Number(e.target.value)].style,
+                    onChange={(e) => {
+                      if (locked) return;
+                      editor.updateTextAppearance(
+                        c.id,
+                        {
+                          style: {
+                            ...textPresets[Number(e.target.value)].style,
+                          },
                         },
-                      })
-                    }
+                        { preserveFontSize: true },
+                      );
+                    }}
                   >
                     <option value="" disabled>
                       选择模板
@@ -897,6 +903,12 @@ export function Inspector({ editor }: { editor: Editor }) {
                 <p className="field-help">
                   拖动画布中的文本框手柄，按框的宽高调整字号。
                 </p>
+                <TextFillFields
+                  style={c.style}
+                  onChange={(patch) =>
+                    update({ style: { ...c.style!, ...patch } })
+                  }
+                />
               </div>
             )}
             <div

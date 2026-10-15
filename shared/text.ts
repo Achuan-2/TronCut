@@ -1,8 +1,47 @@
-import type { Transform } from "./model";
+import {
+  type Clip,
+  type Transform,
+  type TextStyle,
+  textFillDefaults,
+} from "./model";
 import { localDelta, projectDelta } from "./rotation";
 
 export type TextBox = { width: number; height: number };
 export const textLineHeight = 1.25;
+export function textFill(style?: TextStyle) {
+  return {
+    color: style?.fill ?? textFillDefaults.fill,
+    opacity: style?.fillOpacity ?? textFillDefaults.fillOpacity,
+  };
+}
+
+export function textFillCss(style?: TextStyle) {
+  const fill = textFill(style);
+  return `${fill.color}${Math.round(fill.opacity * 255)
+    .toString(16)
+    .padStart(2, "0")}`;
+}
+
+export function textFrameSize(
+  clip: Pick<Clip, "text" | "style" | "textBox">,
+  measuredWidth: number,
+): TextBox {
+  if (clip.textBox) return clip.textBox;
+  const padding = (clip.style?.outlineWidth ?? 0) * 2;
+  return {
+    width: Math.min(32768, Math.max(16, measuredWidth) + padding),
+    height: Math.min(
+      32768,
+      Math.max(
+        16,
+        (clip.text ?? "").split("\n").length *
+          (clip.style?.fontSize ?? 68) *
+          textLineHeight +
+          padding,
+      ),
+    ),
+  };
+}
 const clamp = (v: number, min: number, max: number) =>
   Math.max(min, Math.min(max, v));
 

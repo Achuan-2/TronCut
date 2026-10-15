@@ -32,7 +32,12 @@ import {
 import { cursorAt, cursorSvg, defaultCursorStyle } from "../shared/cursor";
 import { cameraAt, resizeHandles, resizeTransform } from "../shared/canvas";
 import { setVideoZoomPan, unzoomVideoPreview } from "../shared/video-zoom-pan";
-import { resizeTextBox, textLineHeight, type TextBox } from "../shared/text";
+import {
+  resizeTextBox,
+  textLineHeight,
+  textFillCss,
+  type TextBox,
+} from "../shared/text";
 import { textBoxFor, fittedTextFont } from "./text";
 import {
   croppedTransform,
@@ -239,6 +244,7 @@ function PreviewLayer({
     "--canvas-scale": scale,
   } as CSSProperties;
   if (textBox) {
+    style.backgroundColor = textFillCss(clip.style);
     style.width = textBox.width * scale;
     style.height = textBox.height * scale;
     style.display = "flex";

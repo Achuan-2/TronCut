@@ -20,7 +20,12 @@ describe("字幕轨道与批量编辑", () => {
       { start: 0, end: 1, text: "字幕" },
     ]);
     const caption = captionClips(result.project)[0];
-    expect(caption.style).toMatchObject({ fontSize: 30, outlineWidth: 2 });
+    expect(caption.style).toMatchObject({
+      fontSize: 30,
+      outlineWidth: 2,
+      fill: "#000000",
+      fillOpacity: 0.75,
+    });
     expect(caption.transform).toMatchObject({ x: 0.5, y: 0.92 });
     expect(text.style!.fontSize).toBe(68);
   });

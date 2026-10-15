@@ -1,5 +1,5 @@
 import type { Clip } from "../shared/model";
-import { fitTextFont, textLineHeight, type TextBox } from "../shared/text";
+import { fitTextFont, textFrameSize, type TextBox } from "../shared/text";
 
 let context: CanvasRenderingContext2D | null;
 function textMeasure(clip: Clip, fontSize: number) {
@@ -14,17 +14,10 @@ export function textBoxFor(clip: Clip): TextBox {
   const fontSize = clip.style?.fontSize ?? 68;
   const measure = textMeasure(clip, fontSize);
   const lines = (clip.text ?? "").split("\n");
-  const padding = (clip.style?.outlineWidth ?? 0) * 2;
-  return {
-    width: Math.min(
-      32768,
-      Math.max(16, ...lines.map((line) => measure(line || " "))) + padding,
-    ),
-    height: Math.min(
-      32768,
-      Math.max(16, lines.length * fontSize * textLineHeight + padding),
-    ),
-  };
+  return textFrameSize(
+    clip,
+    Math.max(...lines.map((line) => measure(line || " "))),
+  );
 }
 
 export function fittedTextFont(clip: Clip, box: TextBox): number {

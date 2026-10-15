@@ -275,30 +275,50 @@ export function useEditor() {
     [apply],
   );
   const updateTextAppearance = useCallback(
-    (id: string, patch: CaptionAppearance) => {
-      if (!current.current.clips.find((clip) => clip.id === id)?.caption) {
-        const { transform, ...appearance } = patch;
-        updateClip(id, (clip) => ({
-          ...clip,
-          ...appearance,
-          transform: { ...clip.transform, ...transform },
-        }));
-        return;
-      }
+    (
+      id: string,
+      patch: CaptionAppearance,
+      options: { preserveFontSize?: boolean } = {},
+    ) => {
       apply((project) => {
-        const next = updateCaptionAppearance(project, id, patch);
+        const target = project.clips.find((clip) => clip.id === id);
+        if (
+          !target ||
+          project.tracks.find((track) => track.id === target.trackId)?.locked
+        )
+          return project;
+        const next = target.caption
+          ? updateCaptionAppearance(project, id, patch)
+          : {
+              ...project,
+              clips: project.clips.map((clip) =>
+                clip.id === id
+                  ? {
+                      ...clip,
+                      ...patch,
+                      transform: { ...clip.transform, ...patch.transform },
+                    }
+                  : clip,
+              ),
+            };
         if (next === project) return project;
         return {
           ...next,
-          clips: next.clips.map((clip, index) =>
-            clip === project.clips[index]
-              ? clip
-              : fitUpdatedText(project.clips[index], clip),
-          ),
+          clips: next.clips.map((clip, index) => {
+            const before = project.clips[index];
+            if (clip === before) return clip;
+            const fitted = fitUpdatedText(before, clip);
+            return options.preserveFontSize && before.style && fitted.style
+              ? {
+                  ...fitted,
+                  style: { ...fitted.style, fontSize: before.style.fontSize },
+                }
+              : fitted;
+          }),
         };
       });
     },
-    [apply, updateClip],
+    [apply],
   );
   const selectCaptionTrack = useCallback(
     (trackId: string, time?: number) => {

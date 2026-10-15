@@ -5,9 +5,33 @@ import {
   newText,
   validateProject,
 } from "../shared/model";
-import { fitTextFont, resizeTextBox } from "../shared/text";
+import {
+  fitTextFont,
+  resizeTextBox,
+  textFill,
+  textFillCss,
+} from "../shared/text";
 
 describe("文本框与自动字号", () => {
+  it("文本默认黑色 75% 填充，旧工程缺省字段使用默认值，也支持关闭填充", () => {
+    const clip = newText("titles", 0);
+    expect(textFill(clip.style)).toEqual({ color: "#000000", opacity: 0.75 });
+    expect(textFillCss(clip.style)).toBe("#000000bf");
+    const legacy = { ...clip.style! };
+    delete legacy.fill;
+    delete legacy.fillOpacity;
+    expect(textFill(legacy)).toEqual({ color: "#000000", opacity: 0.75 });
+    expect(
+      textFill({ ...clip.style!, fill: "#ff0000", fillOpacity: 0 }),
+    ).toEqual({ color: "#ff0000", opacity: 0 });
+    expect(() =>
+      validateProject({
+        ...createProject(),
+        clips: [{ ...clip, style: { ...clip.style!, fillOpacity: 1.1 } }],
+      }),
+    ).toThrow();
+  });
+
   const canvas = { width: 1000, height: 500 };
   it("独立拉宽文本框，保持字号所用的图层缩放和左边缘", () => {
     const resized = resizeTextBox(

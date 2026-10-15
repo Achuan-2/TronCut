@@ -3,6 +3,8 @@ import path from "node:path";
 import sharp from "sharp";
 import type { Clip } from "../shared/model";
 import { glyphMotion, layoutGlyphs, textGlyphs } from "../shared/behaviors";
+import { textFrameSize } from "../shared/text";
+import { textFillRectangle } from "./text-fill";
 
 const xml = (text: string) =>
   text.replace(
@@ -122,8 +124,12 @@ export async function rasterizeBehaviorText(
     images.set(glyph.text, { width, height, data: png.toString("base64") });
   }
   const padding = Math.ceil(fontSize * 6 + style.outlineWidth * 2 + 12);
-  const width = Math.ceil(layout.width + padding * 2),
-    height = Math.ceil(layout.height + padding * 2);
+  const box = textFrameSize(clip, layout.width);
+  const width = Math.ceil(Math.max(layout.width, box.width) + padding * 2),
+    height = Math.ceil(Math.max(layout.height, box.height) + padding * 2);
+  const left = (width - layout.width) / 2,
+    top = (height - layout.height) / 2;
+  const fill = textFillRectangle(clip, box, { width, height });
   const cache = new Map<string, string>(),
     runs: { file: string; frames: number }[] = [];
   const count = still ? 1 : Math.max(1, Math.ceil(clip.duration * fps));
@@ -141,12 +147,12 @@ export async function rasterizeBehaviorText(
           const image = images.get(glyph.text),
             motion = motions[index];
           if (!image || motion.opacity <= 0) return "";
-          return `<g opacity="${motion.opacity}" transform="translate(${padding + glyph.x + motion.x * fontSize} ${padding + glyph.y + motion.y * fontSize}) rotate(${motion.rotation}) scale(${motion.scale})"><image x="${-image.width / 2}" y="${-image.height / 2}" width="${image.width}" height="${image.height}" href="data:image/png;base64,${image.data}"/></g>`;
+          return `<g opacity="${motion.opacity}" transform="translate(${left + glyph.x + motion.x * fontSize} ${top + glyph.y + motion.y * fontSize}) rotate(${motion.rotation}) scale(${motion.scale})"><image x="${-image.width / 2}" y="${-image.height / 2}" width="${image.width}" height="${image.height}" href="data:image/png;base64,${image.data}"/></g>`;
         })
         .join("");
       await sharp(
         Buffer.from(
-          `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">${body}</svg>`,
+          `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">${fill}${body}</svg>`,
         ),
       )
         .png()
