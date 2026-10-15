@@ -11,7 +11,8 @@ export const captionDefaults = {
   fontSize: 40,
   x: 0.5,
   y: 0.92,
-  outlineWidth: 2,
+  outlineWidth: 7,
+  fillEnabled: false,
 } as const;
 
 // Keep the clicked cue active while selecting the rest of its subtitle track.
@@ -166,8 +167,13 @@ export function appendCaptionCues(
     clip.transform.y = captionDefaults.y;
     clip.style!.fontSize = captionDefaults.fontSize;
     clip.style!.outlineWidth = captionDefaults.outlineWidth;
+    clip.style!.fillEnabled = captionDefaults.fillEnabled;
     if (template) {
-      clip.style = { ...clip.style!, ...template.style };
+      clip.style = {
+        ...clip.style!,
+        ...template.style,
+        fillEnabled: template.style?.fillEnabled ?? true,
+      };
       clip.transform = { ...template.transform };
       if (template.textBox) clip.textBox = { ...template.textBox };
       clip.autoResizeText = template.autoResizeText;

@@ -11,7 +11,10 @@ export const textLineHeight = 1.25;
 export function textFill(style?: TextStyle) {
   return {
     color: style?.fill ?? textFillDefaults.fill,
-    opacity: style?.fillOpacity ?? textFillDefaults.fillOpacity,
+    opacity:
+      style?.fillEnabled === false
+        ? 0
+        : (style?.fillOpacity ?? textFillDefaults.fillOpacity),
   };
 }
 

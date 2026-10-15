@@ -35,7 +35,8 @@ describe("Codex CLI 工程与命令协议", () => {
     const project = addCaptionCues(createProject(), cues);
     expect(project.clips[0].style).toMatchObject({
       fontSize: 40,
-      outlineWidth: 3,
+      outlineWidth: 7,
+      fillEnabled: false,
     });
     expect(project.clips[0].transform).toMatchObject({ x: 0.5, y: 0.92 });
     const custom = addCaptionCues(createProject(), cues, {

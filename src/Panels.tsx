@@ -782,7 +782,11 @@ export function Inspector({ editor }: { editor: Editor }) {
                 <TextFillFields
                   style={c.style}
                   onChange={(patch) =>
-                    update({ style: { ...c.style!, ...patch } })
+                    editor.updateTextAppearance(
+                      c.id,
+                      { style: { ...c.style!, ...patch } },
+                      { preserveFontSize: true },
+                    )
                   }
                 />
               </div>

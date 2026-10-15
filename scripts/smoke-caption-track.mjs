@@ -77,6 +77,14 @@ try {
   await expect(page.locator(".timeline-clip.selected")).toHaveCount(3);
   await expect(page.getByLabel("文本内容")).toHaveValue("字幕乙");
   await expect(page.getByLabel("字号", { exact: true })).toHaveValue("40");
+  await expect(page.getByLabel("描边宽度", { exact: true })).toHaveValue("7");
+  const backgroundToggle = page.getByRole("switch", {
+    name: "启用背景色",
+    exact: true,
+  });
+  await expect(backgroundToggle).not.toBeChecked();
+  await expect(page.getByLabel("填充颜色", { exact: true })).toBeDisabled();
+  await backgroundToggle.check();
   const save = async () => {
     await page.getByRole("button", { name: "保存", exact: true }).click();
     await expect(page.getByRole("status")).toContainText("工程已保存");
@@ -145,6 +153,31 @@ try {
     .locator(".preview-text-fill")
     .evaluate((layer) => getComputedStyle(layer).backgroundColor);
   assert.match(background, /rgba\(18, 52, 86, 0\.50?\d*\)/);
+  await backgroundToggle.uncheck();
+  await expect(
+    page.getByLabel("填充不透明度 (%)", { exact: true }),
+  ).toHaveValue("50");
+  await expect
+    .poll(() =>
+      page
+        .locator(".preview-layer.text")
+        .filter({ hasText: "字幕甲" })
+        .locator(".preview-text-fill")
+        .evaluate((layer) => getComputedStyle(layer).backgroundColor),
+    )
+    .toMatch(/rgba\(18, 52, 86, 0\)/);
+  const disabledBackground = await save();
+  assert(
+    disabledBackground.clips
+      .filter((clip) => first.ids.includes(clip.id))
+      .every(
+        (clip) =>
+          clip.style.fillEnabled === false &&
+          clip.style.fill === "#123456" &&
+          clip.style.fillOpacity === 0.5,
+      ),
+  );
+  await backgroundToggle.check();
   const geometry = await page
     .locator(".preview-layer.text")
     .filter({ hasText: "字幕甲" })

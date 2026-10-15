@@ -9,7 +9,10 @@ export default function TextFillFields({
   onChange: (patch: Partial<TextStyle>) => void;
 }) {
   const fill = textFill(style);
-  const opacity = Math.round(fill.opacity * 100);
+  const enabled = style?.fillEnabled ?? textFillDefaults.fillEnabled;
+  const opacity = Math.round(
+    (style?.fillOpacity ?? textFillDefaults.fillOpacity) * 100,
+  );
   const setOpacity = (value: string) => {
     const next = Number(value);
     if (Number.isFinite(next))
@@ -17,10 +20,21 @@ export default function TextFillFields({
   };
   return (
     <>
+      <label className="check-field">
+        <input
+          type="checkbox"
+          role="switch"
+          aria-label="启用背景色"
+          checked={enabled}
+          onChange={(event) => onChange({ fillEnabled: event.target.checked })}
+        />
+        背景色
+      </label>
       <label className="field">
         填充颜色
         <input
           type="color"
+          disabled={!enabled}
           value={fill.color}
           onChange={(event) => onChange({ fill: event.target.value })}
         />
@@ -30,6 +44,7 @@ export default function TextFillFields({
         <span className="text-fill-opacity-controls">
           <input
             type="range"
+            disabled={!enabled}
             aria-label="填充不透明度滑块"
             min="0"
             max="100"
@@ -39,6 +54,7 @@ export default function TextFillFields({
           />
           <input
             type="number"
+            disabled={!enabled}
             aria-label="填充不透明度 (%)"
             min="0"
             max="100"
@@ -60,6 +76,7 @@ export default function TextFillFields({
           {label}
           <input
             type="number"
+            disabled={!enabled}
             min="0"
             max="200"
             step="1"

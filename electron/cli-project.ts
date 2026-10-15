@@ -215,10 +215,8 @@ export function addCaptionCues(
     clip.duration = cue.end - cue.start;
     clip.transform.y = style.y;
     clip.style!.fontSize = style.fontSize ?? captionDefaults.fontSize;
-    clip.style!.outlineWidth = Math.max(
-      1,
-      Math.round(clip.style!.fontSize / 14),
-    );
+    clip.style!.outlineWidth = captionDefaults.outlineWidth;
+    clip.style!.fillEnabled = captionDefaults.fillEnabled;
     project.clips.push(clip);
   }
   return validateProject(project);

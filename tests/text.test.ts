@@ -56,6 +56,22 @@ describe("文本框与自动字号", () => {
     expect(
       textFill({ ...clip.style!, fill: "#ff0000", fillOpacity: 0 }),
     ).toEqual({ color: "#ff0000", opacity: 0 });
+    const disabled = {
+      ...clip.style!,
+      fill: "#123456",
+      fillOpacity: 0.5,
+      fillEnabled: false,
+    };
+    expect(textFill(disabled)).toEqual({ color: "#123456", opacity: 0 });
+    expect(textFillCss(disabled)).toBe("#12345600");
+    const reopened = validateProject({
+      ...createProject(),
+      clips: [{ ...clip, style: disabled }],
+    });
+    expect(reopened.clips[0].style).toMatchObject(disabled);
+    expect(
+      textFill({ ...reopened.clips[0].style!, fillEnabled: true }),
+    ).toEqual({ color: "#123456", opacity: 0.5 });
     expect(() =>
       validateProject({
         ...createProject(),

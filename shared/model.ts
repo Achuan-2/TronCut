@@ -71,6 +71,7 @@ export const styleSchema = z.object({
     .regex(/^#[\da-f]{6}$/i)
     .optional(),
   fillOpacity: finite.min(0).max(1).optional(),
+  fillEnabled: z.boolean().optional(),
   fillPaddingX: finite.min(0).max(200).optional(),
   fillPaddingY: finite.min(0).max(200).optional(),
   fillRadius: finite.min(0).max(200).optional(),
@@ -254,6 +255,7 @@ export const defaultTransform: Transform = {
   opacity: 1,
 };
 export const textFillDefaults = {
+  fillEnabled: true,
   fill: "#000000",
   fillOpacity: 0.75,
   fillPaddingX: 12,

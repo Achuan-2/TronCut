@@ -86,6 +86,7 @@ it("文本、字幕和逐字行为导出独立填充，颜色透明度可保存�
     "behavior",
     "blue",
     "transparent",
+    "disabled",
   ] as const) {
     const current = structuredClone(clip);
     if (kind === "caption") current.caption = true;
@@ -98,6 +99,7 @@ it("文本、字幕和逐字行为导出独立填充，颜色透明度可保存�
     if (kind === "blue")
       current.style = { ...current.style!, fill: "#0000ff", fillOpacity: 0.5 };
     if (kind === "transparent") current.style!.fillOpacity = 0;
+    if (kind === "disabled") current.style!.fillEnabled = false;
     project.clips = [current];
     const file = path.join(root, `${kind}.troncut`);
     await saveProject(project, file);
@@ -124,7 +126,7 @@ it("文本、字幕和逐字行为导出独立填充，颜色透明度可保存�
     const expected =
       kind === "blue"
         ? [127, 127, 255]
-        : kind === "transparent"
+        : kind === "transparent" || kind === "disabled"
           ? [255, 255, 255]
           : [63, 63, 63];
     pixel(100, 70).forEach((channel, index) =>
