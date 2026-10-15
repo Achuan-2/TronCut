@@ -321,7 +321,7 @@ try {
     "文本 - 中心向外",
   );
   await expect(page.getByLabel("逐字偏移（秒）", { exact: true })).toHaveValue(
-    "0.030",
+    "0.033",
   );
   await page.screenshot({ path: path.join(root, "shifting-text-out.png") });
   await page.getByRole("tab", { name: "进", exact: true }).click();

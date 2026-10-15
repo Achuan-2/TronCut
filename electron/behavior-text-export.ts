@@ -2,7 +2,13 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import sharp from "sharp";
 import type { Clip } from "../shared/model";
-import { glyphMotion, layoutGlyphs, textGlyphs } from "../shared/behaviors";
+import {
+  clipsBehaviorText,
+  glyphMotion,
+  layoutGlyphs,
+  textGlyphs,
+} from "../shared/behaviors";
+import { rotationMatrix } from "../shared/rotation";
 import { textFrameSize, textFillGeometry } from "../shared/text";
 import { textFillRectangle } from "./text-fill";
 import { outlinedText } from "./text-outline";
@@ -36,11 +42,11 @@ export async function rasterizeBehaviorText(
   const checkCancelled = () => {
     if (signal.aborted) throw new Error("任务已取消");
   };
-  const textBuffer = (text: string) =>
+  const textBuffer = (text: string, resolution = 1) =>
     sharp({
       text: {
         text: xml(text),
-        font: `${style.fontFamily} Bold ${fontSize}`,
+        font: `${style.fontFamily} Bold ${fontSize * resolution}`,
         rgba: true,
         dpi: 72,
       },
@@ -80,22 +86,37 @@ export async function rasterizeBehaviorText(
     string,
     { width: number; height: number; data: string }
   >();
+  // Perspective fly-in enlarges letters dramatically. Supersample its cached
+  // glyph textures instead of magnifying a low-resolution mask in every frame.
+  const resolution = clip.behaviors?.some(
+    (behavior) =>
+      behavior.enabled &&
+      [behavior.incoming, behavior.during, behavior.outgoing].some(
+        (phase) => phase.style === "fly",
+      ),
+  )
+    ? 4
+    : 1;
   for (const glyph of layout.glyphs) {
     if (images.has(glyph.text) || !glyph.text.trim()) continue;
     checkCancelled();
-    const mask = await textBuffer(glyph.text),
+    const mask = await textBuffer(glyph.text, resolution),
       info = await sharp(mask).metadata();
-    const margin = Math.ceil(style.outlineWidth) + 2;
+    const margin = Math.ceil(style.outlineWidth * resolution) + 2;
     const width = info.width! + margin * 2,
       height = info.height! + margin * 2;
     const png = await outlinedText(
       mask,
       style.color,
       style.outline,
-      style.outlineWidth,
+      style.outlineWidth * resolution,
       margin,
     );
-    images.set(glyph.text, { width, height, data: png.toString("base64") });
+    images.set(glyph.text, {
+      width: width / resolution,
+      height: height / resolution,
+      data: png.toString("base64"),
+    });
   }
   const padding = Math.ceil(fontSize * 6 + style.outlineWidth * 2 + 12);
   const box = textFrameSize(clip, layout.width);
@@ -117,7 +138,8 @@ export async function rasterizeBehaviorText(
     const motions = layout.glyphs.map((glyph) =>
       glyphMotion(clip, frame / fps, glyph.index, layout.count, "text"),
     );
-    const signature = JSON.stringify(motions);
+    const clipped = clipsBehaviorText(clip, frame / fps, layout.count);
+    const signature = JSON.stringify([clipped, motions]);
     let file = cache.get(signature);
     if (!file) {
       file = `${cache.size}.png`;
@@ -126,12 +148,17 @@ export async function rasterizeBehaviorText(
           const image = images.get(glyph.text),
             motion = motions[index];
           if (!image || motion.opacity <= 0) return "";
-          return `<g opacity="${motion.opacity}" transform="translate(${left + glyph.x + motion.x * fontSize} ${top + glyph.y + motion.y * fontSize}) rotate(${motion.rotation}) scale(${motion.scale})"><image x="${-image.width / 2}" y="${-image.height / 2}" width="${image.width}" height="${image.height}" href="data:image/png;base64,${image.data}"/></g>`;
+          const { a, b, c, d } = rotationMatrix(motion);
+          return `<g opacity="${motion.opacity}" transform="translate(${left + glyph.x + motion.x * fontSize} ${top + glyph.y + motion.y * fontSize}) matrix(${a} ${b} ${c} ${d} 0 0) scale(${motion.scale})"><image x="${-image.width / 2}" y="${-image.height / 2}" width="${image.width}" height="${image.height}" href="data:image/png;base64,${image.data}"/></g>`;
         })
         .join("");
       await sharp(
         Buffer.from(
-          `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">${fill}${body}</svg>`,
+          `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">${fill}${
+            clipped
+              ? `<defs><clipPath id="frame"><rect x="${(width - box.width) / 2}" y="${(height - box.height) / 2}" width="${box.width}" height="${box.height}"/></clipPath></defs><g clip-path="url(#frame)">${body}</g>`
+              : body
+          }</svg>`,
         ),
       )
         .png()

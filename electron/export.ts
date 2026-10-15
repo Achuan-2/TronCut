@@ -101,7 +101,15 @@ export function expression(
   const base = baseExpression(clip, key, clock);
   if (
     !clip.behaviors?.some((behavior) => behavior.enabled) ||
-    !["x", "y", "scale", "opacity", "rotation"].includes(key)
+    ![
+      "x",
+      "y",
+      "scale",
+      "opacity",
+      "rotation",
+      "rotationX",
+      "rotationY",
+    ].includes(key)
   )
     return base;
   const motion = objectBehaviorExpressions(
@@ -110,7 +118,7 @@ export function expression(
   );
   if (key === "x" || key === "y") return `(${base}+0.08*(${motion[key]}))`;
   if (key === "scale" || key === "opacity") return `(${base}*(${motion[key]}))`;
-  return `(${base}+(${motion.rotation}))`;
+  return `(${base}+(${motion[key as "rotation" | "rotationX" | "rotationY"]}))`;
 }
 function baseExpression(
   clip: Pick<
@@ -535,8 +543,11 @@ async function renderProject(
         expression(clip, key, clock(name));
       const scale = `(${pose("scale")})*2000/(2000-clip((${pose("z")}),-10000,1000))`;
       const transform = `scale=w='max(2,trunc(${cropWidth * fit}*(${scale})/2)*2)':h='max(2,trunc(${cropHeight * fit}*(${scale})/2)*2)':eval=frame`;
+      // Per-glyph motion is already rasterized. Only run outer-frame filters
+      // for channels that actually contain object motion.
+      const objectMotion = objectBehaviorExpressions(clip, clock("t"));
       const alphaAnimated =
-        !!clip.behaviors?.some((behavior) => behavior.enabled) ||
+        objectMotion.opacity !== "1" ||
         clip.keyframes.some((k) => k.value.opacity !== clip.transform.opacity);
       let alpha = alphaAnimated
         ? `geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='alpha(X,Y)*(${pose("opacity", "T")})'`
@@ -553,21 +564,28 @@ async function renderProject(
       );
       const rotation = clip.transform.rotation ?? clip.rotation ?? 0;
       const animatedRotation =
-        !!clip.behaviors?.some((behavior) => behavior.enabled) ||
+        objectMotion.rotation !== "0" ||
         clip.keyframes.some(
           (frame) => (frame.value.rotation ?? rotation) !== rotation,
         );
-      const hasAxisRotation = [
-        clip.transform,
-        ...clip.keyframes.map((frame) => frame.value),
-      ].some((value) => value.rotationX || value.rotationY || value.skew);
+      const hasAxisRotation =
+        objectMotion.rotationX !== "0" ||
+        objectMotion.rotationY !== "0" ||
+        [clip.transform, ...clip.keyframes.map((frame) => frame.value)].some(
+          (value) => value.rotationX || value.rotationY || value.skew,
+        );
       const rotate = hasAxisRotation
         ? axisRotationFilters({
             x: pose("rotationX", "T"),
             y: pose("rotationY", "T"),
             z: pose("rotation", "T"),
             skew: pose("skew", "T"),
-            maxSkew: Math.max(Math.abs(clip.transform.skew ?? 0), ...clip.keyframes.map((frame) => Math.abs(frame.value.skew ?? clip.transform.skew ?? 0))),
+            maxSkew: Math.max(
+              Math.abs(clip.transform.skew ?? 0),
+              ...clip.keyframes.map((frame) =>
+                Math.abs(frame.value.skew ?? clip.transform.skew ?? 0),
+              ),
+            ),
           })
         : animatedRotation
           ? [

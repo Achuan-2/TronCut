@@ -8,17 +8,112 @@ import { exportFrame, exportVideo } from "../electron/export";
 import { findBinary, runProcess } from "../electron/process";
 import { saveProject, openProject } from "../electron/project-store";
 
-async function whitePixels(image: string) {
+async function whiteBounds(image: string) {
+  const { data, info } = await sharp(image)
+    .removeAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  let left = info.width,
+    right = -1,
+    top = info.height,
+    bottom = -1;
+  for (let y = 0; y < info.height; y++)
+    for (let x = 0; x < info.width; x++) {
+      const pixel = (y * info.width + x) * info.channels;
+      if (data[pixel] > 180 && data[pixel + 1] > 180 && data[pixel + 2] > 180) {
+        left = Math.min(left, x);
+        right = Math.max(right, x);
+        top = Math.min(top, y);
+        bottom = Math.max(bottom, y);
+      }
+    }
+  return {
+    width: Math.max(0, right - left + 1),
+    height: Math.max(0, bottom - top + 1),
+  };
+}
+
+it("文本和图片的弹出在真实输出中沿边缘翻起，不再等比缩小", async () => {
+  const root = path.resolve(`test-output/behavior-hinge-${Date.now()}`);
+  await fs.mkdir(root, { recursive: true });
+  const source = path.join(root, "source.png");
+  await sharp({
+    create: { width: 80, height: 40, channels: 3, background: "#ffffff" },
+  })
+    .png()
+    .toFile(source);
+  for (const kind of ["text", "image"] as const) {
+    const project = createProject();
+    project.canvas = {
+      width: 320,
+      height: 180,
+      fps: 30,
+      background: "#000000",
+    };
+    const clip = { ...newText("titles", 0, 0, "ABC"), kind };
+    clip.style = {
+      ...clip.style!,
+      fontSize: 40,
+      outlineWidth: 0,
+      fillEnabled: false,
+    };
+    if (kind === "image") {
+      project.assets = [
+        {
+          id: "image",
+          name: "image",
+          path: source,
+          kind,
+          width: 80,
+          height: 40,
+          duration: 0,
+          hasAudio: false,
+        },
+      ];
+      clip.assetId = "image";
+      clip.transform.scale = 0.3;
+    }
+    const behavior = createBehavior("pop", 5, kind)!;
+    behavior.incoming.type = kind === "text" ? "simultaneous" : "whole";
+    behavior.incoming.offset = 0;
+    behavior.during.style = "none";
+    behavior.outgoing.style = "none";
+    clip.behaviors = [behavior];
+    project.clips = [clip];
+    const bounds = [];
+    for (const time of [0.1, 1]) {
+      const image = path.join(root, `${kind}-${time}.png`);
+      await exportFrame(
+        project,
+        time,
+        image,
+        path.join(root, `${kind}-${time}`),
+        AbortSignal.timeout(15000),
+      );
+      bounds.push(await whiteBounds(image));
+    }
+    expect(bounds[0].width).toBeGreaterThan(bounds[1].width * 0.8);
+    expect(bounds[0].height).toBeGreaterThan(0);
+    expect(bounds[0].height).toBeLessThan(bounds[1].height * 0.6);
+  }
+}, 45000);
+
+async function whitePixels(image: string, threshold = 180) {
   const { data, info } = await sharp(image)
     .removeAlpha()
     .raw()
     .toBuffer({ resolveWithObject: true });
   let count = 0;
   for (let i = 0; i < data.length; i += info.channels)
-    if (data[i] > 180 && data[i + 1] > 180 && data[i + 2] > 180) count++;
+    if (
+      data[i] > threshold &&
+      data[i + 1] > threshold &&
+      data[i + 2] > threshold
+    )
+      count++;
   return count;
 }
-async function whiteCenter(image: string) {
+async function whiteCenter(image: string, axis: "x" | "y" = "x") {
   const { data, info } = await sharp(image)
     .removeAlpha()
     .raw()
@@ -28,7 +123,7 @@ async function whiteCenter(image: string) {
   for (let y = 0; y < info.height; y++)
     for (let x = 0; x < info.width; x++)
       if (data[(y * info.width + x) * info.channels] > 180) {
-        sum += x;
+        sum += axis === "x" ? x : y;
         count++;
       }
   expect(count).toBeGreaterThan(20);
@@ -121,7 +216,7 @@ it("切换的对象平移和文本同时平移真实写入视频，参数可保�
         "1",
         image,
       ]);
-      centers.push(await whiteCenter(image));
+      centers.push(await whiteCenter(image, "y"));
     }
     expect(Math.abs(centers[0] - centers[1])).toBeGreaterThan(15);
     const capture = path.join(root, kind, "capture.png");
@@ -132,7 +227,7 @@ it("切换的对象平移和文本同时平移真实写入视频，参数可保�
       path.join(root, kind, "capture"),
       AbortSignal.timeout(10000),
     );
-    expect(await whiteCenter(capture)).toBeCloseTo(centers[1], 0);
+    expect(await whiteCenter(capture, "y")).toBeCloseTo(centers[1], 0);
   }
 }, 60000);
 it("逐字行为可保存重开，实际导出逐字出现，截帧保留当前阶段", async () => {
@@ -173,7 +268,7 @@ it("逐字行为可保存重开，实际导出逐字出现，截帧保留当前�
       "1",
       image,
     ]);
-    counts.push(await whitePixels(image));
+    counts.push(await whitePixels(image, 20));
   }
   expect(counts[0]).toBe(0);
   expect(counts[1]).toBeGreaterThan(20);
@@ -237,7 +332,7 @@ it("图片和视频使用对象行为，实际导出包含入场与出场透明�
       duration: 1.2,
     };
     clip.transform.scale = 0.5;
-    clip.behaviors = [createBehavior("fade", clip.duration)!];
+    clip.behaviors = [createBehavior("fade", clip.duration, kind)!];
     project.clips = [clip];
     const output = path.join(root, `${kind}.mp4`);
     await exportVideo(

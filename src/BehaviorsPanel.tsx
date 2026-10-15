@@ -38,7 +38,7 @@ function BehaviorCard({
     <button
       className="behavior-card"
       draggable
-      title="拖到文字片段，或双击应用"
+      title="拖到文字、图片或视频片段，或双击应用"
       onMouseEnter={() => setTime(0)}
       onMouseLeave={() => setTime(null)}
       onFocus={() => setTime(0)}
@@ -54,7 +54,7 @@ function BehaviorCard({
           className="behavior-card-word"
           style={{
             opacity: objectMotion.opacity,
-            transform: `translate(${objectMotion.x}em, ${objectMotion.y}em) rotate(${objectMotion.rotation}deg) scale(${objectMotion.scale})`,
+            transform: `translate(${objectMotion.x}em, ${objectMotion.y}em) rotateZ(${objectMotion.rotation}deg) rotateY(${objectMotion.rotationY}deg) rotateX(${objectMotion.rotationX}deg) scale(${objectMotion.scale})`,
           }}
         >
           {Array.from("TronCut").map((text, index) => {
@@ -70,7 +70,7 @@ function BehaviorCard({
                 key={index}
                 style={{
                   opacity: motion.opacity,
-                  transform: `translate(${motion.x}em, ${motion.y}em) rotate(${motion.rotation}deg) scale(${motion.scale})`,
+                  transform: `translate(${motion.x}em, ${motion.y}em) rotateZ(${motion.rotation}deg) rotateY(${motion.rotationY}deg) rotateX(${motion.rotationX}deg) scale(${motion.scale})`,
                 }}
               >
                 {text}

@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { Clip, Transform } from "./model";
+import { referenceBehaviorPhases } from "./behavior-reference";
 
 export const behaviorStyles = [
   "none",
@@ -58,6 +59,12 @@ export const behaviorPhaseSchema = z.object({
   loopForever: z.boolean().default(true),
   tension: z.number().finite().min(0.1).max(20).default(7),
   shift: z.number().finite().min(0).max(100).default(5),
+  // Exact phase lengths from authored presets; absent in older projects.
+  duration: z.number().finite().min(0.001).max(60).optional(),
+  rotation: z.number().finite().min(0).max(180).default(16),
+  horizontal: z.number().finite().min(0).max(100).default(10),
+  vertical: z.number().finite().min(0).max(100).default(10),
+  frequency: z.number().finite().min(0.05).max(20).default(1),
 });
 export const behaviorSchema = z.object({
   id: z.string().regex(/^[a-zA-Z0-9_-]{1,128}$/),
@@ -93,6 +100,10 @@ const phase = (
   loopForever: true,
   tension: 7,
   shift: 5,
+  rotation: 16,
+  horizontal: 10,
+  vertical: 10,
+  frequency: 1,
 });
 export const behaviorMovementOptions: readonly (readonly [
   BehaviorPhase["easing"],
@@ -133,6 +144,10 @@ export function shiftingPhase(
             : 0
         : 0,
     loopTime: 3.17,
+    duration:
+      key === "incoming" ? 91 / 60 : key === "outgoing" ? 13 / 30 : undefined,
+    ...referenceBehaviorPhases.cut[key],
+    ...(kind === "text" ? {} : { type: "whole" as const, offset: 0 }),
   };
 }
 export interface BehaviorPreset {
@@ -157,9 +172,18 @@ const presetDefinitions: readonly (readonly [
   ["type-fade", "文字逐个显示-淡入", "fade", "none", "fade", "forward"],
   ["type-scale", "文字逐个显示-缩放", "scale", "none", "scale", "forward"],
   ["type-fly", "文字逐个显示-飞入", "fly", "none", "fly", "forward"],
+  [
+    "type-scatter",
+    "文字逐个显示-结束散开（适合结尾）",
+    "slide",
+    "none",
+    "explode",
+    "forward",
+  ],
   ["reveal", "显示", "reveal", "none", "reveal", "whole"],
   ["fade", "淡入淡出", "fade", "none", "fade", "whole"],
   ["slide", "滑动", "slide", "none", "slide", "whole"],
+  ["fly", "飞入", "fly", "none", "fly", "forward"],
   ["drift", "漂移", "drift", "none", "drift", "whole"],
   ["explode", "爆炸", "explode", "none", "explode", "forward"],
   ["scale", "缩放", "scale", "none", "scale", "whole"],
@@ -168,8 +192,8 @@ const presetDefinitions: readonly (readonly [
   ["shake", "颤动", "fade", "shake", "fade", "whole"],
   ["wave", "波浪", "fade", "wave", "fade", "forward"],
 ];
-export const behaviorPresets: BehaviorPreset[] = presetDefinitions.map(
-  ([id, name, incoming, during, outgoing, type]) => ({
+export const behaviorPresets: BehaviorPreset[] = presetDefinitions
+  .map(([id, name, incoming, during, outgoing, type]) => ({
     id,
     name,
     incoming:
@@ -178,8 +202,17 @@ export const behaviorPresets: BehaviorPreset[] = presetDefinitions.map(
       id === "cut" ? shiftingPhase("during", "text") : phase(during, type),
     outgoing:
       id === "cut" ? shiftingPhase("outgoing", "text") : phase(outgoing, type),
-  }),
-);
+  }))
+  .map((preset) => {
+    const reference = referenceBehaviorPhases[preset.id];
+    if (!reference) return preset;
+    return {
+      ...preset,
+      incoming: { ...preset.incoming, ...reference.incoming },
+      during: { ...preset.during, ...reference.during },
+      outgoing: { ...preset.outgoing, ...reference.outgoing },
+    };
+  });
 
 export function createBehavior(
   presetId: string,
@@ -247,6 +280,8 @@ export interface GlyphMotion {
   y: number;
   scale: number;
   rotation: number;
+  rotationX: number;
+  rotationY: number;
   opacity: number;
 }
 export const neutralMotion = (): GlyphMotion => ({
@@ -254,6 +289,8 @@ export const neutralMotion = (): GlyphMotion => ({
   y: 0,
   scale: 1,
   rotation: 0,
+  rotationX: 0,
+  rotationY: 0,
   opacity: 1,
 });
 function rankFor(type: BehaviorPhase["type"], index: number, count: number) {
@@ -272,7 +309,12 @@ function phaseDelay(phase: BehaviorPhase, index: number, count: number) {
     phase.offset
   );
 }
-function ease(p: number, easing: BehaviorPhase["easing"], tension = 7) {
+export function behaviorEase(
+  p: number,
+  easing: BehaviorPhase["easing"],
+  tension = 7,
+  seconds = 1,
+) {
   if (p <= 0 || p >= 1) return Math.max(0, Math.min(1, p));
   switch (easing) {
     case "linear":
@@ -282,8 +324,27 @@ function ease(p: number, easing: BehaviorPhase["easing"], tension = 7) {
     case "quad-in-out":
       return p < 0.5 ? 8 * p ** 4 : 1 - (-2 * p + 2) ** 4 / 2;
     case "spring":
+      // Unit-mass damped spring, matching the reference stiffness of 50.
+      // Use physical seconds so changing damping does not also change frequency.
+      const damping = tension / 2,
+        time = p * seconds;
+      const delta = 50 - damping * damping;
+      if (Math.abs(delta) < 1e-6)
+        return 1 - Math.exp(-damping * time) * (1 + damping * time);
+      const frequency = Math.sqrt(Math.abs(delta));
+      if (delta > 0)
+        return (
+          1 -
+          Math.exp(-damping * time) *
+            (Math.cos(frequency * time) +
+              (damping / frequency) * Math.sin(frequency * time))
+        );
+      const slow = -damping + frequency,
+        fast = -damping - frequency;
       return (
-        1 - Math.exp(-tension * p) * Math.cos(p * Math.PI * (tension / 2 + 1))
+        1 -
+        (fast * Math.exp(slow * time) - slow * Math.exp(fast * time)) /
+          (fast - slow)
       );
     case "circular-out":
       return Math.sqrt(Math.max(0, 1 - (p - 1) ** 2));
@@ -296,9 +357,33 @@ function ease(p: number, easing: BehaviorPhase["easing"], tension = 7) {
   }
 }
 export const phaseSeconds = (phase: BehaviorPhase) =>
-  phase.style === "cut" && phase.easing === "spring"
+  phase.duration ??
+  (phase.style === "cut" && phase.easing === "spring"
     ? 0.7 + (20 - phase.tension) * 0.02
-    : 0.12 + (100 - phase.speed) * 0.018;
+    : 0.12 + (100 - phase.speed) * 0.018);
+
+export function changeBehaviorPhase(
+  phase: BehaviorPhase,
+  patch: Partial<BehaviorPhase>,
+): BehaviorPhase {
+  const next = { ...phase, ...patch };
+  if (phase.duration !== undefined && patch.duration === undefined) {
+    if (patch.speed !== undefined)
+      next.duration = Math.min(
+        60,
+        Math.max(
+          0.001,
+          (phaseSeconds(phase) * (101 - patch.speed)) / (101 - phase.speed),
+        ),
+      );
+    else if (patch.tension !== undefined && phase.easing === "spring")
+      next.duration = Math.min(
+        60,
+        Math.max(0.001, (phaseSeconds(phase) * phase.tension) / patch.tension),
+      );
+  }
+  return next;
+}
 export function behaviorWindows(behavior: Behavior, count: number) {
   const length = (p: BehaviorPhase) =>
     p.style === "none"
@@ -318,33 +403,53 @@ function transition(
   progress: number,
   index: number,
   count: number,
+  entering: boolean,
 ): GlyphMotion {
   const value = neutralMotion();
   const p = Math.max(0, Math.min(1, progress)),
-    q = ease(p, phase.easing, phase.tension),
+    eased = behaviorEase(p, phase.easing, phase.tension, phaseSeconds(phase)),
+    q = entering ? eased : 1 - eased,
     hidden = 1 - q;
   if (phase.style === "none") return value;
-  value.opacity = phase.style === "reveal" ? (p > 0 ? 1 : 0) : p;
-  if (phase.style === "fade") value.opacity = Math.max(0, Math.min(1, q));
-  if (phase.style === "cut") value.x = -2 * hidden;
-  const distance =
-    phase.style === "fly" ? 5 : phase.style === "drift" ? 2 : 1.5;
-  if (["slide", "fly", "drift"].includes(phase.style)) {
+  if (phase.style === "fade" || phase.style === "reveal")
+    value.opacity = Math.max(0, Math.min(1, q));
+  else value.opacity = (entering ? p > 0 : p < 1) ? 1 : 0;
+  if (phase.style === "cut")
+    value.y =
+      (phase.type === "whole" ? -12.5 : (index % 2 ? 1 : -1) * 1.25) * hidden;
+  const distance = phase.style === "drift" ? 8 : 12;
+  if (["slide", "drift"].includes(phase.style)) {
     if (phase.direction === "left" || phase.direction === "right")
       value.x = hidden * distance * (phase.direction === "left" ? -1 : 1);
     else value.y = hidden * distance * (phase.direction === "top" ? -1 : 1);
   }
-  if (phase.style === "pop" || phase.style === "scale")
-    value.scale = Math.max(0.01, q);
+  if (phase.style === "scale") value.scale = Math.max(0.01, q);
+  if (phase.style === "pop") {
+    const angle = (hidden * Math.PI) / 2;
+    if (phase.direction === "left" || phase.direction === "right") {
+      value.rotationY = hidden * 90;
+      value.x =
+        (1 - Math.cos(angle)) * (phase.direction === "left" ? -0.5 : 0.5);
+    } else {
+      value.rotationX = hidden * 90;
+      value.y =
+        (1 - Math.cos(angle)) * (phase.direction === "top" ? -0.5 : 0.5);
+    }
+  }
+  if (phase.style === "fly") {
+    // Fly-in is a perspective approach, not a directional slide.
+    value.scale = 1 / Math.max(0.02, q);
+    value.x = (index - (count - 1) / 2) * 0.65 * (value.scale - 1);
+  }
   if (phase.style === "bounce")
     value.y = -3 * hidden - Math.abs(Math.sin(p * Math.PI * 3)) * hidden;
-  if (phase.style === "drift") value.rotation = -20 * hidden;
+  if (phase.style === "drift") value.rotation = 25 * hidden;
   if (phase.style === "explode") {
-    const angle = (index / Math.max(1, count)) * Math.PI * 2;
-    value.x = Math.cos(angle) * 5 * hidden;
-    value.y = Math.sin(angle) * 5 * hidden;
-    value.rotation = 180 * hidden;
-    value.scale = 1 + hidden;
+    const angle = (-Math.PI * 3) / 4 + (index * Math.PI * 4) / 3;
+    value.x = Math.cos(angle) * 12 * hidden;
+    value.y = Math.sin(angle) * 12 * hidden;
+    value.rotation = (index % 2 ? -90 : 90) * hidden;
+    value.rotationY = 180 * hidden;
   }
   return value;
 }
@@ -382,45 +487,108 @@ export function glyphMotion(
       const p =
         (elapsed - delay) /
         Math.max(0.001, phaseSeconds(phase) * windows.ratio);
-      value = transition(phase, incoming ? p : 1 - p, index, count);
+      value = transition(
+        phase,
+        p,
+        index,
+        phase.type === "whole" ? 1 : count,
+        incoming,
+      );
     } else {
       const phase = behavior.during;
       const elapsed = time - windows.incoming - phaseDelay(phase, index, count);
       const period = phase.loopTime + phase.delay;
-      const cycle = Math.floor(elapsed / period),
+      const cycle = Math.floor((elapsed + 1e-9) / period),
         within = elapsed - cycle * period;
       if (
         elapsed < 0 ||
-        within >= phase.loopTime ||
+        (within >= phase.loopTime - 1e-9 && within < period - 1e-9) ||
         (!phase.loopForever && cycle >= phase.loops)
       )
         continue;
-      const clock = ease(within / phase.loopTime, phase.easing, phase.tension);
+      const clock = behaviorEase(
+        within / phase.loopTime,
+        phase.easing,
+        phase.tension,
+        phase.loopTime,
+      );
       const wave = Math.sin(clock * Math.PI * 2),
+        envelope = (1 - Math.cos(clock * Math.PI * 2)) / 2,
         intensity = phase.intensity / 100;
-      if (
-        phase.style === "pulse" ||
-        phase.style === "scale" ||
-        phase.style === "pop"
-      )
-        value.scale = 1 + intensity * wave;
-      else if (phase.style === "sway" || phase.style === "drift")
-        value.rotation = phase.intensity * wave;
-      else if (phase.style === "shake")
-        value.x = intensity * Math.sin(clock * Math.PI * 14);
-      else if (phase.style === "fade" || phase.style === "reveal")
-        value.opacity = 1 - intensity * (0.5 + 0.5 * wave);
-      else if (phase.style === "cut") value.x = (phase.shift / 100) * wave;
+      if (phase.style === "pulse" || phase.style === "scale")
+        value.scale = 1 + intensity * envelope;
+      else if (phase.style === "pop") {
+        const angle = phase.rotation * envelope;
+        const horizontal =
+          phase.direction === "left" || phase.direction === "right";
+        value[horizontal ? "rotationY" : "rotationX"] = angle;
+        value[horizontal ? "x" : "y"] =
+          (1 - Math.cos((angle * Math.PI) / 180)) *
+          (["left", "top"].includes(phase.direction) ? -0.5 : 0.5);
+      } else if (phase.style === "sway" || phase.style === "shake") {
+        // Deterministic, smooth noise: seeking and rendering a frame must agree.
+        const t =
+          elapsed * phase.frequency * (phase.style === "shake" ? 12 : 1) +
+          index * 0.37;
+        value.x =
+          ((phase.horizontal / 100) *
+            (Math.sin(t * 2.3) + Math.sin(t * 3.7) * 0.5)) /
+          1.5;
+        value.y =
+          ((phase.vertical / 100) *
+            (Math.sin(t * 2.9) + Math.sin(t * 4.3) * 0.5)) /
+          1.5;
+        value.rotation =
+          phase.rotation *
+          (phase.style === "shake" ? 1 : 0) *
+          Math.sin(t * 2.1);
+      } else if (phase.style === "drift") {
+        value.y = -intensity * wave;
+        value.rotation = phase.rotation * wave;
+      } else if (phase.style === "fade" || phase.style === "reveal")
+        value.opacity = 1 - intensity * envelope;
+      else if (phase.style === "cut")
+        value.y =
+          (phase.shift / 100) *
+          wave *
+          (phase.type === "whole" || phase.type === "simultaneous" || index % 2
+            ? 1
+            : -1);
       else if (phase.style !== "none") value.y = -intensity * wave;
     }
     result.x += value.x;
     result.y += value.y;
     result.rotation += value.rotation;
+    result.rotationX += value.rotationX;
+    result.rotationY += value.rotationY;
     result.scale *= value.scale;
     result.opacity *= value.opacity;
   }
   return result;
 }
+
+export function clipsBehaviorText(
+  clip: Pick<Clip, "behaviors">,
+  localTime: number,
+  count: number,
+) {
+  return (
+    clip.behaviors?.some((behavior) => {
+      const time = localTime - behavior.start;
+      if (!behavior.enabled || time < 0 || time >= behavior.duration)
+        return false;
+      const windows = behaviorWindows(behavior, count);
+      const phase =
+        time < windows.incoming
+          ? behavior.incoming
+          : time >= behavior.duration - windows.outgoing
+            ? behavior.outgoing
+            : behavior.during;
+      return phase.style === "cut" && phase.type !== "whole";
+    }) ?? false
+  );
+}
+
 export function behaviorTransform(
   clip: Pick<Clip, "kind" | "text" | "behaviors">,
   transform: Transform,
@@ -440,6 +608,8 @@ export function behaviorTransform(
     scale: Math.max(0.01, transform.scale * motion.scale),
     opacity: transform.opacity * motion.opacity,
     rotation: (transform.rotation ?? 0) + motion.rotation,
+    rotationX: (transform.rotationX ?? 0) + motion.rotationX,
+    rotationY: (transform.rotationY ?? 0) + motion.rotationY,
   };
 }
 

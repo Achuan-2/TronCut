@@ -3074,7 +3074,7 @@ fieldset:disabled {
   grid-template-columns: 56px minmax(0, 1fr);
   font-size: 12px;
 }
-.shifting-controls .behavior-number-control {
+.behavior-property .behavior-number-control {
   grid-template-columns: 56px minmax(20px, 1fr) 78px;
   gap: 6px;
 }
@@ -3085,7 +3085,7 @@ fieldset:disabled {
   border-radius: 4px;
   background: #12191c;
 }
-.shifting-controls .behavior-number-input input {
+.behavior-property .behavior-number-input input {
   min-width: 0;
   width: 100%;
   border: 0;
@@ -3098,7 +3098,7 @@ fieldset:disabled {
   padding-right: 4px;
   font-size: 11px;
 }
-.shifting-controls input[type="range"] {
+.behavior-number-control > input[type="range"] {
   min-width: 0;
   width: 100%;
 }

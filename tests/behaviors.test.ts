@@ -39,17 +39,17 @@ describe("行为的对象与逐字时序", () => {
     const text = createBehavior("cut", 5, "text")!;
     expect(text.incoming).toMatchObject({ type: "center", offset: 0.02 });
     expect(text.during).toMatchObject({ type: "simultaneous", offset: 0 });
-    expect(text.outgoing).toMatchObject({ type: "center", offset: 0.03 });
+    expect(text.outgoing).toMatchObject({ type: "center", offset: 1 / 30 });
     const clip = { behaviors: [video] };
     const low = glyphMotion(clip, 0.2, 0, 1, "object");
-    expect(Math.abs(low.x)).toBeGreaterThan(0.01);
+    expect(Math.abs(low.y)).toBeGreaterThan(0.01);
     video.incoming.tension = 15;
-    expect(glyphMotion(clip, 0.2, 0, 1, "object").x).not.toBeCloseTo(low.x);
+    expect(glyphMotion(clip, 0.2, 0, 1, "object").y).not.toBeCloseTo(low.y);
     video.incoming.style = "none";
     video.outgoing.style = "none";
-    const smallShift = glyphMotion(clip, 0.2, 0, 1, "object").x;
+    const smallShift = glyphMotion(clip, 0.2, 0, 1, "object").y;
     video.during.shift = 50;
-    expect(glyphMotion(clip, 0.2, 0, 1, "object").x).toBeCloseTo(
+    expect(glyphMotion(clip, 0.2, 0, 1, "object").y).toBeCloseTo(
       smallShift * 10,
     );
     expect(glyphMotion(clip, 0.2, 0, 1, "object").opacity).toBe(1);
@@ -69,8 +69,8 @@ describe("行为的对象与逐字时序", () => {
     expect(glyphMotion(clip, 0.2, 0, 4, "object").x).toBe(0);
     const simultaneous = glyphMotion(clip, 0.2, 0, 4, "text");
     behavior.during.offset = 0.1;
-    expect(glyphMotion(clip, 0.2, 0, 4, "text").x).not.toBeCloseTo(
-      simultaneous.x,
+    expect(glyphMotion(clip, 0.2, 0, 4, "text").y).not.toBeCloseTo(
+      simultaneous.y,
     );
     expect(glyphMotion(clip, 0.2, 0, 4, "text")).toEqual(
       glyphMotion(clip, 0.2, 3, 4, "text"),
@@ -96,7 +96,7 @@ describe("行为的对象与逐字时序", () => {
   });
   it("期间阶段遵守强度、循环时间、循环间延迟和有限次数", () => {
     const clip = newText("titles", 0);
-    const behavior = createBehavior("pulse", clip.duration)!;
+    const behavior = createBehavior("pulse", clip.duration, "image")!;
     behavior.incoming.style = "none";
     behavior.outgoing.style = "none";
     behavior.during = {
@@ -109,11 +109,11 @@ describe("行为的对象与逐字时序", () => {
       intensity: 40,
     };
     clip.behaviors = [behavior];
-    expect(glyphMotion(clip, 0.25, 0, 1, "object").scale).toBeCloseTo(1.4);
+    expect(glyphMotion(clip, 0.5, 0, 1, "object").scale).toBeCloseTo(1.4);
     expect(glyphMotion(clip, 1.2, 0, 1, "object").scale).toBe(1);
     expect(glyphMotion(clip, 1.75, 0, 1, "object").scale).toBe(1);
     behavior.during.loopForever = true;
-    expect(glyphMotion(clip, 1.75, 0, 1, "object").scale).toBeCloseTo(1.4);
+    expect(glyphMotion(clip, 2, 0, 1, "object").scale).toBeCloseTo(1.4);
   });
   it("所有对象预设、缓动和循环参数的导出表达式与预览采样一致", () => {
     const math = {
@@ -194,12 +194,12 @@ describe("行为的对象与逐字时序", () => {
     behavior.incoming.offset = 0.2;
     behavior.outgoing.style = "none";
     clip.behaviors = [behavior];
-    expect(glyphMotion(clip, 0.1, 0, 3, "text").opacity).toBe(1);
+    expect(glyphMotion(clip, 0.1, 0, 3, "text").opacity).toBeGreaterThan(0);
     expect(glyphMotion(clip, 0.1, 2, 3, "text").opacity).toBe(0);
     expect(glyphMotion(clip, 0.1, 2, 3, "object").opacity).toBe(1);
     behavior.incoming.type = "backward";
     expect(glyphMotion(clip, 0.1, 0, 3, "text").opacity).toBe(0);
-    expect(glyphMotion(clip, 0.1, 2, 3, "text").opacity).toBe(1);
+    expect(glyphMotion(clip, 0.1, 2, 3, "text").opacity).toBeGreaterThan(0);
     behavior.enabled = false;
     expect(glyphMotion(clip, 0, 0, 3).opacity).toBe(1);
   });
@@ -233,13 +233,14 @@ describe("行为的对象与逐字时序", () => {
   it("对象行为叠加在基础变换上，原有动画和参数不被改写", () => {
     const clip = newText("titles", 0);
     clip.behaviors = [
-      createBehavior("slide", clip.duration)!,
-      createBehavior("pulse", clip.duration)!,
+      createBehavior("slide", clip.duration, "image")!,
+      createBehavior("pulse", clip.duration, "image")!,
     ];
     const before = JSON.stringify(clip);
     const value = behaviorTransform(clip, clip.transform, 0.2);
     expect(value.x).toBeLessThan(clip.transform.x);
-    expect(value.opacity).toBeLessThan(1);
+    expect(value.scale).not.toBe(clip.transform.scale);
+    expect(value.opacity).toBe(1);
     expect(JSON.stringify(clip)).toBe(before);
   });
 });

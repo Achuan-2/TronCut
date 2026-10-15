@@ -11,11 +11,13 @@ import {
   type BehaviorPhaseKey,
   shiftingPhase,
   behaviorMovementOptions,
+  changeBehaviorPhase,
 } from "../shared/behaviors";
 import type { Clip } from "../shared/model";
 import type { Editor } from "./useEditor";
 import BehaviorTypeMenu from "./BehaviorTypeMenu";
 import ShiftingProperties from "./ShiftingProperties";
+import NumberControl from "./BehaviorNumberControl";
 
 export default function BehaviorProperties({
   clip,
@@ -46,7 +48,7 @@ export default function BehaviorProperties({
             editor.updateBehavior(clip.id, behavior.id, patch);
         };
         const change = (patch: Partial<BehaviorPhase>) =>
-          update({ [phaseKey]: { ...phase, ...patch } });
+          update({ [phaseKey]: changeBehaviorPhase(phase, patch) });
         const selectField = <K extends "style" | "easing" | "direction">(
           label: string,
           key: K,
@@ -220,42 +222,56 @@ export default function BehaviorProperties({
                           />
                         </div>
                         {selectField("移动", "easing", behaviorMovementOptions)}
-                        {selectField(
-                          phaseKey === "outgoing" ? "移向" : "移自",
-                          "direction",
-                          [
-                            ["left", "左"],
-                            ["right", "右"],
-                            ["top", "上"],
-                            ["bottom", "下"],
-                          ],
-                        )}
-                        {phaseKey !== "during" && (
-                          <label className="field behavior-range">
-                            速度
-                            <input
-                              aria-label="行为速度滑块"
-                              type="range"
-                              min={1}
-                              max={100}
-                              value={phase.speed}
-                              onChange={(event) =>
-                                change({ speed: Number(event.target.value) })
-                              }
+                        {["slide", "drift", "pop", "bounce"].includes(
+                          phase.style,
+                        ) &&
+                          selectField(
+                            phaseKey === "outgoing" ? "移向" : "移自",
+                            "direction",
+                            [
+                              ["left", "左"],
+                              ["right", "右"],
+                              ["top", "上"],
+                              ["bottom", "下"],
+                            ],
+                          )}
+                        {phaseKey !== "during" &&
+                          (phase.easing === "spring" ? (
+                            <NumberControl
+                              key={`${phaseKey}-tension`}
+                              label="张力"
+                              name="行为张力"
+                              value={phase.tension}
+                              min={0.1}
+                              max={20}
+                              change={(tension) => change({ tension })}
                             />
-                            <input
-                              aria-label="行为速度（%）"
-                              type="number"
-                              min={1}
-                              max={100}
-                              value={phase.speed}
-                              onChange={(event) =>
-                                change({ speed: Number(event.target.value) })
-                              }
-                            />
-                            <span>%</span>
-                          </label>
-                        )}
+                          ) : (
+                            <label className="field behavior-range">
+                              速度
+                              <input
+                                aria-label="行为速度滑块"
+                                type="range"
+                                min={1}
+                                max={100}
+                                value={phase.speed}
+                                onChange={(event) =>
+                                  change({ speed: Number(event.target.value) })
+                                }
+                              />
+                              <input
+                                aria-label="行为速度（%）"
+                                type="number"
+                                min={1}
+                                max={100}
+                                value={phase.speed}
+                                onChange={(event) =>
+                                  change({ speed: Number(event.target.value) })
+                                }
+                              />
+                              <span>%</span>
+                            </label>
+                          ))}
                         <label className="field behavior-range">
                           偏移
                           <input
@@ -286,21 +302,71 @@ export default function BehaviorProperties({
                         </label>
                         {phaseKey === "during" && (
                           <>
-                            <label className="field">
-                              强度
-                              <input
-                                aria-label="行为强度（%）"
-                                type="number"
+                            {["sway", "shake"].includes(phase.style) ? (
+                              <>
+                                {(
+                                  [
+                                    "horizontal",
+                                    "vertical",
+                                    "frequency",
+                                  ] as const
+                                ).map((key) => (
+                                  <NumberControl
+                                    key={key}
+                                    label={
+                                      key === "horizontal"
+                                        ? "水平"
+                                        : key === "vertical"
+                                          ? "垂直"
+                                          : "频率"
+                                    }
+                                    name={
+                                      key === "horizontal"
+                                        ? "行为水平位移"
+                                        : key === "vertical"
+                                          ? "行为垂直位移"
+                                          : "行为频率"
+                                    }
+                                    value={phase[key]}
+                                    min={key === "frequency" ? 0.05 : 0}
+                                    max={key === "frequency" ? 20 : 100}
+                                    change={(value) => change({ [key]: value })}
+                                  />
+                                ))}
+                              </>
+                            ) : (
+                              phase.style !== "pop" && (
+                                <label className="field">
+                                  强度
+                                  <input
+                                    aria-label="行为强度（%）"
+                                    type="number"
+                                    min={0}
+                                    max={100}
+                                    value={phase.intensity}
+                                    onChange={(event) =>
+                                      change({
+                                        intensity: Number(event.target.value),
+                                      })
+                                    }
+                                  />
+                                </label>
+                              )
+                            )}
+                            {["pop", "drift", "shake"].includes(
+                              phase.style,
+                            ) && (
+                              <NumberControl
+                                key={`${phaseKey}-rotation`}
+                                label="旋转"
+                                name="行为旋转（度）"
+                                value={phase.rotation}
                                 min={0}
-                                max={100}
-                                value={phase.intensity}
-                                onChange={(event) =>
-                                  change({
-                                    intensity: Number(event.target.value),
-                                  })
-                                }
+                                max={180}
+                                unit="°"
+                                change={(rotation) => change({ rotation })}
                               />
-                            </label>
+                            )}
                             <label className="field">
                               循环时间
                               <input
