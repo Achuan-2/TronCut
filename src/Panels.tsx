@@ -6,28 +6,24 @@ import {
   Sparkles,
   AudioLines,
   Settings2,
-  Plus,
   Film,
   Music2,
-  Image,
   WandSparkles,
   AlignCenter,
-  FileJson,
-  ArrowRight,
   Mic,
   MousePointer2,
   Link2,
   Paintbrush,
   ArrowRightLeft,
 } from "lucide-react";
-import { type Clip, textPresets, defaultTransform } from "../shared/model";
+import { type Asset, type Clip, textPresets, defaultTransform } from "../shared/model";
 import { createTransformSampler } from "../shared/editor";
 import type { Capabilities } from "../shared/bridge";
 import type { Editor } from "./useEditor";
 import { timeLabel } from "./Preview";
 import { defaultCrop, defaultEffects } from "../shared/effects";
 import { textBoxFor } from "./text";
-import { MediaThumbnail } from "./MediaThumbnail";
+import MediaLibrary from "./MediaLibrary";
 import { defaultCursorStyle } from "../shared/cursor";
 import NarrationPanel from "./NarrationPanel";
 import AnimationsPanel from "./AnimationsPanel";
@@ -104,7 +100,7 @@ export default function Panels(props: Props) {
         ))}
       </nav>
       <div
-        className={`library-content ${tab === "captions" ? "captions-library" : tab === "narration" ? "narration-library" : tab === "animations" ? "animations-library" : ""}`}
+        className={`library-content ${tab === "media" ? "media-library" : tab === "captions" ? "captions-library" : tab === "narration" ? "narration-library" : tab === "animations" ? "animations-library" : ""}`}
       >
         {tab !== "captions" && tab !== "animations" && tab !== "narration" && (
           <div className="library-heading">
@@ -117,113 +113,34 @@ export default function Panels(props: Props) {
           </div>
         )}
         {tab === "media" && (
-          <>
-            <button
-              className="wide-button import-button"
-              onClick={props.importMedia}
-            >
-              <Plus size={17} />
-              导入媒体
-            </button>
-            <input
-              className="search-input"
-              placeholder="搜索素材…"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-            />
-            {!project.assets.length ? (
-              <div className="library-empty">
-                <div className="empty-icon">
-                  <Film size={30} />
-                </div>
-                <b>好作品，从素材开始</b>
-                <p>
-                  导入视频、音频或图片
-                  <br />
-                  双击素材即可加入时间线
-                </p>
-                <button className="plain-link" onClick={props.importCamtasia}>
-                  <FileJson size={14} />
-                  导入 Camtasia 工程
-                  <ArrowRight size={13} />
-                </button>
-              </div>
-            ) : (
-              <div className="asset-grid">
-                {project.assets
-                  .filter((a) =>
-                    a.name.toLowerCase().includes(query.toLowerCase()),
-                  )
-                  .map((asset) => (
-                    <button
-                      className={`asset-card ${asset.missing ? "missing" : ""}`}
-                      key={asset.id}
-                      draggable
-                      onDragStart={(event) =>
-                        event.dataTransfer.setData("framecraft-asset", asset.id)
-                      }
-                      onDoubleClick={() => {
-                        if (!asset.missing) {
-                          editor.addAssets([asset], true);
-                          return;
-                        }
-                        run(async () => {
-                          const consumed = Math.max(
-                            0,
-                            ...project.clips
-                              .filter((c) => c.assetId === asset.id)
-                              .map((c) => c.sourceIn + c.duration * c.speed),
-                          );
-                          const replacement = await bridge().relinkMedia(
-                            asset.id,
-                            consumed,
-                          );
-                          if (!replacement) return;
-                          editor.apply((p) => ({
-                            ...p,
-                            assets: p.assets.map((a) =>
-                              a.id === asset.id ? replacement : a,
-                            ),
-                          }));
-                          toast("素材已重新链接，片段与动画保持原位置");
-                        });
-                      }}
-                      title={`${asset.name}\n${asset.missing ? "双击重新链接素材" : "双击添加到时间线"}`}
-                    >
-                      <div className={`asset-thumbnail ${asset.kind}`}>
-                        <MediaThumbnail
-                          asset={asset}
-                          waveform={asset.kind === "audio"}
-                        />
-                        {asset.kind === "video" ? (
-                          <Film size={28} />
-                        ) : asset.kind === "audio" ? (
-                          <Music2 size={28} />
-                        ) : (
-                          <Image size={28} />
-                        )}
-                        <span>
-                          {asset.missing
-                            ? "素材离线"
-                            : asset.kind === "image"
-                              ? "图片"
-                              : timeLabel(asset.duration)}
-                        </span>
-                      </div>
-                      <span className="asset-name">{asset.name}</span>
-                    </button>
-                  ))}
-              </div>
-            )}
-            <div className="library-bottom-note">
-              <FileJson size={15} />
-              <span>
-                保存工程时，素材自动归档
-                <br />
-                JSON 工程，随时看得懂
-              </span>
-            </div>
-          </>
+          <MediaLibrary
+            assets={project.assets}
+            query={query}
+            onQueryChange={setQuery}
+            onImport={props.importMedia}
+            onImportCamtasia={props.importCamtasia}
+            onActivate={(asset: Asset) => {
+              if (!asset.missing) {
+                editor.addAssets([asset], true);
+                return;
+              }
+              run(async () => {
+                const consumed = Math.max(
+                  0,
+                  ...project.clips
+                    .filter((c) => c.assetId === asset.id)
+                    .map((c) => c.sourceIn + c.duration * c.speed),
+                );
+                const replacement = await bridge().relinkMedia(asset.id, consumed);
+                if (!replacement) return;
+                editor.apply((p) => ({
+                  ...p,
+                  assets: p.assets.map((a) => a.id === asset.id ? replacement : a),
+                }));
+                toast("素材已重新链接，片段与动画保持原位置");
+              });
+            }}
+          />
         )}
         <div hidden={tab !== "annotations"}>
           <AnnotationsPanel key={project.id} editor={editor} />
