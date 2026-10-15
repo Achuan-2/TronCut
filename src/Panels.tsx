@@ -29,6 +29,7 @@ import { defaultCrop, defaultEffects } from "../shared/effects";
 import { textBoxFor } from "./text";
 import { MediaThumbnail } from "./MediaThumbnail";
 import { defaultCursorStyle } from "../shared/cursor";
+import { recordingZoomFrames } from "../shared/recording";
 import NarrationPanel from "./NarrationPanel";
 import AnimationsPanel from "./AnimationsPanel";
 import { defaultContentTransform } from "../shared/crop";
@@ -360,9 +361,9 @@ export default function Panels(props: Props) {
             <p className="small-note">
               本地工程 · 自由表达
               <br />
-              参考 OpenScreen / Recordly
-              的录制流程。当前基础录屏仍会包含系统鼠标；可编辑光标、原生 GPU
-              捕获、TREC 和完整 Camtasia 特效兼容尚在开发计划中。
+              Windows
+              原生录屏支持独立鼠标、自动背景与鼠标聚焦缩放；兼容录制的鼠标包含在画面中。TREC
+              和完整 Camtasia 特效兼容仍在开发计划中。
             </p>
           </>
         )}
@@ -806,6 +807,59 @@ export function Inspector({ editor }: { editor: Editor }) {
                     onChange={(e) => update({ fill: e.target.value })}
                   />
                 </label>
+              )}
+              {(c.kind === "video" || c.kind === "image") &&
+                numberField(
+                  "圆角 (px)",
+                  c.mediaFrame?.radius ?? 0,
+                  (radius) => update({ mediaFrame: { radius } }),
+                  0,
+                  200,
+                )}
+              {hasCursor && asset && (
+                <div className="recording-zoom-controls">
+                  <h3 className="section-title">自动缩放</h3>
+                  <button
+                    disabled={
+                      locked ||
+                      c.keyframes.some((frame) => !frame.recordingZoom)
+                    }
+                    onClick={() =>
+                      update({
+                        animationOffset: 0,
+                        keyframes: recordingZoomFrames(
+                          asset,
+                          c,
+                          c.keyframes.find(
+                            (frame) =>
+                              frame.recordingZoom &&
+                              (frame.value.contentScale ?? 1) > 1,
+                          )?.value.contentScale ?? 1.8,
+                        ),
+                      })
+                    }
+                  >
+                    根据鼠标重新生成缩放
+                  </button>
+                  <button
+                    disabled={
+                      locked ||
+                      !c.keyframes.some((frame) => frame.recordingZoom)
+                    }
+                    onClick={() =>
+                      update({
+                        keyframes: c.keyframes.filter(
+                          (frame) => !frame.recordingZoom,
+                        ),
+                      })
+                    }
+                  >
+                    移除自动缩放
+                  </button>
+                  <p className="field-help">
+                    缩放动画可在时间线上编辑。已有手动动画时，请先调整或移除动画再重新生成；轨迹没有有效点击或停留时不生成动画。
+                  </p>
+                </div>
               )}
               {c.kind !== "audio" && (
                 <>

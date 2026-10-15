@@ -516,6 +516,7 @@ function PreviewLayer({
             width: "100%",
             height: "100%",
             overflow: "hidden",
+            borderRadius: (clip.mediaFrame?.radius ?? 0) * scale,
             position: "relative",
             transform: `scale(${effects.flipX ? -1 : 1}, ${effects.flipY ? -1 : 1})`,
           }}

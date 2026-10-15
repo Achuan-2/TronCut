@@ -2,6 +2,26 @@ import type { Clip } from "../shared/model";
 import { contentOrigin, defaultContentTransform } from "../shared/crop";
 import type { VisualKey } from "../shared/visual-state";
 
+export function mediaFrameFilters(
+  clip: Clip,
+  fit: number,
+  cropExpression?: (key: VisualKey) => string,
+) {
+  if (!clip.mediaFrame?.radius) return [];
+  const width = cropExpression
+    ? `W*(1-(${cropExpression("cropLeft")})-(${cropExpression("cropRight")}))`
+    : "W";
+  const height = cropExpression
+    ? `H*(1-(${cropExpression("cropTop")})-(${cropExpression("cropBottom")}))`
+    : "H";
+  const prefix = `st(0,(${width})/2);st(1,(${height})/2);st(2,min(${clip.mediaFrame.radius / fit},min(ld(0),ld(1))));`;
+  const mask =
+    "lte(pow(max(abs(X+0.5-W/2)-ld(0)+ld(2),0),2)+pow(max(abs(Y+0.5-H/2)-ld(1)+ld(2),0),2),ld(2)*ld(2))";
+  return [
+    `geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='${prefix}alpha(X,Y)*(${mask})'`,
+  ];
+}
+
 // Resample into a fixed transparent surface. Unlike scaling the whole source,
 // this keeps both the clipping boundary and memory use independent of zoom.
 function samplePlane(x: string, y: string, visible = "1") {

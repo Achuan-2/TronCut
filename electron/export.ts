@@ -12,8 +12,12 @@ import { defaultCrop, fadeDurations, visualFilters } from "../shared/effects";
 import { cursorFilters } from "./cursor-export";
 import { loopImageInput } from "./loop-image";
 import { easingExpression } from "../shared/easing";
-import { contentFilters, axisRotationFilters } from "./visual-transform";
-import { animatedViewportFilters } from "./visual-transform";
+import {
+  contentFilters,
+  axisRotationFilters,
+  mediaFrameFilters,
+  animatedViewportFilters,
+} from "./visual-transform";
 import {
   hasVisualAnimation,
   visualDefaults,
@@ -563,8 +567,11 @@ async function renderProject(
         source === `${index}:v`
           ? `trim=start=${sourceIn}:duration=${clip.duration * clip.speed},setpts=(PTS-STARTPTS)/${clip.speed}${padding ? "," + padding : `+${clip.start}/TB,`}`
           : padding;
+      const frameFilters = mediaFrameFilters(
+        clip, fit, animatedViewport ? key => pose(key, "T") : undefined,
+      );
       filters.push(
-        `[${source}]${timing}${animatedText ? `fps=${fps},` : ""}format=rgba,${[...(animatedViewport ? animatedViewportFilters((key) => pose(key, "T")) : contentFilters(clip)), ...visualEffects, transform, "setsar=1", ...rotate, alpha].join(",")}[${visual}]`,
+        `[${source}]${timing}${animatedText ? `fps=${fps},` : ""}format=rgba,${[...(animatedViewport ? animatedViewportFilters((key) => pose(key, "T")) : contentFilters(clip)), ...visualEffects, ...frameFilters, transform, "setsar=1", ...rotate, alpha].join(",")}[${visual}]`,
       );
       // Composite text before chroma subsampling so rounded fills and glyphs
       // retain the same pixel position in video and frame captures.

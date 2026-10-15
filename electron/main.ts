@@ -51,6 +51,11 @@ import { preferencesUpdateSchema } from "../shared/preferences";
 import { captionProcessingSchema, cueSchema } from "../shared/caption-processing";
 import { processCaptionCues } from "./caption-processing";
 import { requestAi } from "./ai";
+import { RecordingStyleStore } from "./recording-style";
+import {
+  recordingBackgroundSchema,
+  recordingSettingsSchema,
+} from "../shared/recording";
 
 const cliIndex = process.argv.indexOf("--cli");
 const cliMode = cliIndex >= 0;
@@ -80,6 +85,7 @@ const windowState = () => ({
 let projectFile: string | null = null;
 const recentProjects = new RecentProjects(path.join(app.getPath("userData"), "recent-projects.json"));
 const preferences = new PreferencesStore(path.join(app.getPath("userData"), "preferences.json"), safeStorage);
+const recordingStyle = new RecordingStyleStore(app.getPath("userData"));
 async function rememberProject(project: Project, file: string) {
   let thumbnail: string | null = null;
   const visible = new Set(project.tracks.filter((track) => !track.hidden).map((track) => track.id));
@@ -182,6 +188,17 @@ function installHandlers() {
     } finally { task = null; }
   });
   handle("window:state", windowState);
+  handle("recording:settings", () => recordingStyle.read());
+  handle("recording:settings:save", (input: unknown) =>
+    recordingStyle.save(recordingSettingsSchema.parse(input)),
+  );
+  handle("recording:background", async (width: unknown, height: unknown, preset: unknown) =>
+    register(await recordingStyle.background(
+      z.number().int().min(16).max(7680).parse(width),
+      z.number().int().min(16).max(4320).parse(height),
+      recordingBackgroundSchema.parse(preset),
+    )),
+  );
   handle("window:minimize", () => window.minimize());
   handle("window:maximize", () => {
     if (window.isFullScreen()) window.setFullScreen(false);

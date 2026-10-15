@@ -13,6 +13,13 @@ import {
 import type { Asset } from "../shared/model";
 import type { CaptureSource } from "../shared/bridge";
 import { timeLabel } from "./Preview";
+import {
+  defaultRecordingSettings,
+  recordingBackgrounds,
+  type RecordedAsset,
+  type RecordingSettings,
+} from "../shared/recording";
+import { cursorSvg } from "../shared/cursor";
 
 interface Session {
   id: string;
@@ -30,7 +37,10 @@ export default function Recorder({
   toast,
 }: {
   onClose: () => void;
-  onRecorded: (assets: { asset: Asset; kind: Session["kind"] }[]) => void;
+  onRecorded: (
+    assets: RecordedAsset[],
+    settings: RecordingSettings,
+  ) => Promise<string | void>;
   toast: (text: string) => void;
 }) {
   const [sources, setSources] = useState<CaptureSource[]>([]),
@@ -48,6 +58,11 @@ export default function Recorder({
     [useNative, setUseNative] = useState(true),
     [fps, setFps] = useState(30);
   const nativeActive = useRef(false);
+  const [settings, setSettings] = useState(defaultRecordingSettings);
+  const [settingsReady, setSettingsReady] = useState(false);
+  const recordingSettings = useRef(settings);
+  const changeSettings = (patch: Partial<RecordingSettings>) =>
+    setSettings((s) => ({ ...s, ...patch }));
   const sessions = useRef<Session[]>([]),
     timing = useRef({ started: 0, paused: 0, pauseStart: 0 }),
     stopping = useRef(false),
@@ -62,6 +77,14 @@ export default function Recorder({
     1000;
   useEffect(() => {
     mounted.current = true;
+    window.framecraft
+      ?.recordingSettings()
+      .then((value) => {
+        if (!mounted.current) return;
+        setSettings(value);
+        setSettingsReady(true);
+      })
+      .catch((e) => setError(String(e)));
     window.framecraft
       ?.captureSources()
       .then((s) => {
@@ -108,11 +131,12 @@ export default function Recorder({
       );
       const failures = results.filter((r) => r.status === "rejected");
       if (recorded.length) {
-        onRecorded(recorded);
+        const warning = await onRecorded(recorded, recordingSettings.current);
         toast(
-          failures.length
-            ? `${recorded.length} 条录制成功；另有录制失败，原始文件已保留`
-            : `录制完成 · ${timeLabel(duration)} · ${recorded.length} 条独立素材`,
+          warning ||
+            (failures.length
+              ? `${recorded.length} 条录制成功；另有录制失败，原始文件已保留`
+              : `录制完成 · ${timeLabel(duration)} · ${recorded.length} 条独立素材`),
         );
         onClose();
       } else {
@@ -123,6 +147,9 @@ export default function Recorder({
         );
         setPhase("configure");
       }
+    } catch (e) {
+      setError(`导入录制失败，原始文件已保留：${String(e)}`);
+      setPhase("configure");
     } finally {
       sessions.current.forEach((s) =>
         s.stream.getTracks().forEach((t) => t.stop()),
@@ -151,6 +178,7 @@ export default function Recorder({
     setPhase("starting");
     const streams: { kind: Session["kind"]; stream: MediaStream }[] = [];
     try {
+      recordingSettings.current = await bridge.saveRecordingSettings(settings);
       const info = await bridge.capabilities();
       if (!info.ffmpeg)
         throw new Error("录制保存需要 FFmpeg / FFprobe，请先在设置中配置引擎");
@@ -371,6 +399,8 @@ export default function Recorder({
           {sources.map((source) => (
             <button
               key={source.id}
+              data-source-id={source.id}
+              aria-pressed={sourceId === source.id}
               className={sourceId === source.id ? "selected" : ""}
               onClick={() => setSourceId(source.id)}
               disabled={phase === "starting"}
@@ -429,15 +459,197 @@ export default function Recorder({
             原生录制与可编辑鼠标
           </label>
         )}
+        <fieldset
+          className="recording-style"
+          disabled={phase === "starting" || !settingsReady}
+        >
+          <legend>录屏完成后自动美化</legend>
+          <div
+            className="recording-style-preview"
+            style={{
+              background: settings.background
+                ? `linear-gradient(135deg, ${recordingBackgrounds[settings.preset].colors.join(",")})`
+                : "#111827",
+              padding: settings.background ? settings.padding * 240 : 0,
+            }}
+            aria-label="录屏美化预览"
+          >
+            <div
+              style={{
+                borderRadius: settings.background ? settings.radius / 3 : 0,
+              }}
+            >
+              <span>录屏画面</span>
+              {nativeAvailable &&
+                useNative &&
+                settings.cursor.style !== "hidden" && (
+                  <img
+                    alt="鼠标预览"
+                    src={`data:image/svg+xml,${encodeURIComponent(cursorSvg(settings.cursor))}`}
+                    style={{
+                      width: settings.cursor.size / 2,
+                      height: settings.cursor.size / 2,
+                    }}
+                  />
+                )}
+            </div>
+          </div>
+          <label className="check-field">
+            <input
+              type="checkbox"
+              checked={settings.background}
+              onChange={(e) => changeSettings({ background: e.target.checked })}
+            />
+            自动添加背景
+          </label>
+          <div className="recording-style-fields">
+            <label className="field">
+              背景
+              <select
+                aria-label="录屏背景"
+                disabled={!settings.background}
+                value={settings.preset}
+                onChange={(e) =>
+                  changeSettings({
+                    preset: e.target.value as RecordingSettings["preset"],
+                  })
+                }
+              >
+                {Object.entries(recordingBackgrounds).map(([id, value]) => (
+                  <option key={id} value={id}>
+                    {value.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="field">
+              留白 (%)
+              <input
+                aria-label="录屏留白"
+                disabled={!settings.background}
+                type="number"
+                min={0}
+                max={25}
+                value={Math.round(settings.padding * 100)}
+                onChange={(e) => {
+                  const n = e.target.valueAsNumber;
+                  if (n >= 0 && n <= 25) changeSettings({ padding: n / 100 });
+                }}
+              />
+            </label>
+            <label className="field">
+              圆角 (px)
+              <input
+                aria-label="录屏圆角"
+                disabled={!settings.background}
+                type="number"
+                min={0}
+                max={200}
+                value={settings.radius}
+                onChange={(e) => {
+                  const n = e.target.valueAsNumber;
+                  if (n >= 0 && n <= 200) changeSettings({ radius: n });
+                }}
+              />
+            </label>
+          </div>
+          <fieldset disabled={!nativeAvailable || !useNative}>
+            <div className="recording-style-fields">
+              <label className="field">
+                鼠标样式
+                <select
+                  aria-label="录屏鼠标样式"
+                  value={settings.cursor.style}
+                  onChange={(e) =>
+                    changeSettings({
+                      cursor: {
+                        ...settings.cursor,
+                        style: e.target
+                          .value as RecordingSettings["cursor"]["style"],
+                      },
+                    })
+                  }
+                >
+                  <option value="arrow">箭头</option>
+                  <option value="circle">圆形</option>
+                  <option value="cross">十字</option>
+                  <option value="hidden">隐藏鼠标</option>
+                </select>
+              </label>
+              <label className="field">
+                鼠标大小 (px)
+                <input
+                  aria-label="录屏鼠标大小"
+                  type="number"
+                  min={8}
+                  max={160}
+                  value={settings.cursor.size}
+                  onChange={(e) => {
+                    const n = e.target.valueAsNumber;
+                    if (n >= 8 && n <= 160)
+                      changeSettings({
+                        cursor: { ...settings.cursor, size: n },
+                      });
+                  }}
+                />
+              </label>
+              <label className="field">
+                放大倍数
+                <select
+                  aria-label="自动缩放倍数"
+                  value={settings.zoom}
+                  onChange={(e) =>
+                    changeSettings({ zoom: Number(e.target.value) })
+                  }
+                >
+                  {[1.5, 1.8, 2, 2.5, 3].map((n) => (
+                    <option key={n} value={n}>
+                      {n}×
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+            <label className="check-field">
+              <input
+                type="checkbox"
+                checked={settings.autoZoom}
+                onChange={(e) => changeSettings({ autoZoom: e.target.checked })}
+              />
+              根据鼠标点击和停留自动缩放
+            </label>
+          </fieldset>
+          <p className="small-note">
+            背景作为独立轨道添加，缩放生成可编辑动画。
+            {nativeAvailable && useNative
+              ? "录制后可在“视频”“鼠标”属性中继续调整。"
+              : "兼容录制没有独立鼠标轨迹，无法修改鼠标或生成自动缩放。"}
+          </p>
+        </fieldset>
         <p className="small-note">
           麦克风与摄像头保存为独立素材。Windows
           原生录制单独保存鼠标轨迹，可在属性中修改样式；兼容录制的鼠标包含在画面中。macOS
           首次使用需要授予录屏、麦克风与摄像头权限。
         </p>
-        {error && <div className="error-box">{error}</div>}
+        {error && (
+          <div className="error-box">
+            {error}
+            {!settingsReady && (
+              <button
+                onClick={() => {
+                  setSettings(structuredClone(defaultRecordingSettings));
+                  setSettingsReady(true);
+                  setError("");
+                }}
+              >
+                恢复默认录屏设置
+              </button>
+            )}
+          </div>
+        )}
         <button
           className="start-recording"
-          disabled={!sourceId || phase === "starting"}
+          disabled={!sourceId || !settingsReady || phase === "starting"}
           onClick={() => void start()}
         >
           <Circle size={15} fill="currentColor" />

@@ -6,6 +6,7 @@ import type { ClonedVoice, CreateClonedVoice } from "./cloned-voices";
 import type { OnnxModel, PreparedOnnxModel } from "./onnx";
 import type { RecentProject, RecoveryInfo } from "./recent-projects";
 import type { Preferences, PreferencesUpdate } from "./preferences";
+import type { RecordingBackground, RecordingSettings } from "./recording";
 import type {
   CaptionProcessingOptions,
   CaptionProcessingResult,
@@ -26,6 +27,15 @@ export interface WindowState {
   fullscreen: boolean;
 }
 export interface FrameCraftBridge {
+  recordingSettings(): Promise<RecordingSettings>;
+  saveRecordingSettings(
+    settings: RecordingSettings,
+  ): Promise<RecordingSettings>;
+  createRecordingBackground(
+    width: number,
+    height: number,
+    preset: RecordingBackground,
+  ): Promise<Asset>;
   preferences(): Promise<Preferences>;
   savePreferences(update: PreferencesUpdate): Promise<Preferences>;
   testAiConnection(update: PreferencesUpdate): Promise<void>;

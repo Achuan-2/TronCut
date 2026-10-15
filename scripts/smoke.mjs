@@ -259,7 +259,8 @@ try {
     await expect(page.getByRole("status")).toContainText("录制完成", {
       timeout: 30000,
     });
-    await expect(page.locator(".asset-card")).toHaveCount(2);
+    await expect(page.locator(".asset-card")).toHaveCount(3);
+    await expect(page.locator(".timeline-clip.image").filter({ hasText: "录屏背景" })).toHaveCount(1);
     const native = await page.evaluate(() =>
       window.framecraft.nativeCaptureAvailable(),
     );

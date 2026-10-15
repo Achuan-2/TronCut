@@ -149,6 +149,7 @@ export const projectSchema = z.object({
               value: transformSchema,
               easing: z.enum(animationEasings).optional(),
               animation: z.literal(true).optional(),
+              recordingZoom: z.literal(true).optional(),
               zoomPan: cameraTransformSchema.optional(),
             }),
           )
@@ -205,6 +206,7 @@ export const projectSchema = z.object({
         fadeIn: finite.min(0).max(86400).optional(),
         fadeOut: finite.min(0).max(86400).optional(),
         cursorStyle: cursorStyleSchema.optional(),
+        mediaFrame: z.object({ radius: finite.min(0).max(200) }).optional(),
       }),
     )
     .max(100000),

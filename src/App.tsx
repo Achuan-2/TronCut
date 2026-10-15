@@ -15,13 +15,7 @@ import {
   Home as HomeIcon,
   Settings2,
 } from "lucide-react";
-import {
-  createProject,
-  type Clip,
-  uid,
-  defaultTransform,
-  newTrack,
-} from "../shared/model";
+import { createProject, type Clip, type Asset, uid } from "../shared/model";
 import type { Capabilities, WindowState } from "../shared/bridge";
 import {
   deleteClips,
@@ -35,6 +29,11 @@ import Timeline from "./Timeline";
 import type { AnimationRange } from "../shared/animation-ranges";
 import Panels, { Inspector, type Tab } from "./Panels";
 import Recorder from "./Recorder";
+import {
+  addRecordedAssets,
+  type RecordedAsset,
+  type RecordingSettings,
+} from "../shared/recording";
 import Home from "./Home";
 import type { RecentProject, RecoveryInfo } from "../shared/recent-projects";
 import PreferencesDialog from "./PreferencesDialog";
@@ -574,42 +573,29 @@ export default function App() {
       setFile(result.file);
       enterEditor();
     });
-  const recorded = (
-    results: Parameters<React.ComponentProps<typeof Recorder>["onRecorded"]>[0],
+  const recorded = async (
+    results: RecordedAsset[],
+    settings: RecordingSettings,
   ) => {
-    editor.apply((p) => {
-      const tracks = [...p.tracks],
-        clips: Clip[] = [];
-      for (const { asset, kind } of results) {
-        const track = newTrack(tracks.length);
-        if (kind === "camera") tracks.unshift(track);
-        else tracks.push(track);
-        clips.push({
-          id: uid(),
-          trackId: track.id,
-          assetId: asset.id,
-          kind: asset.kind,
-          name: asset.name,
-          start: editor.playhead,
-          duration: asset.duration,
-          sourceIn: 0,
-          speed: 1,
-          volume: 1,
-          podcast: false,
-          transform:
-            kind === "camera"
-              ? { x: 0.83, y: 0.8, scale: 0.25, opacity: 1 }
-              : { ...defaultTransform },
-          keyframes: [],
-        });
+    const start = editor.playhead,
+      canvas = editor.project.canvas;
+    let background: Asset | undefined;
+    let warning: string | undefined;
+    if (settings.background && results.some((r) => r.kind === "screen")) {
+      try {
+        background = await bridge().createRecordingBackground(
+          canvas.width,
+          canvas.height,
+          settings.preset,
+        );
+      } catch (error) {
+        warning = `背景生成失败，录屏已导入：${String(error)}`;
       }
-      return {
-        ...p,
-        tracks,
-        clips: [...p.clips, ...clips],
-        assets: [...p.assets, ...results.map((r) => r.asset)],
-      };
-    });
+    }
+    editor.apply((p) =>
+      addRecordedAssets(p, results, settings, start, background),
+    );
+    return warning;
   };
   return (
     <main className="app-shell" onClick={() => menu && setMenu(false)}>
