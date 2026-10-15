@@ -1417,8 +1417,9 @@ fieldset:disabled {
   min-height: 0;
   overflow: auto;
   position: relative;
-  background-image: radial-gradient(#87978c19 1px, transparent 1px);
-  background-size: 17px 17px;
+  background-color: #25292b;
+  background-image: conic-gradient(#313638 25%, transparent 0 50%, #313638 0 75%, transparent 0);
+  background-size: 20px 20px;
 }
 .preview-panel:fullscreen {
   width: 100vw;
@@ -1433,6 +1434,9 @@ fieldset:disabled {
 }
 .preview-panel:fullscreen .canvas-scene {
   pointer-events: none;
+}
+.preview-panel:fullscreen .canvas {
+  overflow: hidden;
 }
 .preview-panel:fullscreen .resize-handle,
 .preview-panel:fullscreen .preview-layer.selected:after {
@@ -1541,7 +1545,8 @@ fieldset:disabled {
 }
 .canvas {
   position: relative;
-  overflow: hidden;
+  overflow: visible;
+  outline: 1px solid #9caaa66b;
   box-shadow: 0 8px 40px #0005;
   flex-shrink: 0;
 }

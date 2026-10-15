@@ -61,6 +61,7 @@ import { annotationMime, parseAnnotation } from "../shared/annotations";
 import { behaviorTransform, supportsBehaviors } from "../shared/behaviors";
 import { transitionRange, transitionTransform } from "../shared/transitions";
 import BehaviorText from "./BehaviorText";
+import { useViewportZoom, type ZoomPoint } from "./useViewportZoom";
 
 export function timeLabel(t: number): string {
   const seconds = Math.max(0, t);
@@ -773,6 +774,9 @@ export default function Preview({ editor }: { editor: Editor }) {
   const [zoom, setZoom] = useState<CanvasZoom>("fit");
   const [fullscreen, setFullscreen] = useState(false);
   const [fullscreenError, setFullscreenError] = useState("");
+  const zoomAnchor = useRef<{ x: number; y: number; point: ZoomPoint } | null>(
+    null,
+  );
   useEffect(() => {
     const changed = () =>
       setFullscreen(document.fullscreenElement === panel.current);
@@ -834,11 +838,42 @@ export default function Preview({ editor }: { editor: Editor }) {
     ),
   );
   const scale = fullscreen || zoom === "fit" ? fitScale : zoom;
+  useViewportZoom(
+    panel,
+    (factor, point) => {
+      const element = holder.current;
+      const canvas = element?.querySelector<HTMLElement>(".canvas");
+      if (!element || !canvas) return;
+      const next = Math.max(0.05, Math.min(20, scale * factor));
+      if (next === scale) return;
+      const bounds = canvas.getBoundingClientRect();
+      const viewport = element.getBoundingClientRect();
+      const anchor = point ?? {
+        x: viewport.left + element.clientWidth / 2,
+        y: viewport.top + element.clientHeight / 2,
+      };
+      zoomAnchor.current = {
+        x: (anchor.x - bounds.left) / scale,
+        y: (anchor.y - bounds.top) / scale,
+        point: anchor,
+      };
+      setZoom(next);
+    },
+    !fullscreen,
+  );
   useLayoutEffect(() => {
     const element = holder.current;
     if (!element) return;
-    element.scrollLeft = (element.scrollWidth - element.clientWidth) / 2;
-    element.scrollTop = (element.scrollHeight - element.clientHeight) / 2;
+    const anchor = zoomAnchor.current;
+    const bounds = element.querySelector(".canvas")?.getBoundingClientRect();
+    if (anchor && bounds) {
+      element.scrollLeft += bounds.left + anchor.x * scale - anchor.point.x;
+      element.scrollTop += bounds.top + anchor.y * scale - anchor.point.y;
+      zoomAnchor.current = null;
+    } else {
+      element.scrollLeft = (element.scrollWidth - element.clientWidth) / 2;
+      element.scrollTop = (element.scrollHeight - element.clientHeight) / 2;
+    }
   }, [fullscreen, zoom, project.canvas.width, project.canvas.height]);
   const resetCrop = () => {
     const clip = editor.selected;

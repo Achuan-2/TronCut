@@ -64,6 +64,7 @@ import {
 } from "../shared/captions";
 import { displayTrackName, isTrackActive } from "../shared/tracks";
 import TrackContextMenu, { type TrackMenuPosition } from "./TrackContextMenu";
+import { useViewportZoom, type ZoomPoint } from "./useViewportZoom";
 
 interface Drag {
   id: string;
@@ -109,10 +110,33 @@ export default function Timeline({
       y: number;
       id: string;
     } | null>(null);
+  const panel = useRef<HTMLElement>(null);
+  const zoomAnchor = useRef<{ time: number; x: number } | null>(null);
   const scroll = useRef<HTMLDivElement>(null),
     captionClipboard = useRef<Clip[]>([]),
     duration = Math.max(20, projectDuration(project) + 5),
     width = duration * zoom;
+  const changeZoom = (next: number, point?: ZoomPoint) => {
+    const element = scroll.current;
+    next = Math.max(15, Math.min(200, next));
+    if (next === zoom) return;
+    if (element) {
+      const bounds = element.getBoundingClientRect();
+      const x = point
+        ? Math.max(0, Math.min(element.clientWidth, point.x - bounds.left))
+        : element.clientWidth / 2;
+      zoomAnchor.current = { time: (element.scrollLeft + x) / zoom, x };
+    }
+    setZoom(next);
+  };
+  useViewportZoom(panel, (factor, point) => changeZoom(zoom * factor, point));
+  useLayoutEffect(() => {
+    const anchor = zoomAnchor.current;
+    if (scroll.current && anchor) {
+      scroll.current.scrollLeft = anchor.time * zoom - anchor.x;
+      zoomAnchor.current = null;
+    }
+  }, [zoom]);
   const [trackMenu, setTrackMenu] = useState<TrackMenuPosition | null>(null);
   const [fileDrop, setFileDrop] = useState<{
     time: number;
@@ -437,6 +461,7 @@ export default function Timeline({
     );
   return (
     <section
+      ref={panel}
       className={`timeline ${fileDrop ? "file-drag-active" : ""}`}
       onClick={() => context && setContext(null)}
       onContextMenuCapture={(event) => {
@@ -595,24 +620,20 @@ export default function Timeline({
           >
             <Magnet size={16} />
           </button>
-          <button
-            title="缩小时间线"
-            onClick={() => setZoom((z) => Math.max(15, z / 1.3))}
-          >
+          <button title="缩小时间线" onClick={() => changeZoom(zoom / 1.3)}>
             <ZoomOut size={16} />
           </button>
           <input
             aria-label="时间线缩放"
+            title="时间线缩放：Ctrl/⌘ + 加减号，或 Ctrl/⌘ + 滚轮"
             type="range"
             min="15"
             max="200"
+            step="any"
             value={zoom}
-            onChange={(e) => setZoom(Number(e.target.value))}
+            onChange={(e) => changeZoom(Number(e.target.value))}
           />
-          <button
-            title="放大时间线"
-            onClick={() => setZoom((z) => Math.min(200, z * 1.3))}
-          >
+          <button title="放大时间线" onClick={() => changeZoom(zoom * 1.3)}>
             <ZoomIn size={16} />
           </button>
         </div>

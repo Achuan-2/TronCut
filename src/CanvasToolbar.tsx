@@ -8,6 +8,7 @@ import { visualClipAt } from "../shared/visual-state";
 
 export type CanvasMode = "select" | "crop";
 export type CanvasZoom = "fit" | number;
+const zoomPresets = [25, 50, 75, 100, 200, 300, 800, 1200, 1600, 2000];
 const presets = [
   { width: 1920, height: 1080, name: "横屏 · 1920 × 1080" },
   { width: 1080, height: 1920, name: "竖屏 · 1080 × 1920" },
@@ -213,6 +214,7 @@ export default function CanvasToolbar({
         </div>
         <select
           aria-label="画布显示比例"
+          title="画布缩放：Ctrl/⌘ + 加减号，或 Ctrl/⌘ + 滚轮"
           value={zoom}
           onChange={(event) => {
             if (event.target.value === "settings") {
@@ -227,7 +229,10 @@ export default function CanvasToolbar({
           }}
         >
           <option value="fit">适合 · {Math.round(scale * 100)}%</option>
-          {[25, 50, 75, 100, 200, 300, 800, 1200, 1600, 2000].map((percent) => (
+          {typeof zoom === "number" && !zoomPresets.includes(zoom * 100) && (
+            <option value={zoom}>{Number((zoom * 100).toFixed(1))}%</option>
+          )}
+          {zoomPresets.map((percent) => (
             <option key={percent} value={percent / 100}>
               {percent}%
             </option>
