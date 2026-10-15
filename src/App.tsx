@@ -1067,7 +1067,6 @@ export default function App() {
               tab={tab}
               setTab={setTab}
               importMedia={importMedia}
-              importCamtasia={importCamtasia}
               run={(fn) => void run(fn)}
               toast={toast}
               capabilities={caps}

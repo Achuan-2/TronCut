@@ -67,7 +67,6 @@ interface Props {
   tab: Tab;
   setTab: (tab: Tab) => void;
   importMedia: () => void;
-  importCamtasia: () => void;
   capabilities?: Capabilities;
   run: (fn: () => Promise<unknown>) => void;
   toast: (text: string) => void;
@@ -117,7 +116,6 @@ export default function Panels(props: Props) {
             query={query}
             onQueryChange={setQuery}
             onImport={props.importMedia}
-            onImportCamtasia={props.importCamtasia}
             onActivate={(asset: Asset) => {
               if (!asset.missing) {
                 editor.addAssets([asset], true);

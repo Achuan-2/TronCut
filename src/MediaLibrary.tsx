@@ -1,7 +1,6 @@
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import {
   ChevronDown,
-  FileJson,
   Film,
   Image,
   LayoutGrid,
@@ -96,14 +95,12 @@ export default function MediaLibrary({
   onQueryChange,
   onActivate,
   onImport,
-  onImportCamtasia,
 }: {
   assets: Asset[];
   query: string;
   onQueryChange: (query: string) => void;
   onActivate: (asset: Asset) => void;
   onImport: () => void;
-  onImportCamtasia: () => void;
 }) {
   const [preferences, setPreferences] = useState(readPreferences);
   const [category, setCategory] = useState<Category>("all");
@@ -293,13 +290,6 @@ export default function MediaLibrary({
         <button className="media-import-button" onClick={onImport}>
           <Plus size={16} />
           导入媒体
-        </button>
-        <button
-          title="导入 Camtasia 工程"
-          aria-label="导入 Camtasia 工程"
-          onClick={onImportCamtasia}
-        >
-          <FileJson size={15} />
         </button>
         <div className="media-view-buttons" role="group" aria-label="素材视图">
           {(
