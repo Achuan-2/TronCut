@@ -1,10 +1,23 @@
 import { AlignCenter, LockKeyhole, RotateCcw } from "lucide-react";
 import type { Clip, Transform } from "../shared/model";
+import { framePosition } from "../shared/canvas";
 import {
   ScaleControl,
   RotationControls,
   PropertySlider,
 } from "./TransformControls";
+
+const positionPresets = [
+  { label: "左上", x: 0, y: 0 },
+  { label: "上中间", x: 0.5, y: 0 },
+  { label: "右上", x: 1, y: 0 },
+  { label: "左中", x: 0, y: 0.5 },
+  { label: "居中", x: 0.5, y: 0.5 },
+  { label: "右中", x: 1, y: 0.5 },
+  { label: "左下", x: 0, y: 1 },
+  { label: "下中间", x: 0.5, y: 1 },
+  { label: "右下", x: 1, y: 1 },
+] as const;
 
 export default function FrameTransformProperties({
   clip,
@@ -18,6 +31,7 @@ export default function FrameTransformProperties({
   onContentOrFrame,
   onResize,
   onCenter,
+  onPosition,
 }: {
   clip: Clip;
   value: Transform;
@@ -30,6 +44,7 @@ export default function FrameTransformProperties({
   onContentOrFrame: (key: "x" | "y" | "scale", value: number) => void;
   onResize: (axis: "width" | "height", pixels: number) => void;
   onCenter: () => void;
+  onPosition: (position: Pick<Transform, "x" | "y">) => void;
 }) {
   const positions = editingContent
     ? [content.x * 100, content.y * 100]
@@ -66,7 +81,45 @@ export default function FrameTransformProperties({
         />
       )}
       <div className="position-controls property-group">
-        <span>{editingContent ? "内容位置" : "位置"}</span>
+        <div className="position-presets-column">
+          <span>{editingContent ? "内容位置" : "位置"}</span>
+          {!editingContent && (
+            <div
+              className="position-presets"
+              role="group"
+              aria-label="画布九宫格定位"
+            >
+              {positionPresets.map(({ label, x, y }) => {
+                const target = framePosition(
+                  value,
+                  size,
+                  canvas,
+                  x,
+                  y,
+                  clip.rotation,
+                );
+                const selected =
+                  Math.abs(value.x - target.x) * canvas.width < 0.01 &&
+                  Math.abs(value.y - target.y) * canvas.height < 0.01;
+                return (
+                  <button
+                    key={label}
+                    type="button"
+                    aria-label={`位置：${label}`}
+                    title={label}
+                    aria-pressed={selected}
+                    disabled={disabled}
+                    onClick={() => onPosition(target)}
+                  >
+                    <span className="position-preset-icon" aria-hidden="true">
+                      <i style={{ left: `${x * 100}%`, top: `${y * 100}%` }} />
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
         <div className="position-axes">
           {positions.map((position, index) => {
             const axis = (["X", "Y", "Z"] as const)[index];
@@ -119,15 +172,17 @@ export default function FrameTransformProperties({
               </label>
             );
           })}
-          <button
-            className="center-layer"
-            title={editingContent ? "内容居中" : "画布居中"}
-            aria-label={editingContent ? "内容居中" : "画布居中"}
-            disabled={disabled}
-            onClick={onCenter}
-          >
-            <AlignCenter size={14} />
-          </button>
+          {editingContent && (
+            <button
+              className="center-layer"
+              title={editingContent ? "内容居中" : "画布居中"}
+              aria-label={editingContent ? "内容居中" : "画布居中"}
+              disabled={disabled}
+              onClick={onCenter}
+            >
+              <AlignCenter size={14} />
+            </button>
+          )}
         </div>
       </div>
       <div className="dimension-controls property-group">

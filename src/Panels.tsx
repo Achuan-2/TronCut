@@ -746,6 +746,9 @@ export function Inspector({ editor }: { editor: Editor }) {
                     clip={c} value={value} canvas={editor.project.canvas} size={size}
                     editingContent={!!editingContent} content={content} disabled={locked}
                     onTransform={transform} onContentOrFrame={contentOrFrame} onResize={resize}
+                    onPosition={(position) => {
+                      if (!locked) editor.updateTransform(c.id, position);
+                    }}
                     onCenter={() => editingContent
                       ? editor.updateContentTransform(c.id, { x: 0, y: 0 })
                       : editor.updateTransform(c.id, { x: 0.5, y: 0.5, z: 0 })}

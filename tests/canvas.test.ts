@@ -7,9 +7,71 @@ import {
 import {
   cameraAt,
   clampCamera,
+  framePosition,
   resizeTransform,
   setCameraTransform,
 } from "../shared/canvas";
+import { projectDelta } from "../shared/rotation";
+
+it("九宫格定位让缩放、三轴旋转和倾斜后的外框对齐画布，居中保留深度", () => {
+  const canvas = { width: 1000, height: 600 };
+  const size = { width: 320, height: 180 };
+  for (const value of [
+    { ...defaultTransform, scale: 0.5 },
+    { ...defaultTransform, scale: 1.4, rotation: 90 },
+    {
+      ...defaultTransform,
+      scale: 1.2,
+      rotation: 28,
+      rotationX: 30,
+      rotationY: -20,
+      skew: 25,
+      z: 500,
+    },
+    { ...defaultTransform, scale: 5 },
+  ]) {
+    const corners = [-1, 1].flatMap((x) =>
+      [-1, 1].map((y) =>
+        projectDelta(value, {
+          x: (x * size.width * value.scale) / 2,
+          y: (y * size.height * value.scale) / 2,
+        }),
+      ),
+    );
+    for (const horizontal of [0, 0.5, 1] as const) {
+      for (const vertical of [0, 0.5, 1] as const) {
+        const position = framePosition(
+          value,
+          size,
+          canvas,
+          horizontal,
+          vertical,
+        );
+        const xs = corners.map((point) => position.x * canvas.width + point.x);
+        const ys = corners.map((point) => position.y * canvas.height + point.y);
+        const alignedX =
+          horizontal === 0
+            ? Math.min(...xs)
+            : horizontal === 1
+              ? Math.max(...xs)
+              : (Math.min(...xs) + Math.max(...xs)) / 2;
+        const alignedY =
+          vertical === 0
+            ? Math.min(...ys)
+            : vertical === 1
+              ? Math.max(...ys)
+              : (Math.min(...ys) + Math.max(...ys)) / 2;
+        expect(alignedX).toBeCloseTo(horizontal * canvas.width, 8);
+        expect(alignedY).toBeCloseTo(vertical * canvas.height, 8);
+        expect({ ...value, ...position }.z).toBe(value.z);
+      }
+    }
+  }
+  expect(framePosition(defaultTransform, size, canvas, 1, 0, 90)).toEqual({
+    x: 0.91,
+    y: 0.16 / 0.6,
+  });
+});
 
 describe("画布缩放与运镜", () => {
   const size = { width: 400, height: 200 },

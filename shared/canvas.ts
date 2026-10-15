@@ -5,7 +5,7 @@ import {
   type Transform,
 } from "./model";
 import { setTransform, transformAt } from "./editor";
-import { localDelta, projectDelta } from "./rotation";
+import { localDelta, projectDelta, rotationMatrix } from "./rotation";
 
 export const resizeHandles = [
   { name: "nw", x: -1, y: -1 },
@@ -19,6 +19,26 @@ export const resizeHandles = [
 ] as const;
 const clamp = (value: number, min: number, max: number) =>
   Math.max(min, Math.min(max, value));
+
+// Align the projected frame bounds, including scale, rotation, skew and depth.
+export function framePosition(
+  value: Transform,
+  size: { width: number; height: number },
+  canvas: { width: number; height: number },
+  horizontal: 0 | 0.5 | 1,
+  vertical: 0 | 0.5 | 1,
+  fallbackRotation = 0,
+): Pick<Transform, "x" | "y"> {
+  const { a, b, c, d } = rotationMatrix(value, fallbackRotation);
+  const width =
+    (Math.abs(a) * size.width + Math.abs(c) * size.height) * value.scale;
+  const height =
+    (Math.abs(b) * size.width + Math.abs(d) * size.height) * value.scale;
+  return {
+    x: clamp(horizontal + ((0.5 - horizontal) * width) / canvas.width, -4, 4),
+    y: clamp(vertical + ((0.5 - vertical) * height) / canvas.height, -4, 4),
+  };
+}
 
 // Delta and size are measured in source canvas pixels, before preview/camera zoom.
 // Keep the opposite handle anchored while preserving aspect ratio and rotation.
