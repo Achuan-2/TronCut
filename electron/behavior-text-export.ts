@@ -5,6 +5,7 @@ import type { Clip } from "../shared/model";
 import { glyphMotion, layoutGlyphs, textGlyphs } from "../shared/behaviors";
 import { textFrameSize, textFillGeometry } from "../shared/text";
 import { textFillRectangle } from "./text-fill";
+import { outlinedText } from "./text-outline";
 
 const xml = (text: string) =>
   text.replace(
@@ -84,43 +85,16 @@ export async function rasterizeBehaviorText(
     checkCancelled();
     const mask = await textBuffer(glyph.text),
       info = await sharp(mask).metadata();
-    const alpha = await sharp(mask).extractChannel(3).toBuffer();
-    const color = (background: string) =>
-      sharp({
-        create: {
-          width: info.width!,
-          height: info.height!,
-          channels: 3,
-          background,
-        },
-      })
-        .joinChannel(alpha)
-        .png()
-        .toBuffer();
     const margin = Math.ceil(style.outlineWidth) + 2;
-    const layers: sharp.OverlayOptions[] = [];
-    if (style.outlineWidth > 0) {
-      const outline = await color(style.outline);
-      for (let angle = 0; angle < 360; angle += 30)
-        layers.push({
-          input: outline,
-          left:
-            margin +
-            Math.round(Math.cos((angle * Math.PI) / 180) * style.outlineWidth),
-          top:
-            margin +
-            Math.round(Math.sin((angle * Math.PI) / 180) * style.outlineWidth),
-        });
-    }
-    layers.push({ input: await color(style.color), left: margin, top: margin });
     const width = info.width! + margin * 2,
       height = info.height! + margin * 2;
-    const png = await sharp({
-      create: { width, height, channels: 4, background: "#00000000" },
-    })
-      .composite(layers)
-      .png()
-      .toBuffer();
+    const png = await outlinedText(
+      mask,
+      style.color,
+      style.outline,
+      style.outlineWidth,
+      margin,
+    );
     images.set(glyph.text, { width, height, data: png.toString("base64") });
   }
   const padding = Math.ceil(fontSize * 6 + style.outlineWidth * 2 + 12);

@@ -23,6 +23,7 @@ import { frameSnapshot } from "../shared/frame-snapshot";
 import { objectBehaviorExpressions } from "./behavior-export";
 import { rasterizeBehaviorText } from "./behavior-text-export";
 import { textFillRectangle } from "./text-fill";
+import { outlinedText } from "./text-outline";
 import { textFrameSize, textFillGeometry } from "../shared/text";
 import { isTrackActive } from "../shared/tracks";
 import {
@@ -256,21 +257,6 @@ async function rasterize(
         background.height,
       ),
     );
-  const alpha = await sharp(text).extractChannel(3).toBuffer();
-  const coloredText = (color: string) =>
-    sharp({
-      create: {
-        width: info.width!,
-        height: info.height!,
-        channels: 3,
-        background: color,
-      },
-    })
-      .joinChannel(alpha)
-      .png()
-      .toBuffer();
-  const colored = await coloredText(style.color);
-  // Composite offset alpha masks to form a readable outline around each glyph.
   const layers: sharp.OverlayOptions[] = [];
   const fill = textFillRectangle(clip, box, { width, height });
   if (fill)
@@ -283,17 +269,18 @@ async function rasterize(
     });
   const textLeft = Math.floor((width - info.width!) / 2),
     textTop = Math.floor((height - info.height!) / 2);
-  if (style.outlineWidth > 0) {
-    const radius = Math.ceil(style.outlineWidth);
-    const outlined = await coloredText(style.outline);
-    for (let angle = 0; angle < 360; angle += 30)
-      layers.push({
-        input: outlined,
-        left: textLeft + Math.round(Math.cos((angle * Math.PI) / 180) * radius),
-        top: textTop + Math.round(Math.sin((angle * Math.PI) / 180) * radius),
-      });
-  }
-  layers.push({ input: colored, left: textLeft, top: textTop });
+  const padding = Math.ceil(style.outlineWidth) + 2;
+  layers.push({
+    input: await outlinedText(
+      text,
+      style.color,
+      style.outline,
+      style.outlineWidth,
+      padding,
+    ),
+    left: textLeft - padding,
+    top: textTop - padding,
+  });
   await sharp({
     create: { width, height, channels: 4, background: "#00000000" },
   })
