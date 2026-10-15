@@ -6,7 +6,7 @@
   <p>
     <a href="https://github.com/Achuan-2/TronCut/releases"><img src="https://img.shields.io/github/v/release/Achuan-2/TronCut?label=release&color=71b896" alt="Release" /></a>
     <a href="LICENSE"><img src="https://img.shields.io/badge/license-AGPL--3.0-blue" alt="AGPL-3.0" /></a>
-    <img src="https://img.shields.io/badge/platform-Windows-0078D4" alt="Windows" />
+    <img src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS-0078D4" alt="Windows and macOS" />
     <img src="https://img.shields.io/badge/status-release-71b896" alt="Release" />
   </p>
   <p><strong>简体中文</strong> · <a href="README.en.md">English</a></p>
@@ -17,7 +17,7 @@
 
 TronCut 将录屏、剪辑、文字、字幕和声音处理放在同一个工作区。素材库、画布、属性面板和多轨时间线采用熟悉的桌面剪辑布局，重点改善教程制作中的文字添加、动画操作、字幕定位和工程迁移。
 
-> **当前版本：v0.4.0 正式版。** Windows 已提供安装包并完成短时录屏、编辑、保存和导出的桌面测试。macOS 仍在开发，Camtasia 工程导入目前为有限转换。本版尚未实现完整 Camtasia 功能，详见[兼容范围](#兼容范围)。
+> **当前版本：v0.4.0 正式版。** Windows 已提供经过桌面测试的安装包；macOS 提供未签名、未经真机验证的 Intel 与 Apple Silicon 安装包，由使用者自行验证。Camtasia 工程导入目前为有限转换。本版尚未实现完整 Camtasia 功能，详见[兼容范围](#兼容范围)。
 
 ## 亮点
 
@@ -41,9 +41,11 @@ TronCut 将录屏、剪辑、文字、字幕和声音处理放在同一个工作
 | ------------------------------------- | ---------------------------------------- |
 | `TronCut-Setup-0.4.0-windows-x64.exe` | Windows x64 安装包，支持选择安装目录。   |
 | `TronCut-0.4.0-windows-x64.zip`       | 免安装版；完整解压后运行 `TronCut.exe`。 |
+| `TronCut-0.4.0-macos-arm64.dmg`       | Apple Silicon Mac 安装包，未经真机验证。 |
+| `TronCut-0.4.0-macos-x64.dmg`         | Intel Mac 安装包，未经真机验证。         |
 | `SHA256SUMS.txt`                      | 发布文件的 SHA256 校验值。               |
 
-安装包包含媒体引擎、原生录屏组件和字幕环境管理器，使用者无需安装 Node.js、FFmpeg 或 uv。**首次生成语音字幕需要联网下载 Python、依赖和模型**，完成后语音识别在本地运行。当前 Windows 包未配置代码签名证书。
+安装包包含对应平台的媒体引擎和字幕环境管理器，Windows 版还包含原生录屏组件，使用者无需安装 Node.js、FFmpeg 或 uv。**首次生成语音字幕需要联网下载 Python、依赖和模型**，完成后语音识别在本地运行。当前 Windows 与 macOS 包均未配置代码签名，macOS 包也未公证或进行真机功能验收。
 
 使用方法按功能模块整理在 [使用文档](docs/README.md) 中，包括素材与录屏鼠标、时间线、文本、画布动画和工程管理。首次使用可阅读 [开始使用](docs/GETTING-STARTED.md)。
 
@@ -52,7 +54,7 @@ TronCut 将录屏、剪辑、文字、字幕和声音处理放在同一个工作
 | 项目                | 当前状态                                                                                                                 |
 | ------------------- | ------------------------------------------------------------------------------------------------------------------------ |
 | Windows x64         | 已有安装包与打包程序桌面测试；真实设备同步、长录屏与 4K 压力测试仍待完成。                                               |
-| macOS               | 已有跨平台源码与 DMG 配置，尚无经过真机验证的 Mac 发布包。                                                               |
+| macOS               | 提供 Apple Silicon 与 Intel DMG；未签名、未公证，也未进行安装、权限、录制和导出真机验收，由使用者自行验证并反馈。        |
 | Camtasia `.tscproj` | 转换常见媒体引用、平面片段、时间、速度与部分变换；附导入报告并保留原 JSON。                                              |
 | TREC 与专有背景     | **暂不支持完整导入。** 实际工程测试中 3 段 TREC 与水波背景被跳过，仅音乐转换成功。                                       |
 | 字幕引擎            | 使用 SenseVoiceSmall / Paraformer ONNX 与 Silero VAD；旧 FunASR / Whisper 调用已退出当前字幕流程。 |

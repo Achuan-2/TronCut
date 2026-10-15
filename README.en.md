@@ -6,7 +6,7 @@
   <p>
     <a href="https://github.com/Achuan-2/TronCut/releases"><img src="https://img.shields.io/github/v/release/Achuan-2/TronCut?label=release&color=71b896" alt="Release" /></a>
     <a href="LICENSE"><img src="https://img.shields.io/badge/license-AGPL--3.0-blue" alt="AGPL-3.0" /></a>
-    <img src="https://img.shields.io/badge/platform-Windows-0078D4" alt="Windows" />
+    <img src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS-0078D4" alt="Windows and macOS" />
     <img src="https://img.shields.io/badge/status-release-71b896" alt="Release" />
   </p>
   <p><a href="README.md">简体中文</a> · <strong>English</strong></p>
@@ -17,7 +17,7 @@
 
 TronCut brings screen recording, editing, text, captions, and audio processing into one workspace. Its media library, canvas, inspector, and multitrack timeline use a familiar desktop editing layout, with particular attention to adding text, creating animations, positioning captions, and moving projects between machines.
 
-> **Current version: v0.4.0 release.** A Windows installer is available and short recording, editing, saving, and export workflows have been tested in the packaged app. macOS is still in development and Camtasia import is limited. This release does not provide complete Camtasia feature parity; see [compatibility](#compatibility). The application UI is currently Chinese; this README is available in both languages.
+> **Current version: v0.4.0 release.** The Windows package has passed desktop checks. Unsigned Intel and Apple Silicon macOS packages are provided without real-device validation for users to test. Camtasia import remains limited. This release does not provide complete Camtasia feature parity; see [compatibility](#compatibility). The application UI is currently Chinese; this README is available in both languages.
 
 ## Highlights
 
@@ -40,9 +40,11 @@ Download from **[GitHub Releases](https://github.com/Achuan-2/TronCut/releases/t
 | ------------------------------------- | ----------------------------------------------------------------- |
 | `TronCut-Setup-0.4.0-windows-x64.exe` | Windows x64 installer with a configurable installation directory. |
 | `TronCut-0.4.0-windows-x64.zip`       | Portable build; extract the entire archive and run `TronCut.exe`. |
+| `TronCut-0.4.0-macos-arm64.dmg`       | Apple Silicon Mac package; not validated on a real device.        |
+| `TronCut-0.4.0-macos-x64.dmg`         | Intel Mac package; not validated on a real device.                |
 | `SHA256SUMS.txt`                      | SHA256 checksums for release files.                               |
 
-Windows packages include the media engine, native recording helpers, and the speech environment manager. End users do not need to install Node.js, FFmpeg, or uv. **The first speech-caption task needs internet access to download Python, dependencies, and models**; speech recognition then runs locally. The current Windows build is unsigned.
+Packages include the matching media engine and speech environment manager; Windows also includes native recording helpers. End users do not need to install Node.js, FFmpeg, or uv. **The first speech-caption task needs internet access to download Python, dependencies, and models**; speech recognition then runs locally. Windows and macOS builds are unsigned, and the macOS packages are neither notarized nor validated on real hardware.
 
 See the [user documentation](docs/README.md) for media, recording cursors, timeline editing, text, canvas animation, and project management. Start with [Getting started](docs/GETTING-STARTED.md). These guides currently use Chinese to match the application UI.
 
@@ -51,7 +53,7 @@ See the [user documentation](docs/README.md) for media, recording cursors, timel
 | Item                             | Current status                                                                                                                                                                                       |
 | -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Windows x64                      | Installer and packaged desktop workflows tested; real-device synchronization, long sessions, and 4K stress testing remain outstanding.                                                               |
-| macOS                            | Cross-platform source and DMG configuration exist; no Mac release has been verified on a real device.                                                                                                |
+| macOS                            | Apple Silicon and Intel DMGs are provided unsigned and unnotarized; installation, permissions, recording, and export remain for users to validate.                                                   |
 | Camtasia `.tscproj`              | Converts common media references, flat clips, timing, speed, and some transforms. An import report and the original JSON are retained.                                                               |
 | TREC and proprietary backgrounds | **Complete import is not supported.** A real project test skipped three TREC recordings and a water-ripple background; only the music was converted.                                                 |
 | Speech engines                   | SenseVoiceSmall/Paraformer recognition and Kokoro/VITS narration use sherpa-onnx on CPU, with model download and offline options. |

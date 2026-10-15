@@ -15,21 +15,22 @@ for (const name of ["ffmpeg", "ffprobe", "uv"]) {
   if (result.status !== 0)
     throw new Error(`安装包媒体引擎不能独立运行：${name}`);
 }
+for (const name of [
+  "FFmpeg-LICENSE.txt",
+  "FFmpeg-README.txt",
+  "uv-LICENSE-MIT.txt",
+  "uv-LICENSE-APACHE.txt",
+]) {
+  if (!fs.existsSync(path.resolve("resources/bin", name)))
+    throw new Error(`安装包缺少第三方许可声明：${name}`);
+}
 if (process.platform === "win32") {
   for (const name of ["wgc-capture.exe", "cursor-sampler.exe"]) {
     if (!fs.existsSync(path.resolve("resources/bin", name)))
       throw new Error(`安装包缺少原生录屏组件：${name}`);
   }
-  for (const name of [
-    "FFmpeg-LICENSE.txt",
-    "FFmpeg-README.txt",
-    "uv-LICENSE-MIT.txt",
-    "uv-LICENSE-APACHE.txt",
-    "OpenScreen-LICENSE.txt",
-  ]) {
-    if (!fs.existsSync(path.resolve("resources/bin", name)))
-      throw new Error(`安装包缺少第三方许可声明：${name}`);
-  }
+  if (!fs.existsSync(path.resolve("resources/bin", "OpenScreen-LICENSE.txt")))
+    throw new Error("安装包缺少第三方许可声明：OpenScreen-LICENSE.txt");
 }
 for (const name of [
   "pyproject.toml",

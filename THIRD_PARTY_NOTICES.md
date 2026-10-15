@@ -23,6 +23,16 @@ The FFmpeg build is unmodified and runs as a separate process. Its supplied lice
 
 FFmpeg 保持上游构建原样，通过独立进程使用；保留 GPL 正文、构建配置、源码链接与下载校验记录。uv 的 MIT/Apache 正文及 OpenScreen 的 MIT 正文也随安装包提供。Electron/Chromium 自带许可位于解压后的程序目录。
 
+## macOS release binaries / macOS 发布包
+
+| Component              | Source                                                                                                                              | License                                                              |
+| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| FFmpeg / FFprobe 6.1.1 | [eugeneware/ffmpeg-static b6.1.1](https://github.com/eugeneware/ffmpeg-static/releases/tag/b6.1.1), separate arm64 and x64 binaries | GPL-3.0-or-later; the upstream license and build README are bundled. |
+| uv 0.6.5               | [astral-sh/uv 0.6.5](https://github.com/astral-sh/uv/tree/0.6.5), separate arm64 and x64 binaries                                   | MIT OR Apache-2.0                                                    |
+| Electron and Chromium  | Versions locked in pnpm-lock.yaml                                                                                                   | MIT and bundled Chromium third-party notices                         |
+
+The macOS binaries are downloaded by CI from immutable release tags and verified against pinned SHA256 values before packaging. The DMGs are unsigned, unnotarized, and have not been validated on real Mac hardware.
+
 ## Application dependencies / 应用依赖
 
 Dependency versions are locked in `pnpm-lock.yaml`. Notable components include React (MIT), lucide-react (ISC), Zod (MIT), sharp (Apache-2.0), and libvips (LGPL-2.1-or-later). Their original package notices are retained where supplied. Build-time tools include Vite, TypeScript, esbuild, electron-builder, Playwright, and Vitest; consult each upstream project for its license.

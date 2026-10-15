@@ -17,6 +17,12 @@ if (process.platform !== "win32")
   throw new Error("This release helper prepares Windows x64 artifacts.");
 const root = path.resolve("release", "publish", `v${pkg.version}`);
 await fs.mkdir(root, { recursive: true });
+// GitHub's tag archive is the canonical TronCut source download. Remove a
+// stale locally prepared project-source ZIP so broad artifact globs cannot
+// accidentally publish it again.
+await fs.rm(path.join(root, `TronCut-${pkg.version}-source.zip`), {
+  force: true,
+});
 const quote = (value) => `'${value.replace(/'/g, "''")}'`;
 async function run(binary, args) {
   await new Promise((resolve, reject) => {
@@ -40,7 +46,6 @@ async function checksum(file) {
 }
 const installer = `TronCut-Setup-${pkg.version}-windows-x64.exe`;
 const portable = `TronCut-${pkg.version}-windows-x64.zip`;
-const source = `TronCut-${pkg.version}-source.zip`;
 const ffmpegSource = "FFmpeg-946fcce07b-source.tar.gz";
 const buildInfoName = `TronCut-${pkg.version}-build-info.json`;
 const revision = spawnSync("git", ["rev-parse", "HEAD"], {
@@ -82,44 +87,6 @@ await run("powershell.exe", [
   "-Command",
   `Compress-Archive -Path ${quote(path.resolve("release/win-unpacked/*"))} -DestinationPath ${quote(path.join(root, portable))} -CompressionLevel Optimal -Force`,
 ]);
-await run("git", [
-  "archive",
-  "--format=zip",
-  `--prefix=TronCut-${pkg.version}/`,
-  "-o",
-  path.join(root, source),
-  "HEAD",
-]);
-// Include provenance and the documented v0.2.0 repair in the source archive.
-// Later tags must already contain their entry file; no other sources are patched.
-const additions = [
-  [
-    path.join(root, buildInfoName),
-    `TronCut-${pkg.version}/RELEASE-BUILD-INFO.json`,
-  ],
-];
-if (restoredEntry)
-  additions.push([
-    path.resolve("index.html"),
-    `TronCut-${pkg.version}/index.html`,
-  ]);
-await run("powershell.exe", [
-  "-NoProfile",
-  "-NonInteractive",
-  "-Command",
-  [
-    "$ErrorActionPreference = 'Stop'",
-    "Add-Type -AssemblyName System.IO.Compression",
-    "Add-Type -AssemblyName System.IO.Compression.FileSystem",
-    `$archive = [System.IO.Compression.ZipFile]::Open(${quote(path.join(root, source))}, [System.IO.Compression.ZipArchiveMode]::Update)`,
-    "try {",
-    ...additions.map(
-      ([file, entry]) =>
-        `[System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile($archive, ${quote(file)}, ${quote(entry)}) | Out-Null`,
-    ),
-    "} finally { $archive.Dispose() }",
-  ].join("\n"),
-]);
 const url = "https://codeload.github.com/FFmpeg/FFmpeg/tar.gz/946fcce07b";
 const cached = path.resolve(".cache/release-sources", ffmpegSource);
 await fs.mkdir(path.dirname(cached), { recursive: true });
@@ -143,7 +110,7 @@ if (
 )
   throw new Error("Pinned FFmpeg source SHA256 mismatch.");
 await fs.copyFile(cached, path.join(root, ffmpegSource));
-const names = [installer, portable, source, ffmpegSource, buildInfoName];
+const names = [installer, portable, ffmpegSource, buildInfoName];
 const manifest = [];
 for (const name of names) {
   const file = path.join(root, name);

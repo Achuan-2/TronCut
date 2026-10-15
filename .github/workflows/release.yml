@@ -117,7 +117,7 @@ jobs:
         run: |
           node scripts/test-editing-ui.mjs
           if ($LASTEXITCODE -ne 0) { throw 'Packaged editing regression failed' }
-      - name: Prepare portable ZIP, sources and checksums
+      - name: Prepare portable ZIP and checksums
         run: node ../ci/scripts/prepare-release.mjs
       - name: Retain packages even when release upload fails
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -141,8 +141,89 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
+  macos:
+    needs: resolve
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            arch: arm64
+          - runner: macos-15-intel
+            arch: x64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: "false"
+      TRONCUT_RELEASE_TAG: ${{ needs.resolve.outputs.tag }}
+      TRONCUT_RELEASE_ARCH: ${{ matrix.arch }}
+      TRONCUT_BUILD_TOOLS_SHA: ${{ github.sha }}
+    defaults:
+      run:
+        shell: bash
+        working-directory: app
+    steps:
+      - name: Checkout workflow tooling
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ github.sha }}
+          path: ci
+          persist-credentials: false
+      - name: Checkout release source
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ needs.resolve.outputs.source }}
+          path: app
+          persist-credentials: false
+      - name: Check version and release entry
+        run: |
+          version=$(node -p "require('./package.json').version")
+          if [[ "v$version" != "$TRONCUT_RELEASE_TAG" ]]; then
+            echo 'Release tag must match package.json version' >&2
+            exit 1
+          fi
+          if [[ ! -f index.html ]]; then
+            if [[ "$TRONCUT_RELEASE_TAG" != 'v0.2.0' ]]; then
+              echo 'Release source is missing index.html' >&2
+              exit 1
+            fi
+            cp ../ci/index.html index.html
+          fi
+      - uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
+        with:
+          version: 12.4.2
+          run_install: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: "22"
+          cache: pnpm
+          cache-dependency-path: app/pnpm-lock.yaml
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Prepare pinned macOS engines
+        run: bash ../ci/scripts/prepare-macos-ci.sh "$TRONCUT_RELEASE_ARCH"
+      - name: Check packaging inputs
+        run: node ../ci/scripts/check-packaging.mjs
+      - name: Build application
+        run: pnpm build
+      - name: Package unsigned macOS DMG
+        run: pnpm exec electron-builder --mac dmg --${{ matrix.arch }} --publish never --config.artifactName='TronCut-${version}-macos-${arch}.${ext}'
+      - name: Prepare DMG and checksums
+        run: node ../ci/scripts/prepare-macos-release.mjs
+      - name: Retain macOS package even when release upload fails
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: macos-${{ matrix.arch }}-${{ needs.resolve.outputs.tag }}
+          path: |
+            app/release/publish/${{ needs.resolve.outputs.tag }}/*.dmg
+            app/release/publish/${{ needs.resolve.outputs.tag }}/SHA256SUMS.txt
+            app/release/publish/${{ needs.resolve.outputs.tag }}/TronCut-*-build-info.json
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 14
+
   upload:
-    needs: [resolve, windows]
+    needs: [resolve, windows, macos]
     if: github.event_name == 'release' || inputs.upload
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -152,7 +233,15 @@ jobs:
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: windows-x64-${{ needs.resolve.outputs.tag }}
-          path: assets
+          path: assets/windows
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: macos-arm64-${{ needs.resolve.outputs.tag }}
+          path: assets/macos-arm64
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: macos-x64-${{ needs.resolve.outputs.tag }}
+          path: assets/macos-x64
       - name: Check and upload to the existing Release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -162,9 +251,21 @@ jobs:
         working-directory: assets
         run: |
           set -euo pipefail
-          sha256sum --check SHA256SUMS.txt
+          for directory in windows macos-arm64 macos-x64; do
+            (cd "$directory" && sha256sum --check SHA256SUMS.txt)
+            find "$directory" -maxdepth 1 -type f ! -name SHA256SUMS.txt -exec mv {} . \;
+          done
+          mapfile -d '' files < <(find . -maxdepth 1 -type f ! -name SHA256SUMS.txt -print0 | sort -z)
+          ((${#files[@]} > 0)) || { echo 'No release files found'; exit 1; }
+          sha256sum "${files[@]}" > SHA256SUMS.txt
           # Draft releases require contents:write; check here rather than in resolve.
           gh release view "$RELEASE_TAG" --json tagName >/dev/null
-          gh release upload "$RELEASE_TAG" ./* --clobber
+          version="${RELEASE_TAG#v}"
+          legacy_source="TronCut-${version}-source.zip"
+          if gh release view "$RELEASE_TAG" --json assets --jq '.assets[].name' | grep -Fxq "$legacy_source"; then
+            gh release delete-asset "$RELEASE_TAG" "$legacy_source" --yes
+          fi
+          files+=(./SHA256SUMS.txt)
+          gh release upload "$RELEASE_TAG" "${files[@]}" --clobber
           gh release view "$RELEASE_TAG" --json url,assets
           echo "Packages uploaded to Release $RELEASE_TAG" >> "$GITHUB_STEP_SUMMARY"
