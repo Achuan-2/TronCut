@@ -15,6 +15,7 @@ import {
 } from "../shared/model";
 import { type Cue } from "../shared/subtitles";
 import { captionDefaults } from "../shared/captions";
+import { isTrackActive } from "../shared/tracks";
 import {
   captionProcessingSchema,
   segmentCaptionCues,
@@ -388,7 +389,9 @@ export async function addCliMusic(
 
 export function projectCues(project: Project): Cue[] {
   const visible = new Set(
-    project.tracks.filter((track) => !track.hidden).map((track) => track.id),
+    project.tracks
+      .filter((track) => isTrackActive(project.tracks, track.id))
+      .map((track) => track.id),
   );
   return project.clips
     .filter((clip) => clip.caption && visible.has(clip.trackId))

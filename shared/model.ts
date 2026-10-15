@@ -113,6 +113,8 @@ export const projectSchema = z.object({
         hidden: z.boolean(),
         muted: z.boolean(),
         locked: z.boolean(),
+        solo: z.boolean().optional(),
+        customName: z.boolean().optional(),
         captionTrack: z.boolean().optional(),
       }),
     )
@@ -234,13 +236,14 @@ export function newTrack(count: number): Project["tracks"][number] {
 export function numberTracks(tracks: Project["tracks"]): Project["tracks"] {
   if (
     tracks.every(
-      (track, index) => track.name === trackName(index, tracks.length),
+      (track, index) =>
+        track.customName || track.name === trackName(index, tracks.length),
     )
   )
     return tracks;
   return tracks.map((track, index) => ({
     ...track,
-    name: trackName(index, tracks.length),
+    name: track.customName ? track.name : trackName(index, tracks.length),
   }));
 }
 export const uid = () => crypto.randomUUID();

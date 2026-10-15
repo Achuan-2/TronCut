@@ -23,13 +23,7 @@ import {
   Camera,
   ChevronUp,
 } from "lucide-react";
-import {
-  type Clip,
-  projectDuration,
-  uid,
-  newTrack,
-  trackName,
-} from "../shared/model";
+import { type Clip, projectDuration, uid, newTrack } from "../shared/model";
 import { snapTime, splitClip, transformAt } from "../shared/editor";
 import {
   deleteClips,
@@ -68,6 +62,8 @@ import {
   mergeWithPreviousCaption,
   previousCaption,
 } from "../shared/captions";
+import { displayTrackName, isTrackActive } from "../shared/tracks";
+import TrackContextMenu, { type TrackMenuPosition } from "./TrackContextMenu";
 
 interface Drag {
   id: string;
@@ -117,6 +113,7 @@ export default function Timeline({
     captionClipboard = useRef<Clip[]>([]),
     duration = Math.max(20, projectDuration(project) + 5),
     width = duration * zoom;
+  const [trackMenu, setTrackMenu] = useState<TrackMenuPosition | null>(null);
   const [fileDrop, setFileDrop] = useState<{
     time: number;
     trackId?: string;
@@ -170,12 +167,6 @@ export default function Timeline({
     return trackHeights
       .slice(0, Math.max(0, index))
       .reduce((sum, height) => sum + height, 0);
-  };
-  const captionTracks = project.tracks.filter((track) => track.captionTrack);
-  const captionTrackName = (id: string) => {
-    if (captionTracks.length < 2) return "字幕";
-    const index = captionTracks.findIndex((track) => track.id === id);
-    return `字幕 ${captionTracks.length - index}`;
   };
   const marqueeSelection = (next: Marquee) => {
     const left = Math.min(next.startX, next.x);
@@ -554,6 +545,7 @@ export default function Timeline({
           </button>
           <button
             title="添加轨道"
+            disabled={project.tracks.length >= 128}
             onClick={() =>
               apply((p) => ({
                 ...p,
@@ -639,9 +631,19 @@ export default function Timeline({
           </div>
           {project.tracks.map((track, index) => (
             <div
-              className={`track-header ${track.locked ? "locked" : ""} ${track.captionTrack ? "caption-track" : ""}`}
+              className={`track-header ${track.locked ? "locked" : ""} ${track.captionTrack ? "caption-track" : ""} ${track.solo ? "solo-track" : ""} ${project.tracks.some((item) => item.solo) && !track.solo ? "inactive-solo-track" : ""}`}
               key={track.id}
+              data-track-id={track.id}
               style={{ height: trackHeights[index] }}
+              onContextMenu={(event) => {
+                event.preventDefault();
+                setContext(null);
+                setTrackMenu({
+                  trackId: track.id,
+                  x: event.clientX,
+                  y: event.clientY,
+                });
+              }}
               onClick={(event) => {
                 if (
                   track.captionTrack &&
@@ -651,11 +653,17 @@ export default function Timeline({
               }}
             >
               <div>
-                <span className="track-name">
-                  {track.captionTrack
-                    ? captionTrackName(track.id)
-                    : trackName(index, project.tracks.length)}
+                <span
+                  className="track-name"
+                  title={displayTrackName(project.tracks, track.id)}
+                >
+                  {displayTrackName(project.tracks, track.id)}
                 </span>
+                {track.solo && (
+                  <span className="track-solo-badge" title="独奏轨道">
+                    S
+                  </span>
+                )}
               </div>
               <div className="track-controls">
                 {(["hidden", "muted", "locked"] as const).map((key) => (
@@ -904,8 +912,18 @@ export default function Timeline({
             {project.tracks.map((track, trackIndex) => (
               <div
                 key={track.id}
-                className={`track-lane ${track.hidden ? "hidden-track" : ""} ${fileDrop?.trackId === track.id ? "external-drop-target" : ""}`}
+                className={`track-lane ${!isTrackActive(project.tracks, track.id) ? "hidden-track" : ""} ${fileDrop?.trackId === track.id ? "external-drop-target" : ""}`}
                 data-track={track.id}
+                onContextMenu={(event) => {
+                  if (event.target !== event.currentTarget) return;
+                  event.preventDefault();
+                  setContext(null);
+                  setTrackMenu({
+                    trackId: track.id,
+                    x: event.clientX,
+                    y: event.clientY,
+                  });
+                }}
                 style={{
                   backgroundSize: `${zoom * 2}px 100%`,
                   height: trackHeights[trackIndex],
@@ -1645,6 +1663,11 @@ export default function Timeline({
           );
         })()}
       <BehaviorContextMenu editor={editor} />
+      <TrackContextMenu
+        editor={editor}
+        menu={trackMenu}
+        onClose={() => setTrackMenu(null)}
+      />
     </section>
   );
 }

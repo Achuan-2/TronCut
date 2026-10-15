@@ -1,0 +1,40 @@
+.track-context-menu {
+  width: 252px;
+}
+.track-context-menu button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-align: left;
+}
+.track-menu-check {
+  display: inline-flex;
+  width: 14px;
+  flex: 0 0 14px;
+}
+.track-menu-arrow {
+  margin-left: auto;
+}
+.track-context-submenu {
+  width: 170px;
+}
+.track-rename-dialog .field.vertical input {
+  width: 100%;
+}
+.track-header .track-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.track-solo-badge {
+  margin-left: 7px;
+  color: #ffe38a;
+  font-size: 10px;
+  font-weight: 700;
+}
+.track-header.solo-track {
+  border-left: 3px solid #e8c65c;
+}
+.track-header.inactive-solo-track .track-name {
+  opacity: 0.45;
+}

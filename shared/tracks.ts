@@ -1,0 +1,115 @@
+import { type Project, newTrack, numberTracks } from "./model";
+
+export type Track = Project["tracks"][number];
+
+export function isTrackActive(tracks: Track[], id: string): boolean {
+  const track = tracks.find((item) => item.id === id);
+  return (
+    !!track &&
+    !track.hidden &&
+    (!tracks.some((item) => item.solo) || !!track.solo)
+  );
+}
+
+export function displayTrackName(tracks: Track[], id: string): string {
+  const track = tracks.find((item) => item.id === id);
+  if (!track) return "";
+  if (track.customName || !track.captionTrack) return track.name;
+  const captions = tracks.filter((item) => item.captionTrack);
+  return captions.length === 1
+    ? "字幕"
+    : `字幕 ${captions.length - captions.findIndex((item) => item.id === id)}`;
+}
+
+export function insertTrack(
+  project: Project,
+  anchorId: string,
+  side: "above" | "below",
+): Project {
+  const index = project.tracks.findIndex((track) => track.id === anchorId);
+  if (index < 0 || project.tracks.length >= 128) return project;
+  const tracks = [...project.tracks];
+  tracks.splice(index + Number(side === "below"), 0, newTrack(tracks.length));
+  return { ...project, tracks: numberTracks(tracks) };
+}
+
+export function moveTrack(
+  project: Project,
+  id: string,
+  direction: "up" | "down" | "top" | "bottom",
+): Project {
+  const index = project.tracks.findIndex((track) => track.id === id);
+  if (index < 0) return project;
+  const destination =
+    direction === "top"
+      ? 0
+      : direction === "bottom"
+        ? project.tracks.length - 1
+        : Math.max(
+            0,
+            Math.min(
+              project.tracks.length - 1,
+              index + (direction === "up" ? -1 : 1),
+            ),
+          );
+  if (destination === index) return project;
+  const tracks = [...project.tracks];
+  const [track] = tracks.splice(index, 1);
+  tracks.splice(destination, 0, track);
+  return { ...project, tracks: numberTracks(tracks) };
+}
+
+export function removeTrack(project: Project, id: string): Project {
+  if (
+    project.tracks.length <= 1 ||
+    !project.tracks.some((track) => track.id === id && !track.locked)
+  )
+    return project;
+  return {
+    ...project,
+    tracks: numberTracks(project.tracks.filter((track) => track.id !== id)),
+    clips: project.clips.filter((clip) => clip.trackId !== id),
+  };
+}
+
+export function removeEmptyTracks(project: Project): Project {
+  const occupied = new Set(project.clips.map((clip) => clip.trackId));
+  const keep = project.tracks.filter(
+    (track) => track.locked || occupied.has(track.id),
+  );
+  const tracks = keep.length ? keep : project.tracks.slice(0, 1);
+  return tracks.length === project.tracks.length
+    ? project
+    : { ...project, tracks: numberTracks(tracks) };
+}
+
+export function renameTrack(
+  project: Project,
+  id: string,
+  name: string,
+): Project {
+  const value = name.trim().slice(0, 100);
+  const track = project.tracks.find((track) => track.id === id);
+  if (!track || !value || (track.customName && track.name === value))
+    return project;
+  return {
+    ...project,
+    tracks: project.tracks.map((track) =>
+      track.id === id ? { ...track, name: value, customName: true } : track,
+    ),
+  };
+}
+
+export function toggleTrack(
+  project: Project,
+  id: string,
+  key: "hidden" | "solo" | "locked",
+): Project {
+  if (!project.tracks.some((track) => track.id === id)) return project;
+  return {
+    ...project,
+    tracks: project.tracks.map((track) =>
+      track.id === id ? { ...track, [key]: !track[key] } : track,
+    ),
+  };
+}

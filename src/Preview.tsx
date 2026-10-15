@@ -40,6 +40,7 @@ import {
   type TextBox,
 } from "../shared/text";
 import { textBoxFor, fittedTextFont } from "./text";
+import { isTrackActive } from "../shared/tracks";
 import {
   croppedTransform,
   dragCrop,
@@ -739,7 +740,7 @@ export function ScenePreview({
     >
       {[...project.tracks]
         .reverse()
-        .filter((track) => !track.hidden)
+        .filter((track) => isTrackActive(project.tracks, track.id))
         .flatMap((track) =>
           active
             .filter((clip) => clip.trackId === track.id)

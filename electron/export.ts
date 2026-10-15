@@ -24,6 +24,7 @@ import { objectBehaviorExpressions } from "./behavior-export";
 import { rasterizeBehaviorText } from "./behavior-text-export";
 import { textFillRectangle } from "./text-fill";
 import { textFrameSize, textFillGeometry } from "../shared/text";
+import { isTrackActive } from "../shared/tracks";
 import {
   transitionRange,
   transitionOffsetExpression,
@@ -388,7 +389,7 @@ async function renderProject(
         .map((clip) => ({ clip, track })),
     );
   for (const { clip, track } of ordered) {
-    if (track.hidden) continue;
+    if (!isTrackActive(project.tracks, track.id)) continue;
     if (signal.aborted) throw new Error("任务已取消");
     const asset = project.assets.find((a) => a.id === clip.assetId);
     if (asset?.missing) throw new Error(`素材离线：${asset.name}`);

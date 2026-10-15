@@ -4,6 +4,7 @@ import { cameraAt } from "./canvas";
 import { fadeOpacity } from "./effects";
 import { shiftBehaviors } from "./behaviors";
 import { transitionRange, transitionTransform } from "./transitions";
+import { isTrackActive } from "./tracks";
 
 /** Freeze visible layers at one timeline instant while retaining source timestamps. */
 export function frameSnapshot(
@@ -12,7 +13,9 @@ export function frameSnapshot(
   endpointClipId?: string,
 ): Project {
   const visible = new Set(
-    project.tracks.filter((track) => !track.hidden).map((track) => track.id),
+    project.tracks
+      .filter((track) => isTrackActive(project.tracks, track.id))
+      .map((track) => track.id),
   );
   return {
     ...project,

@@ -1,4 +1,5 @@
 import { projectDuration, type Project } from "./model";
+import { isTrackActive } from "./tracks";
 
 export type PlaybackDirection = -1 | 1;
 const tolerance = 1e-7;
@@ -26,7 +27,9 @@ export function mediaBoundaryTime(
 ): number {
   const duration = projectDuration(project);
   const hidden = new Set(
-    project.tracks.filter((track) => track.hidden).map((track) => track.id),
+    project.tracks
+      .filter((track) => !isTrackActive(project.tracks, track.id))
+      .map((track) => track.id),
   );
   const boundaries = [
     0,

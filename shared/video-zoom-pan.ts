@@ -6,6 +6,7 @@ import {
 } from "./model";
 import { clampCamera } from "./canvas";
 import { setTransform, transformAt } from "./editor";
+import { isTrackActive } from "./tracks";
 
 export function zoomPanVideos(project: Project, time: number) {
   return project.clips.filter(
@@ -14,7 +15,7 @@ export function zoomPanVideos(project: Project, time: number) {
       time >= clip.start &&
       time <= clip.start + clip.duration &&
       !project.tracks.find((track) => track.id === clip.trackId)?.locked &&
-      !project.tracks.find((track) => track.id === clip.trackId)?.hidden,
+      isTrackActive(project.tracks, clip.trackId),
   );
 }
 

@@ -3,6 +3,7 @@ import path from "node:path";
 import { type Project, projectDuration } from "../shared/model";
 import { audioFilters } from "./export";
 import { findBinary, runProcess } from "./process";
+import { isTrackActive } from "../shared/tracks";
 
 /** Render the same audible tracks as video export, in project time for ASR. */
 export async function renderTimelineAudio(
@@ -17,7 +18,7 @@ export async function renderTimelineAudio(
     const track = project.tracks.find((item) => item.id === clip.trackId);
     const asset = project.assets.find((item) => item.id === clip.assetId);
     return track &&
-      !track.hidden &&
+      isTrackActive(project.tracks, track.id) &&
       !track.muted &&
       ["audio", "video"].includes(clip.kind) &&
       clip.volume > 0 &&
