@@ -18,6 +18,123 @@ async function whitePixels(image: string) {
     if (data[i] > 180 && data[i + 1] > 180 && data[i + 2] > 180) count++;
   return count;
 }
+async function whiteCenter(image: string) {
+  const { data, info } = await sharp(image)
+    .removeAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  let sum = 0,
+    count = 0;
+  for (let y = 0; y < info.height; y++)
+    for (let x = 0; x < info.width; x++)
+      if (data[(y * info.width + x) * info.channels] > 180) {
+        sum += x;
+        count++;
+      }
+  expect(count).toBeGreaterThan(20);
+  return sum / count;
+}
+it("切换的对象平移和文本同时平移真实写入视频，参数可保存重开", async () => {
+  const root = path.resolve(`test-output/shifting-${Date.now()}`);
+  await fs.mkdir(root, { recursive: true });
+  const source = path.join(root, "source.png"),
+    movie = path.join(root, "source.mp4");
+  await sharp({
+    create: { width: 40, height: 30, channels: 3, background: "#ffffff" },
+  })
+    .png()
+    .toFile(source);
+  await runProcess(findBinary("ffmpeg"), [
+    "-y",
+    "-loop",
+    "1",
+    "-i",
+    source,
+    "-t",
+    "2",
+    "-r",
+    "10",
+    "-pix_fmt",
+    "yuv420p",
+    movie,
+  ]);
+  for (const kind of ["video", "text"] as const) {
+    const project = createProject();
+    project.canvas = {
+      width: 320,
+      height: 180,
+      fps: 10,
+      background: "#000000",
+    };
+    project.exportSettings = { encoder: "software" };
+    if (kind === "video")
+      project.assets = [
+        {
+          id: "source",
+          name: "source",
+          path: movie,
+          kind,
+          width: 40,
+          height: 30,
+          duration: 2,
+          hasAudio: false,
+        },
+      ];
+    const clip = {
+      ...newText("video", 0, 0, "ABC"),
+      kind,
+      ...(kind === "video" ? { assetId: "source" } : {}),
+      duration: 2,
+    };
+    clip.style = { ...clip.style!, fontSize: 40, outlineWidth: 0 };
+    clip.transform.scale = kind === "video" ? 0.25 : 1;
+    const behavior = createBehavior("cut", 2, kind)!;
+    behavior.incoming.style = "none";
+    behavior.outgoing.style = "none";
+    behavior.during.shift = 80;
+    behavior.during.loopTime = 1;
+    clip.behaviors = [behavior];
+    project.clips = [clip];
+    const file = path.join(root, kind, "project.troncut");
+    await saveProject(project, file);
+    const reopened = await openProject(file);
+    expect(reopened.clips[0].behaviors).toEqual(clip.behaviors);
+    const output = path.join(root, kind, "shift.mp4");
+    await exportVideo(
+      reopened,
+      output,
+      path.join(root, kind, "render"),
+      false,
+      AbortSignal.timeout(25000),
+      () => {},
+    );
+    const centers: number[] = [];
+    for (const time of [0.1, 0.3]) {
+      const image = path.join(root, kind, `frame-${time}.png`);
+      await runProcess(findBinary("ffmpeg"), [
+        "-y",
+        "-ss",
+        String(time),
+        "-i",
+        output,
+        "-frames:v",
+        "1",
+        image,
+      ]);
+      centers.push(await whiteCenter(image));
+    }
+    expect(Math.abs(centers[0] - centers[1])).toBeGreaterThan(15);
+    const capture = path.join(root, kind, "capture.png");
+    await exportFrame(
+      reopened,
+      0.3,
+      capture,
+      path.join(root, kind, "capture"),
+      AbortSignal.timeout(10000),
+    );
+    expect(await whiteCenter(capture)).toBeCloseTo(centers[1], 0);
+  }
+}, 60000);
 it("逐字行为可保存重开，实际导出逐字出现，截帧保留当前阶段", async () => {
   const root = path.resolve(`test-output/behaviors-text-${Date.now()}`);
   const project = createProject();

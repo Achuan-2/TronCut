@@ -2200,6 +2200,41 @@ fieldset:disabled {
 .behavior-type-menu {
   width: 100%;
 }
+.shifting-controls .field {
+  grid-template-columns: 56px minmax(0, 1fr);
+  font-size: 12px;
+}
+.shifting-controls .behavior-number-control {
+  grid-template-columns: 56px minmax(20px, 1fr) 78px;
+  gap: 6px;
+}
+.behavior-number-input {
+  display: flex;
+  align-items: center;
+  border: 1px solid #45545a;
+  border-radius: 4px;
+  background: #12191c;
+}
+.shifting-controls .behavior-number-input input {
+  min-width: 0;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  font-size: 12px;
+  padding: 6px 2px;
+  text-align: right;
+}
+.behavior-number-input > span {
+  padding-right: 4px;
+  font-size: 11px;
+}
+.shifting-controls input[type="range"] {
+  min-width: 0;
+  width: 100%;
+}
+.shifting-forever {
+  margin-left: 62px;
+}
 .behavior-range {
   display: flex !important;
   gap: 5px;

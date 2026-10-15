@@ -18,6 +18,64 @@ import { splitClip } from "../shared/editor";
 import { setClipSpeed } from "../shared/clip-speed";
 
 describe("行为的对象与逐字时序", () => {
+  it("切换为位移行为，默认参数区分视频与文本，张力与平移影响实际运动", () => {
+    const video = createBehavior("cut", 5, "video")!;
+    expect(video.incoming).toMatchObject({
+      type: "whole",
+      easing: "spring",
+      tension: 7,
+    });
+    expect(video.during).toMatchObject({
+      style: "cut",
+      easing: "circular-out",
+      shift: 5,
+      loopTime: 3.17,
+      loopForever: true,
+    });
+    expect(video.outgoing).toMatchObject({
+      easing: "exponential-out",
+      speed: 93,
+    });
+    const text = createBehavior("cut", 5, "text")!;
+    expect(text.incoming).toMatchObject({ type: "center", offset: 0.02 });
+    expect(text.during).toMatchObject({ type: "simultaneous", offset: 0 });
+    expect(text.outgoing).toMatchObject({ type: "center", offset: 0.03 });
+    const clip = { behaviors: [video] };
+    const low = glyphMotion(clip, 0.2, 0, 1, "object");
+    expect(Math.abs(low.x)).toBeGreaterThan(0.01);
+    video.incoming.tension = 15;
+    expect(glyphMotion(clip, 0.2, 0, 1, "object").x).not.toBeCloseTo(low.x);
+    video.incoming.style = "none";
+    video.outgoing.style = "none";
+    const smallShift = glyphMotion(clip, 0.2, 0, 1, "object").x;
+    video.during.shift = 50;
+    expect(glyphMotion(clip, 0.2, 0, 1, "object").x).toBeCloseTo(
+      smallShift * 10,
+    );
+    expect(glyphMotion(clip, 0.2, 0, 1, "object").opacity).toBe(1);
+  });
+  it("中心向外优先处理中间两个字，文本同时不会变为对象动画", () => {
+    const behavior = createBehavior("cut", 5)!;
+    behavior.incoming.offset = 0.2;
+    const clip = { behaviors: [behavior] };
+    expect(glyphMotion(clip, 0.1, 0, 4, "text").opacity).toBe(0);
+    expect(glyphMotion(clip, 0.1, 1, 4, "text").opacity).toBeGreaterThan(0);
+    expect(glyphMotion(clip, 0.1, 2, 4, "text").opacity).toBeGreaterThan(0);
+    behavior.incoming.style = "none";
+    behavior.outgoing.style = "none";
+    expect(glyphMotion(clip, 0.2, 0, 4, "text")).toEqual(
+      glyphMotion(clip, 0.2, 3, 4, "text"),
+    );
+    expect(glyphMotion(clip, 0.2, 0, 4, "object").x).toBe(0);
+    const simultaneous = glyphMotion(clip, 0.2, 0, 4, "text");
+    behavior.during.offset = 0.1;
+    expect(glyphMotion(clip, 0.2, 0, 4, "text").x).not.toBeCloseTo(
+      simultaneous.x,
+    );
+    expect(glyphMotion(clip, 0.2, 0, 4, "text")).toEqual(
+      glyphMotion(clip, 0.2, 3, 4, "text"),
+    );
+  });
   it("视频变速与拆分使行为跟随各片段长度，不改动源内容", () => {
     const clip = {
       ...newText("video", 2),
@@ -65,11 +123,14 @@ describe("行为的对象与逐字时序", () => {
       lt: (a: number, b: number) => Number(a < b),
       gt: (a: number, b: number) => Number(a > b),
       gte: (a: number, b: number) => Number(a >= b),
+      lte: (a: number, b: number) => Number(a <= b),
       pow: Math.pow,
       max: Math.max,
       abs: Math.abs,
       sin: Math.sin,
       cos: Math.cos,
+      exp: Math.exp,
+      sqrt: Math.sqrt,
       mod: (a: number, b: number) => a % b,
     };
     for (const preset of behaviorPresets)
@@ -80,6 +141,8 @@ describe("行为的对象与逐字时序", () => {
         "quad-in-out",
         "spring",
         "bounce",
+        "circular-out",
+        "exponential-out",
       ] as const) {
         const clip = { ...newText("titles", 2), kind: "image" as const };
         const behavior = createBehavior(preset.id, clip.duration, clip.kind)!;
@@ -103,7 +166,7 @@ describe("行为的对象与逐字时序", () => {
             const evaluate = new Function(
               "t",
               "m",
-              `const {choose,clip,lt,gt,gte,pow,max,abs,sin,cos,mod}=m; return ${expression};`,
+              `const {choose,clip,lt,gt,gte,lte,pow,max,abs,sin,cos,mod,exp,sqrt}=m; return ${expression};`,
             );
             expect(
               evaluate(clip.start + local, math),

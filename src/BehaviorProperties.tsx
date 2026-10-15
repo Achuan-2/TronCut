@@ -9,10 +9,13 @@ import {
   type Behavior,
   type BehaviorPhase,
   type BehaviorPhaseKey,
+  shiftingPhase,
+  behaviorMovementOptions,
 } from "../shared/behaviors";
 import type { Clip } from "../shared/model";
 import type { Editor } from "./useEditor";
 import BehaviorTypeMenu from "./BehaviorTypeMenu";
+import ShiftingProperties from "./ShiftingProperties";
 
 export default function BehaviorProperties({
   clip,
@@ -54,7 +57,13 @@ export default function BehaviorProperties({
             <select
               aria-label={`行为${label}`}
               value={phase[key]}
-              onChange={(event) => change({ [key]: event.target.value })}
+              onChange={(event) =>
+                change(
+                  key === "style" && event.target.value === "cut"
+                    ? shiftingPhase(phaseKey, clip.kind)
+                    : { [key]: event.target.value },
+                )
+              }
             >
               {options.map(([value, text]) => (
                 <option key={String(value)} value={value}>
@@ -192,162 +201,166 @@ export default function BehaviorProperties({
                       (style) => [style, behaviorStyleLabels[style]] as const,
                     ),
                   )}
-                  {phase.style !== "none" && (
-                    <>
-                      <div className="field">
-                        <span>类型</span>
-                        <BehaviorTypeMenu
-                          value={phase.type}
-                          text={clip.kind === "text"}
-                          change={(type) => change({ type })}
-                        />
-                      </div>
-                      {selectField("移动", "easing", [
-                        ["linear", "线性"],
-                        ["quad-in", "缓入 - 四次函数缓动"],
-                        ["quad-out", "缓出 - 四次函数缓动"],
-                        ["quad-in-out", "缓入缓出 - 四次函数缓动"],
-                        ["spring", "弹性"],
-                        ["bounce", "回弹"],
-                      ])}
-                      {selectField(
-                        phaseKey === "outgoing" ? "移向" : "移自",
-                        "direction",
-                        [
-                          ["left", "左"],
-                          ["right", "右"],
-                          ["top", "上"],
-                          ["bottom", "下"],
-                        ],
-                      )}
-                      {phaseKey !== "during" && (
-                        <label className="field behavior-range">
-                          速度
-                          <input
-                            aria-label="行为速度滑块"
-                            type="range"
-                            min={1}
-                            max={100}
-                            value={phase.speed}
-                            onChange={(event) =>
-                              change({ speed: Number(event.target.value) })
-                            }
+                  {phase.style === "cut" ? (
+                    <ShiftingProperties
+                      phase={phase}
+                      phaseKey={phaseKey}
+                      text={clip.kind === "text"}
+                      change={change}
+                    />
+                  ) : (
+                    phase.style !== "none" && (
+                      <>
+                        <div className="field">
+                          <span>类型</span>
+                          <BehaviorTypeMenu
+                            value={phase.type}
+                            text={clip.kind === "text"}
+                            change={(type) => change({ type })}
                           />
-                          <input
-                            aria-label="行为速度（%）"
-                            type="number"
-                            min={1}
-                            max={100}
-                            value={phase.speed}
-                            onChange={(event) =>
-                              change({ speed: Number(event.target.value) })
-                            }
-                          />
-                          <span>%</span>
-                        </label>
-                      )}
-                      <label className="field behavior-range">
-                        偏移
-                        <input
-                          aria-label="逐字偏移滑块"
-                          type="range"
-                          min={0}
-                          max={0.5}
-                          step={0.01}
-                          disabled={phase.type === "whole"}
-                          value={phase.offset}
-                          onChange={(event) =>
-                            change({ offset: Number(event.target.value) })
-                          }
-                        />
-                        <input
-                          aria-label="逐字偏移（秒）"
-                          type="number"
-                          min={0}
-                          max={2}
-                          step={0.01}
-                          disabled={phase.type === "whole"}
-                          value={phase.offset}
-                          onChange={(event) =>
-                            change({ offset: Number(event.target.value) })
-                          }
-                        />
-                        <span>s</span>
-                      </label>
-                      {phaseKey === "during" && (
-                        <>
-                          <label className="field">
-                            强度
+                        </div>
+                        {selectField("移动", "easing", behaviorMovementOptions)}
+                        {selectField(
+                          phaseKey === "outgoing" ? "移向" : "移自",
+                          "direction",
+                          [
+                            ["left", "左"],
+                            ["right", "右"],
+                            ["top", "上"],
+                            ["bottom", "下"],
+                          ],
+                        )}
+                        {phaseKey !== "during" && (
+                          <label className="field behavior-range">
+                            速度
                             <input
-                              aria-label="行为强度（%）"
-                              type="number"
-                              min={0}
+                              aria-label="行为速度滑块"
+                              type="range"
+                              min={1}
                               max={100}
-                              value={phase.intensity}
+                              value={phase.speed}
                               onChange={(event) =>
-                                change({
-                                  intensity: Number(event.target.value),
-                                })
+                                change({ speed: Number(event.target.value) })
                               }
                             />
-                          </label>
-                          <label className="field">
-                            循环时间
                             <input
-                              aria-label="行为循环时间（秒）"
-                              type="number"
-                              min={0.05}
-                              max={60}
-                              step={0.05}
-                              value={phase.loopTime}
-                              onChange={(event) =>
-                                change({ loopTime: Number(event.target.value) })
-                              }
-                            />
-                          </label>
-                          <label className="field">
-                            延迟
-                            <input
-                              aria-label="行为循环延迟（秒）"
-                              type="number"
-                              min={0}
-                              max={60}
-                              step={0.05}
-                              value={phase.delay}
-                              onChange={(event) =>
-                                change({ delay: Number(event.target.value) })
-                              }
-                            />
-                          </label>
-                          <label className="field">
-                            循环次数
-                            <input
-                              aria-label="行为循环次数"
+                              aria-label="行为速度（%）"
                               type="number"
                               min={1}
-                              max={1000}
-                              step={1}
-                              disabled={phase.loopForever}
-                              value={phase.loops}
+                              max={100}
+                              value={phase.speed}
                               onChange={(event) =>
-                                change({ loops: Number(event.target.value) })
+                                change({ speed: Number(event.target.value) })
                               }
                             />
+                            <span>%</span>
                           </label>
-                          <label className="check-field">
-                            <input
-                              aria-label="永远循环"
-                              type="checkbox"
-                              checked={phase.loopForever}
-                              onChange={(event) =>
-                                change({ loopForever: event.target.checked })
-                              }
-                            />
-                            永远循环
-                          </label>
-                        </>
-                      )}
-                    </>
+                        )}
+                        <label className="field behavior-range">
+                          偏移
+                          <input
+                            aria-label="逐字偏移滑块"
+                            type="range"
+                            min={0}
+                            max={0.5}
+                            step={0.01}
+                            disabled={phase.type === "whole"}
+                            value={phase.offset}
+                            onChange={(event) =>
+                              change({ offset: Number(event.target.value) })
+                            }
+                          />
+                          <input
+                            aria-label="逐字偏移（秒）"
+                            type="number"
+                            min={0}
+                            max={2}
+                            step={0.01}
+                            disabled={phase.type === "whole"}
+                            value={phase.offset}
+                            onChange={(event) =>
+                              change({ offset: Number(event.target.value) })
+                            }
+                          />
+                          <span>s</span>
+                        </label>
+                        {phaseKey === "during" && (
+                          <>
+                            <label className="field">
+                              强度
+                              <input
+                                aria-label="行为强度（%）"
+                                type="number"
+                                min={0}
+                                max={100}
+                                value={phase.intensity}
+                                onChange={(event) =>
+                                  change({
+                                    intensity: Number(event.target.value),
+                                  })
+                                }
+                              />
+                            </label>
+                            <label className="field">
+                              循环时间
+                              <input
+                                aria-label="行为循环时间（秒）"
+                                type="number"
+                                min={0.05}
+                                max={60}
+                                step={0.05}
+                                value={phase.loopTime}
+                                onChange={(event) =>
+                                  change({
+                                    loopTime: Number(event.target.value),
+                                  })
+                                }
+                              />
+                            </label>
+                            <label className="field">
+                              延迟
+                              <input
+                                aria-label="行为循环延迟（秒）"
+                                type="number"
+                                min={0}
+                                max={60}
+                                step={0.05}
+                                value={phase.delay}
+                                onChange={(event) =>
+                                  change({ delay: Number(event.target.value) })
+                                }
+                              />
+                            </label>
+                            <label className="field">
+                              循环次数
+                              <input
+                                aria-label="行为循环次数"
+                                type="number"
+                                min={1}
+                                max={1000}
+                                step={1}
+                                disabled={phase.loopForever}
+                                value={phase.loops}
+                                onChange={(event) =>
+                                  change({ loops: Number(event.target.value) })
+                                }
+                              />
+                            </label>
+                            <label className="check-field">
+                              <input
+                                aria-label="永远循环"
+                                type="checkbox"
+                                checked={phase.loopForever}
+                                onChange={(event) =>
+                                  change({ loopForever: event.target.checked })
+                                }
+                              />
+                              永远循环
+                            </label>
+                          </>
+                        )}
+                      </>
+                    )
                   )}
                 </div>
               </>

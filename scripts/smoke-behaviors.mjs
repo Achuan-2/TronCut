@@ -267,13 +267,107 @@ try {
     "rgb(230, 190, 86)",
   );
   await page.screenshot({ path: path.join(root, "effects-inside-clip.png") });
+  const shiftingTransfer = await page.evaluateHandle(() => {
+    const value = new DataTransfer();
+    value.setData("troncut-behavior", "cut");
+    return value;
+  });
+  await videoClip.dispatchEvent("drop", { dataTransfer: shiftingTransfer });
+  await page.getByRole("tab", { name: "进", exact: true }).click();
+  await expect(page.getByLabel("行为张力", { exact: true })).toHaveValue(
+    "7.00",
+  );
+  await expect(page.getByLabel("行为类型", { exact: true })).toHaveCount(0);
+  await expect(page.getByLabel("行为速度（%）", { exact: true })).toHaveCount(
+    0,
+  );
+  await expect(page.getByLabel("行为移动")).toHaveValue("spring");
+  await page.screenshot({ path: path.join(root, "shifting-video-in.png") });
+  await page.getByLabel("行为张力", { exact: true }).fill("9.50");
+  await page.getByLabel("行为移动").selectOption("quad-out");
+  await expect(page.getByLabel("行为张力", { exact: true })).toHaveCount(0);
+  await expect(page.getByLabel("行为速度（%）", { exact: true })).toHaveValue(
+    "77",
+  );
+  await page.getByLabel("行为移动").selectOption("spring");
+  await expect(page.getByLabel("行为张力", { exact: true })).toHaveValue(
+    "9.50",
+  );
+  await page.getByRole("tab", { name: "期间", exact: true }).click();
+  await expect(page.getByLabel("行为平移", { exact: true })).toHaveValue(
+    "5.00",
+  );
+  await expect(
+    page.getByLabel("行为循环时间（秒）", { exact: true }),
+  ).toHaveValue("3.17");
+  await expect(page.getByLabel("行为循环次数", { exact: true })).toBeDisabled();
+  await expect(page.getByLabel("逐字偏移（秒）", { exact: true })).toHaveCount(
+    0,
+  );
+  await page.screenshot({ path: path.join(root, "shifting-video-during.png") });
+  await page.getByLabel("永远循环", { exact: true }).uncheck();
+  await page.getByLabel("行为循环次数", { exact: true }).fill("2");
+  await page.getByRole("tab", { name: "出", exact: true }).click();
+  await expect(page.getByLabel("行为移动")).toHaveValue("exponential-out");
+  await expect(page.getByLabel("行为速度（%）", { exact: true })).toHaveValue(
+    "93",
+  );
+  await expect(page.getByLabel("行为张力", { exact: true })).toHaveCount(0);
+  await page.screenshot({ path: path.join(root, "shifting-video-out.png") });
+  await page
+    .locator(".timeline-clip.text")
+    .dispatchEvent("drop", { dataTransfer: shiftingTransfer });
+  await expect(page.getByLabel("行为类型", { exact: true })).toHaveText(
+    "文本 - 中心向外",
+  );
+  await expect(page.getByLabel("逐字偏移（秒）", { exact: true })).toHaveValue(
+    "0.030",
+  );
+  await page.screenshot({ path: path.join(root, "shifting-text-out.png") });
+  await page.getByRole("tab", { name: "进", exact: true }).click();
+  await expect(page.getByLabel("行为张力", { exact: true })).toHaveValue(
+    "7.00",
+  );
+  await expect(page.getByLabel("逐字偏移（秒）", { exact: true })).toHaveValue(
+    "0.020",
+  );
+  await page.screenshot({ path: path.join(root, "shifting-text-in.png") });
+  await page.getByRole("tab", { name: "期间", exact: true }).click();
+  await expect(page.getByLabel("行为类型", { exact: true })).toHaveText(
+    "文本 - 同时",
+  );
+  await expect(page.getByLabel("逐字偏移（秒）", { exact: true })).toHaveValue(
+    "0.000",
+  );
+  await page.getByLabel("行为类型", { exact: true }).click();
+  await page.getByRole("menuitem", { name: "文本", exact: true }).click();
+  await page
+    .getByRole("menuitemradio", { name: "中心向外", exact: true })
+    .click();
+  await page.getByLabel("逐字偏移（秒）", { exact: true }).fill("0.015");
+  await page.getByLabel("行为类型", { exact: true }).click();
+  await page.getByRole("menuitem", { name: "文本", exact: true }).click();
+  await page.getByRole("menuitemradio", { name: "同时", exact: true }).click();
+  await page.screenshot({ path: path.join(root, "shifting-text-during.png") });
+  await checkEffectsInsideClips(page);
+  await page.getByTitle("保存工程 Ctrl+S").click();
+  await expect(page.locator(".toast")).toContainText("工程已保存");
+  await expect
+    .poll(async () => {
+      const project = JSON.parse(await fs.readFile(file, "utf8"));
+      return project.clips
+        .find((clip) => clip.id === "video")
+        .behaviors.find((behavior) => behavior.preset === "cut")?.incoming
+        .tension;
+    })
+    .toBe(9.5);
   await page.screenshot({ path: path.join(root, "media-behaviors.png") });
   expect(errors).toEqual([]);
   console.log(
     JSON.stringify({
       root,
       checks:
-        "文字/图片/视频、对象/文本分级、三个阶段、循环、开关、复制粘贴、Delete、撤销与保存",
+        "文字/图片/视频、效果条在对象内部、速度条拖动、对象/文本分级、切换三阶段与张力/速度动态字段、循环、开关、复制粘贴、Delete、撤销与保存",
       rendererErrors: errors,
     }),
   );

@@ -806,7 +806,9 @@ export function Inspector({ editor }: { editor: Editor }) {
   const activeTab =
     editor.selectedBehavior?.clipId === c?.id
       ? "behaviors"
-      : tab.clipId === c?.id && tabs.some((item) => item.name === tab.name)
+      : tab.clipId === c?.id &&
+          tab.name !== "behaviors" &&
+          tabs.some((item) => item.name === tab.name)
         ? tab.name
         : hasText
           ? "text"
@@ -1290,7 +1292,9 @@ export function Inspector({ editor }: { editor: Editor }) {
                   </>
                 )}
             </div>
-            {hasClipSpeed(c) && <SpeedProperties clip={c} editor={editor} />}
+            {hasClipSpeed(c) && activeTab !== "behaviors" && (
+              <SpeedProperties clip={c} editor={editor} />
+            )}
             {hasBehaviors(c) && (
               <div
                 id="inspector-behaviors"

@@ -37,7 +37,7 @@ export const behaviorStyleLabels: Record<BehaviorStyle, string> = {
 };
 export const behaviorPhaseSchema = z.object({
   style: z.enum(behaviorStyles),
-  type: z.enum(["whole", "forward", "backward", "center"]),
+  type: z.enum(["whole", "forward", "backward", "center", "simultaneous"]),
   easing: z.enum([
     "linear",
     "quad-in",
@@ -45,6 +45,8 @@ export const behaviorPhaseSchema = z.object({
     "quad-in-out",
     "spring",
     "bounce",
+    "circular-out",
+    "exponential-out",
   ]),
   direction: z.enum(["left", "right", "top", "bottom"]),
   speed: z.number().finite().min(1).max(100),
@@ -54,6 +56,8 @@ export const behaviorPhaseSchema = z.object({
   delay: z.number().finite().min(0).max(60).default(0),
   loops: z.number().int().min(1).max(1000).default(1),
   loopForever: z.boolean().default(true),
+  tension: z.number().finite().min(0.1).max(20).default(7),
+  shift: z.number().finite().min(0).max(100).default(5),
 });
 export const behaviorSchema = z.object({
   id: z.string().regex(/^[a-zA-Z0-9_-]{1,128}$/),
@@ -87,7 +91,50 @@ const phase = (
   delay: 0,
   loops: 1,
   loopForever: true,
+  tension: 7,
+  shift: 5,
 });
+export const behaviorMovementOptions: readonly (readonly [
+  BehaviorPhase["easing"],
+  string,
+])[] = [
+  ["linear", "线性"],
+  ["quad-in", "缓入 - 四次函数缓动"],
+  ["quad-out", "缓出 - 四次函数缓动"],
+  ["quad-in-out", "缓入缓出 - 四次函数缓动"],
+  ["circular-out", "缓出 - 圆曲线缓动"],
+  ["exponential-out", "缓出 - 指数函数缓动"],
+  ["spring", "跳跃"],
+  ["bounce", "回弹"],
+];
+export function shiftingPhase(
+  key: BehaviorPhaseKey,
+  kind: Clip["kind"],
+): BehaviorPhase {
+  const value = phase(
+    "cut",
+    kind === "text" ? (key === "during" ? "simultaneous" : "center") : "whole",
+  );
+  return {
+    ...value,
+    easing:
+      key === "incoming"
+        ? "spring"
+        : key === "during"
+          ? "circular-out"
+          : "exponential-out",
+    speed: key === "outgoing" ? 93 : 77,
+    offset:
+      kind === "text"
+        ? key === "incoming"
+          ? 0.02
+          : key === "outgoing"
+            ? 0.03
+            : 0
+        : 0,
+    loopTime: 3.17,
+  };
+}
 export interface BehaviorPreset {
   id: string;
   name: string;
@@ -103,7 +150,7 @@ const presetDefinitions: readonly (readonly [
   BehaviorStyle,
   BehaviorPhase["type"],
 ])[] = [
-  ["cut", "切换", "cut", "none", "cut", "whole"],
+  ["cut", "切换", "cut", "cut", "cut", "center"],
   ["pop", "弹出", "pop", "none", "pop", "forward"],
   ["sway", "摆动", "fade", "sway", "fade", "whole"],
   ["type-reveal", "文字逐个显示-显示", "reveal", "none", "reveal", "forward"],
@@ -125,9 +172,12 @@ export const behaviorPresets: BehaviorPreset[] = presetDefinitions.map(
   ([id, name, incoming, during, outgoing, type]) => ({
     id,
     name,
-    incoming: phase(incoming, type),
-    during: phase(during, type),
-    outgoing: phase(outgoing, type),
+    incoming:
+      id === "cut" ? shiftingPhase("incoming", "text") : phase(incoming, type),
+    during:
+      id === "cut" ? shiftingPhase("during", "text") : phase(during, type),
+    outgoing:
+      id === "cut" ? shiftingPhase("outgoing", "text") : phase(outgoing, type),
   }),
 );
 
@@ -207,15 +257,22 @@ export const neutralMotion = (): GlyphMotion => ({
   opacity: 1,
 });
 function rankFor(type: BehaviorPhase["type"], index: number, count: number) {
-  return type === "whole"
+  return type === "whole" || type === "simultaneous"
     ? 0
     : type === "backward"
       ? count - index - 1
       : type === "center"
-        ? Math.abs(index - (count - 1) / 2)
+        ? Math.floor(Math.abs(index - (count - 1) / 2))
         : index;
 }
-function ease(p: number, easing: BehaviorPhase["easing"]) {
+function phaseDelay(phase: BehaviorPhase, index: number, count: number) {
+  // Simultaneous text keeps all glyphs together while offset delays the group.
+  return (
+    (phase.type === "simultaneous" ? 1 : rankFor(phase.type, index, count)) *
+    phase.offset
+  );
+}
+function ease(p: number, easing: BehaviorPhase["easing"], tension = 7) {
   if (p <= 0 || p >= 1) return Math.max(0, Math.min(1, p));
   switch (easing) {
     case "linear":
@@ -225,7 +282,13 @@ function ease(p: number, easing: BehaviorPhase["easing"]) {
     case "quad-in-out":
       return p < 0.5 ? 8 * p ** 4 : 1 - (-2 * p + 2) ** 4 / 2;
     case "spring":
-      return 1 + 2.70158 * (p - 1) ** 3 + 1.70158 * (p - 1) ** 2;
+      return (
+        1 - Math.exp(-tension * p) * Math.cos(p * Math.PI * (tension / 2 + 1))
+      );
+    case "circular-out":
+      return Math.sqrt(Math.max(0, 1 - (p - 1) ** 2));
+    case "exponential-out":
+      return 1 - 2 ** (-10 * p);
     case "bounce":
       return 1 - Math.abs(Math.cos(p * Math.PI * 2.5)) * (1 - p) ** 2;
     default:
@@ -233,13 +296,15 @@ function ease(p: number, easing: BehaviorPhase["easing"]) {
   }
 }
 export const phaseSeconds = (phase: BehaviorPhase) =>
-  0.12 + (100 - phase.speed) * 0.018;
+  phase.style === "cut" && phase.easing === "spring"
+    ? 0.7 + (20 - phase.tension) * 0.02
+    : 0.12 + (100 - phase.speed) * 0.018;
 export function behaviorWindows(behavior: Behavior, count: number) {
   const length = (p: BehaviorPhase) =>
     p.style === "none"
       ? 0
       : phaseSeconds(p) +
-        (p.type === "whole" ? 0 : Math.max(0, count - 1) * p.offset);
+        Math.max(phaseDelay(p, 0, count), phaseDelay(p, count - 1, count));
   const incoming = length(behavior.incoming),
     outgoing = length(behavior.outgoing);
   const ratio = Math.min(
@@ -256,12 +321,12 @@ function transition(
 ): GlyphMotion {
   const value = neutralMotion();
   const p = Math.max(0, Math.min(1, progress)),
-    q = ease(p, phase.easing),
+    q = ease(p, phase.easing, phase.tension),
     hidden = 1 - q;
   if (phase.style === "none") return value;
-  value.opacity =
-    phase.style === "reveal" || phase.style === "cut" ? (p > 0 ? 1 : 0) : p;
+  value.opacity = phase.style === "reveal" ? (p > 0 ? 1 : 0) : p;
   if (phase.style === "fade") value.opacity = Math.max(0, Math.min(1, q));
+  if (phase.style === "cut") value.x = -2 * hidden;
   const distance =
     phase.style === "fly" ? 5 : phase.style === "drift" ? 2 : 1.5;
   if (["slide", "fly", "drift"].includes(phase.style)) {
@@ -313,18 +378,14 @@ export function glyphMotion(
       const elapsed = incoming
         ? time
         : time - (behavior.duration - windows.outgoing);
-      const delay =
-        rankFor(phase.type, index, count) * phase.offset * windows.ratio;
+      const delay = phaseDelay(phase, index, count) * windows.ratio;
       const p =
         (elapsed - delay) /
         Math.max(0.001, phaseSeconds(phase) * windows.ratio);
       value = transition(phase, incoming ? p : 1 - p, index, count);
     } else {
       const phase = behavior.during;
-      const elapsed =
-        time -
-        windows.incoming -
-        rankFor(phase.type, index, count) * phase.offset;
+      const elapsed = time - windows.incoming - phaseDelay(phase, index, count);
       const period = phase.loopTime + phase.delay;
       const cycle = Math.floor(elapsed / period),
         within = elapsed - cycle * period;
@@ -334,7 +395,7 @@ export function glyphMotion(
         (!phase.loopForever && cycle >= phase.loops)
       )
         continue;
-      const clock = ease(within / phase.loopTime, phase.easing);
+      const clock = ease(within / phase.loopTime, phase.easing, phase.tension);
       const wave = Math.sin(clock * Math.PI * 2),
         intensity = phase.intensity / 100;
       if (
@@ -347,12 +408,9 @@ export function glyphMotion(
         value.rotation = phase.intensity * wave;
       else if (phase.style === "shake")
         value.x = intensity * Math.sin(clock * Math.PI * 14);
-      else if (
-        phase.style === "fade" ||
-        phase.style === "reveal" ||
-        phase.style === "cut"
-      )
+      else if (phase.style === "fade" || phase.style === "reveal")
         value.opacity = 1 - intensity * (0.5 + 0.5 * wave);
+      else if (phase.style === "cut") value.x = (phase.shift / 100) * wave;
       else if (phase.style !== "none") value.y = -intensity * wave;
     }
     result.x += value.x;

@@ -5,7 +5,8 @@ import type { BehaviorPhase } from "../shared/behaviors";
 const orders = [
   ["forward", "第一个到最后一个"],
   ["backward", "最后一个到第一个"],
-  ["center", "从中间向两侧"],
+  ["center", "中心向外"],
+  ["simultaneous", "同时"],
 ] as const;
 export default function BehaviorTypeMenu({
   value,
