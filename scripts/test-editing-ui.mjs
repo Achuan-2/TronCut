@@ -719,10 +719,12 @@ try {
   };
   for (const label of ["指数缓入/缓出", "线性", "跳跃", "回弹", "自动"]) {
     await openAnimationMenu(imageArrow);
-    await page.getByRole("menuitem", { name: "启用缓冲", exact: true }).click();
+    await page.getByRole("menuitem", { name: "启用缓冲", exact: true })
+      .press("ArrowRight");
     await page.getByRole("menuitemradio", { name: label, exact: true }).click();
     await openAnimationMenu(imageArrow);
-    await page.getByRole("menuitem", { name: "启用缓冲", exact: true }).click();
+    await page.getByRole("menuitem", { name: "启用缓冲", exact: true })
+      .press("ArrowRight");
     await expect(page.getByRole("menuitemradio", { name: label, exact: true })).toHaveAttribute("aria-checked", "true");
     if (label === "回弹") await page.screenshot({ path: path.join(root, "animation-context-menu.png") });
     await page.keyboard.press("Escape");

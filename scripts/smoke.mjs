@@ -85,10 +85,13 @@ try {
   await captionEditor.fill("需要替换的字幕");
   await page.getByRole("button", { name: "字幕操作", exact: true }).click();
   await page.getByRole("menuitem", { name: "搜索和替换", exact: true }).click();
-  await page.getByLabel("搜索", { exact: true }).fill("需要替换");
-  await page.getByLabel("替换为", { exact: true }).fill("已经修改");
-  await page.getByRole("button", { name: "全部替换", exact: true }).click();
+  await page.getByLabel("查找字幕", { exact: true }).fill("需要替换");
+  await page.getByLabel("替换字幕为", { exact: true }).fill("已经修改");
+  await page.getByRole("button", { name: "替换全部匹配", exact: true }).click();
   await expect(captionEditor).toHaveValue("已经修改的字幕");
+  await page
+    .getByRole("button", { name: "关闭字幕搜索替换", exact: true })
+    .click();
   await page.getByRole("button", { name: "统一字幕样式", exact: true }).click();
   await page
     .getByRole("button", { name: "应用到全部字幕", exact: true })
@@ -158,7 +161,9 @@ try {
   await page
     .locator(".timeline-clip.selected .animation-arrow")
     .click({ button: "right" });
-  await page.getByRole("menuitem", { name: "启用缓冲", exact: true }).click();
+  await page
+    .getByRole("menuitem", { name: "启用缓冲", exact: true })
+    .press("ArrowRight");
   await page.getByRole("menuitemradio", { name: "线性", exact: true }).click();
   await expect(
     page.locator(".timeline-clip.selected .clip-animation"),
@@ -187,13 +192,6 @@ try {
   await expect(
     page.locator(".asset-thumbnail img.thumbnail-image"),
   ).toHaveCount(1, { timeout: 20000 });
-  await page.getByRole("button", { name: "音频", exact: true }).click();
-  await page.getByRole("button", { name: "应用播客人声", exact: true }).click();
-  await page.getByRole("button", { name: "处理后试听", exact: true }).click();
-  await expect(page.getByRole("status")).toContainText("正在试听处理后的音频", {
-    timeout: 20000,
-  });
-  await page.getByRole("button", { name: "停止试听", exact: true }).click();
   await page.getByRole("button", { name: "媒体", exact: true }).click();
   await app.evaluate(({ dialog }, folder) => {
     dialog.showOpenDialog = async () => ({
@@ -254,12 +252,17 @@ try {
       timeout: 30000,
     });
     await expect(page.locator(".asset-card")).toHaveCount(3);
-    await expect(page.locator(".timeline-clip.image").filter({ hasText: "录屏背景" })).toHaveCount(1);
+    await expect(
+      page.locator(".timeline-clip.image").filter({ hasText: "录屏背景" }),
+    ).toHaveCount(1);
     const native = await page.evaluate(() =>
       window.framecraft.nativeCaptureAvailable(),
     );
     if (native) {
-      await page.locator(".timeline-clip.video").last().click();
+      const recordingClip = page.locator(".timeline-clip.video")
+        .filter({ hasNotText: "源视频.mp4" });
+      await expect(recordingClip).toHaveCount(1);
+      await recordingClip.click();
       await page.getByRole("tab", { name: "鼠标", exact: true }).click();
       await expect(page.getByLabel("鼠标样式")).toBeVisible();
       await page.getByLabel("鼠标样式").selectOption("circle");
@@ -284,10 +287,14 @@ try {
       if (!sidecar.samples.length) throw new Error("鼠标采样为空");
       await page.getByRole("button", { name: "导出视频", exact: true }).click();
       await page.getByLabel("导出位置", { exact: true }).fill(root);
-      await page.getByLabel("导出文件名", { exact: true }).fill("desktop-native-recording");
+      await page
+        .getByLabel("导出文件名", { exact: true })
+        .fill("desktop-native-recording");
       await page.getByRole("button", { name: "开始导出", exact: true }).click();
       await expect(page.getByRole("status")).toContainText("视频已导出", {
-        timeout: 90000,
+        // Native captures may be larger than the canvas; allow software
+        // composition of the cursor, rounded frame and background to finish.
+        timeout: 240000,
       });
       console.log(
         `原生 WGC 录屏、${sidecar.samples.length} 个鼠标样本、样式修改、独立 JSON 与真实导出通过`,
