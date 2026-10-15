@@ -1043,8 +1043,9 @@ fieldset:disabled {
 .preferences-dialog .field {
   margin: 14px 0;
 }
-.preferences-dialog .field input:not([type="checkbox"]) {
+.preferences-dialog .field.vertical input:not([type="checkbox"]) {
   width: 100%;
+  min-width: 0;
 }
 .caption-instruction {
   margin: 10px 0;
