@@ -60,9 +60,25 @@ export default function Recorder({
   const nativeActive = useRef(false);
   const [settings, setSettings] = useState(defaultRecordingSettings);
   const [settingsReady, setSettingsReady] = useState(false);
+  const [savingSettings, setSavingSettings] = useState(false);
   const recordingSettings = useRef(settings);
   const changeSettings = (patch: Partial<RecordingSettings>) =>
     setSettings((s) => ({ ...s, ...patch }));
+  async function closeSettings() {
+    if (!settingsReady || !window.framecraft) {
+      onClose();
+      return;
+    }
+    setSavingSettings(true);
+    try {
+      await window.framecraft.saveRecordingSettings(settings);
+      onClose();
+    } catch (error) {
+      if (mounted.current) setError(`保存录屏设置失败：${String(error)}`);
+    } finally {
+      if (mounted.current) setSavingSettings(false);
+    }
+  }
   const sessions = useRef<Session[]>([]),
     timing = useRef({ started: 0, paused: 0, pauseStart: 0 }),
     stopping = useRef(false),
@@ -387,7 +403,11 @@ export default function Recorder({
             <h2>录制你的灵感</h2>
             <p>屏幕、声音与镜头，分别记录。</p>
           </div>
-          <button disabled={phase === "starting"} onClick={onClose}>
+          <button
+            aria-label="关闭录制设置"
+            disabled={phase === "starting" || savingSettings}
+            onClick={() => void closeSettings()}
+          >
             <X size={20} />
           </button>
         </div>
@@ -403,7 +423,7 @@ export default function Recorder({
               aria-pressed={sourceId === source.id}
               className={sourceId === source.id ? "selected" : ""}
               onClick={() => setSourceId(source.id)}
-              disabled={phase === "starting"}
+              disabled={phase === "starting" || savingSettings}
             >
               <img src={source.thumbnail} alt="录制来源缩略图" />
               <span>{source.name}</span>
@@ -425,7 +445,7 @@ export default function Recorder({
               <option.icon size={22} />
               <span>{option.label}</span>
               <input
-                disabled={phase === "starting"}
+                disabled={phase === "starting" || savingSettings}
                 type="checkbox"
                 checked={option.value}
                 onChange={(e) => option.change(e.target.checked)}
@@ -438,7 +458,7 @@ export default function Recorder({
           <select
             aria-label="录制帧率"
             value={fps}
-            disabled={phase === "starting"}
+            disabled={phase === "starting" || savingSettings}
             onChange={(e) => setFps(Number(e.target.value))}
           >
             {[15, 30, 60].map((value) => (
@@ -452,7 +472,7 @@ export default function Recorder({
           <label className="check-field">
             <input
               type="checkbox"
-              disabled={phase === "starting"}
+              disabled={phase === "starting" || savingSettings}
               checked={useNative}
               onChange={(e) => setUseNative(e.target.checked)}
             />
@@ -461,7 +481,7 @@ export default function Recorder({
         )}
         <fieldset
           className="recording-style"
-          disabled={phase === "starting" || !settingsReady}
+          disabled={phase === "starting" || savingSettings || !settingsReady}
         >
           <legend>录屏完成后自动美化</legend>
           <div
@@ -627,6 +647,9 @@ export default function Recorder({
           </p>
         </fieldset>
         <p className="small-note">
+          开始录制或关闭窗口时会记住美化设置，下次录制继续使用。录制后仍可在时间线和属性中调整。
+        </p>
+        <p className="small-note">
           麦克风与摄像头保存为独立素材。Windows
           原生录制单独保存鼠标轨迹，可在属性中修改样式；兼容录制的鼠标包含在画面中。macOS
           首次使用需要授予录屏、麦克风与摄像头权限。
@@ -649,7 +672,12 @@ export default function Recorder({
         )}
         <button
           className="start-recording"
-          disabled={!sourceId || !settingsReady || phase === "starting"}
+          disabled={
+            !sourceId ||
+            !settingsReady ||
+            phase === "starting" ||
+            savingSettings
+          }
           onClick={() => void start()}
         >
           <Circle size={15} fill="currentColor" />

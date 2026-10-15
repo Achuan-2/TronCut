@@ -124,7 +124,7 @@ it("录屏、镜头和背景分层导入，保留素材与原工程；禁用美�
     duration: 10,
     transform: { scale: 0.84 },
     cursorStyle: { size: 40 },
-    mediaFrame: { radius: 18 },
+    mediaFrame: { radius: 0 },
   });
   expect(recording.keyframes).toHaveLength(4);
   expect(added.clips.every((c) => c.start === 5)).toBe(true);

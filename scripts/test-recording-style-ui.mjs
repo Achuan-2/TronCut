@@ -14,15 +14,33 @@ const env = {
   FRAMECRAFT_USER_DATA: profile,
 };
 delete env.ELECTRON_RUN_AS_NODE;
-const app = await electron.launch({ args: ["."], env });
+let app = await electron.launch({ args: ["."], env });
 const errors = [];
 try {
-  const page = await app.firstWindow();
+  let page = await app.firstWindow();
+  page.on("pageerror", (error) => errors.push(error.message));
+  await page.getByRole("button", { name: "新建录制", exact: true }).click();
+  await expect(page.getByLabel("录屏背景", { exact: true })).toBeEnabled();
+  await expect(page.getByLabel("录屏圆角", { exact: true })).toHaveValue("0");
+  await page.getByLabel("录屏背景", { exact: true }).selectOption("violet");
+  await page.getByLabel("录屏留白", { exact: true }).fill("10");
+  await page.getByLabel("录屏圆角", { exact: true }).fill("7");
+  await page.getByRole("button", { name: "关闭录制设置", exact: true }).click();
+  await expect(page.locator(".recorder-modal")).toHaveCount(0);
+  // No recording has started: closing the configuration must still persist it.
+  await app.close();
+  app = await electron.launch({ args: ["."], env });
+  page = await app.firstWindow();
   page.on("pageerror", (error) => errors.push(error.message));
   const ownId = await app.evaluate(({ BrowserWindow }) =>
     BrowserWindow.getAllWindows()[0].getMediaSourceId(),
   );
   await page.getByRole("button", { name: "新建录制", exact: true }).click();
+  await expect(page.getByLabel("录屏背景", { exact: true })).toHaveValue(
+    "violet",
+  );
+  await expect(page.getByLabel("录屏留白", { exact: true })).toHaveValue("10");
+  await expect(page.getByLabel("录屏圆角", { exact: true })).toHaveValue("7");
   const ownWindow = page.locator(
     `.capture-sources > button[data-source-id="${ownId}"]`,
   );
@@ -93,6 +111,25 @@ try {
   await expect(page.locator(".timeline-clip")).toHaveCount(0);
   await page.getByTitle("重做 Ctrl+Shift+Z", { exact: true }).click();
   await expect(page.locator(".timeline-clip")).toHaveCount(2);
+  await page.locator(".timeline-clip.video").click();
+  await page.getByRole("tab", { name: "视频", exact: true }).click();
+  await page.getByLabel("圆角 (px)", { exact: true }).fill("0");
+  await page.getByLabel("缩放 (%)", { exact: true }).fill("75");
+  await expect(page.getByLabel("缩放 (%)", { exact: true })).toHaveValue("75");
+  await page.getByRole("tab", { name: "鼠标", exact: true }).click();
+  await page
+    .getByRole("combobox", { name: "鼠标样式", exact: true })
+    .selectOption("cross");
+  await page
+    .getByRole("spinbutton", { name: "鼠标大小", exact: true })
+    .fill("48");
+  await page.locator(".timeline-clip.image").click();
+  await page.getByLabel("缩放 (%)", { exact: true }).fill("85");
+  await page.locator(".timeline-clip.image").click({ button: "right" });
+  await page.getByRole("button", { name: "删除片段", exact: true }).click();
+  await expect(page.locator(".timeline-clip")).toHaveCount(1);
+  await page.getByTitle("撤销 Ctrl+Z", { exact: true }).click();
+  await expect(page.locator(".timeline-clip")).toHaveCount(2);
   await page.getByLabel("工程名称").fill("录屏美化验收");
   await app.evaluate(({ dialog }, folder) => {
     dialog.showOpenDialog = async () => ({
@@ -111,6 +148,14 @@ try {
     ),
   );
   expect(saved.assets.find((a) => a.kind === "image").path).toMatch(/\.png$/);
+  expect(saved.clips.find((c) => c.kind === "video")).toMatchObject({
+    mediaFrame: { radius: 0 },
+    transform: { scale: 0.75 },
+    cursorStyle: { style: "cross", size: 48 },
+  });
+  expect(saved.clips.find((c) => c.kind === "image").transform.scale).toBe(
+    0.85,
+  );
   await expect
     .poll(() =>
       page
@@ -138,9 +183,37 @@ try {
     radius: 24,
     zoom: 2.5,
   });
+  await page.getByRole("button", { name: "关闭录制设置", exact: true }).click();
+  await app.close();
+  app = await electron.launch({ args: ["."], env });
+  page = await app.firstWindow();
+  page.on("pageerror", (error) => errors.push(error.message));
+  await app.evaluate(
+    ({ dialog }, file) => {
+      dialog.showOpenDialog = async () => ({
+        canceled: false,
+        filePaths: [file],
+      });
+    },
+    path.join(root, "录屏美化验收", "录屏美化验收.troncut"),
+  );
+  await page.getByRole("button", { name: "打开项目", exact: true }).click();
+  await page.locator(".timeline-clip.video").click();
+  await page.getByRole("tab", { name: "视频", exact: true }).click();
+  await expect(page.getByLabel("圆角 (px)", { exact: true })).toHaveValue("0");
+  await expect(page.getByLabel("缩放 (%)", { exact: true })).toHaveValue("75");
+  await page.getByRole("tab", { name: "鼠标", exact: true }).click();
+  await expect(
+    page.getByRole("combobox", { name: "鼠标样式", exact: true }),
+  ).toHaveValue("cross");
+  await expect(
+    page.getByRole("spinbutton", { name: "鼠标大小", exact: true }),
+  ).toHaveValue("48");
+  await page.locator(".timeline-clip.image").click();
+  await expect(page.getByLabel("缩放 (%)", { exact: true })).toHaveValue("85");
   expect(errors).toEqual([]);
   console.log(
-    `真实 WGC 录屏、暂停继续、鼠标预设、背景分轨、撤销重做、归档图片加载和选项持久化通过：${root}`,
+    `默认直角、关闭后重启记忆、真实 WGC 录屏、录后圆角/留白/鼠标与背景编辑、撤销重做及工程重开通过：${root}`,
   );
 } catch (error) {
   await app

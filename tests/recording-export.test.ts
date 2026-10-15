@@ -20,6 +20,7 @@ it("真实导出和归档重开保留背景、圆角与自动缩放，放大画�
   expect(await store.read()).toEqual(defaultRecordingSettings);
   const settings = {
     ...defaultRecordingSettings,
+    radius: 18,
     preset: "violet" as const,
     cursor: { ...defaultRecordingSettings.cursor, style: "hidden" as const },
   };

@@ -37,7 +37,7 @@ export const defaultRecordingSettings: RecordingSettings = {
   background: true,
   preset: "mint",
   padding: 0.08,
-  radius: 18,
+  radius: 0,
   cursor: { ...defaultCursorStyle, size: 40 },
   autoZoom: true,
   zoom: 1.8,
