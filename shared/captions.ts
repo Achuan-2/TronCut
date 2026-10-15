@@ -11,7 +11,7 @@ export const captionDefaults = {
   fontSize: 40,
   x: 0.5,
   y: 0.92,
-  outlineWidth: 7,
+  outlineWidth: 5,
   fillEnabled: false,
 } as const;
 

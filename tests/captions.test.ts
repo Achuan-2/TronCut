@@ -22,7 +22,7 @@ describe("字幕轨道与批量编辑", () => {
     const caption = captionClips(result.project)[0];
     expect(caption.style).toMatchObject({
       fontSize: 40,
-      outlineWidth: 7,
+      outlineWidth: 5,
       fillEnabled: false,
       fill: "#000000",
       fillOpacity: 0.75,
