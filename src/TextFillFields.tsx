@@ -9,7 +9,8 @@ export default function TextFillFields({
   onChange: (patch: Partial<TextStyle>) => void;
 }) {
   const fill = textFill(style);
-  const enabled = style?.fillEnabled ?? textFillDefaults.fillEnabled;
+  // Older projects without this switch rendered a background by default.
+  const enabled = style?.fillEnabled !== false;
   const opacity = Math.round(
     (style?.fillOpacity ?? textFillDefaults.fillOpacity) * 100,
   );

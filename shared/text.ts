@@ -11,6 +11,7 @@ export const textLineHeight = 1.25;
 export function textFill(style?: TextStyle) {
   return {
     color: style?.fill ?? textFillDefaults.fill,
+    // Preserve legacy backgrounds; new presets explicitly disable the fill.
     opacity:
       style?.fillEnabled === false
         ? 0

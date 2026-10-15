@@ -3,6 +3,7 @@ import {
   createProject,
   defaultTransform,
   newText,
+  textPresets,
   validateProject,
 } from "../shared/model";
 import {
@@ -45,14 +46,23 @@ describe("文本框与自动字号", () => {
     ).toThrow();
   });
 
-  it("文本默认黑色 75% 填充，旧工程缺省字段使用默认值，也支持关闭填充", () => {
+  it("新增文本的所有预设默认无背景，旧工程和主动开启的填充仍保留", () => {
+    for (const [index] of textPresets.entries()) {
+      const preset = newText("titles", 0, index);
+      expect(preset.style!.fillEnabled).toBe(false);
+      expect(textFill(preset.style).opacity).toBe(0);
+      const reopened = validateProject({ ...createProject(), clips: [preset] });
+      expect(textFill(reopened.clips[0].style).opacity).toBe(0);
+    }
     const clip = newText("titles", 0);
-    expect(textFill(clip.style)).toEqual({ color: "#000000", opacity: 0.75 });
-    expect(textFillCss(clip.style)).toBe("#000000bf");
+    expect(textFill(clip.style)).toEqual({ color: "#000000", opacity: 0 });
+    expect(textFillCss(clip.style)).toBe("#00000000");
     const legacy = { ...clip.style! };
+    delete legacy.fillEnabled;
     delete legacy.fill;
     delete legacy.fillOpacity;
     expect(textFill(legacy)).toEqual({ color: "#000000", opacity: 0.75 });
+    expect(textFillCss(legacy)).toBe("#000000bf");
     expect(
       textFill({ ...clip.style!, fill: "#ff0000", fillOpacity: 0 }),
     ).toEqual({ color: "#ff0000", opacity: 0 });

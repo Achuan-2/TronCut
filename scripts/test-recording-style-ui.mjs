@@ -106,7 +106,7 @@ try {
   await page.getByRole("tab", { name: "视频", exact: true }).click();
   await expect(
     page.getByRole("button", { name: "根据鼠标重新生成缩放", exact: true }),
-  ).toBeVisible();
+  ).toHaveCount(0);
   await page.getByTitle("撤销 Ctrl+Z", { exact: true }).click();
   await expect(page.locator(".timeline-clip")).toHaveCount(0);
   await page.getByTitle("重做 Ctrl+Shift+Z", { exact: true }).click();

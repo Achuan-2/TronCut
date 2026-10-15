@@ -108,6 +108,31 @@ const app = await electron.launch({
   env,
   timeout: 30000,
 });
+// Compare actual handle centers with the rendered selection border, in screen pixels.
+async function expectHandlesOnBorder(layer) {
+  const offsets = await layer.evaluate((element) => {
+    const bounds = element.getBoundingClientRect();
+    const border = getComputedStyle(element, "::after");
+    const scaleX = bounds.width / element.offsetWidth;
+    const scaleY = bounds.height / element.offsetHeight;
+    const left = bounds.left + (parseFloat(border.left) + parseFloat(border.borderLeftWidth) / 2) * scaleX;
+    const right = bounds.right - (parseFloat(border.right) + parseFloat(border.borderRightWidth) / 2) * scaleX;
+    const top = bounds.top + (parseFloat(border.top) + parseFloat(border.borderTopWidth) / 2) * scaleY;
+    const bottom = bounds.bottom - (parseFloat(border.bottom) + parseFloat(border.borderBottomWidth) / 2) * scaleY;
+    return [...element.querySelectorAll(".resize-handle")].map((handle) => {
+      const rect = handle.getBoundingClientRect();
+      const direction = handle.classList.item(handle.classList.length - 1);
+      const x = direction.includes("w") ? left : direction.includes("e") ? right : (left + right) / 2;
+      const y = direction.includes("n") ? top : direction.includes("s") ? bottom : (top + bottom) / 2;
+      return { direction, x: Math.abs(rect.x + rect.width / 2 - x), y: Math.abs(rect.y + rect.height / 2 - y) };
+    });
+  });
+  expect(offsets).toHaveLength(8);
+  for (const offset of offsets) {
+    expect(offset.x, `${offset.direction} 水平中心偏差`).toBeLessThan(0.6);
+    expect(offset.y, `${offset.direction} 垂直中心偏差`).toBeLessThan(0.6);
+  }
+}
 try {
   const page = await app.firstWindow();
   await expect(page.locator(".home-page")).toBeVisible();
@@ -325,6 +350,7 @@ try {
   await page.getByLabel("垂直翻转", { exact: true }).uncheck();
   await page.getByLabel("缩放 (%)", { exact: true }).fill("50");
   const videoHandle = canvasVideo.locator(".resize-handle.se");
+  await expectHandlesOnBorder(canvasVideo);
   await videoHandle.hover();
   const videoBefore = await canvasVideo.boundingBox();
   const videoHandleBounds = await videoHandle.boundingBox();
@@ -574,6 +600,7 @@ try {
   await canvasImage.click();
   await page.getByLabel("缩放 (%)", { exact: true }).fill("50");
   await expect(canvasImage.locator(".resize-handle")).toHaveCount(8);
+  await expectHandlesOnBorder(canvasImage);
   const dragHandle = async (locator, dx, dy, steps = 5) => {
     await locator.hover();
     const bounds = await locator.boundingBox();
@@ -586,6 +613,7 @@ try {
   };
   const uncroppedImage = await canvasImage.boundingBox();
   await page.getByRole("button", { name: "裁剪模式", exact: true }).click();
+  await expectHandlesOnBorder(canvasImage);
   await dragHandle(canvasImage.locator(".crop-handle.s"), 0, -12);
   await expect.poll(async () => (await canvasImage.boundingBox()).height).toBeLessThan(uncroppedImage.height - 8);
   await page.getByTitle("撤销 Ctrl+Z", { exact: true }).click();
@@ -801,6 +829,13 @@ try {
 
   await page.getByRole("button", { name: "添加文本", exact: true }).click();
   const canvasText = page.locator(".preview-panel .preview-layer.text");
+  const textBackground = page.getByRole("switch", { name: "启用背景色", exact: true });
+  await expect(textBackground).not.toBeChecked();
+  await expect(canvasText.locator(".preview-text-fill")).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+  await textBackground.check();
+  await expect(canvasText.locator(".preview-text-fill")).toHaveCSS("background-color", "rgba(0, 0, 0, 0.75)");
+  await textBackground.uncheck();
+  await expect(canvasText.locator(".preview-text-fill")).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
   await canvasText.dblclick();
   const textEditor = page.getByLabel("画布文本内容", { exact: true });
   await expect(textEditor).toBeFocused();
@@ -846,6 +881,7 @@ try {
   await expect(autoText).not.toBeChecked();
   await fontSize.fill("50");
   await expect(canvasText.locator(".resize-handle")).toHaveCount(8);
+  await expectHandlesOnBorder(canvasText);
   const beforeTextResize = await canvasText.boundingBox();
   await dragHandle(canvasText.locator(".resize-handle.e"), 40, 0);
   await expect.poll(async () => (await canvasText.boundingBox()).width)

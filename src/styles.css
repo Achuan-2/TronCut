@@ -1917,7 +1917,8 @@ fieldset:disabled {
 .preview-layer.selected:after {
   content: "";
   position: absolute;
-  inset: -5px;
+  /* Center the 1px border on the same bounds as the resize handles. */
+  inset: -0.5px;
   pointer-events: none;
   border: 1px solid var(--accent);
   outline: 2px solid #183d2940;
@@ -1962,18 +1963,6 @@ fieldset:disabled {
 }
 .preview-text-editor:focus-visible {
   outline: none;
-}
-.preview-layer.selected:before {
-  content: "";
-  position: absolute;
-  width: 5px;
-  height: 5px;
-  background: #fff;
-  border: 1px solid var(--accent);
-  left: -7px;
-  top: -7px;
-  z-index: 1;
-  box-shadow: 6px 0 0 -1px #0000;
 }
 .preview-layer img,
 .preview-layer video {
@@ -3929,16 +3918,6 @@ fieldset:disabled {
   left: 60%;
 }
 .recording-style :disabled { opacity: 0.5; }
-.recording-zoom-controls {
-  display: grid;
-  gap: 8px;
-  margin-bottom: 16px;
-}
-.recording-zoom-controls button {
-  border: 1px solid var(--line);
-  padding: 7px;
-  border-radius: 4px;
-}
 .start-recording:hover {
   background: #f0a194;
   color: #291714;

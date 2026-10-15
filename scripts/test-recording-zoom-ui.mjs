@@ -77,11 +77,10 @@ try {
   const cropMode = page.getByRole("button", { name: "裁剪模式", exact: true });
   await expect(arrows).toHaveCount(2);
   await video.click();
-  await page
-    .getByRole("button", { name: "编辑缩放与移动", exact: true })
-    .click();
-  await expect(cropMode).toHaveAttribute("aria-pressed", "true");
-  await page.getByRole("button", { name: "选择模式", exact: true }).click();
+  for (const name of ["编辑缩放与移动", "根据鼠标重新生成缩放", "移除自动缩放"])
+    await expect(page.getByRole("button", { name, exact: true })).toHaveCount(0);
+  await expect(page.getByText("自动缩放", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("选中时间线上的动画起点或终点", { exact: false })).toHaveCount(0);
   await arrows.first().locator(".animation-point.end").click();
   await expect(cropMode).toHaveAttribute("aria-pressed", "true");
   await expect(zoom).toHaveValue("200");

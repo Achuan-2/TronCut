@@ -87,8 +87,11 @@ it("文本、字幕和逐字行为导出独立填充，颜色透明度可保存�
     "blue",
     "transparent",
     "disabled",
+    "default",
   ] as const) {
     const current = structuredClone(clip);
+    // These cases exercise explicitly enabled fills, independent of new-text defaults.
+    if (kind !== "default") current.style!.fillEnabled = true;
     if (kind === "caption") current.caption = true;
     if (kind === "behavior") {
       const behavior = createBehavior("type-reveal", current.duration)!;
@@ -126,7 +129,7 @@ it("文本、字幕和逐字行为导出独立填充，颜色透明度可保存�
     const expected =
       kind === "blue"
         ? [127, 127, 255]
-        : kind === "transparent" || kind === "disabled"
+        : kind === "transparent" || kind === "disabled" || kind === "default"
           ? [255, 255, 255]
           : [63, 63, 63];
     pixel(100, 70).forEach((channel, index) =>

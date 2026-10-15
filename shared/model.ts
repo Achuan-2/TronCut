@@ -256,7 +256,7 @@ export const defaultTransform: Transform = {
   opacity: 1,
 };
 export const textFillDefaults = {
-  fillEnabled: true,
+  fillEnabled: false,
   fill: "#000000",
   fillOpacity: 0.75,
   fillPaddingX: 12,

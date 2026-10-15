@@ -29,7 +29,6 @@ import { defaultCrop, defaultEffects } from "../shared/effects";
 import { textBoxFor } from "./text";
 import { MediaThumbnail } from "./MediaThumbnail";
 import { defaultCursorStyle } from "../shared/cursor";
-import { recordingZoomFrames } from "../shared/recording";
 import NarrationPanel from "./NarrationPanel";
 import AnimationsPanel from "./AnimationsPanel";
 import { defaultContentTransform } from "../shared/crop";
@@ -835,57 +834,6 @@ export function Inspector({ editor }: { editor: Editor }) {
                   0,
                   200,
                 )}
-              {hasCursor && asset && (
-                <div className="recording-zoom-controls">
-                  <h3 className="section-title">自动缩放</h3>
-                  <button
-                    disabled={locked}
-                    onClick={() => editor.setCanvasMode("crop")}
-                  >
-                    编辑缩放与移动
-                  </button>
-                  <button
-                    disabled={
-                      locked ||
-                      c.keyframes.some((frame) => !frame.recordingZoom)
-                    }
-                    onClick={() =>
-                      update({
-                        animationOffset: 0,
-                        keyframes: recordingZoomFrames(
-                          asset,
-                          c,
-                          c.keyframes.find(
-                            (frame) =>
-                              frame.recordingZoom &&
-                              (frame.value.contentScale ?? 1) > 1,
-                          )?.value.contentScale ?? 1.8,
-                        ),
-                      })
-                    }
-                  >
-                    根据鼠标重新生成缩放
-                  </button>
-                  <button
-                    disabled={
-                      locked ||
-                      !c.keyframes.some((frame) => frame.recordingZoom)
-                    }
-                    onClick={() =>
-                      update({
-                        keyframes: c.keyframes.filter(
-                          (frame) => !frame.recordingZoom,
-                        ),
-                      })
-                    }
-                  >
-                    移除自动缩放
-                  </button>
-                  <p className="field-help">
-                    选中时间线上的动画起点或终点，可修改框内缩放、位置和裁剪范围；拖动箭头或端点可调整动画时间。已有手动动画时，请先调整或移除动画再重新生成。
-                  </p>
-                </div>
-              )}
               {c.kind !== "audio" && (
                 <>
                   <h3 className="section-title">
