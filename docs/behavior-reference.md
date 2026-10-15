@@ -35,4 +35,4 @@ node scripts/compare-behaviors.mjs
 
 `compare-behaviors.mjs` 根据原工程的 18 段片段建立可编辑 TronCut 工程，逐段实际导出，再生成左侧 Camtasia、右侧 TronCut 的并排视频。结果位于独立的 `test-output/behavior-comparison-*` 目录；对比图放大中央区域，便于检查小字运动。此脚本需要本地参考文件，普通构建与测试不需要。
 
-另行执行 `tests/frame-properties.test.ts` 时，原有圆角校验用例会因图片夹具缺少素材引用而失败（该测试和 `shared/model.ts` 本轮未修改）；同文件的三轴旋转实际导出检查通过。
+`tests/frame-properties.test.ts` 的图片夹具已补齐素材引用，圆角校验与三轴旋转实际导出检查通过；新增百分比圆角同时验证静态裁切、动画裁切及旧像素圆角兼容。

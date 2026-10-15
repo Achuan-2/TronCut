@@ -1,5 +1,11 @@
 # 验证记录（含历史与 TronCut 0.3）
 
+## v0.4.3 发布前检查（2026-10-16）
+
+本地 `pnpm test` 的 66 个文件、288 项测试全部通过，包含真实 FFmpeg 视频导出、区域标记、百分比圆角与旧工程兼容、行为动画、录屏样式、Rust/Wasm 区间索引和工程归档。`pnpm run test:rust` 的 2 项 Rust 单元测试通过；`scripts/check-packaging.mjs` 确认随包媒体引擎、原生录屏组件、许可文件及语音 worker 齐全。
+
+此前本轮源码的 TypeScript、Vite 和 Electron 构建通过。`scripts/smoke-markers.mjs` 验证标记新增/编辑/删除、备注、预设与自定义颜色、时间校验、区域移动和两端裁切、撤销、Esc 取消、键盘微调、反向框选、点与区域转换及保存重开，前端错误为零；`scripts/smoke-timeline-scroll.mjs` 验证滚动对齐、横向缩放、窗口缩放及选中定位通过。发布安装包的构建、Windows 打包版编辑回归和 SHA256 校验另由发布工作流执行，macOS CI 打包不等同于真机验收。
+
 ## 新增素材保持工具标签（2026-10-15，开发版）
 
 移除粘贴素材、外部文件拖入和截取当前帧后的强制媒体标签切换，新增素材保留当前左侧工具标签。`pnpm build` 通过；`scripts/test-media-input-ui.mjs` 在标注标签粘贴图片、视觉效果标签批量拖入和失败后重新导入，确认标签保持不变。`scripts/test-frame-capture-ui.mjs` 在行为标签截帧，确认仍停留在行为标签，并通过真实截帧、轨道定位、撤销重做和保存重开回归。两项桌面专项均无前端运行错误。未重新打包安装程序。
