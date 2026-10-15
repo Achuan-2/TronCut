@@ -4,15 +4,17 @@ export default function CaptionProcessingFields({
   value,
   onChange,
   existing = false,
+  segmentationOnly = false,
 }: {
   value: CaptionProcessingOptions;
   onChange: (value: CaptionProcessingOptions) => void;
   existing?: boolean;
+  segmentationOnly?: boolean;
 }) {
   const usesAi = value.segmentation === "ai" || value.refinement !== "none";
   return (
     <fieldset className="caption-processing-fields">
-      <legend>断句与精修</legend>
+      <legend>{segmentationOnly ? "断句设置" : "断句与精修"}</legend>
       {!existing && (
         <>
           <label className="field vertical">
@@ -54,24 +56,26 @@ export default function CaptionProcessingFields({
           </p>
         </>
       )}
-      <label className="field vertical">
-        文字精修
-        <select
-          aria-label="文字精修"
-          value={value.refinement}
-          onChange={(event) =>
-            onChange({
-              ...value,
-              refinement: event.target
-                .value as CaptionProcessingOptions["refinement"],
-            })
-          }
-        >
-          {!existing && <option value="none">不精修，保留识别原文</option>}
-          <option value="correct">AI 纠错精修</option>
-          <option value="polish">AI 润色</option>
-        </select>
-      </label>
+      {!segmentationOnly && (
+        <label className="field vertical">
+          文字精修
+          <select
+            aria-label="文字精修"
+            value={value.refinement}
+            onChange={(event) =>
+              onChange({
+                ...value,
+                refinement: event.target
+                  .value as CaptionProcessingOptions["refinement"],
+              })
+            }
+          >
+            {!existing && <option value="none">不精修，保留识别原文</option>}
+            <option value="correct">AI 纠错精修</option>
+            <option value="polish">AI 润色</option>
+          </select>
+        </label>
+      )}
       {usesAi && (
         <>
           <details className="caption-instruction">

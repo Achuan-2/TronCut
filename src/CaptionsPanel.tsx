@@ -7,6 +7,7 @@ import {
   Search,
   SlidersHorizontal,
   Sparkles,
+  Scissors,
   Type,
   Upload,
   X,
@@ -27,8 +28,13 @@ import CaptionProcessingFields from "./CaptionProcessingFields";
 import TextFillFields from "./TextFillFields";
 import {
   captionProcessingSchema,
+  segmentCaptionCues,
   type CaptionProcessingOptions,
 } from "../shared/caption-processing";
+import {
+  captionSegmentationGroups,
+  applyCaptionSegmentation,
+} from "../shared/caption-segmentation";
 
 interface Props {
   editor: Editor;
@@ -38,7 +44,7 @@ interface Props {
   onPreferences: () => void;
 }
 
-type Dialog = "transcribe" | "replace" | "style" | "refine" | null;
+type Dialog = "transcribe" | "replace" | "style" | "refine" | "segment" | null;
 
 export function addCues(
   editor: Editor,
@@ -78,10 +84,22 @@ export default function CaptionsPanel({
         refinement: "polish",
       }),
     );
+  const [segmentation, setSegmentation] = useState<CaptionProcessingOptions>(
+    () => captionProcessingSchema.parse({}),
+  );
   const menu = useRef<HTMLDivElement>(null);
   const first = captions[0];
   const selectedCaptions = captions.filter((clip) =>
     editor.selectedIds.includes(clip.id),
+  );
+  const selectedCaptionTracks = new Set(
+    selectedCaptions.map((clip) => clip.trackId),
+  );
+  const segmentationTargets = captions.filter(
+    (clip) =>
+      (!selectedCaptionTracks.size ||
+        selectedCaptionTracks.has(clip.trackId)) &&
+      !project.tracks.find((track) => track.id === clip.trackId)?.locked,
   );
   const refineTargets = (
     selectedCaptions.length ? selectedCaptions : captions
@@ -237,6 +255,14 @@ export default function CaptionsPanel({
                 </button>
                 <button
                   role="menuitem"
+                  disabled={!segmentationTargets.length}
+                  onClick={() => open("segment")}
+                >
+                  <Scissors size={14} />
+                  断句
+                </button>
+                <button
+                  role="menuitem"
                   disabled={!refineTargets.length}
                   onClick={() => open("refine")}
                 >
@@ -332,7 +358,9 @@ export default function CaptionsPanel({
                       ? "搜索和替换"
                       : dialog === "refine"
                         ? "AI 精修与润色"
-                        : "统一字幕样式"}
+                        : dialog === "segment"
+                          ? "字幕断句"
+                          : "统一字幕样式"}
                 </h2>
                 <p>
                   {dialog === "transcribe"
@@ -341,7 +369,9 @@ export default function CaptionsPanel({
                       ? "搜索并批量替换所有未锁定字幕。"
                       : dialog === "refine"
                         ? `处理${selectedCaptions.length ? "选中的" : "全部"} ${refineTargets.length} 条未锁定字幕，保留时间和样式，支持撤销。`
-                        : `统一修改 ${captions.length} 条字幕的显示样式。`}
+                        : dialog === "segment"
+                          ? `对${selectedCaptionTracks.size ? "选中字幕轨道上的" : "全部"} ${segmentationTargets.length} 条未锁定字幕重新断句，无需重新识别语音。相邻同样式字幕可重新组合，保留样式和较长停顿，支持撤销；新断点按原字幕时间估算。`
+                          : `统一修改 ${captions.length} 条字幕的显示样式。`}
                 </p>
               </div>
               <button aria-label="关闭" onClick={() => setDialog(null)}>
@@ -404,6 +434,89 @@ export default function CaptionsPanel({
                 >
                   <AudioLines size={16} />
                   开始识别
+                </button>
+              </>
+            )}
+
+            {dialog === "segment" && (
+              <>
+                <CaptionProcessingFields
+                  segmentationOnly
+                  value={segmentation}
+                  onChange={setSegmentation}
+                />
+                {segmentation.segmentation === "ai" && (
+                  <button
+                    className="caption-preferences-link"
+                    onClick={() => {
+                      setDialog(null);
+                      onPreferences();
+                    }}
+                  >
+                    配置 AI 模型…
+                  </button>
+                )}
+                <button
+                  className="wide-button primary"
+                  disabled={
+                    busy ||
+                    !segmentationTargets.length ||
+                    (segmentation.segmentation === "custom" &&
+                      (!Number.isInteger(segmentation.maxChars) ||
+                        segmentation.maxChars < 8 ||
+                        segmentation.maxChars > 120))
+                  }
+                  onClick={() => {
+                    const groups = captionSegmentationGroups(
+                      project,
+                      segmentationTargets.map((clip) => clip.id),
+                    );
+                    const options = {
+                      ...segmentation,
+                      refinement: "none" as const,
+                    };
+                    setDialog(null);
+                    run(async () => {
+                      const results: Parameters<
+                        typeof applyCaptionSegmentation
+                      >[1] = [];
+                      const warnings = new Set<string>();
+                      for (const group of groups) {
+                        const result =
+                          options.segmentation === "ai"
+                            ? await bridge().refineCaptions(
+                                [group.cue],
+                                options,
+                              )
+                            : {
+                                cues: segmentCaptionCues([group.cue], options),
+                                warnings: [],
+                              };
+                        result.warnings.forEach((warning) =>
+                          warnings.add(warning),
+                        );
+                        results.push({ group, cues: result.cues });
+                      }
+                      let ids: string[] = [],
+                        changed = 0;
+                      editor.apply((current) => {
+                        const result = applyCaptionSegmentation(
+                          current,
+                          results,
+                        );
+                        ids = result.ids;
+                        changed = result.changed;
+                        return result.project;
+                      });
+                      if (ids.length) editor.selectMany(ids);
+                      toast(
+                        `${changed ? `已重新断句，共 ${ids.length} 条字幕` : "字幕断句无需调整"}${warnings.size ? `；${[...warnings].join("；")}` : ""}`,
+                      );
+                    });
+                  }}
+                >
+                  <Scissors size={16} />
+                  应用断句
                 </button>
               </>
             )}
