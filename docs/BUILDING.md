@@ -47,9 +47,11 @@ Mac 安装包不要求先完成本地验收。工作流直接构建并发布 arm
 
 请求发布但未指定版本号时，默认将当前版本的末位（patch）加 1，例如 v0.4.1 → v0.4.2；明确指定版本号时按指定版本执行。
 
-The [Build release workflow](../.github/workflows/release.yml) runs when a GitHub Release is published, including prereleases. It checks that `v<version>` matches `package.json` and checks out the exact tag commit. The Windows job downloads SHA256-verified FFmpeg 9.0.2 and uv 0.6.5, compiles the native capture helpers, runs tests and the packaged editing regression, and produces the x64 installer and portable ZIP. Native macOS jobs produce unsigned arm64 and x64 DMGs without local acceptance tests. The final job combines build provenance and checksums before uploading all packages. Upload permissions are limited to that final job; no extra secret or personal access token is required.
+Release 标题填写在 GitHub 的标题栏；`docs/releases/v<version>.md` 正文直接从简介开始，不再添加 `# TronCut v<version>`，避免页面重复显示标题。
 
-发布正式 Release 或预发布后，GitHub Actions 会自动上传 Windows x64 安装包、免安装 ZIP、macOS arm64/x64 DMG、构建记录、FFmpeg 上游源码及统一 SHA256 校验文件。TronCut 项目源码由 GitHub 版本标签提供，不再重复生成 `TronCut-<version>-source.zip`。先修改 `package.json` 版本并提交，推送对应 `v<version>` 标签，再在 GitHub 发布该标签的 Release。正式版不勾选预发布；普通提交或仅推送标签不会触发发版。
+The [Build release workflow](../.github/workflows/release.yml) runs when a GitHub Release is published, including prereleases. It checks that `v<version>` matches `package.json` and checks out the exact tag commit. The Windows job downloads SHA256-verified FFmpeg 9.0.2 and uv 0.6.5, compiles the native capture helpers, runs tests and the packaged editing regression, and produces the x64 installer and portable ZIP. Native macOS jobs produce unsigned arm64 and x64 DMGs without local acceptance tests. The final job combines checksums before uploading all packages. Upload permissions are limited to that final job; no extra secret or personal access token is required.
+
+发布正式 Release 或预发布后，GitHub Actions 会自动上传 Windows x64 安装包、免安装 ZIP、macOS arm64/x64 DMG、FFmpeg 上游源码及统一 SHA256 校验文件，不再生成或上传 `build-info.json`。TronCut 项目源码由 GitHub 版本标签提供，不再重复生成 `TronCut-<version>-source.zip`。先修改 `package.json` 版本并提交，推送对应 `v<version>` 标签，再在 GitHub 发布该标签的 Release。正式版不勾选预发布；普通提交或仅推送标签不会触发发版。
 
 To rebuild an existing release, open **Actions → Build release → Run workflow**, select `main`, and enter the existing tag. Upload replaces assets with the same names and regenerates checksums; the Release description, visibility, and prerelease state are preserved. Uncheck **Upload packages** to build only: packages remain available as Actions artifacts for 14 days. A failed build does not run the upload job, and a failed upload can be retried without rebuilding by rerunning the failed job. This workflow does not create commits, tags, or Releases.
 
@@ -57,6 +59,6 @@ To rebuild an existing release, open **Actions → Build release → Run workflo
 
 已有版本补包：在 **Actions → Build release → Run workflow** 中选择 `main`，输入标签即可。取消 **Upload packages** 可只构建而不发附件，保留明确的“不发版”入口。工作流不会创建或修改提交、标签、Release 文案或预发布状态。同名附件会被替换，校验文件会同步更新；上传过程失败可能留下部分附件，重跑失败任务可以继续上传。
 
-The first `v0.2.0` tag omitted `index.html`. Only this tag may restore that existing entry from the workflow commit, and its build-info JSON records the repair and both commit IDs. Subsequent tags must contain their complete source. Windows and macOS CI packages remain unsigned; the Mac packages are also unnotarized. CI success does not replace installation, permission, capture, export, or performance acceptance on actual devices.
+The first `v0.2.0` tag omitted `index.html`. Only this tag may restore that existing entry from the workflow commit. The Actions run records the source checkout and restoration step. Subsequent tags must contain their complete source. Windows and macOS CI packages remain unsigned; the Mac packages are also unnotarized. CI success does not replace installation, permission, capture, export, or performance acceptance on actual devices.
 
-首次 `v0.2.0` 标签漏收了 `index.html`，仅该版本补包允许从工作流提交恢复现有入口，构建记录会标明修复、入口校验值及源码与工具提交。后续版本缺少入口会直接报错。当前工作流发布 Windows x64 与 Mac arm64/x64，所有平台仍未配置代码签名，Mac 真机验收由使用者完成。
+首次 `v0.2.0` 标签漏收了 `index.html`，仅该版本补包允许从工作流提交恢复现有入口，源码检出与恢复步骤保留在 Actions 运行记录中。后续版本缺少入口会直接报错。当前工作流发布 Windows x64 与 Mac arm64/x64，所有平台仍未配置代码签名，Mac 真机验收由使用者完成。

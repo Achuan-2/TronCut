@@ -2,7 +2,7 @@
 import fs from "node:fs/promises";
 import { createReadStream, createWriteStream } from "node:fs";
 import path from "node:path";
-import { spawn, spawnSync } from "node:child_process";
+import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import { pipeline } from "node:stream/promises";
 import { Readable } from "node:stream";
@@ -21,6 +21,10 @@ await fs.mkdir(root, { recursive: true });
 // stale locally prepared project-source ZIP so broad artifact globs cannot
 // accidentally publish it again.
 await fs.rm(path.join(root, `TronCut-${pkg.version}-source.zip`), {
+  force: true,
+});
+// Remove metadata left by earlier packaging runs from the publish directory.
+await fs.rm(path.join(root, `TronCut-${pkg.version}-build-info.json`), {
   force: true,
 });
 const quote = (value) => `'${value.replace(/'/g, "''")}'`;
@@ -47,35 +51,6 @@ async function checksum(file) {
 const installer = `TronCut-Setup-${pkg.version}-windows-x64.exe`;
 const portable = `TronCut-${pkg.version}-windows-x64.zip`;
 const ffmpegSource = "FFmpeg-946fcce07b-source.tar.gz";
-const buildInfoName = `TronCut-${pkg.version}-build-info.json`;
-const revision = spawnSync("git", ["rev-parse", "HEAD"], {
-  encoding: "utf8",
-  windowsHide: true,
-});
-if (revision.status !== 0) throw new Error("Cannot resolve source commit.");
-const restoredEntry = process.env.TRONCUT_SOURCE_ENTRY_RESTORED === "1";
-await fs.writeFile(
-  path.join(root, buildInfoName),
-  JSON.stringify(
-    {
-      version: pkg.version,
-      sourceCommit: revision.stdout.trim(),
-      buildToolsCommit: process.env.TRONCUT_BUILD_TOOLS_SHA || null,
-      platform: "windows",
-      arch: "x64",
-      signed: false,
-      restoredEntry: restoredEntry
-        ? {
-            file: "index.html",
-            sha256: await checksum("index.html"),
-            reason: "The v0.2.0 tag omitted the existing Vite entry file.",
-          }
-        : null,
-    },
-    null,
-    2,
-  ) + "\n",
-);
 await fs.copyFile(
   path.resolve(`release/TronCut Setup ${pkg.version}.exe`),
   path.join(root, installer),
@@ -110,7 +85,7 @@ if (
 )
   throw new Error("Pinned FFmpeg source SHA256 mismatch.");
 await fs.copyFile(cached, path.join(root, ffmpegSource));
-const names = [installer, portable, ffmpegSource, buildInfoName];
+const names = [installer, portable, ffmpegSource];
 const manifest = [];
 for (const name of names) {
   const file = path.join(root, name);

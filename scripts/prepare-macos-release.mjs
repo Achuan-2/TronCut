@@ -4,7 +4,6 @@ import fs from "node:fs/promises";
 import { createReadStream } from "node:fs";
 import path from "node:path";
 import { createHash } from "node:crypto";
-import { spawnSync } from "node:child_process";
 
 const pkg = JSON.parse(await fs.readFile("package.json", "utf8"));
 const arch = process.env.TRONCUT_RELEASE_ARCH;
@@ -22,8 +21,12 @@ if (
 
 const root = path.resolve("release", "publish", `v${pkg.version}`);
 const dmg = `TronCut-${pkg.version}-macos-${arch}.dmg`;
-const buildInfoName = `TronCut-${pkg.version}-macos-${arch}-build-info.json`;
 await fs.mkdir(root, { recursive: true });
+// Remove metadata left by earlier packaging runs from the publish directory.
+await fs.rm(
+  path.join(root, `TronCut-${pkg.version}-macos-${arch}-build-info.json`),
+  { force: true },
+);
 
 async function checksum(file) {
   const hash = createHash("sha256");
@@ -31,28 +34,9 @@ async function checksum(file) {
   return hash.digest("hex");
 }
 
-const revision = spawnSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" });
-if (revision.status !== 0) throw new Error("Cannot resolve source commit.");
 await fs.copyFile(path.resolve("release", dmg), path.join(root, dmg));
-await fs.writeFile(
-  path.join(root, buildInfoName),
-  JSON.stringify(
-    {
-      version: pkg.version,
-      sourceCommit: revision.stdout.trim(),
-      buildToolsCommit: process.env.TRONCUT_BUILD_TOOLS_SHA || null,
-      platform: "macos",
-      arch,
-      signed: false,
-      notarized: false,
-      localValidation: "not-run",
-    },
-    null,
-    2,
-  ) + "\n",
-);
 
-const names = [dmg, buildInfoName];
+const names = [dmg];
 const manifest = [];
 for (const name of names) {
   const file = path.join(root, name);

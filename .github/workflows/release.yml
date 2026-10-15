@@ -51,7 +51,6 @@ jobs:
     env:
       CSC_IDENTITY_AUTO_DISCOVERY: "false"
       TRONCUT_RELEASE_TAG: ${{ needs.resolve.outputs.tag }}
-      TRONCUT_BUILD_TOOLS_SHA: ${{ github.sha }}
     defaults:
       run:
         shell: pwsh
@@ -80,7 +79,6 @@ jobs:
               throw 'Release source is missing index.html'
             }
             Copy-Item -LiteralPath ../ci/index.html -Destination index.html
-            'TRONCUT_SOURCE_ENTRY_RESTORED=1' >> $env:GITHUB_ENV
           }
       - uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
         with:
@@ -129,7 +127,6 @@ jobs:
             app/release/publish/${{ needs.resolve.outputs.tag }}/*.zip
             app/release/publish/${{ needs.resolve.outputs.tag }}/*.tar.gz
             app/release/publish/${{ needs.resolve.outputs.tag }}/SHA256SUMS.txt
-            app/release/publish/${{ needs.resolve.outputs.tag }}/TronCut-*-build-info.json
           if-no-files-found: error
           compression-level: 0
           retention-days: 14
@@ -158,7 +155,6 @@ jobs:
       CSC_IDENTITY_AUTO_DISCOVERY: "false"
       TRONCUT_RELEASE_TAG: ${{ needs.resolve.outputs.tag }}
       TRONCUT_RELEASE_ARCH: ${{ matrix.arch }}
-      TRONCUT_BUILD_TOOLS_SHA: ${{ github.sha }}
     defaults:
       run:
         shell: bash
@@ -220,7 +216,6 @@ jobs:
           path: |
             app/release/publish/${{ needs.resolve.outputs.tag }}/*.dmg
             app/release/publish/${{ needs.resolve.outputs.tag }}/SHA256SUMS.txt
-            app/release/publish/${{ needs.resolve.outputs.tag }}/TronCut-*-build-info.json
           if-no-files-found: error
           compression-level: 0
           retention-days: 14
