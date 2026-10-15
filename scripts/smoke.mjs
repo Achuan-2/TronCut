@@ -226,17 +226,24 @@ try {
   console.log(`发现 ${sources.length} 个屏幕/窗口来源`);
   await page.screenshot({ path: path.join(root, "edited.png") });
   if (process.env.FRAMECRAFT_RECORDING_SMOKE === "1") {
+    const ownId = await app.evaluate(({ BrowserWindow }) => {
+      const window = BrowserWindow.getAllWindows()[0];
+      window.unmaximize();
+      window.setSize(1280, 800);
+      return window.getMediaSourceId();
+    });
     await page.getByRole("button", { name: "录制", exact: true }).click();
     await page
       .getByText("麦克风", { exact: true })
       .locator("..")
       .locator("input")
       .uncheck();
-    const ownWindow = page
-      .locator(".capture-sources > button")
-      .filter({ hasText: "TronCut" })
-      .first();
-    if (await ownWindow.count()) await ownWindow.click();
+    const ownWindow = page.locator(
+      `.capture-sources > button[data-source-id="${ownId}"]`,
+    );
+    await expect(ownWindow).toHaveCount(1, { timeout: 20000 });
+    await ownWindow.click();
+    await page.getByLabel("录制帧率", { exact: true }).selectOption("15");
     await page.getByRole("button", { name: "开始录制", exact: true }).click();
     await expect(page.getByText("正在录制", { exact: true })).toBeVisible({
       timeout: 20000,

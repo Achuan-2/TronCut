@@ -271,7 +271,7 @@ try {
   await page.getByLabel("画布显示比例", { exact: true }).selectOption("fit");
   await page.getByRole("button", { name: "全屏预览", exact: true }).click();
   await expect.poll(() => page.evaluate(() => document.fullscreenElement !== null)).toBe(true);
-  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: "退出全屏预览", exact: true }).press("Escape");
   await expect.poll(() => page.evaluate(() => document.fullscreenElement === null)).toBe(true);
   console.log("全屏画布显示、自适应、播放控制、按钮退出及 Esc 退出通过");
   await expect(page.getByRole("button", { name: "波纹删除", exact: true })).toHaveCount(0);
