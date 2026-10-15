@@ -22,6 +22,7 @@ import {
   MousePointer2,
   Scan,
   Link2,
+  Paintbrush,
 } from "lucide-react";
 import {
   type Clip,
@@ -49,6 +50,9 @@ import AnnotationsPanel from "./AnnotationsPanel";
 import VisualEffectsPanel from "./VisualEffectsPanel";
 import SpeedProperties from "./SpeedProperties";
 import { hasClipSpeed } from "../shared/clip-speed";
+import { hasBehaviors } from "../shared/behaviors";
+import BehaviorsPanel from "./BehaviorsPanel";
+import BehaviorProperties from "./BehaviorProperties";
 
 export type Tab =
   | "media"
@@ -59,12 +63,14 @@ export type Tab =
   | "audio"
   | "narration"
   | "effects"
+  | "behaviors"
   | "settings";
 const tabs = [
   { id: "media", name: "媒体", icon: FolderOpen },
   { id: "annotations", name: "标注", icon: Type },
   { id: "captions", name: "字幕", icon: Captions },
   { id: "animations", name: "动画", icon: Sparkles },
+  { id: "behaviors", name: "行为", icon: Paintbrush },
   { id: "zoompan", name: "缩放与平移", icon: Scan },
   { id: "effects", name: "视觉效果", icon: WandSparkles },
   { id: "audio", name: "音频", icon: AudioLines },
@@ -279,6 +285,7 @@ export default function Panels(props: Props) {
           <AnnotationsPanel key={project.id} editor={editor} />
         </div>
         {tab === "effects" && <VisualEffectsPanel editor={editor} />}
+        {tab === "behaviors" && <BehaviorsPanel editor={editor} />}
         <div hidden={tab !== "narration"}>
           <NarrationPanel
             key={project.id}
@@ -789,18 +796,23 @@ export function Inspector({ editor }: { editor: Editor }) {
       ? [{ name: "cursor", label: "鼠标", icon: MousePointer2 }]
       : []),
     ...(hasText ? [{ name: "text", label: "文本", icon: Type }] : []),
+    ...(c && hasBehaviors(c)
+      ? [{ name: "behaviors", label: "行为", icon: Paintbrush }]
+      : []),
     ...(c?.kind === "audio"
       ? [{ name: "audio", label: "声音", icon: Music2 }]
       : []),
   ];
   const activeTab =
-    tab.clipId === c?.id && tabs.some((item) => item.name === tab.name)
-      ? tab.name
-      : hasText
-        ? "text"
-        : c?.kind === "audio"
-          ? "audio"
-          : "video";
+    editor.selectedBehavior?.clipId === c?.id
+      ? "behaviors"
+      : tab.clipId === c?.id && tabs.some((item) => item.name === tab.name)
+        ? tab.name
+        : hasText
+          ? "text"
+          : c?.kind === "audio"
+            ? "audio"
+            : "video";
   const cursorActive = activeTab === "cursor";
   const textActive = activeTab === "text";
   const value = c
@@ -905,6 +917,9 @@ export function Inspector({ editor }: { editor: Editor }) {
                       (event.key === "ArrowRight" ? 1 : -1) +
                       tabs.length) %
                     tabs.length;
+            if (tabs[index].name !== "behaviors") editor.select(c.id);
+            else if (c.behaviors?.length)
+              editor.selectBehavior(c.id, c.behaviors[0].id);
             setTab({ clipId: c.id, name: tabs[index].name });
             event.currentTarget
               .querySelectorAll<HTMLButtonElement>("button")
@@ -920,7 +935,12 @@ export function Inspector({ editor }: { editor: Editor }) {
               aria-controls={`inspector-${name}`}
               aria-selected={activeTab === name}
               tabIndex={activeTab === name ? 0 : -1}
-              onClick={() => setTab({ clipId: c.id, name })}
+              onClick={() => {
+                if (name !== "behaviors") editor.select(c.id);
+                else if (c.behaviors?.length)
+                  editor.selectBehavior(c.id, c.behaviors[0].id);
+                setTab({ clipId: c.id, name });
+              }}
             >
               <Icon size={18} />
               {label}
@@ -1271,6 +1291,16 @@ export function Inspector({ editor }: { editor: Editor }) {
                 )}
             </div>
             {hasClipSpeed(c) && <SpeedProperties clip={c} editor={editor} />}
+            {hasBehaviors(c) && (
+              <div
+                id="inspector-behaviors"
+                role="tabpanel"
+                aria-labelledby="inspector-behaviors-tab"
+                hidden={activeTab !== "behaviors"}
+              >
+                <BehaviorProperties clip={c} editor={editor} />
+              </div>
+            )}
           </fieldset>
         )}
       </div>

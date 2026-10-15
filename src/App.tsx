@@ -215,6 +215,7 @@ export default function App() {
     range: AnimationRange,
     cut = false,
   ) => {
+    editor.clearBehaviorClipboard();
     const token = editor.copyAnimation(clipId, range, cut);
     if (!token) return;
     clipClipboard.current = [];
@@ -231,13 +232,23 @@ export default function App() {
         : {
             assets: [],
             clipToken:
-              editor.animationClipboardToken() ?? clipClipboardToken.current,
+              editor.behaviorClipboardToken() ??
+              editor.animationClipboardToken() ??
+              clipClipboardToken.current,
           };
       if (result.assets.length) {
         editor.setPlaying(false);
         editor.addAssets(result.assets, true, { pasteToTop: true });
         setTab("media");
         toast(`已粘贴 ${result.assets.length} 个素材到时间线`);
+      } else if (
+        result.clipToken &&
+        result.clipToken === editor.behaviorClipboardToken()
+      ) {
+        if (editor.selectedId) {
+          editor.pasteBehavior(editor.selectedId);
+          toast("已粘贴行为");
+        }
       } else if (
         result.clipToken &&
         result.clipToken === editor.animationClipboardToken()
@@ -397,6 +408,26 @@ export default function App() {
       )?.locked;
     const animation = editor.selectedAnimation;
     if (
+      editor.selectedBehavior &&
+      ["Delete", "Backspace"].includes(event.key)
+    ) {
+      event.preventDefault();
+      if (!locked)
+        editor.removeBehavior(
+          editor.selectedBehavior.clipId,
+          editor.selectedBehavior.behaviorId,
+        );
+    } else if (
+      editor.selectedBehavior &&
+      (event.ctrlKey || event.metaKey) &&
+      event.key.toLowerCase() === "c"
+    ) {
+      event.preventDefault();
+      editor.copyBehavior(
+        editor.selectedBehavior.clipId,
+        editor.selectedBehavior.behaviorId,
+      );
+    } else if (
       animation &&
       selected &&
       (event.ctrlKey || event.metaKey) &&
@@ -456,6 +487,7 @@ export default function App() {
     ) {
       event.preventDefault();
       editor.clearAnimationClipboard();
+      editor.clearBehaviorClipboard();
       clipClipboard.current = structuredClone(
         editor.project.clips.filter((c) => editor.selectedIds.includes(c.id)),
       );

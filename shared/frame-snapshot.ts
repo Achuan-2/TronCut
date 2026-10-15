@@ -2,6 +2,7 @@ import { type Project } from "./model";
 import { transformAt } from "./editor";
 import { cameraAt } from "./canvas";
 import { fadeOpacity } from "./effects";
+import { shiftBehaviors } from "./behaviors";
 
 /** Freeze visible layers at one timeline instant while retaining source timestamps. */
 export function frameSnapshot(
@@ -44,6 +45,7 @@ export function frameSnapshot(
           keyframes: [],
           fadeIn: 0,
           fadeOut: 0,
+          ...(clip.behaviors ? { behaviors: shiftBehaviors(clip, local) } : {}),
         };
       }),
   };

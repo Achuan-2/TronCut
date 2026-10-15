@@ -51,6 +51,12 @@ import {
 } from "../shared/animation-edit";
 import { uid } from "../shared/model";
 import {
+  createBehavior,
+  supportsBehaviors,
+  fitBehaviorDuration,
+  type Behavior,
+} from "../shared/behaviors";
+import {
   stepFrameTime,
   mediaBoundaryTime,
   type PlaybackDirection,
@@ -105,11 +111,25 @@ export function useEditor() {
     setKeyframeSelection(null);
   }, []);
   const [selection, selectMany] = useState<string[]>([]);
+  const [behaviorSelection, setBehaviorSelection] = useState<{
+    clipId: string;
+    behaviorId: string;
+  } | null>(null);
+  const behaviorClipboard = useRef<Behavior | null>(null);
+  const behaviorClipboardToken = useRef<string | null>(null);
+  const [behaviorMenu, showBehaviorMenu] = useState<{
+    x: number;
+    y: number;
+    clipId: string;
+    behaviorId: string;
+    locked: boolean;
+  } | null>(null);
   const selectedIds = selection.filter((id) =>
     project.clips.some((c) => c.id === id),
   );
   const selectedId = selectedIds.at(-1) ?? null;
   const select = useCallback((id: string | null, additive = false) => {
+    setBehaviorSelection(null);
     if (id && !additive && keyframeRef.current?.clipId === id) return;
     clearKeyframeEdit();
     if (!id) {
@@ -152,7 +172,16 @@ export function useEditor() {
       const before = current.current,
         result = typeof next === "function" ? next(before) : next;
       const tracks = numberTracks(result.tracks);
-      const after = tracks === result.tracks ? result : { ...result, tracks };
+      const fittedClips = result.clips.map(fitBehaviorDuration);
+      const clips = fittedClips.some(
+        (clip, index) => clip !== result.clips[index],
+      )
+        ? fittedClips
+        : result.clips;
+      const after =
+        tracks === result.tracks && clips === result.clips
+          ? result
+          : { ...result, tracks, clips };
       if (after === before) return;
       past.current = [...past.current.slice(-99), before];
       future.current = [];
@@ -270,6 +299,7 @@ export function useEditor() {
       side: "start" | "end",
       keepSelection = false,
     ) => {
+      setBehaviorSelection(null);
       const clip = current.current.clips.find((clip) => clip.id === clipId);
       const track = current.current.tracks.find(
         (track) => track.id === clip?.trackId,
@@ -441,6 +471,103 @@ export function useEditor() {
       setPlaying(false);
     },
     [apply, selectedIds, select, clearKeyframeEdit, setPlaying],
+  );
+  const selectBehavior = useCallback(
+    (clipId: string, behaviorId: string) => {
+      select(clipId);
+      clearKeyframeEdit();
+      setPlaying(false);
+      setBehaviorSelection({ clipId, behaviorId });
+    },
+    [select, clearKeyframeEdit, setPlaying],
+  );
+  const addBehavior = useCallback(
+    (presetId: string, clipId?: string) => {
+      const p = current.current;
+      const ids = clipId ? [clipId] : selectedIds;
+      let added: { clipId: string; behaviorId: string } | null = null;
+      const clips = p.clips.map((clip) => {
+        if (
+          !ids.includes(clip.id) ||
+          !supportsBehaviors(clip) ||
+          (clip.behaviors?.length ?? 0) >= 32 ||
+          p.tracks.find((track) => track.id === clip.trackId)?.locked
+        )
+          return clip;
+        const behavior = createBehavior(presetId, clip.duration, clip.kind);
+        if (!behavior) return clip;
+        added = { clipId: clip.id, behaviorId: behavior.id };
+        return { ...clip, behaviors: [...(clip.behaviors ?? []), behavior] };
+      });
+      if (added) {
+        apply({ ...p, clips });
+        const target = added as { clipId: string; behaviorId: string };
+        selectBehavior(target.clipId, target.behaviorId);
+      }
+    },
+    [apply, selectedIds, selectBehavior],
+  );
+  const updateBehavior = useCallback(
+    (clipId: string, behaviorId: string, patch: Partial<Behavior>) => {
+      updateClip(clipId, (clip) => ({
+        ...clip,
+        behaviors: clip.behaviors?.map((behavior) =>
+          behavior.id === behaviorId ? { ...behavior, ...patch } : behavior,
+        ),
+      }));
+    },
+    [updateClip],
+  );
+  const removeBehavior = useCallback(
+    (clipId: string, behaviorId: string) => {
+      updateClip(clipId, (clip) => ({
+        ...clip,
+        behaviors: clip.behaviors?.filter(
+          (behavior) => behavior.id !== behaviorId,
+        ),
+      }));
+      setBehaviorSelection(null);
+    },
+    [updateClip],
+  );
+  const copyBehavior = useCallback((clipId: string, behaviorId: string) => {
+    const value = current.current.clips
+      .find((clip) => clip.id === clipId)
+      ?.behaviors?.find((behavior) => behavior.id === behaviorId);
+    if (value) {
+      behaviorClipboard.current = structuredClone(value);
+      behaviorClipboardToken.current = uid();
+      void window.framecraft
+        ?.copyClipClipboard(behaviorClipboardToken.current)
+        .catch(() => {});
+    }
+  }, []);
+  const pasteBehavior = useCallback(
+    (clipId: string) => {
+      const copied = behaviorClipboard.current;
+      const clip = current.current.clips.find((clip) => clip.id === clipId);
+      if (
+        !copied ||
+        !clip ||
+        !supportsBehaviors(clip) ||
+        (clip.behaviors?.length ?? 0) >= 32 ||
+        current.current.tracks.find((track) => track.id === clip.trackId)
+          ?.locked
+      )
+        return;
+      const value = {
+        ...structuredClone(copied),
+        id: uid(),
+        start: 0,
+        duration: clip.duration,
+      };
+      if (clip.kind !== "text")
+        for (const key of ["incoming", "during", "outgoing"] as const)
+          value[key] = { ...value[key], type: "whole", offset: 0 };
+      updateClip(clip.id, { behaviors: [...(clip.behaviors ?? []), value] });
+      selectBehavior(clip.id, value.id);
+    },
+    [updateClip, selectBehavior],
   );
   const changeClipSpeed = useCallback(
     (id: string, speed: number) => {
@@ -689,6 +816,30 @@ export function useEditor() {
     addText,
     addAnnotation,
     addSpeedEffect,
+    addBehavior,
+    updateBehavior,
+    removeBehavior,
+    selectBehavior,
+    selectedBehavior:
+      behaviorSelection &&
+      selectedIds.includes(behaviorSelection.clipId) &&
+      project.clips
+        .find((clip) => clip.id === behaviorSelection.clipId)
+        ?.behaviors?.some(
+          (behavior) => behavior.id === behaviorSelection.behaviorId,
+        )
+        ? behaviorSelection
+        : null,
+    behaviorMenu,
+    showBehaviorMenu,
+    copyBehavior,
+    pasteBehavior,
+    hasBehaviorClipboard: () => !!behaviorClipboard.current,
+    behaviorClipboardToken: () => behaviorClipboardToken.current,
+    clearBehaviorClipboard: () => {
+      behaviorClipboard.current = null;
+      behaviorClipboardToken.current = null;
+    },
     changeClipSpeed,
     changeSpeedDuration,
     removeSpeedEffect,

@@ -20,6 +20,8 @@ import {
   visualKeys,
 } from "../shared/visual-state";
 import { frameSnapshot } from "../shared/frame-snapshot";
+import { objectBehaviorExpressions } from "./behavior-export";
+import { rasterizeBehaviorText } from "./behavior-text-export";
 
 // Avoid lookahead buffering in short, delayed overlay graphs. Hardware failure
 // fallback and explicitly requested software encoding use identical settings.
@@ -51,9 +53,34 @@ export function expression(
     Clip,
     "transform" | "keyframes" | "start" | "animationOffset" | "rotation"
   > &
-    Partial<Pick<Clip, "crop" | "contentTransform">>,
+    Partial<
+      Pick<Clip, "crop" | "contentTransform" | "behaviors" | "kind" | "text">
+    >,
   key: keyof Transform,
   clock = "t",
+): string {
+  const base = baseExpression(clip, key, clock);
+  if (
+    !clip.behaviors?.some((behavior) => behavior.enabled) ||
+    !["x", "y", "scale", "opacity", "rotation"].includes(key)
+  )
+    return base;
+  const motion = objectBehaviorExpressions(
+    { ...clip, kind: clip.kind ?? "image" },
+    clock,
+  );
+  if (key === "x" || key === "y") return `(${base}+0.08*(${motion[key]}))`;
+  if (key === "scale" || key === "opacity") return `(${base}*(${motion[key]}))`;
+  return `(${base}+(${motion.rotation}))`;
+}
+function baseExpression(
+  clip: Pick<
+    Clip,
+    "transform" | "keyframes" | "start" | "animationOffset" | "rotation"
+  > &
+    Partial<Pick<Clip, "crop" | "contentTransform">>,
+  key: keyof Transform,
+  clock: string,
 ): string {
   const frames = [...clip.keyframes].sort((a, b) => a.time - b.time);
   const baseValue =
@@ -176,7 +203,7 @@ async function chooseEncoder(
 async function rasterize(
   clip: Clip,
   target: string,
-): Promise<{ width: number; height: number }> {
+): Promise<{ width: number; height: number; input?: string }> {
   if (clip.kind === "shape") {
     const body =
       clip.shape === "ellipse"
@@ -344,7 +371,16 @@ async function renderProject(
     const index = input++;
     // Seeking the decoder directly makes a late-timeline capture fast. Image
     // inputs start at zero; their source timestamp only matters to cursor data.
-    const sourceIn = still ? 0 : clip.sourceIn;
+    const animatedText =
+      clip.kind === "text" &&
+      !!clip.behaviors?.some(
+        (behavior) =>
+          behavior.enabled &&
+          [behavior.incoming, behavior.during, behavior.outgoing].some(
+            (phase) => phase.type !== "whole" && phase.style !== "none",
+          ),
+      );
+    const sourceIn = still || animatedText ? 0 : clip.sourceIn;
     let sourceSeek = clip.sourceIn;
     if (
       still &&
@@ -385,13 +421,18 @@ async function renderProject(
     let intrinsicWidth = asset?.width ?? 600,
       intrinsicHeight = asset?.height ?? 300;
     if (clip.kind === "text" || clip.kind === "shape") {
-      const image = path.join(workDir, `${layer}.png`),
-        size = await rasterize(clip, image);
+      const image = path.join(workDir, `${layer}.png`);
+      const size = animatedText
+        ? await rasterizeBehaviorText(clip, workDir, layer, fps, still, signal)
+        : await rasterize(clip, image);
       intrinsicWidth = size.width;
       intrinsicHeight = size.height;
-      args.push(
-        ...loopImageInput(image, fps, sourceIn + clip.duration * clip.speed),
-      );
+      if (animatedText)
+        args.push("-f", "concat", "-safe", "0", "-i", size.input!);
+      else
+        args.push(
+          ...loopImageInput(image, fps, sourceIn + clip.duration * clip.speed),
+        );
     } else if (clip.kind === "image")
       args.push(
         ...loopImageInput(
@@ -431,9 +472,9 @@ async function renderProject(
         (animatedViewport ? 0 : Math.floor(intrinsicHeight * crop.bottom));
       const scale = expression(clip, "scale");
       const transform = `scale=w='max(2,trunc(${cropWidth * fit}*(${scale})/2)*2)':h='max(2,trunc(${cropHeight * fit}*(${scale})/2)*2)':eval=frame`;
-      const alphaAnimated = clip.keyframes.some(
-        (k) => k.value.opacity !== clip.transform.opacity,
-      );
+      const alphaAnimated =
+        !!clip.behaviors?.some((behavior) => behavior.enabled) ||
+        clip.keyframes.some((k) => k.value.opacity !== clip.transform.opacity);
       let alpha = alphaAnimated
         ? `geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='alpha(X,Y)*(${expression(clip, "opacity", "T")})'`
         : `colorchannelmixer=aa=${clip.transform.opacity}`;
@@ -448,9 +489,11 @@ async function renderProject(
         intrinsicHeight,
       );
       const rotation = clip.transform.rotation ?? clip.rotation ?? 0;
-      const animatedRotation = clip.keyframes.some(
-        (frame) => (frame.value.rotation ?? rotation) !== rotation,
-      );
+      const animatedRotation =
+        !!clip.behaviors?.some((behavior) => behavior.enabled) ||
+        clip.keyframes.some(
+          (frame) => (frame.value.rotation ?? rotation) !== rotation,
+        );
       const hasAxisRotation = [
         clip.transform,
         ...clip.keyframes.map((frame) => frame.value),
@@ -497,7 +540,7 @@ async function renderProject(
           ? `trim=start=${sourceIn}:duration=${clip.duration * clip.speed},setpts=(PTS-STARTPTS)/${clip.speed}+${clip.start}/TB,`
           : "";
       filters.push(
-        `[${source}]${timing}format=rgba,${[...(animatedViewport ? animatedViewportFilters((key) => expression(clip, key, "T")) : contentFilters(clip)), ...visualEffects, transform, "setsar=1", ...rotate, alpha].join(",")}[${visual}]`,
+        `[${source}]${timing}${animatedText ? `fps=${fps},` : ""}format=rgba,${[...(animatedViewport ? animatedViewportFilters((key) => expression(clip, key, "T")) : contentFilters(clip)), ...visualEffects, transform, "setsar=1", ...rotate, alpha].join(",")}[${visual}]`,
       );
       filters.push(
         `[${base}][${visual}]overlay=x='${width}*(${expression(clip, "x")})-overlay_w/2':y='${height}*(${expression(clip, "y")})-overlay_h/2':enable='gte(t,${clip.start})*lt(t,${clip.start + clip.duration})':eof_action=pass:repeatlast=0${still ? ":format=auto" : ""}[${output}]`,

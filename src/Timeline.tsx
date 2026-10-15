@@ -49,6 +49,9 @@ import type { Editor } from "./useEditor";
 import { timeLabel } from "./Preview";
 import { hasClipSpeed, supportsClipSpeed } from "../shared/clip-speed";
 import TimelineSpeedEffect from "./TimelineSpeedEffect";
+import TimelineBehaviorEffect from "./TimelineBehaviorEffect";
+import BehaviorContextMenu from "./BehaviorContextMenu";
+import { hasBehaviors, supportsBehaviors } from "../shared/behaviors";
 import { annotationMime, parseAnnotation } from "../shared/annotations";
 
 interface Drag {
@@ -102,7 +105,9 @@ export default function Timeline({
   const [effectDrop, setEffectDrop] = useState<string | null>(null);
   const knownSpeedEffects = useRef(new Set<string>());
   useEffect(() => {
-    const ids = project.clips.filter(hasClipSpeed).map((clip) => clip.id);
+    const ids = project.clips
+      .filter((clip) => hasClipSpeed(clip) || hasBehaviors(clip))
+      .map((clip) => clip.id);
     const added = ids.filter((id) => !knownSpeedEffects.current.has(id));
     knownSpeedEffects.current = new Set(ids);
     if (added.length)
@@ -111,15 +116,21 @@ export default function Timeline({
         ...Object.fromEntries(added.map((id) => [id, true])),
       }));
   }, [project.clips]);
-  const trackHeights = project.tracks.map((track) =>
-    project.clips.some(
-      (clip) =>
-        clip.trackId === track.id &&
-        hasClipSpeed(clip) &&
-        expandedEffects[clip.id],
-    )
-      ? 98
-      : 70,
+  const trackHeights = project.tracks.map(
+    (track) =>
+      70 +
+      28 *
+        Math.max(
+          0,
+          ...project.clips
+            .filter(
+              (clip) => clip.trackId === track.id && expandedEffects[clip.id],
+            )
+            .map(
+              (clip) =>
+                Number(hasClipSpeed(clip)) + (clip.behaviors?.length ?? 0),
+            ),
+        ),
   );
   const layoutKey = trackHeights.join(",");
   const trackTop = (id: string) => {
@@ -134,6 +145,13 @@ export default function Timeline({
     select(id);
     setActiveSpeed(id);
   };
+  useEffect(() => {
+    if (editor.selectedBehavior)
+      setExpandedEffects((previous) => ({
+        ...previous,
+        [editor.selectedBehavior!.clipId]: true,
+      }));
+  }, [editor.selectedBehavior?.clipId, editor.selectedBehavior?.behaviorId]);
   const headers = useRef<HTMLDivElement>(null);
   const deleteControl = useRef<HTMLDivElement>(null);
   const deletePopup = useRef<HTMLDivElement>(null);
@@ -174,6 +192,14 @@ export default function Timeline({
       playhead <= clip.start + clip.duration,
   );
   const deleteSelection = (ripple = false) => {
+    if (editor.selectedBehavior) {
+      editor.removeBehavior(
+        editor.selectedBehavior.clipId,
+        editor.selectedBehavior.behaviorId,
+      );
+      setDeleteMenu(false);
+      return;
+    }
     apply((project) => deleteClips(project, editor.selectedIds, ripple));
     select(null);
     setDeleteMenu(false);
@@ -698,7 +724,10 @@ export default function Timeline({
                 }}
                 onDragOver={(e) => {
                   e.preventDefault();
-                  if (e.dataTransfer.types.includes("troncut-effect"))
+                  if (
+                    e.dataTransfer.types.includes("troncut-effect") ||
+                    e.dataTransfer.types.includes("troncut-behavior")
+                  )
                     e.dataTransfer.dropEffect = "none";
                 }}
                 onDrop={(e) => {
@@ -801,6 +830,21 @@ export default function Timeline({
                           }}
                           onDragOver={(event) => {
                             if (
+                              event.dataTransfer.types.includes(
+                                "troncut-behavior",
+                              )
+                            ) {
+                              event.preventDefault();
+                              event.stopPropagation();
+                              const allowed =
+                                !track.locked && supportsBehaviors(c);
+                              event.dataTransfer.dropEffect = allowed
+                                ? "copy"
+                                : "none";
+                              setEffectDrop(allowed ? c.id : null);
+                              return;
+                            }
+                            if (
                               !event.dataTransfer.types.includes(
                                 "troncut-effect",
                               )
@@ -824,6 +868,21 @@ export default function Timeline({
                               setEffectDrop(null);
                           }}
                           onDrop={(event) => {
+                            const behavior =
+                              event.dataTransfer.getData("troncut-behavior");
+                            if (behavior) {
+                              event.preventDefault();
+                              event.stopPropagation();
+                              setEffectDrop(null);
+                              if (!track.locked && supportsBehaviors(c)) {
+                                editor.addBehavior(behavior, c.id);
+                                setExpandedEffects((previous) => ({
+                                  ...previous,
+                                  [c.id]: true,
+                                }));
+                              }
+                              return;
+                            }
                             if (
                               event.dataTransfer.getData("troncut-effect") !==
                               "clip-speed"
@@ -844,6 +903,8 @@ export default function Timeline({
                             if (event.button !== 0 || track.locked) return;
                             event.stopPropagation();
                             editor.clearKeyframeEdit();
+                            if (editor.selectedBehavior?.clipId === c.id)
+                              select(c.id);
                             if (
                               event.ctrlKey ||
                               event.metaKey ||
@@ -1020,14 +1081,14 @@ export default function Timeline({
                             className="trim-handle right"
                             data-trim="right"
                           />
-                          {hasClipSpeed(c) && (
+                          {(hasClipSpeed(c) || hasBehaviors(c)) && (
                             <button
                               className="clip-effects-toggle"
                               type="button"
                               aria-label={
                                 expandedEffects[c.id]
-                                  ? "收起剪辑速度效果"
-                                  : "展开剪辑速度效果"
+                                  ? "收起片段效果"
+                                  : "展开片段效果"
                               }
                               aria-expanded={!!expandedEffects[c.id]}
                               onPointerDown={(event) => event.stopPropagation()}
@@ -1037,7 +1098,7 @@ export default function Timeline({
                                   ...previous,
                                   [c.id]: !previous[c.id],
                                 }));
-                                selectSpeed(c.id);
+                                select(c.id);
                               }}
                             >
                               {expandedEffects[c.id] ? (
@@ -1070,6 +1131,24 @@ export default function Timeline({
                             commit={(next) => editor.updateClip(next.id, next)}
                           />
                         )}
+                        {expandedEffects[c.id] &&
+                          c.behaviors?.map((behavior, index) => (
+                            <TimelineBehaviorEffect
+                              key={behavior.id}
+                              clip={c}
+                              behavior={behavior}
+                              zoom={zoom}
+                              row={index + Number(hasClipSpeed(c))}
+                              locked={track.locked}
+                              editor={editor}
+                              offsetY={
+                                drag?.id === c.id
+                                  ? trackTop(drag.trackId) -
+                                    trackTop(original.trackId)
+                                  : 0
+                              }
+                            />
+                          ))}
                       </Fragment>
                     );
                   })}
@@ -1118,6 +1197,19 @@ export default function Timeline({
             复制片段
           </button>
           <button
+            disabled={
+              !editor.hasBehaviorClipboard() ||
+              !!project.tracks.find(
+                (track) =>
+                  track.id ===
+                  project.clips.find((clip) => clip.id === context.id)?.trackId,
+              )?.locked
+            }
+            onClick={() => editor.pasteBehavior(context.id)}
+          >
+            粘贴效果
+          </button>
+          <button
             onClick={() => apply((p) => splitClip(p, context.id, playhead))}
           >
             <Scissors size={14} />
@@ -1129,6 +1221,7 @@ export default function Timeline({
           </button>
         </div>
       )}
+      <BehaviorContextMenu editor={editor} />
     </section>
   );
 }

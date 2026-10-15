@@ -51,6 +51,8 @@ import CanvasToolbar, {
 import type { Editor } from "./useEditor";
 import { visualClipAt } from "../shared/visual-state";
 import { annotationMime, parseAnnotation } from "../shared/annotations";
+import { behaviorTransform, supportsBehaviors } from "../shared/behaviors";
+import BehaviorText from "./BehaviorText";
 
 export function timeLabel(t: number): string {
   const seconds = Math.max(0, t);
@@ -212,7 +214,13 @@ function PreviewLayer({
     dragRef.current = value;
     setDrag(value);
   };
-  const displayed = drag?.value ?? transform;
+  const displayed = editing
+    ? (drag?.value ?? transform)
+    : behaviorTransform(
+        clip,
+        drag?.value ?? transform,
+        editor.playhead - clip.start,
+      );
   const textBox = clip.kind === "text" ? (drag?.box ?? textBoxFor(clip)) : null;
   const style: CSSProperties = {
     left: `${displayed.x * 100}%`,
@@ -281,6 +289,25 @@ function PreviewLayer({
     <div
       className={`preview-layer ${clip.kind} ${interactive && editor.selectedIds.includes(clip.id) ? "selected" : ""} ${editing ? "editing" : ""} ${cropping ? "cropping" : ""}`}
       style={style}
+      onDragOver={(event) => {
+        if (
+          !interactive ||
+          !event.dataTransfer.types.includes("troncut-behavior")
+        )
+          return;
+        event.preventDefault();
+        event.stopPropagation();
+        event.dataTransfer.dropEffect =
+          selectable && supportsBehaviors(clip) ? "copy" : "none";
+      }}
+      onDrop={(event) => {
+        const preset = event.dataTransfer.getData("troncut-behavior");
+        if (!interactive || !preset) return;
+        event.preventDefault();
+        event.stopPropagation();
+        if (selectable && supportsBehaviors(clip))
+          editor.addBehavior(preset, clip.id);
+      }}
       onClick={(event) => event.stopPropagation()}
       onDoubleClick={(event) => {
         if (clip.kind !== "text" || editing || !selectable || mode !== "select")
@@ -560,6 +587,12 @@ function PreviewLayer({
                   editor.endTextEdit(clip.id);
                 }
               }}
+            />
+          ) : clip.behaviors?.length ? (
+            <BehaviorText
+              clip={clip}
+              time={editor.playhead - clip.start}
+              scale={scale}
             />
           ) : (
             clip.text || " "

@@ -12,6 +12,7 @@ import { sameTransform } from "./animation-ranges";
 import { easeProgress } from "./easing";
 import { normalizeRotationAxes, rotationKeys } from "./rotation";
 import { visualKeys, visualValues } from "./visual-state";
+import { fitBehaviorDuration } from "./behaviors";
 
 export function availableTrack(
   project: Pick<Project, "tracks" | "clips">,
@@ -302,11 +303,11 @@ export function splitClip(
   if (!clip || time <= clip.start || time >= clip.start + clip.duration)
     return project;
   const cut = time - clip.start;
-  const left: Clip = {
+  const left: Clip = fitBehaviorDuration({
     ...clip,
     duration: cut,
-  };
-  const right: Clip = {
+  });
+  const right: Clip = fitBehaviorDuration({
     ...clip,
     id: uid(),
     start: time,
@@ -314,7 +315,7 @@ export function splitClip(
     sourceIn: clip.sourceIn + cut * clip.speed,
     // Keep the original curve. Rebuilding a smooth curve at the cut would change its acceleration.
     animationOffset: (clip.animationOffset ?? 0) + cut,
-  };
+  });
   return {
     ...project,
     clips: project.clips.flatMap((c) =>
@@ -324,13 +325,13 @@ export function splitClip(
 }
 export function changeSpeed(clip: Clip, speed: number): Clip {
   const ratio = clip.speed / speed;
-  return {
+  return fitBehaviorDuration({
     ...clip,
     speed,
     duration: clip.duration * ratio,
     animationOffset: (clip.animationOffset ?? 0) * ratio,
     keyframes: clip.keyframes.map((k) => ({ ...k, time: k.time * ratio })),
-  };
+  });
 }
 export function animation(
   clip: Clip,
