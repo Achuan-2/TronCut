@@ -6,7 +6,6 @@ import {
   globalShortcut,
   ipcMain,
   Menu,
-  net,
   protocol,
   session,
   screen,
@@ -14,7 +13,6 @@ import {
 import fs from "node:fs/promises";
 import type { FileHandle } from "node:fs/promises";
 import path from "node:path";
-import { pathToFileURL } from "node:url";
 import { z } from "zod";
 import {
   type Asset,
@@ -36,6 +34,7 @@ import { ttsOptionsSchema } from "../shared/tts";
 import { onnxModelSchema } from "../shared/onnx";
 import { downloadOnnxModel } from "./onnx";
 import { mediaThumbnail } from "./thumbnails";
+import { serveMediaFile } from "./media-protocol";
 import { NativeRecording } from "./native-recording";
 import { copyClipClipboard, importClipboardMedia } from "./clipboard-media";
 import { importMediaPaths } from "./import-media";
@@ -966,9 +965,7 @@ app
       const id = decodeURIComponent(new URL(request.url).pathname.slice(1)),
         asset = assets.get(id);
       if (!asset) return new Response("素材不存在", { status: 404 });
-      return net.fetch(pathToFileURL(asset.path).toString(), {
-        headers: request.headers,
-      });
+      return serveMediaFile(request, asset.path);
     });
     session.defaultSession.setPermissionRequestHandler(
       (contents, permission, callback) =>
