@@ -22,8 +22,14 @@ import {
   availableTrack,
   setTransform,
   setKeyframeTransform,
+  transformAt,
 } from "../shared/editor";
 import { selectionWithGroups } from "../shared/timeline";
+import {
+  captionTrackSelection,
+  updateCaptionAppearance,
+  type CaptionAppearance,
+} from "../shared/captions";
 import {
   addTransition as addProjectTransition,
   updateTransition as updateProjectTransition,
@@ -147,7 +153,11 @@ export function useEditor() {
       selectMany([]);
       return;
     }
-    const group = selectionWithGroups(current.current, [id]);
+    const clip = current.current.clips.find((clip) => clip.id === id);
+    const group =
+      clip?.caption && !additive
+        ? captionTrackSelection(current.current, id)
+        : selectionWithGroups(current.current, [id]);
     selectMany((previous) =>
       additive
         ? previous.includes(id)
@@ -264,6 +274,48 @@ export function useEditor() {
     },
     [apply],
   );
+  const updateTextAppearance = useCallback(
+    (id: string, patch: CaptionAppearance) => {
+      if (!current.current.clips.find((clip) => clip.id === id)?.caption) {
+        const { transform, ...appearance } = patch;
+        updateClip(id, (clip) => ({
+          ...clip,
+          ...appearance,
+          transform: { ...clip.transform, ...transform },
+        }));
+        return;
+      }
+      apply((project) => {
+        const next = updateCaptionAppearance(project, id, patch);
+        if (next === project) return project;
+        return {
+          ...next,
+          clips: next.clips.map((clip, index) =>
+            clip === project.clips[index]
+              ? clip
+              : fitUpdatedText(project.clips[index], clip),
+          ),
+        };
+      });
+    },
+    [apply, updateClip],
+  );
+  const selectCaptionTrack = useCallback(
+    (trackId: string, time?: number) => {
+      const clips = current.current.clips.filter(
+        (clip) => clip.caption && clip.trackId === trackId,
+      );
+      const active =
+        clips.find(
+          (clip) =>
+            time !== undefined &&
+            clip.start <= time &&
+            time < clip.start + clip.duration,
+        ) ?? clips[0];
+      select(active?.id ?? null);
+    },
+    [select],
+  );
   const updateContentTransform = useCallback(
     (id: string, patch: Partial<ContentTransform>) => {
       const frame = keyframeRef.current;
@@ -360,6 +412,24 @@ export function useEditor() {
   const updateTransform = useCallback(
     (id: string, patch: Partial<Transform>, clipPatch: Partial<Clip> = {}) => {
       const frame = keyframeRef.current;
+      const clip = current.current.clips.find((clip) => clip.id === id);
+      if (clip?.caption && frame?.clipId !== id) {
+        const sampled = transformAt(clip, playhead - clip.start);
+        updateTextAppearance(id, {
+          ...(clipPatch.style ? { style: clipPatch.style } : {}),
+          ...(clipPatch.textBox ? { textBox: clipPatch.textBox } : {}),
+          transform: {
+            ...patch,
+            ...(patch.x === undefined
+              ? {}
+              : { x: clip.transform.x + patch.x - sampled.x }),
+            ...(patch.y === undefined
+              ? {}
+              : { y: clip.transform.y + patch.y - sampled.y }),
+          },
+        });
+        return;
+      }
       updateClip(id, (clip) => {
         const source = { ...clip, ...clipPatch };
         return frame?.clipId === id
@@ -372,7 +442,7 @@ export function useEditor() {
           : setTransform(source, patch, playhead - clip.start, autoAnimate);
       });
     },
-    [updateClip, playhead, autoAnimate],
+    [updateClip, updateTextAppearance, playhead, autoAnimate],
   );
   const addSelectedKeyframe = useCallback(() => {
     const project = current.current;
@@ -834,6 +904,7 @@ export function useEditor() {
     selectedIds,
     selectMany,
     select,
+    selectCaptionTrack,
     playhead,
     seek,
     playing,
@@ -843,6 +914,7 @@ export function useEditor() {
     undo,
     redo,
     updateClip,
+    updateTextAppearance,
     updateContentTransform,
     updateCrop,
     canvasMode,

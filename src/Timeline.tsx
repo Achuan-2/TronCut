@@ -62,6 +62,7 @@ import {
   type TransitionTarget,
 } from "../shared/transitions";
 import {
+  captionTrackSelection,
   convertCaptionsToText,
   ensureCaptionTrack,
   mergeWithPreviousCaption,
@@ -627,6 +628,13 @@ export default function Timeline({
               className={`track-header ${track.locked ? "locked" : ""} ${track.captionTrack ? "caption-track" : ""}`}
               key={track.id}
               style={{ height: trackHeights[index] }}
+              onClick={(event) => {
+                if (
+                  track.captionTrack &&
+                  !(event.target as HTMLElement).closest("button")
+                )
+                  editor.selectCaptionTrack(track.id, playhead);
+              }}
             >
               <div>
                 <span className="track-name">
@@ -894,8 +902,11 @@ export default function Timeline({
                       marqueeMoved.current = false;
                       return;
                     }
-                    select(null);
-                    seek(timeFromEvent(event));
+                    const time = timeFromEvent(event);
+                    if (track.captionTrack)
+                      editor.selectCaptionTrack(track.id, time);
+                    else select(null);
+                    seek(time);
                   }
                 }}
                 onDragOver={(e) => {
@@ -1146,9 +1157,16 @@ export default function Timeline({
                             }
                             const ids = editor.selectedIds.includes(c.id)
                               ? editor.selectedIds
-                              : selectionWithGroups(project, [c.id]);
+                              : c.caption
+                                ? captionTrackSelection(project, c.id)
+                                : selectionWithGroups(project, [c.id]);
                             if (!editor.selectedIds.includes(c.id))
                               select(c.id);
+                            else if (c.caption)
+                              editor.selectMany([
+                                ...ids.filter((id) => id !== c.id),
+                                c.id,
+                              ]);
                             const mode = (event.target as HTMLElement).dataset
                               .trim as "left" | "right" | undefined;
                             event.currentTarget.setPointerCapture(
@@ -1199,7 +1217,11 @@ export default function Timeline({
                             });
                           }}
                           onPointerUp={() => {
-                            if (drag) {
+                            if (
+                              drag &&
+                              (drag.delta !== 0 ||
+                                drag.trackId !== drag.original.trackId)
+                            ) {
                               const next = dragClip(drag);
                               if (drag.mode === "move" && drag.ids.length > 1)
                                 apply((p) =>

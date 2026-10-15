@@ -1,5 +1,90 @@
-import { type Clip, type Project, newText, newTrack } from "./model";
+import {
+  type Clip,
+  type Project,
+  type Transform,
+  newText,
+  newTrack,
+} from "./model";
 import type { Cue } from "./subtitles";
+
+export const captionDefaults = {
+  fontSize: 30,
+  x: 0.5,
+  y: 0.92,
+  outlineWidth: 2,
+} as const;
+
+// Keep the clicked cue active while selecting the rest of its subtitle track.
+export function captionTrackSelection(
+  project: Project,
+  clipId: string,
+): string[] {
+  const target = project.clips.find((clip) => clip.id === clipId);
+  if (!target?.caption) return [clipId];
+  return [
+    ...captionClips(project)
+      .filter((clip) => clip.trackId === target.trackId && clip.id !== clipId)
+      .map((clip) => clip.id),
+    clipId,
+  ];
+}
+
+export type CaptionAppearance = Partial<
+  Pick<Clip, "style" | "textBox" | "autoResizeText">
+> & {
+  transform?: Partial<Transform>;
+};
+
+export function updateCaptionAppearance(
+  project: Project,
+  clipId: string,
+  patch: CaptionAppearance,
+): Project {
+  const target = project.clips.find((clip) => clip.id === clipId);
+  if (
+    !target?.caption ||
+    project.tracks.find((track) => track.id === target.trackId)?.locked
+  )
+    return project;
+  const { transform } = patch;
+  // Only appearance may be propagated; cue text and timing always stay local.
+  const appearance = {
+    ...(patch.style ? { style: patch.style } : {}),
+    ...(patch.textBox ? { textBox: patch.textBox } : {}),
+    ...(patch.autoResizeText === undefined
+      ? {}
+      : { autoResizeText: patch.autoResizeText }),
+  };
+  return {
+    ...project,
+    clips: project.clips.map((clip) => {
+      if (!clip.caption || clip.trackId !== target.trackId) return clip;
+      return {
+        ...clip,
+        ...appearance,
+        ...(transform
+          ? {
+              transform: { ...clip.transform, ...transform },
+              keyframes: clip.keyframes.map((frame) => ({
+                ...frame,
+                value: {
+                  ...frame.value,
+                  ...transform,
+                  // Reposition existing motion rather than erasing its path.
+                  ...(transform.x === undefined
+                    ? {}
+                    : { x: frame.value.x + transform.x - clip.transform.x }),
+                  ...(transform.y === undefined
+                    ? {}
+                    : { y: frame.value.y + transform.y - clip.transform.y }),
+                },
+              })),
+            }
+          : {}),
+      };
+    }),
+  };
+}
 
 export function captionClips(project: Project) {
   return project.clips
@@ -69,13 +154,24 @@ export function appendCaptionCues(
     (item) => item.id === ensured.trackId,
   )!;
   if (track.locked) throw new Error("字幕轨道已锁定，请先解锁");
+  const template = ensured.project.clips.find(
+    (clip) => clip.caption && clip.trackId === track.id,
+  );
   const clips = cues.flatMap((cue) => {
     if (!cue.text.trim() || cue.end <= cue.start) return [];
     const clip = newText(track.id, cue.start, 0, cue.text);
     clip.duration = cue.end - cue.start;
     clip.caption = true;
-    clip.transform.y = 0.85;
-    clip.style!.fontSize = 56;
+    clip.transform.x = captionDefaults.x;
+    clip.transform.y = captionDefaults.y;
+    clip.style!.fontSize = captionDefaults.fontSize;
+    clip.style!.outlineWidth = captionDefaults.outlineWidth;
+    if (template) {
+      clip.style = { ...clip.style!, ...template.style };
+      clip.transform = { ...template.transform };
+      if (template.textBox) clip.textBox = { ...template.textBox };
+      clip.autoResizeText = template.autoResizeText;
+    }
     return [clip];
   });
   return {

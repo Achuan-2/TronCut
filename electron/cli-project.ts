@@ -14,6 +14,7 @@ import {
   projectDuration,
 } from "../shared/model";
 import { type Cue } from "../shared/subtitles";
+import { captionDefaults } from "../shared/captions";
 import { setClipSpeed, supportsClipSpeed } from "../shared/clip-speed";
 import { deleteClips } from "../shared/timeline";
 import { probeMedia } from "./media";
@@ -196,7 +197,7 @@ export function sourceCuesToTimeline(cues: Cue[], clip: Clip): Cue[] {
 export function addCaptionCues(
   input: Project,
   cues: Cue[],
-  style: { y: number; fontSize?: number } = { y: 0.85 },
+  style: { y: number; fontSize?: number } = { y: captionDefaults.y },
 ) {
   if (!cues.length) return input;
   const project = structuredClone(input),
@@ -208,12 +209,7 @@ export function addCaptionCues(
     clip.caption = true;
     clip.duration = cue.end - cue.start;
     clip.transform.y = style.y;
-    clip.style!.fontSize =
-      style.fontSize ??
-      Math.max(
-        12,
-        Math.min(300, Math.round((project.canvas.height * 56) / 1080)),
-      );
+    clip.style!.fontSize = style.fontSize ?? captionDefaults.fontSize;
     clip.style!.outlineWidth = Math.max(
       1,
       Math.round(clip.style!.fontSize / 14),

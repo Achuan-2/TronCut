@@ -12,6 +12,7 @@ import {
 } from "../shared/cli";
 import { type Project, projectDuration, uid } from "../shared/model";
 import { toSrt } from "../shared/subtitles";
+import { captionDefaults } from "../shared/captions";
 import { onnxModelSchema } from "../shared/onnx";
 import { exportFrame, exportVideo } from "./export";
 import { capabilities, probeMedia } from "./media";
@@ -437,7 +438,7 @@ export async function executeCli(
         project,
         configuration,
         context,
-        { y: 0.85 },
+        { y: captionDefaults.y },
       );
       if (!result.cues.length)
         throw new Error(
@@ -456,8 +457,11 @@ export async function executeCli(
           )
         : "";
       if (options.offline) script.offline = true;
-      project = (await narrateCliProject(project, script, context, { y: 0.85 }))
-        .project;
+      project = (
+        await narrateCliProject(project, script, context, {
+          y: captionDefaults.y,
+        })
+      ).project;
     }
     return saveOutputs(
       project,

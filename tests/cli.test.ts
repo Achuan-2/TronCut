@@ -2,7 +2,11 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { executeCli, runCli } from "../electron/cli";
-import { editCliProject, sourceCuesToTimeline } from "../electron/cli-project";
+import {
+  addCaptionCues,
+  editCliProject,
+  sourceCuesToTimeline,
+} from "../electron/cli-project";
 import {
   cliPlanSchema,
   editSchema,
@@ -26,6 +30,22 @@ function context(root: string) {
 }
 
 describe("Codex CLI 工程与命令协议", () => {
+  it("CLI 字幕与编辑器共用默认字号和位置，并保留显式设置", () => {
+    const cues = [{ start: 0, end: 2, text: "默认字幕" }];
+    const project = addCaptionCues(createProject(), cues);
+    expect(project.clips[0].style).toMatchObject({
+      fontSize: 30,
+      outlineWidth: 2,
+    });
+    expect(project.clips[0].transform).toMatchObject({ x: 0.5, y: 0.92 });
+    const custom = addCaptionCues(createProject(), cues, {
+      y: 0.8,
+      fontSize: 50,
+    });
+    expect(custom.clips[0].style!.fontSize).toBe(50);
+    expect(custom.clips[0].transform.y).toBe(0.8);
+  });
+
   it("拒绝未知计划字段、重叠文案、无效裁剪与锁定轨道编辑", () => {
     expect(transcriptionSchema.parse({}).engine).toBe("qwen3-asr");
     expect(

@@ -603,7 +603,10 @@ export function Inspector({ editor }: { editor: Editor }) {
     ? transformAt(c, editor.playhead - c.start)
     : defaultTransform;
   const update = (patch: Partial<Clip>) => {
-    if (c && !locked) editor.updateClip(c.id, patch);
+    if (!c || locked) return;
+    if (patch.style || patch.textBox || patch.autoResizeText !== undefined)
+      editor.updateTextAppearance(c.id, patch);
+    else editor.updateClip(c.id, patch);
   };
   const transform = (key: keyof typeof value, v: number) => {
     if (c && !locked && Number.isFinite(v))
@@ -762,7 +765,7 @@ export function Inspector({ editor }: { editor: Editor }) {
                     ? "轨道已锁定"
                     : c.kind === "text"
                       ? c.caption
-                        ? "字幕文本"
+                        ? `字幕轨道 · ${editor.project.clips.filter((clip) => clip.caption && clip.trackId === c.trackId).length} 条字幕（样式与位置统一设置）`
                         : "文本图层"
                       : c.kind === "shape"
                         ? "标注图层"

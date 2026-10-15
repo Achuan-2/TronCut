@@ -17,6 +17,7 @@ import type { SpeechEngine } from "../shared/asr";
 import {
   appendCaptionCues,
   captionClips,
+  captionDefaults,
   convertCaptionsToText,
   replaceCaptionText,
 } from "../shared/captions";
@@ -92,9 +93,13 @@ export default function CaptionsPanel({
     opacity: number;
     y: number;
   }>(() => ({
-    text: { ...textPresets[0].style, fontSize: 56 },
+    text: {
+      ...textPresets[0].style,
+      fontSize: captionDefaults.fontSize,
+      outlineWidth: captionDefaults.outlineWidth,
+    },
     opacity: 1,
-    y: 0.85,
+    y: captionDefaults.y,
   }));
 
   useEffect(() => {
@@ -611,7 +616,10 @@ export default function CaptionsPanel({
                       }))
                     }
                   >
-                    <option value="0.85">底部</option>
+                    <option value={captionDefaults.y}>底部</option>
+                    {![captionDefaults.y, 0.5].includes(style.y) && (
+                      <option value={style.y}>当前位置</option>
+                    )}
                     <option value="0.5">居中</option>
                   </select>
                 </label>

@@ -3,13 +3,120 @@ import { createProject, newText, validateProject } from "../shared/model";
 import {
   appendCaptionCues,
   captionClips,
+  captionDefaults,
+  captionTrackSelection,
   convertCaptionsToText,
   mergeWithPreviousCaption,
   replaceCaptionText,
+  updateCaptionAppearance,
 } from "../shared/captions";
 import { availableTrack } from "../shared/editor";
 
 describe("字幕轨道与批量编辑", () => {
+  it("新字幕使用 30 号字和底部居中位置，普通文本默认样式不变", () => {
+    const project = createProject();
+    const text = newText(project.tracks[0].id, 0);
+    const result = appendCaptionCues(project, [
+      { start: 0, end: 1, text: "字幕" },
+    ]);
+    const caption = captionClips(result.project)[0];
+    expect(caption.style).toMatchObject({ fontSize: 30, outlineWidth: 2 });
+    expect(caption.transform).toMatchObject({ x: 0.5, y: 0.92 });
+    expect(text.style!.fontSize).toBe(68);
+  });
+
+  it("点击字幕只圈选同轨字幕，并将点击的这一句保留为当前编辑对象", () => {
+    const first = appendCaptionCues(createProject(), [
+      { start: 0, end: 1, text: "第一句" },
+      { start: 1, end: 2, text: "第二句" },
+    ]);
+    const second = appendCaptionCues(
+      first.project,
+      [{ start: 0, end: 1, text: "另一轨" }],
+      { newTrack: true },
+    );
+    const selection = captionTrackSelection(second.project, first.ids[0]);
+    expect(selection).toEqual([first.ids[1], first.ids[0]]);
+    expect(selection).not.toContain(second.ids[0]);
+  });
+
+  it("批量样式和位置保留逐句内容、时间与动画，不影响普通文本、其他轨道和锁定轨道", () => {
+    const first = appendCaptionCues(createProject(), [
+      { start: 0, end: 1, text: "第一句" },
+      { start: 2, end: 4, text: "第二句" },
+    ]);
+    const { project } = appendCaptionCues(
+      first.project,
+      [{ start: 0, end: 1, text: "另一轨" }],
+      { newTrack: true },
+    );
+    const source = project.clips.find((clip) => clip.id === first.ids[0])!;
+    source.keyframes = [
+      {
+        time: 0,
+        value: {
+          ...source.transform,
+          y: source.transform.y + 0.05,
+          opacity: 0,
+        },
+      },
+      { time: 1, value: { ...source.transform, opacity: 1 } },
+    ];
+    const ordinary = newText(source.trackId, 4, 0, "保留普通文本");
+    project.clips.push(ordinary);
+    const updated = updateCaptionAppearance(project, source.id, {
+      style: { ...source.style!, fontSize: 42, color: "#ffff00" },
+      transform: { x: 0.4, y: 0.8 },
+    });
+    for (const id of first.ids) {
+      const before = project.clips.find((clip) => clip.id === id)!;
+      const after = updated.clips.find((clip) => clip.id === id)!;
+      expect(after.style).toMatchObject({ fontSize: 42, color: "#ffff00" });
+      expect(after.transform).toMatchObject({ x: 0.4, y: 0.8 });
+      expect([after.text, after.start, after.duration]).toEqual([
+        before.text,
+        before.start,
+        before.duration,
+      ]);
+    }
+    expect(updated.clips[0].keyframes[0].value.y).toBeCloseTo(0.85);
+    expect(updated.clips[0].keyframes[0].value.opacity).toBe(0);
+    expect(updated.clips[0].keyframes[1].value.y).toBeCloseTo(0.8);
+    // Add to the first dedicated track, so explicitly put the edited track first.
+    const sameTrack = appendCaptionCues(
+      {
+        ...updated,
+        tracks: [...updated.tracks].sort(
+          (a, b) =>
+            Number(b.id === source.trackId) - Number(a.id === source.trackId),
+        ),
+      },
+      [{ start: 5, end: 6, text: "同轨新增" }],
+    );
+    const newCaption = sameTrack.project.clips.find(
+      (clip) => clip.id === sameTrack.ids[0],
+    )!;
+    expect(newCaption.style).toMatchObject({ fontSize: 42, color: "#ffff00" });
+    expect(newCaption.transform).toMatchObject({ x: 0.4, y: 0.8 });
+    expect(newCaption.keyframes).toEqual([]);
+    for (const clip of project.clips.filter(
+      (clip) => !first.ids.includes(clip.id),
+    ))
+      expect(updated.clips.find((item) => item.id === clip.id)).toBe(clip);
+    const locked = {
+      ...project,
+      tracks: project.tracks.map((track) =>
+        track.id === source.trackId ? { ...track, locked: true } : track,
+      ),
+    };
+    expect(
+      updateCaptionAppearance(locked, source.id, {
+        transform: { y: captionDefaults.y },
+      }),
+    ).toBe(locked);
+    validateProject(updated);
+  });
+
   it("导入和新增字幕始终复用独立字幕轨道", () => {
     const project = createProject();
     project.clips = [newText(project.tracks[0].id, 0, 0, "普通文本")];

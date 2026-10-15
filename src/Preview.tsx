@@ -327,6 +327,7 @@ function PreviewLayer({
         if (!selectable || event.button !== 0) return;
         event.stopPropagation();
         editor.setPlaying(false);
+        if (clip.caption) editor.clearKeyframeEdit();
         editor.select(
           clip.id,
           event.ctrlKey || event.metaKey || event.shiftKey,

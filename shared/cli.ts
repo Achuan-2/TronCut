@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { speechEngineSchema } from "./asr";
 import { projectSchema, styleSchema, transformSchema } from "./model";
+import { captionDefaults } from "./captions";
 
 const time = z.number().finite().nonnegative();
 export const cutSchema = z
@@ -129,7 +130,7 @@ export const cliPlanSchema = z
       .default([]),
     captions: z
       .object({
-        y: z.number().min(0).max(1).default(0.85),
+        y: z.number().min(0).max(1).default(captionDefaults.y),
         fontSize: z.number().min(8).max(300).optional(),
       })
       .strict()
