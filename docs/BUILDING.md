@@ -25,7 +25,7 @@ pnpm test:smoke
 pnpm dist:win
 ```
 
-The installer is written to `release/TronCut Setup 0.4.0.exe`; the unpacked app is under `release/win-unpacked/`. Test the packaged app before uploading. Release asset names use hyphens for stable direct-download URLs.
+The installer is written to `release/TronCut Setup 0.4.1.exe`; the unpacked app is under `release/win-unpacked/`. Test the packaged app before uploading. Release asset names use hyphens for stable direct-download URLs.
 
 ```powershell
 $env:FRAMECRAFT_PACKAGED_SMOKE='1'
@@ -44,6 +44,8 @@ Apple signing and notarization are not configured. The workflow deliberately pub
 Mac 安装包不要求先完成本地验收。工作流直接构建并发布 arm64 与 x64 DMG，但不会把 CI 构建成功表述为真机安装、权限、录制或导出已经通过；这些项目交给使用者验证。
 
 ## Publishing / 发布
+
+请求发布但未指定版本号时，默认将当前版本的末位（patch）加 1，例如 v0.4.1 → v0.4.2；明确指定版本号时按指定版本执行。
 
 The [Build release workflow](../.github/workflows/release.yml) runs when a GitHub Release is published, including prereleases. It checks that `v<version>` matches `package.json` and checks out the exact tag commit. The Windows job downloads SHA256-verified FFmpeg 9.0.2 and uv 0.6.5, compiles the native capture helpers, runs tests and the packaged editing regression, and produces the x64 installer and portable ZIP. Native macOS jobs produce unsigned arm64 and x64 DMGs without local acceptance tests. The final job combines build provenance and checksums before uploading all packages. Upload permissions are limited to that final job; no extra secret or personal access token is required.
 
