@@ -3734,6 +3734,68 @@ fieldset:disabled {
   padding: 14px;
   margin-top: 18px;
 }
+.export-dialog {
+  width: min(600px, calc(100vw - 40px));
+  max-height: 85vh;
+  overflow: auto;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 25px 90px #0008;
+}
+.export-dialog .field.vertical {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+}
+.export-directory,
+.export-file-name {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.export-directory input,
+.export-file-name input {
+  flex: 1;
+  width: 100%;
+}
+.export-directory button {
+  border-color: var(--line);
+}
+.export-file-name span {
+  color: var(--muted);
+}
+.export-settings-grid {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr 1fr;
+  gap: 12px;
+}
+.export-summary {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  background: #ffffff05;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  margin: 16px 0;
+  overflow-wrap: anywhere;
+}
+.export-summary small {
+  color: var(--muted);
+}
+.export-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
+}
+.export-dialog-actions .primary {
+  background: var(--accent);
+  color: #14372a;
+  padding: 7px 20px;
+}
 .recording-style legend {
   color: #c8ded0;
   padding: 0 6px;

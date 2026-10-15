@@ -52,6 +52,8 @@ import { captionProcessingSchema, cueSchema } from "../shared/caption-processing
 import { processCaptionCues } from "./caption-processing";
 import { requestAi } from "./ai";
 import { RecordingStyleStore } from "./recording-style";
+import { videoExportRequestSchema } from "../shared/export-settings";
+import { assertExportTarget, videoExportTarget } from "./video-export-target";
 import {
   recordingBackgroundSchema,
   recordingSettingsSchema,
@@ -617,42 +619,66 @@ function installHandlers() {
       await fs.rm(temp, { recursive: true, force: true });
     }
   });
-  handle("video:export", async (input: unknown) => {
+  handle("video:export:directory", () =>
+    projectFile ? path.dirname(projectFile) : app.getPath("videos"),
+  );
+  handle("video:export:choose-directory", async (input: unknown) => {
+    const defaultPath = z.string().max(32768).parse(input);
+    const result = await dialog.showOpenDialog(window, {
+      title: "选择视频导出位置",
+      defaultPath:
+        defaultPath || (projectFile ? path.dirname(projectFile) : app.getPath("videos")),
+      properties: ["openDirectory", "createDirectory"],
+    });
+    return result.canceled ? null : result.filePaths[0] ?? null;
+  });
+  handle("video:export", async (input: unknown, inputRequest: unknown) => {
     if (task) throw new Error("已有后台任务正在执行");
     const project = authorizedProject(input);
-    const result = await dialog.showSaveDialog(window, {
-      title: "导出视频",
-      defaultPath: `${project.name}.mp4`,
-      filters: [{ name: "MP4", extensions: ["mp4"] }],
-    });
-    if (result.canceled || !result.filePath) return null;
-    if (
-      project.assets.some(
-        (a) => path.resolve(a.path) === path.resolve(result.filePath!),
-      )
-    )
-      throw new Error("导出目标不能覆盖工程源素材");
+    const request = videoExportRequestSchema.parse(inputRequest);
+    const target = videoExportTarget(request);
     task = new AbortController();
-    const temp = await fs.mkdtemp(
-      path.join(app.getPath("temp"), "framecraft-export-"),
-    );
+    let temp: string | undefined;
     try {
+      await fs.mkdir(path.dirname(target), { recursive: true });
+      await assertExportTarget(project, target, projectFile);
+      try {
+        const stat = await fs.stat(target);
+        if (!stat.isFile())
+          throw new Error("导出目标已被文件夹占用，请更换文件名");
+        const result = await dialog.showMessageBox(window, {
+          type: "question",
+          title: "替换已有视频",
+          message: "文件已存在，是否替换？",
+          detail: target,
+          buttons: ["取消", "替换"],
+          defaultId: 0,
+          cancelId: 0,
+          noLink: true,
+        });
+        if (result.response !== 1) return null;
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+      }
       const info = await capabilities(process.resourcesPath);
       if (!info.ffmpeg)
         throw new Error("未找到 FFmpeg/FFprobe，请在设置中配置");
+      temp = await fs.mkdtemp(
+        path.join(app.getPath("temp"), "framecraft-export-"),
+      );
       await exportVideo(
-        project,
-        result.filePath,
+        { ...project, exportSettings: request.settings },
+        target,
         temp,
         info.rubberband,
         task.signal,
         (p) => notify(p, "正在导出视频"),
         process.resourcesPath,
       );
-      return result.filePath;
+      return target;
     } finally {
       task = null;
-      await fs.rm(temp, { recursive: true, force: true });
+      if (temp) await fs.rm(temp, { recursive: true, force: true });
     }
   });
   handle("task:cancel", () => {

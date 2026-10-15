@@ -15,6 +15,7 @@
 | [转换](TRANSITIONS.md) | Smooth Slide 片头、片尾与相邻接点拖放、时长和属性 |
 | [画布与动画](CANVAS.md) | 图层尺寸、自动动画、整幅画面的缩放与平移 |
 | [工程管理](PROJECTS.md) | 最近项目、手动恢复、保存、素材归档与迁移 |
+| [视频导出](EXPORT.md) | 导出位置、分辨率、质量、格式与进度取消 |
 | [本地配音](TTS.md) | Kokoro/VITS、ONNX 模型下载与离线合成 |
 | [Codex CLI](CLI.md) | 剪辑、抽帧、转录、文案配音、字幕与导出 |
 

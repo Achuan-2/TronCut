@@ -37,6 +37,8 @@ import {
 import Home from "./Home";
 import type { RecentProject, RecoveryInfo } from "../shared/recent-projects";
 import PreferencesDialog from "./PreferencesDialog";
+import ExportDialog from "./ExportDialog";
+import type { VideoExportRequest } from "../shared/export-settings";
 
 export default function App() {
   const editor = useEditor(),
@@ -63,6 +65,7 @@ export default function App() {
     [file, setFile] = useState(""),
     [importReport, setImportReport] = useState<string[] | null>(null);
   const [preferencesOpen, setPreferencesOpen] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
       undefined,
     ),
@@ -71,7 +74,11 @@ export default function App() {
   const initialized = useRef(false);
   const mediaImportLock = useRef(false);
   const actionsBlocked =
-    busy || mediaImporting || recording || !!editor.narrationRecording;
+    busy ||
+    mediaImporting ||
+    recording ||
+    exportOpen ||
+    !!editor.narrationRecording;
   const toast = useCallback((message: string) => {
     setToast(message);
     clearTimeout(toastTimer.current);
@@ -315,6 +322,7 @@ export default function App() {
       ) ||
       busy ||
       preferencesOpen ||
+      exportOpen ||
       recording ||
       screen === "home"
     )
@@ -351,12 +359,30 @@ export default function App() {
       if (record) setRecording(true);
     });
   };
-  const exportVideo = () =>
-    run(async () => {
-      editor.setPlaying(false);
-      const result = await bridge().exportVideo(editor.project);
-      if (result) toast(`视频已导出：${result}`);
-    });
+  const exportVideo = () => {
+    if (actionsBlocked) return;
+    editor.setPlaying(false);
+    setMenu(false);
+    setExportOpen(true);
+  };
+  const startExport = async (request: VideoExportRequest) => {
+    setBusy(true);
+    try {
+      const result = await bridge().exportVideo(editor.project, request);
+      if (result) {
+        if (
+          JSON.stringify(editor.project.exportSettings) !==
+          JSON.stringify(request.settings)
+        )
+          editor.apply((p) => ({ ...p, exportSettings: request.settings }));
+        setExportOpen(false);
+        toast(`视频已导出：${result}`);
+      }
+    } finally {
+      setBusy(false);
+      setProgress(null);
+    }
+  };
   const commands = useRef<(command: string) => void>(() => {});
   commands.current = (command) => {
     if (actionsBlocked || preferencesOpen) return;
@@ -403,6 +429,7 @@ export default function App() {
       target.closest('input, textarea, select, [contenteditable="true"]') ||
       busy ||
       preferencesOpen ||
+      exportOpen ||
       recording ||
       screen === "home"
     )
@@ -880,6 +907,14 @@ export default function App() {
             )}
           </div>
         </div>
+      )}
+      {exportOpen && (
+        <ExportDialog
+          project={editor.project}
+          busy={busy}
+          onClose={() => setExportOpen(false)}
+          onExport={startExport}
+        />
       )}
       {recording && (
         <Recorder

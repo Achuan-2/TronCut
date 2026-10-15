@@ -7,6 +7,7 @@ import type { OnnxModel, PreparedOnnxModel } from "./onnx";
 import type { RecentProject, RecoveryInfo } from "./recent-projects";
 import type { Preferences, PreferencesUpdate } from "./preferences";
 import type { RecordingBackground, RecordingSettings } from "./recording";
+import type { VideoExportRequest } from "./export-settings";
 import type {
   CaptionProcessingOptions,
   CaptionProcessingResult,
@@ -76,7 +77,12 @@ export interface FrameCraftBridge {
   importCamtasia(): Promise<Project | null>;
   importSubtitles(): Promise<Cue[] | null>;
   exportSubtitles(cues: Cue[]): Promise<string | null>;
-  exportVideo(project: Project): Promise<string | null>;
+  exportDirectory(): Promise<string>;
+  selectExportDirectory(defaultPath: string): Promise<string | null>;
+  exportVideo(
+    project: Project,
+    request: VideoExportRequest,
+  ): Promise<string | null>;
   captureFrame(
     project: Project,
     time: number,

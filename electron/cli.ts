@@ -272,7 +272,7 @@ async function saveOutputs(
   if (video) {
     if (path.extname(video).toLowerCase() !== ".mp4")
       throw new Error("视频输出请使用 .mp4 扩展名");
-    if (options.software) saved.exportSettings = { encoder: "software" };
+    if (options.software) saved.exportSettings = { ...saved.exportSettings, encoder: "software" };
     const engines = await capabilities(context.resources);
     if (!engines.ffmpeg) throw new Error(engines.error || "媒体引擎不可用");
     await inWorkDir(context, (workDir) =>
@@ -397,7 +397,7 @@ export async function executeCli(
     );
     if (path.extname(video).toLowerCase() !== ".mp4")
       throw new Error("视频输出请使用 .mp4 扩展名");
-    if (options.software) project.exportSettings = { encoder: "software" };
+    if (options.software) project.exportSettings = { ...project.exportSettings, encoder: "software" };
     const engine = await capabilities(context.resources);
     if (!engine.ffmpeg) throw new Error(engine.error);
     await inWorkDir(context, (workDir) =>

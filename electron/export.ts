@@ -31,22 +31,49 @@ import { outlinedText } from "./text-outline";
 import { textFrameSize, textFillGeometry } from "../shared/text";
 import { isTrackActive } from "../shared/tracks";
 import {
+  exportDimensions,
+  exportQualities,
+  resolvedExportSettings,
+  videoFormatSchema,
+  type ExportSettings,
+} from "../shared/export-settings";
+import {
   transitionRange,
   transitionOffsetExpression,
 } from "../shared/transitions";
 
 // Avoid lookahead buffering in short, delayed overlay graphs. Hardware failure
 // fallback and explicitly requested software encoding use identical settings.
-const softwareEncoder = [
-  "-c:v",
-  "libx264",
-  "-preset",
-  "fast",
-  "-crf",
-  "20",
-  "-tune",
-  "zerolatency",
-];
+function softwareEncoder(settings: Required<ExportSettings>) {
+  const quality = exportQualities[settings.quality];
+  if (settings.format === "webm")
+    return [
+      "-c:v",
+      "libvpx-vp9",
+      "-deadline",
+      "good",
+      "-cpu-used",
+      "4",
+      "-row-mt",
+      "1",
+      "-lag-in-frames",
+      "0",
+      "-crf",
+      String(quality.vp9),
+      "-b:v",
+      "0",
+    ];
+  return [
+    "-c:v",
+    "libx264",
+    "-preset",
+    "fast",
+    "-crf",
+    String(quality.h264),
+    "-tune",
+    "zerolatency",
+  ];
+}
 
 const xml = (s: string) =>
   s.replace(
@@ -161,26 +188,34 @@ export function audioFilters(clip: Clip, rubberband: boolean): string[] {
 }
 async function chooseEncoder(
   project: Project,
+  settings: Required<ExportSettings>,
   resourcesPath: string | undefined,
   signal: AbortSignal,
 ): Promise<string[]> {
-  if (project.exportSettings?.encoder === "software") return softwareEncoder;
+  const software = softwareEncoder(settings);
+  if (settings.encoder === "software" || settings.format === "webm")
+    return software;
+  const quality = exportQualities[settings.quality];
+  const qp = String(quality.h264);
+  const output = exportDimensions(project.canvas, settings.resolution);
+  const pixelRate = output.width * output.height * project.canvas.fps;
+  const bitrate = `${Math.max(500, Math.round(quality.mbps * 1000 * pixelRate / (1920 * 1080 * 30)))}k`;
   const candidates =
     process.platform === "darwin"
-      ? [["-c:v", "h264_videotoolbox", "-b:v", "12M"]]
+      ? [["-c:v", "h264_videotoolbox", "-b:v", bitrate]]
       : process.platform === "win32"
         ? [
-            ["-c:v", "h264_nvenc", "-preset", "p4", "-cq", "22", "-b:v", "0"],
-            ["-c:v", "h264_qsv", "-preset", "fast", "-global_quality", "22"],
+            ["-c:v", "h264_nvenc", "-preset", "p4", "-cq", qp, "-b:v", "0"],
+            ["-c:v", "h264_qsv", "-preset", "fast", "-global_quality", qp],
             [
               "-c:v",
               "h264_amf",
               "-quality",
               "balanced",
               "-qp_i",
-              "22",
+              qp,
               "-qp_p",
-              "24",
+              String(quality.h264 + 2),
             ],
           ]
         : [];
@@ -210,7 +245,7 @@ async function chooseEncoder(
       /* Try the next supported GPU; software is always available. */
     }
   }
-  return softwareEncoder;
+  return software;
 }
 async function rasterize(
   clip: Clip,
@@ -347,12 +382,16 @@ async function renderProject(
 ): Promise<void> {
   const duration = still ? 1 / project.canvas.fps : projectDuration(project);
   if (duration <= 0) throw new Error("时间线为空");
-  if (!still && (project.canvas.width % 2 || project.canvas.height % 2))
-    throw new Error("H.264 导出要求画布宽高为偶数");
+  const settings = resolvedExportSettings(project.exportSettings);
+  const extension = videoFormatSchema.safeParse(
+    path.extname(target).slice(1).toLowerCase(),
+  );
+  // The target extension is authoritative for CLI callers as well as the dialog.
+  if (extension.success) settings.format = extension.data;
   await fs.mkdir(workDir, { recursive: true });
   const partial = path.join(
     path.dirname(target),
-    `.framecraft-${Date.now()}.partial.${still ? "png" : "mp4"}`,
+    `.framecraft-${Date.now()}.partial.${still ? "png" : settings.format}`,
   );
   const { width, height, fps, background } = project.canvas;
   const args = [
@@ -363,7 +402,7 @@ async function renderProject(
     "-f",
     "lavfi",
     "-i",
-    `color=c=${background}:s=${width}x${height}:r=${fps}:d=${duration}${still ? ",format=rgba" : ""}`,
+    `color=c=${background}:s=${width}x${height}:r=${fps}:d=${duration}${still || width % 2 || height % 2 ? ",format=rgba" : ""}`,
   ];
   if (!still)
     args.push("-f", "lavfi", "-i", `anullsrc=r=48000:cl=stereo:d=${duration}`);
@@ -568,7 +607,9 @@ async function renderProject(
           ? `trim=start=${sourceIn}:duration=${clip.duration * clip.speed},setpts=(PTS-STARTPTS)/${clip.speed}${padding ? "," + padding : `+${clip.start}/TB,`}`
           : padding;
       const frameFilters = mediaFrameFilters(
-        clip, fit, animatedViewport ? key => pose(key, "T") : undefined,
+        clip,
+        fit,
+        animatedViewport ? (key) => pose(key, "T") : undefined,
       );
       filters.push(
         `[${source}]${timing}${animatedText ? `fps=${fps},` : ""}format=rgba,${[...(animatedViewport ? animatedViewportFilters((key) => pose(key, "T")) : contentFilters(clip)), ...visualEffects, ...frameFilters, transform, "setsar=1", ...rotate, alpha].join(",")}[${visual}]`,
@@ -610,6 +651,15 @@ async function renderProject(
     base = "camera";
   }
   const graph = path.join(workDir, "graph.txt");
+  if (!still) {
+    const output = exportDimensions(project.canvas, settings.resolution);
+    if (output.width !== width || output.height !== height) {
+      filters.push(
+        `[${base}]scale=${output.width}:${output.height}:force_original_aspect_ratio=decrease:force_divisible_by=2:flags=lanczos,pad=${output.width}:${output.height}:(ow-iw)/2:(oh-ih)/2:color=${background},setsar=1[resized]`,
+      );
+      base = "resized";
+    }
+  }
   filters.push(`[${base}]format=${still ? "rgb24" : "yuv420p"}[video]`);
   await fs.writeFile(graph, filters.join(";\n"));
   const version = await runProcess(
@@ -620,7 +670,7 @@ async function renderProject(
   const major = Number(version.match(/ffmpeg version (?:n)?(\d+)\./)?.[1] ?? 7);
   const encoder = still
     ? ["-c:v", "png"]
-    : await chooseEncoder(project, resourcesPath, signal);
+    : await chooseEncoder(project, settings, resourcesPath, signal);
   args.push(
     major >= 7 ? "-/filter_complex" : "-filter_complex_script",
     graph,
@@ -638,11 +688,12 @@ async function renderProject(
           "-pix_fmt",
           "yuv420p",
           "-c:a",
-          "aac",
+          settings.format === "webm" ? "libopus" : "aac",
           "-b:a",
-          "192k",
-          "-movflags",
-          "+faststart",
+          exportQualities[settings.quality].audio,
+          ...(["mp4", "mov"].includes(settings.format)
+            ? ["-movflags", "+faststart"]
+            : []),
         ]),
     "-progress",
     "pipe:1",
@@ -666,9 +717,14 @@ async function renderProject(
         processOptions,
       );
     } catch (error) {
-      if (still || signal.aborted || encoder[1] === "libx264") throw error;
+      if (
+        still ||
+        signal.aborted ||
+        ["libx264", "libvpx-vp9"].includes(encoder[1])
+      )
+        throw error;
       const index = args.indexOf("-c:v");
-      args.splice(index, encoder.length, ...softwareEncoder);
+      args.splice(index, encoder.length, ...softwareEncoder(settings));
       progress(0);
       await runProcess(
         findBinary("ffmpeg", resourcesPath),

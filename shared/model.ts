@@ -3,6 +3,7 @@ import { ttsOptionsSchema } from "./tts";
 import { animationEasings } from "./easing";
 import { behaviorSchema } from "./behaviors";
 import { transitionSchema } from "./transitions";
+import { exportSettingsSchema } from "./export-settings";
 
 const finite = z.number().finite();
 const identifier = z
@@ -213,9 +214,7 @@ export const projectSchema = z.object({
   markers: z.array(
     z.object({ id: identifier, time: finite.nonnegative(), label: z.string() }),
   ),
-  exportSettings: z
-    .object({ encoder: z.enum(["auto", "software"]) })
-    .optional(),
+  exportSettings: exportSettingsSchema.optional(),
   importReport: z.array(z.string()).optional(),
   camtasiaOriginal: z.unknown().optional(),
 });

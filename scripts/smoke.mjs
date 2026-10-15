@@ -215,16 +215,10 @@ try {
   );
   if (saved.clips.length !== 4 || !saved.assets[0].path.startsWith("media/"))
     throw new Error("工程收集素材验证失败");
-  await app.evaluate(
-    ({ dialog }, target) => {
-      dialog.showSaveDialog = async () => ({
-        canceled: false,
-        filePath: target,
-      });
-    },
-    path.join(root, "desktop-export.mp4"),
-  );
   await page.getByRole("button", { name: "导出视频", exact: true }).click();
+  await page.getByLabel("导出位置", { exact: true }).fill(root);
+  await page.getByLabel("导出文件名", { exact: true }).fill("desktop-export");
+  await page.getByRole("button", { name: "开始导出", exact: true }).click();
   const exportStart = Date.now();
   await expect(page.getByRole("status")).toContainText("视频已导出", {
     timeout: 90000,
@@ -289,6 +283,9 @@ try {
       );
       if (!sidecar.samples.length) throw new Error("鼠标采样为空");
       await page.getByRole("button", { name: "导出视频", exact: true }).click();
+      await page.getByLabel("导出位置", { exact: true }).fill(root);
+      await page.getByLabel("导出文件名", { exact: true }).fill("desktop-native-recording");
+      await page.getByRole("button", { name: "开始导出", exact: true }).click();
       await expect(page.getByRole("status")).toContainText("视频已导出", {
         timeout: 90000,
       });

@@ -3,8 +3,10 @@ import type { FrameCraftBridge } from "../shared/bridge";
 
 const bridge: FrameCraftBridge = {
   recordingSettings: () => ipcRenderer.invoke("recording:settings"),
-  saveRecordingSettings: (settings) => ipcRenderer.invoke("recording:settings:save", settings),
-  createRecordingBackground: (width, height, preset) => ipcRenderer.invoke("recording:background", width, height, preset),
+  saveRecordingSettings: (settings) =>
+    ipcRenderer.invoke("recording:settings:save", settings),
+  createRecordingBackground: (width, height, preset) =>
+    ipcRenderer.invoke("recording:background", width, height, preset),
   preferences: () => ipcRenderer.invoke("preferences:get"),
   savePreferences: (update) => ipcRenderer.invoke("preferences:save", update),
   testAiConnection: (update) =>
@@ -51,7 +53,11 @@ const bridge: FrameCraftBridge = {
   importCamtasia: () => ipcRenderer.invoke("project:camtasia"),
   importSubtitles: () => ipcRenderer.invoke("subtitles:import"),
   exportSubtitles: (cues) => ipcRenderer.invoke("subtitles:export", cues),
-  exportVideo: (project) => ipcRenderer.invoke("video:export", project),
+  exportDirectory: () => ipcRenderer.invoke("video:export:directory"),
+  selectExportDirectory: (defaultPath) =>
+    ipcRenderer.invoke("video:export:choose-directory", defaultPath),
+  exportVideo: (project, request) =>
+    ipcRenderer.invoke("video:export", project, request),
   captureFrame: (project, time, endpointClipId) =>
     ipcRenderer.invoke("video:frame", project, time, endpointClipId),
   previewAudio: (project, clipId) =>
