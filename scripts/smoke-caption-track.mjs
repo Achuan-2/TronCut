@@ -76,7 +76,7 @@ try {
   await clips.nth(1).click();
   await expect(page.locator(".timeline-clip.selected")).toHaveCount(3);
   await expect(page.getByLabel("文本内容")).toHaveValue("字幕乙");
-  await expect(page.getByLabel("字号", { exact: true })).toHaveValue("30");
+  await expect(page.getByLabel("字号", { exact: true })).toHaveValue("40");
   const save = async () => {
     await page.getByRole("button", { name: "保存", exact: true }).click();
     await expect(page.getByRole("status")).toContainText("工程已保存");
@@ -99,13 +99,13 @@ try {
     "6",
   );
   await page.locator("#inspector-text select").selectOption("3");
-  await expect(page.getByLabel("字号", { exact: true })).toHaveValue("30");
+  await expect(page.getByLabel("字号", { exact: true })).toHaveValue("40");
   const preset = await save();
   assert.deepEqual(
     preset.clips
       .filter((clip) => first.ids.includes(clip.id))
       .map((clip) => clip.style.fontSize),
-    [30, 30, 36],
+    [40, 40, 36],
   );
   await page.getByLabel("填充颜色", { exact: true }).evaluate((input) => {
     Object.getOwnPropertyDescriptor(

@@ -13,7 +13,7 @@ import {
 import { availableTrack } from "../shared/editor";
 
 describe("字幕轨道与批量编辑", () => {
-  it("新字幕使用 30 号字和底部居中位置，普通文本默认样式不变", () => {
+  it("新字幕使用 40 号字和底部居中位置，普通文本默认样式不变", () => {
     const project = createProject();
     const text = newText(project.tracks[0].id, 0);
     const result = appendCaptionCues(project, [
@@ -21,7 +21,7 @@ describe("字幕轨道与批量编辑", () => {
     ]);
     const caption = captionClips(result.project)[0];
     expect(caption.style).toMatchObject({
-      fontSize: 30,
+      fontSize: 40,
       outlineWidth: 2,
       fill: "#000000",
       fillOpacity: 0.75,

@@ -8,7 +8,7 @@ import {
 import type { Cue } from "./subtitles";
 
 export const captionDefaults = {
-  fontSize: 30,
+  fontSize: 40,
   x: 0.5,
   y: 0.92,
   outlineWidth: 2,
