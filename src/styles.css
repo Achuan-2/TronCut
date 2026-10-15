@@ -2094,7 +2094,7 @@ fieldset:disabled {
   opacity: 0.5;
 }
 .behavior-property {
-  margin-bottom: 12px;
+  margin-bottom: 6px;
   border: 1px solid #343d43;
   border-radius: 4px;
 }
@@ -2103,20 +2103,36 @@ fieldset:disabled {
 }
 .behavior-property .speed-heading {
   margin: 0;
-  padding: 10px;
+  padding: 4px 8px;
+  gap: 6px;
   background: #171e22;
 }
-.behavior-name {
+.behavior-property .behavior-name {
   display: flex;
   align-items: center;
-  gap: 5px;
+  justify-content: flex-start;
+  gap: 4px;
   flex: 1;
   text-align: left;
-  font-size: 15px;
+  font-size: 14px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  padding: 0;
+  min-height: 28px;
+  min-width: 0;
+  padding: 2px 0;
+}
+.behavior-name > svg {
+  flex-shrink: 0;
+}
+.behavior-actions > button {
+  display: flex;
+  width: 28px;
+  height: 28px;
+  padding: 4px;
+}
+.inspector fieldset:has(> #inspector-behaviors:not([hidden])) {
+  padding: 12px 12px 16px;
 }
 .behavior-actions {
   position: relative;
@@ -2168,12 +2184,12 @@ fieldset:disabled {
 }
 .behavior-phase-tabs {
   display: flex;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
   border-bottom: 1px solid #363f45;
 }
 .behavior-phase-tabs > button {
   flex: 1;
-  padding: 12px 0;
+  padding: 8px 0;
   border-bottom: 2px solid transparent;
   border-radius: 0;
   font-size: 16px;
@@ -2183,12 +2199,13 @@ fieldset:disabled {
   color: var(--accent);
 }
 .behavior-property [role="tabpanel"] {
-  padding: 0 10px 8px;
+  padding: 0 8px 6px;
 }
 .behavior-property .field {
   display: grid;
   grid-template-columns: 44px minmax(0, 1fr);
   gap: 6px;
+  margin: 8px 0;
 }
 .behavior-property .field select,
 .behavior-property .field input:not([type="range"]):not([type="color"]) {
