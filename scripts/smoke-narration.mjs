@@ -14,6 +14,19 @@ const env = {
     process.env.TRONCUT_TEST_PROFILE || path.join(root, "profile"),
 };
 delete env.ELECTRON_RUN_AS_NODE;
+if (process.env.TRONCUT_TEST_VITS_DIR) {
+  const destination = path.join(
+    env.FRAMECRAFT_USER_DATA,
+    "models/onnx/vits-zh-aishell3",
+  );
+  if (
+    path.resolve(process.env.TRONCUT_TEST_VITS_DIR) !==
+    path.resolve(destination)
+  )
+    await fs.cp(process.env.TRONCUT_TEST_VITS_DIR, destination, {
+      recursive: true,
+    });
+}
 const app = await electron.launch({
   args: [
     ".",
@@ -41,21 +54,32 @@ try {
     rail.getByRole("button", { name: "配音", exact: true }),
   ).toHaveCount(0);
   await rail.getByRole("button", { name: "旁白", exact: true }).click();
-  await page.getByRole("button", { name: "读取选中文本", exact: true }).click();
+  await page.getByRole("button", { name: "旁白更多选项", exact: true }).click();
+  await page
+    .getByRole("menuitem", { name: "读取选中文本", exact: true })
+    .click();
   await expect(page.getByLabel("旁白文稿")).toHaveValue(
     "这是可以照读的旁白文稿。",
   );
   await expect(page.getByLabel("录制过程中静音时间轴")).toBeChecked();
-  await page.getByText("AI 配音设置", { exact: true }).click();
+  await page.getByRole("button", { name: "旁白更多选项", exact: true }).click();
+  await page
+    .getByRole("menuitem", { name: "AI 配音设置", exact: true })
+    .click();
   await page.getByLabel("配音模型", { exact: true }).selectOption("vits-onnx");
-  await page.getByLabel("配音模型目录", { exact: true }).fill("测试模型目录");
+  await page.getByLabel("配音音色", { exact: true }).selectOption("173");
+  await page.getByRole("button", { name: "完成", exact: true }).click();
   await page.getByRole("button", { name: "媒体", exact: true }).click();
   await rail.getByRole("button", { name: "旁白", exact: true }).click();
   await expect(page.getByLabel("旁白文稿")).toHaveValue(
     "这是可以照读的旁白文稿。",
   );
-  await expect(page.getByLabel("配音模型目录")).toHaveValue("测试模型目录");
-  await page.getByText("AI 配音设置", { exact: true }).click();
+  await page.getByRole("button", { name: "旁白更多选项", exact: true }).click();
+  await page
+    .getByRole("menuitem", { name: "AI 配音设置", exact: true })
+    .click();
+  await expect(page.getByLabel("配音音色")).toHaveValue("173");
+  await page.getByRole("button", { name: "完成", exact: true }).click();
   await page.locator(".narration-body").evaluate((element) => {
     element.scrollTop = 0;
   });
@@ -172,11 +196,6 @@ try {
   );
 
   if (process.env.TRONCUT_TEST_VITS_DIR) {
-    await page.getByText("AI 配音设置", { exact: true }).click();
-    await page
-      .getByLabel("配音模型目录")
-      .fill(path.resolve(process.env.TRONCUT_TEST_VITS_DIR));
-    await page.getByLabel("仅使用已下载的依赖和模型").check();
     await page.getByRole("button", { name: "生成音频", exact: true }).click();
     await expect(page.getByRole("status")).toContainText("已生成", {
       timeout: 180000,

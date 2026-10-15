@@ -73,6 +73,8 @@ export interface FrameCraftBridge {
   ): Promise<Asset>;
   previewAudio(project: Project, clipId: string): Promise<string>;
   synthesize(options: TtsOptions): Promise<Asset>;
+  previewSpeechVoice(options: TtsOptions): Promise<Asset>;
+  releaseSpeechVoicePreview(id: string): Promise<void>;
   windowsSpeechVoices(): Promise<WindowsSpeechVoice[]>;
   downloadSpeechModel(engine: OnnxModel): Promise<PreparedOnnxModel>;
   selectNarrationReference(): Promise<Asset | null>;

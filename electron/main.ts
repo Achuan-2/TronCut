@@ -31,6 +31,7 @@ import { audioFilters, exportVideo, exportFrame } from "./export";
 import { speechEngineSchema, speechOptionsSchema } from "../shared/asr";
 import { transcribeProject } from "./transcription";
 import { synthesizeSpeech } from "./synthesis";
+import { SpeechVoicePreviews } from "./speech-preview";
 import { windowsSpeechVoices } from "./windows-speech";
 import { ttsOptionsSchema } from "../shared/tts";
 import { onnxModelSchema } from "../shared/onnx";
@@ -99,6 +100,7 @@ let captureSelection: { id: string; systemAudio: boolean } | null = null;
 let task: AbortController | null = null;
 let nativeRecording: NativeRecording | null = null;
 const assets = new Map<string, Asset>();
+const speechVoicePreviews = new SpeechVoicePreviews();
 const approvedPaths = new Set<string>();
 const recordings = new Map<
   string,
@@ -637,6 +639,29 @@ function installHandlers() {
   handle("audio:windows-voices", () => windowsSpeechVoices(app.isPackaged
     ? path.join(process.resourcesPath, "workers", "onnx")
     : path.resolve("workers/onnx")));
+  handle("audio:voice-preview", async (input: unknown) => {
+    if (task) throw new Error("已有后台任务正在执行");
+    const options = ttsOptionsSchema.parse(input);
+    task = new AbortController();
+    try {
+      return register(await speechVoicePreviews.create(options, {
+        userData: app.getPath("userData"),
+        workers: app.isPackaged
+          ? path.join(process.resourcesPath, "workers", "onnx")
+          : path.resolve("workers/onnx"),
+        resources: process.resourcesPath,
+      }, task.signal, notify));
+    } finally {
+      task = null;
+    }
+  });
+  handle("audio:voice-preview:release", async (input: unknown) => {
+    const asset = await speechVoicePreviews.release(z.string().max(128).parse(input));
+    if (asset) {
+      assets.delete(asset.id);
+      approvedPaths.delete(path.resolve(asset.path));
+    }
+  });
   handle("audio:synthesize", async (input: unknown) => {
     if (task) throw new Error("已有后台任务正在执行");
     const options = ttsOptionsSchema.parse(input);

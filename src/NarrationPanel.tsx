@@ -1,15 +1,17 @@
 import { useEffect, useRef, useState } from "react";
-import { AudioLines, Play, Square, Type } from "lucide-react";
 import {
-  availableTtsModels,
-  ttsOptionsSchema,
-  type AvailableTtsEngine,
-  type WindowsSpeechVoice,
-  type TtsOptions,
-} from "../shared/tts";
+  AudioLines,
+  MoreHorizontal,
+  Play,
+  SlidersHorizontal,
+  Square,
+  Type,
+} from "lucide-react";
+import { ttsOptionsSchema, type TtsOptions } from "../shared/tts";
 import type { Editor } from "./useEditor";
 import { timeLabel } from "./Preview";
 import NarrationRecorder from "./NarrationRecorder";
+import NarrationSettingsDialog from "./NarrationSettingsDialog";
 
 interface Props {
   editor: Editor;
@@ -38,38 +40,9 @@ export default function NarrationPanel({
     offline: false,
     modelDir: "",
   });
-  const [windowsVoices, setWindowsVoices] = useState<WindowsSpeechVoice[]>([]);
-  const [voiceLoading, setVoiceLoading] = useState(false);
-  const [voiceError, setVoiceError] = useState("");
-  const [voiceRefresh, setVoiceRefresh] = useState(0);
-  useEffect(() => {
-    if (!active || options.engine !== "windows-sapi") return;
-    let cancelled = false;
-    setVoiceLoading(true);
-    setVoiceError("");
-    window.framecraft
-      ?.windowsSpeechVoices()
-      .then((voices) => {
-        if (cancelled) return;
-        setWindowsVoices(voices);
-        if (!voices.length)
-          setVoiceError(
-            "未找到 Windows 系统音色，请先在 Windows 中安装语音或切换配音模型",
-          );
-      })
-      .catch((error) => {
-        if (!cancelled)
-          setVoiceError(
-            `读取 Windows 音色失败：${error instanceof Error ? error.message : String(error)}`,
-          );
-      })
-      .finally(() => {
-        if (!cancelled) setVoiceLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [active, options.engine, voiceRefresh]);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const menu = useRef<HTMLDivElement>(null);
   const [generatedId, setGeneratedId] = useState<string | null>(null);
   const generated = editor.project.assets.find(
     (asset) => asset.id === generatedId,
@@ -77,57 +50,86 @@ export default function NarrationPanel({
   const [playing, setPlaying] = useState(false);
   const player = useRef<HTMLAudioElement | null>(null);
   const auditionToken = useRef(0);
-  useEffect(() => {
-    if (!active) setPlaying(false);
-    return () => {
-      auditionToken.current++;
-      player.current?.pause();
-      player.current = null;
-    };
-  }, [active]);
-  const update = (patch: Partial<TtsOptions>) =>
-    setOptions((current) => ({ ...current, ...patch }));
-  const useText = () => {
-    if (!editor.selected?.text) {
-      toast("请先选中一个文本或字幕片段");
-      return;
-    }
-    update({ text: editor.selected.text });
-  };
-  const loadNarration = () => {
-    const asset = editor.project.assets.find(
-      (a) => a.id === editor.selected?.assetId,
-    );
-    if (!asset?.narration) {
-      toast("请先选中已有配音片段");
-      return;
-    }
-    if (asset.narration.engine in availableTtsModels) {
-      setOptions(asset.narration);
-    } else {
-      // Read old projects without silently assigning a legacy speaker ID to an ONNX voice.
-      setOptions({
-        ...asset.narration,
-        engine: "kokoro-onnx",
-        voice: "10",
-        device: "cpu",
-        instruction: "",
-        referenceAssetId: undefined,
-        modelDir: "",
-      });
-      toast("已读取旧配音文稿与语速，请重新选择 ONNX 音色");
-    }
-  };
-  const engine = options.engine as AvailableTtsEngine;
-  const windows = engine === "windows-sapi";
   const working = busy || !!editor.narrationRecording;
   const stopAudition = () => {
     auditionToken.current++;
     player.current?.pause();
     setPlaying(false);
   };
+  useEffect(() => {
+    if (!active) {
+      setPlaying(false);
+      setSettingsOpen(false);
+      setMenuOpen(false);
+    }
+    return () => {
+      auditionToken.current++;
+      player.current?.pause();
+      player.current = null;
+    };
+  }, [active]);
+  useEffect(() => {
+    if (!menuOpen) return;
+    const outside = (event: PointerEvent) => {
+      if (!menu.current?.contains(event.target as Node)) setMenuOpen(false);
+    };
+    const escape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setMenuOpen(false);
+    };
+    window.addEventListener("pointerdown", outside);
+    window.addEventListener("keydown", escape);
+    return () => {
+      window.removeEventListener("pointerdown", outside);
+      window.removeEventListener("keydown", escape);
+    };
+  }, [menuOpen]);
+
   return (
     <div className="narration-panel">
+      <header className="library-heading">
+        <h2>旁白</h2>
+        <div className="caption-actions" ref={menu}>
+          <button
+            aria-label="旁白更多选项"
+            title="更多"
+            aria-haspopup="menu"
+            aria-expanded={menuOpen}
+            onClick={() => setMenuOpen((value) => !value)}
+          >
+            <MoreHorizontal size={19} />
+          </button>
+          {menuOpen && (
+            <div className="caption-actions-menu" role="menu">
+              <button
+                role="menuitem"
+                disabled={working}
+                onClick={() => {
+                  setMenuOpen(false);
+                  stopAudition();
+                  setSettingsOpen(true);
+                }}
+              >
+                <SlidersHorizontal size={14} />
+                AI 配音设置
+              </button>
+              <button
+                role="menuitem"
+                disabled={!editor.selected?.text}
+                onClick={() => {
+                  setMenuOpen(false);
+                  setOptions((current) => ({
+                    ...current,
+                    text: editor.selected?.text ?? current.text,
+                  }));
+                }}
+              >
+                <Type size={14} />
+                读取选中文本
+              </button>
+            </div>
+          )}
+        </div>
+      </header>
       <div className="narration-body">
         <NarrationRecorder
           editor={editor}
@@ -145,201 +147,25 @@ export default function NarrationPanel({
             maxLength={10000}
             placeholder="在此粘贴或输入脚本文本，可照稿录音，或用 AI 生成音频…"
             value={options.text}
-            onChange={(e) => update({ text: e.target.value })}
+            onChange={(event) =>
+              setOptions((current) => ({
+                ...current,
+                text: event.target.value,
+              }))
+            }
           />
         </label>
-        <div className="two-buttons">
-          <button onClick={useText}>
-            <Type size={14} />
-            读取选中文本
-          </button>
-          <button onClick={loadNarration}>读取配音参数</button>
-        </div>
-        <details className="narration-settings">
-          <summary>AI 配音设置</summary>
-          <fieldset disabled={working}>
-            <label className="field vertical">
-              配音模型
-              <select
-                aria-label="配音模型"
-                value={engine}
-                onChange={(e) => {
-                  const next = e.target.value as AvailableTtsEngine;
-                  update({
-                    engine: next,
-                    voice:
-                      next === "windows-sapi"
-                        ? "auto"
-                        : next === "kokoro-onnx"
-                          ? "10"
-                          : "0",
-                    language: "zh",
-                    modelDir: "",
-                  });
-                }}
-              >
-                {Object.entries(availableTtsModels)
-                  .filter(
-                    ([id]) =>
-                      id !== "windows-sapi" ||
-                      window.framecraft?.platform === "win32",
-                  )
-                  .map(([id, model]) => (
-                    <option key={id} value={id}>
-                      {model.name}
-                    </option>
-                  ))}
-              </select>
-            </label>
-            <label className="field">
-              配音音色
-              <select
-                aria-label="配音音色"
-                value={options.voice}
-                onChange={(e) => update({ voice: e.target.value })}
-              >
-                {availableTtsModels[engine].voices.map((voice) => (
-                  <option key={voice.id} value={voice.id}>
-                    {voice.name}
-                  </option>
-                ))}
-                {windows &&
-                  windowsVoices.map((voice) => (
-                    <option key={voice.id} value={voice.id}>
-                      {voice.name} · {voice.language} ·{" "}
-                      {voice.gender === "Male"
-                        ? "男声"
-                        : voice.gender === "Female"
-                          ? "女声"
-                          : voice.gender}
-                    </option>
-                  ))}
-                {windows &&
-                  options.voice !== "auto" &&
-                  !windowsVoices.some(
-                    (voice) => voice.id === options.voice,
-                  ) && (
-                    <option value={options.voice}>
-                      原音色不可用 · {options.voice}
-                    </option>
-                  )}
-              </select>
-            </label>
-            {windows && (
-              <>
-                <button
-                  disabled={working || voiceLoading}
-                  onClick={() => setVoiceRefresh((value) => value + 1)}
-                >
-                  {voiceLoading ? "正在读取音色…" : "刷新系统音色"}
-                </button>
-                <p className="small-note">
-                  调用本机已安装的 Windows
-                  语音，无需下载模型；自动优先使用微软云希。自定义音色是否联网取决于本机安装的语音服务。
-                </p>
-                {voiceError && (
-                  <p className="small-note" role="alert">
-                    {voiceError}
-                  </p>
-                )}
-              </>
-            )}
-            {!windows && (
-              <>
-                <label className="field vertical">
-                  配音模型目录
-                  <input
-                    value={options.modelDir ?? ""}
-                    placeholder="留空自动查找本机模型"
-                    onChange={(e) => update({ modelDir: e.target.value })}
-                  />
-                </label>
-                <p className="small-note">
-                  默认使用 TronCut 已下载的模型。指定目录时，请选择包含
-                  ONNX、音色和词典文件的完整模型文件夹。
-                </p>
-                <button
-                  className="wide-button"
-                  disabled={working}
-                  onClick={() =>
-                    run(async () => {
-                      if (!window.framecraft)
-                        throw new Error("下载模型需要桌面版");
-                      const prepared =
-                        await window.framecraft.downloadSpeechModel(
-                          engine as "kokoro-onnx" | "vits-onnx",
-                        );
-                      update({ modelDir: "" });
-                      toast(`配音模型已就绪：${prepared.directory}`);
-                    })
-                  }
-                >
-                  下载配音模型
-                </button>
-                <label className="field">
-                  配音设备
-                  <select
-                    aria-label="配音设备"
-                    value={options.device}
-                    onChange={(e) =>
-                      update({ device: e.target.value as "cpu" | "auto" })
-                    }
-                  >
-                    <option value="cpu">CPU · sherpa-onnx</option>
-                    <option value="auto">自动 · CPU</option>
-                  </select>
-                </label>
-              </>
-            )}
-            <label className="field">
-              配音语速
-              <select
-                aria-label="配音语速"
-                value={options.speed}
-                onChange={(e) => update({ speed: Number(e.target.value) })}
-              >
-                {[0.5, 0.75, 1, 1.25, 1.5, 2].map((speed) => (
-                  <option key={speed} value={speed}>
-                    {speed}×{speed === 1 ? " · 正常" : ""}
-                  </option>
-                ))}
-              </select>
-            </label>
-            {!windows && (
-              <>
-                <label className="narration-offline">
-                  <input
-                    type="checkbox"
-                    checked={options.offline}
-                    onChange={(e) => update({ offline: e.target.checked })}
-                  />
-                  仅使用已下载的依赖和模型
-                </label>
-                <p className="small-note">
-                  Kokoro 支持中英文混读，VITS
-                  提供中文音色。首次运行准备本地语音环境，缺少模型时自动下载；生成过程中显示进度，可取消，文稿不上传云端。
-                </p>
-              </>
-            )}
-          </fieldset>
-        </details>
       </div>
       <button
         className="wide-button primary narration-generate"
-        disabled={
-          working ||
-          !options.text.trim() ||
-          (windows && (voiceLoading || !windowsVoices.length || !!voiceError))
-        }
+        disabled={working || !options.text.trim()}
         onClick={() =>
           run(async () => {
             const parsed = ttsOptionsSchema.safeParse(options);
             if (!parsed.success)
               throw new Error(parsed.error.issues[0].message);
             if (!window.framecraft) throw new Error("配音功能需要桌面版");
-            auditionToken.current++;
-            player.current?.pause();
-            setPlaying(false);
+            stopAudition();
             editor.setPlaying(false);
             const asset = await window.framecraft.synthesize(parsed.data);
             editor.addAssets([asset], true);
@@ -365,9 +191,7 @@ export default function NarrationPanel({
             disabled={working}
             onClick={() => {
               if (playing) {
-                auditionToken.current++;
-                player.current?.pause();
-                setPlaying(false);
+                stopAudition();
                 return;
               }
               run(async () => {
@@ -384,18 +208,30 @@ export default function NarrationPanel({
                   toast("配音试听失败，可在时间线检查音频");
                 };
                 await audio.play();
-                if (token !== auditionToken.current) {
-                  audio.pause();
-                  return;
-                }
-                setPlaying(true);
+                if (token !== auditionToken.current) audio.pause();
+                else setPlaying(true);
               });
             }}
           >
-            {playing ? <Square size={14} /> : <Play size={14} />}
+            {playing ? <Square size={14} /> : <Play size={14} />}{" "}
             {playing ? "停止试听" : "试听音频"}
           </button>
         </div>
+      )}
+      {settingsOpen && (
+        <NarrationSettingsDialog
+          options={options}
+          busy={working}
+          update={(patch) =>
+            setOptions((current) => ({ ...current, ...patch }))
+          }
+          run={run}
+          onPreviewStart={() => {
+            stopAudition();
+            editor.setPlaying(false);
+          }}
+          onClose={() => setSettingsOpen(false)}
+        />
       )}
     </div>
   );

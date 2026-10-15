@@ -106,7 +106,7 @@ export default function Panels(props: Props) {
       <div
         className={`library-content ${tab === "captions" ? "captions-library" : tab === "narration" ? "narration-library" : tab === "animations" ? "animations-library" : ""}`}
       >
-        {tab !== "captions" && tab !== "animations" && (
+        {tab !== "captions" && tab !== "animations" && tab !== "narration" && (
           <div className="library-heading">
             <h2>
               {tabs.find((t) => t.id === tab)?.name === "媒体"

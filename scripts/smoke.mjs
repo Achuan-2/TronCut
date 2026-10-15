@@ -120,26 +120,38 @@ try {
   await page.getByLabel("文本内容").fill("TronCut：中文文本与动画");
   await expect(page.locator(".timeline-clip")).toHaveCount(3);
   await page.getByRole("button", { name: "旁白", exact: true }).click();
-  await page.getByRole("button", { name: "读取选中文本", exact: true }).click();
+  await page.getByRole("button", { name: "旁白更多选项", exact: true }).click();
+  await page
+    .getByRole("menuitem", { name: "读取选中文本", exact: true })
+    .click();
   await expect(page.getByLabel("旁白文稿")).toHaveValue(
     "TronCut：中文文本与动画",
   );
-  await page.getByText("AI 配音设置", { exact: true }).click();
+  await page.getByRole("button", { name: "旁白更多选项", exact: true }).click();
+  await page
+    .getByRole("menuitem", { name: "AI 配音设置", exact: true })
+    .click();
   await page.getByLabel("配音模型", { exact: true }).selectOption("vits-onnx");
-  await page.getByLabel("配音模型目录").fill("C:/我的模型/vits");
+  await page.getByLabel("配音音色").selectOption("173");
+  await page.getByRole("button", { name: "完成", exact: true }).click();
   await page.getByRole("button", { name: "媒体", exact: true }).click();
   await page.getByRole("button", { name: "旁白", exact: true }).click();
   await expect(page.getByLabel("旁白文稿")).toHaveValue(
     "TronCut：中文文本与动画",
   );
-  await expect(page.getByLabel("配音模型目录")).toHaveValue("C:/我的模型/vits");
+  await page.getByRole("button", { name: "旁白更多选项", exact: true }).click();
+  await page
+    .getByRole("menuitem", { name: "AI 配音设置", exact: true })
+    .click();
+  await expect(page.getByLabel("配音音色")).toHaveValue("173");
   await page
     .getByLabel("配音模型", { exact: true })
     .selectOption("kokoro-onnx");
   await expect(page.getByLabel("配音音色")).toHaveValue("10");
-  await expect(page.getByLabel("配音模型目录")).toHaveValue("");
+  await expect(page.getByLabel("配音模型目录")).toHaveCount(0);
   await expect(page.getByLabel("语气指令")).toHaveCount(0);
-  await expect(page.getByLabel("配音设备")).toHaveValue("cpu");
+  await expect(page.getByLabel("配音设备")).toHaveCount(0);
+  await page.getByRole("button", { name: "完成", exact: true }).click();
   await page.getByRole("button", { name: "媒体", exact: true }).click();
   await page.getByRole("button", { name: "自动动画", exact: true }).click();
   await page.getByRole("tab", { name: "画面", exact: true }).click();

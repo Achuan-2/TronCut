@@ -14,6 +14,10 @@ await fs.mkdir(root, { recursive: true });
 const profile = path.resolve("test-output/onnx-integration/profile");
 const modelCache = path.join(profile, "models/onnx");
 await fs.mkdir(modelCache, { recursive: true });
+if (path.resolve(kokoro) !== path.join(modelCache, "kokoro-multi-lang-v1_1"))
+  await fs.cp(kokoro, path.join(modelCache, "kokoro-multi-lang-v1_1"), {
+    recursive: true,
+  });
 await fs.cp(sensevoice, path.join(modelCache, "sensevoice-small"), {
   recursive: true,
 });
@@ -41,7 +45,10 @@ try {
   await page.getByRole("button", { name: "新建项目", exact: true }).click();
   await page.getByLabel("工程名称", { exact: true }).fill("ONNX语音");
   await page.getByRole("button", { name: "旁白", exact: true }).click();
-  await page.getByText("AI 配音设置", { exact: true }).click();
+  await page.getByRole("button", { name: "旁白更多选项", exact: true }).click();
+  await page
+    .getByRole("menuitem", { name: "AI 配音设置", exact: true })
+    .click();
   await expect(page.getByLabel("配音模型", { exact: true })).toHaveValue(
     process.platform === "win32" ? "windows-sapi" : "kokoro-onnx",
   );
@@ -55,27 +62,15 @@ try {
     "vits-onnx",
   ]);
   await page.getByLabel("配音模型", { exact: true }).selectOption("vits-onnx");
-  await page
-    .getByLabel("配音模型目录", { exact: true })
-    .fill("unused custom directory");
-  await page.getByRole("button", { name: "下载配音模型", exact: true }).click();
-  await expect(page.getByRole("status")).toContainText("配音模型已就绪", {
-    timeout: 90000,
-  });
-  await expect(page.getByLabel("配音模型目录", { exact: true })).toHaveValue(
-    "",
-  );
+  await expect(page.getByLabel("配音模型目录", { exact: true })).toHaveCount(0);
   await page
     .getByLabel("配音模型", { exact: true })
     .selectOption("kokoro-onnx");
+  await page.getByLabel("配音语速", { exact: true }).selectOption("1.25");
+  await page.getByRole("button", { name: "完成", exact: true }).click();
   await page
     .getByLabel("旁白文稿", { exact: true })
     .fill("欢迎使用本地语音模型。现在可以生成配音和字幕。");
-  await page.getByLabel("配音模型目录", { exact: true }).fill(kokoro);
-  await page.getByLabel("配音语速", { exact: true }).selectOption("1.25");
-  await page
-    .getByRole("checkbox", { name: "仅使用已下载的依赖和模型", exact: true })
-    .check();
   await page.getByRole("button", { name: "生成音频", exact: true }).click();
   await expect(page.locator(".narration-result")).toBeVisible({
     timeout: 90000,
@@ -90,9 +85,17 @@ try {
   await expect(
     page.getByRole("button", { name: "试听音频", exact: true }),
   ).toBeVisible();
-  await expect(page.getByLabel("配音模型目录", { exact: true })).toHaveValue(
-    kokoro,
+  await page.getByRole("button", { name: "旁白更多选项", exact: true }).click();
+  await page
+    .getByRole("menuitem", { name: "AI 配音设置", exact: true })
+    .click();
+  await expect(page.getByLabel("配音模型", { exact: true })).toHaveValue(
+    "kokoro-onnx",
   );
+  await expect(page.getByLabel("配音语速", { exact: true })).toHaveValue(
+    "1.25",
+  );
+  await page.getByRole("button", { name: "完成", exact: true }).click();
   await page.locator(".timeline-clip.audio").click();
   await page.getByRole("button", { name: "字幕", exact: true }).click();
   await page.getByRole("button", { name: "字幕操作", exact: true }).click();
