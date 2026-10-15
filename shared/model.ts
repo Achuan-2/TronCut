@@ -225,7 +225,14 @@ export const projectSchema = z.object({
     )
     .max(100000),
   markers: z.array(
-    z.object({ id: identifier, time: finite.nonnegative(), label: z.string() }),
+    z.object({
+      id: identifier,
+      time: finite.nonnegative(),
+      label: z.string(),
+      duration: finite.min(0).max(86400).optional(),
+      comments: z.string().max(10000).optional(),
+      color: z.string().regex(/^#[\da-f]{6}$/i).optional(),
+    }),
   ),
   exportSettings: exportSettingsSchema.optional(),
   importReport: z.array(z.string()).optional(),
@@ -233,6 +240,7 @@ export const projectSchema = z.object({
 });
 export type Project = z.infer<typeof projectSchema>;
 export type Clip = Project["clips"][number];
+export type Marker = Project["markers"][number];
 export type Asset = Project["assets"][number];
 export type Transform = z.infer<typeof transformSchema>;
 export type TextStyle = z.infer<typeof styleSchema>;

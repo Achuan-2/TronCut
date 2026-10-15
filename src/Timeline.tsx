@@ -31,7 +31,14 @@ import {
   Camera,
   ChevronUp,
 } from "lucide-react";
-import { type Clip, projectDuration, uid, newTrack } from "../shared/model";
+import {
+  type Clip, type Marker, projectDuration, uid, newTrack,
+} from "../shared/model";
+import {
+  createMarker, markerEnd, markerFrameTime, putMarker, removeMarker,
+} from "../shared/markers";
+import TimelineMarkers from "./TimelineMarkers";
+import MarkerDialog from "./MarkerDialog";
 import { snapTime, splitClip, transformAt } from "../shared/editor";
 import {
   deleteClips,
@@ -140,8 +147,11 @@ export default function Timeline({
   const scroll = useRef<HTMLDivElement>(null),
     captionClipboard = useRef<Clip[]>([]),
     duration = useMemo(
-      () => Math.max(20, projectDuration(project) + 5),
-      [project.clips],
+      () => project.markers.reduce(
+        (end, marker) => Math.max(end, markerEnd(marker) + 5),
+        Math.max(20, projectDuration(project) + 5),
+      ),
+      [project.clips, project.markers],
     ),
     width = duration * zoom;
   const changeZoom = (next: number, point?: ZoomPoint) => {
@@ -166,6 +176,37 @@ export default function Timeline({
     }
   }, [zoom]);
   const [trackMenu, setTrackMenu] = useState<TrackMenuPosition | null>(null);
+  const [markerEditor, setMarkerEditor] = useState<Marker | null>(null);
+  const [markerRange, setMarkerRange] = useState<{
+    pointerId: number;
+    start: number;
+    end: number;
+  } | null>(null);
+  useEffect(() => {
+    setMarkerEditor(null);
+    setMarkerRange(null);
+  }, [project.id]);
+  useEffect(() => {
+    if (!markerRange) return;
+    const cancel = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      event.stopPropagation();
+      setMarkerRange(null);
+    };
+    window.addEventListener("keydown", cancel, true);
+    return () => window.removeEventListener("keydown", cancel, true);
+  }, [markerRange?.pointerId]);
+  const editMarker = (marker: Marker) => {
+    editor.setPlaying(false);
+    setMarkerEditor(marker);
+  };
+  const addMarker = (start: number, end = start) =>
+    editMarker(createMarker(
+      markerFrameTime(Math.min(start, end), project.canvas.fps),
+      `标记 ${project.markers.length + 1}`,
+      markerFrameTime(Math.abs(end - start), project.canvas.fps),
+    ));
   const [fileDrop, setFileDrop] = useState<{
     time: number;
     trackId?: string;
@@ -655,21 +696,26 @@ export default function Timeline({
           </button>
           <button
             title="添加标记"
-            onClick={() =>
-              apply((p) => ({
-                ...p,
-                markers: [
-                  ...p.markers,
-                  {
-                    id: uid(),
-                    time: playhead,
-                    label: `标记 ${p.markers.length + 1}`,
-                  },
-                ],
-              }))
-            }
+            onClick={() => addMarker(playhead)}
           >
             <Flag size={16} />
+          </button>
+          <button
+            title="添加区域标记（Shift+拖动标尺）"
+            onClick={() => {
+              const clips = project.clips.filter((clip) =>
+                editor.selectedIds.includes(clip.id),
+              );
+              const start = clips.length
+                ? Math.min(...clips.map((clip) => clip.start)) : playhead;
+              const end = clips.length
+                ? Math.max(...clips.map((clip) => clip.start + clip.duration))
+                : playhead + 1;
+              addMarker(start, end);
+            }}
+          >
+            <Flag size={16} />
+            区域标记
           </button>
         </div>
         <div className="tool-group">
@@ -955,14 +1001,35 @@ export default function Timeline({
           >
             <div
               className="ruler"
+              title="拖动定位；Shift+拖动添加区域标记"
               onPointerDown={(event) => {
+                if (event.button !== 0) return;
+                const time = markerFrameTime(
+                  timeFromEvent(event), project.canvas.fps,
+                );
+                if (event.shiftKey)
+                  setMarkerRange({ pointerId: event.pointerId, start: time, end: time });
                 seek(timeFromEvent(event));
                 editor.setPlaying(false);
                 event.currentTarget.setPointerCapture(event.pointerId);
               }}
               onPointerMove={(event) => {
-                if (event.buttons === 1) seek(timeFromEvent(event));
+                if (markerRange?.pointerId === event.pointerId) {
+                  setMarkerRange({
+                    ...markerRange,
+                    end: markerFrameTime(timeFromEvent(event), project.canvas.fps),
+                  });
+                } else if (event.buttons === 1) seek(timeFromEvent(event));
               }}
+              onPointerUp={(event) => {
+                if (markerRange?.pointerId !== event.pointerId) return;
+                const end = markerFrameTime(timeFromEvent(event), project.canvas.fps);
+                if (Math.abs(end - markerRange.start) >= 1 / project.canvas.fps - 1e-8)
+                  addMarker(markerRange.start, end);
+                setMarkerRange(null);
+              }}
+              onPointerCancel={() => setMarkerRange(null)}
+              onLostPointerCapture={() => setMarkerRange(null)}
             >
               {Array.from(
                 {
@@ -985,27 +1052,13 @@ export default function Timeline({
                   {timeLabel(t).split(".")[0]}
                 </span>
               ))}
-              {project.markers.map((m) => (
-                <button
-                  key={m.id}
-                  className="marker"
-                  title={`${m.label}（右键删除）`}
-                  style={{ left: m.time * zoom }}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    seek(m.time);
-                  }}
-                  onContextMenu={(e) => {
-                    e.preventDefault();
-                    apply((p) => ({
-                      ...p,
-                      markers: p.markers.filter((x) => x.id !== m.id),
-                    }));
-                  }}
-                >
-                  <Flag size={12} fill="currentColor" />
-                </button>
-              ))}
+              <TimelineMarkers editor={editor} zoom={zoom} snap={snap} onEdit={editMarker} />
+              {markerRange && (
+                <div className="marker-range-draft" style={{
+                  left: Math.min(markerRange.start, markerRange.end) * zoom,
+                  width: Math.max(2, Math.abs(markerRange.end - markerRange.start) * zoom),
+                }} />
+              )}
               <div className="ruler-playhead" style={{ left: playhead * zoom }}>
                 <span />
               </div>
@@ -1601,12 +1654,30 @@ export default function Timeline({
         <span>
           空格 播放 / 暂停<span className="separator-dot">·</span>S 拆分
           <span className="separator-dot">·</span>右键动画 编辑动画
+          <span className="separator-dot">·</span>Shift+拖动标尺 区域标记
         </span>
         <span>
           {project.clips.length} 个片段 · 已选 {editor.selectedIds.length} ·{" "}
           {timeLabel(projectDuration(project))}
         </span>
       </div>
+      {markerEditor && (
+        <MarkerDialog
+          key={`${project.id}-${markerEditor.id}`}
+          marker={markerEditor}
+          fps={project.canvas.fps}
+          existing={project.markers.some((marker) => marker.id === markerEditor.id)}
+          onClose={() => setMarkerEditor(null)}
+          onSave={(marker) => {
+            apply((project) => putMarker(project, marker));
+            setMarkerEditor(null);
+          }}
+          onDelete={() => {
+            apply((project) => removeMarker(project, markerEditor.id));
+            setMarkerEditor(null);
+          }}
+        />
+      )}
       {context &&
         (() => {
           const clip = project.clips.find((item) => item.id === context.id);

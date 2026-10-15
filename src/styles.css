@@ -3357,14 +3357,6 @@ fieldset:disabled {
   white-space: nowrap;
   pointer-events: none;
 }
-.ruler > button.marker {
-  position: absolute;
-  padding: 0;
-  color: #e6c66f;
-  top: 21px;
-  z-index: 2;
-  transform: translateX(-4px);
-}
 .track-lane {
   position: relative;
   height: 70px;

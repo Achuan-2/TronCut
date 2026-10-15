@@ -13,6 +13,7 @@ import { easeProgress } from "./easing";
 import { normalizeRotationAxes, optionalTransformKeys } from "./rotation";
 import { visualKeys, visualValues } from "./visual-state";
 import { fitBehaviorDuration } from "./behaviors";
+import { markerEnd } from "./markers";
 
 export function availableTrack(
   project: Pick<Project, "tracks" | "clips">,
@@ -405,6 +406,7 @@ export function snapTime(
 ): number {
   const points = [
     0,
+    ...project.markers.flatMap((marker) => [marker.time, markerEnd(marker)]),
     ...project.clips
       .filter((c) => c.id !== excludeId)
       .flatMap((c) => [c.start, c.start + c.duration]),

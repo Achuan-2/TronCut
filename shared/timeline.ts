@@ -1,5 +1,6 @@
 import { type Clip, type Project, uid } from "./model";
 import { splitClip } from "./editor";
+import { markerEnd } from "./markers";
 
 export function editableIds(
   project: Project,
@@ -128,7 +129,13 @@ export function deleteClips(
     clips: remaining.map((c) =>
       locked.has(c.trackId) ? c : { ...c, start: shift(c.start) },
     ),
-    markers: project.markers.map((m) => ({ ...m, time: shift(m.time) })),
+    markers: project.markers.map((marker) => ({
+      ...marker,
+      time: shift(marker.time),
+      ...(marker.duration === undefined ? {} : {
+        duration: shift(markerEnd(marker)) - shift(marker.time),
+      }),
+    })),
   };
 }
 

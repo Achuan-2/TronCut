@@ -1,0 +1,175 @@
+.timeline-marker {
+  position: absolute;
+  top: 21px;
+  height: 15px;
+  z-index: 2;
+  touch-action: none;
+}
+.timeline-marker:focus-within {
+  z-index: 4;
+  outline: 1px solid white;
+  outline-offset: 1px;
+}
+.timeline-marker .marker-body {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  height: 100%;
+  padding: 0 7px;
+  border: 0;
+  border-radius: 2px;
+  background: var(--marker-color);
+  color: var(--marker-text);
+  cursor: grab;
+  font-size: 10px;
+  line-height: 15px;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.timeline-marker .marker-body svg {
+  flex-shrink: 0;
+}
+.timeline-marker .marker-body span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.timeline-marker.point-marker .marker-body {
+  color: var(--marker-color);
+  background: transparent;
+  padding: 0;
+}
+.timeline-marker.point-marker .marker-body span {
+  display: none;
+}
+.timeline-marker .marker-edge {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 5px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  cursor: ew-resize;
+  background: #14201933;
+}
+.marker-edge.start {
+  left: 0;
+}
+.marker-edge.end {
+  right: 0;
+}
+.marker-range-draft {
+  position: absolute;
+  top: 21px;
+  height: 15px;
+  z-index: 5;
+  background: #66d99a88;
+  border: 1px solid #a6f5c8;
+  pointer-events: none;
+}
+.marker-dialog {
+  width: min(480px, calc(100vw - 32px));
+  max-height: calc(100vh - 48px);
+  padding: 22px;
+  border: 1px solid #4c6253;
+  border-radius: 10px;
+  background: #202728;
+  color: #dbe5e0;
+  box-shadow: 0 20px 80px #0008;
+}
+.marker-dialog::backdrop {
+  background: #060c09b8;
+  backdrop-filter: blur(4px);
+}
+.marker-dialog .modal-heading h3 {
+  margin: 0;
+}
+.marker-dialog .field {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  margin: 16px 0;
+}
+.marker-dialog textarea {
+  resize: vertical;
+  min-height: 80px;
+  padding: 8px;
+  color: inherit;
+  background: #171d20;
+  border: 1px solid #3b4940;
+  border-radius: 4px;
+  font: inherit;
+}
+.marker-dialog .field > input:not([type="color"]):not([type="range"]) {
+  width: 100%;
+  min-width: 0;
+}
+.marker-range-toggle {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 12px;
+}
+.marker-time-fields {
+  display: flex;
+  gap: 16px;
+}
+.marker-time-fields .field {
+  flex: 1;
+  min-width: 0;
+  margin-bottom: 0;
+}
+.marker-color-heading {
+  margin: 16px 0 8px;
+  font-size: 12px;
+}
+.marker-colors {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.marker-colors > button {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: 4px;
+}
+.marker-colors > button[aria-pressed="true"] {
+  outline: 2px solid #dbe5e0;
+  outline-offset: 2px;
+}
+.marker-custom-color {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  font-size: 11px;
+}
+.marker-custom-color input {
+  width: 28px;
+  height: 24px;
+  padding: 0;
+}
+.marker-dialog-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-top: 24px;
+}
+.marker-dialog-actions button {
+  border: 1px solid #4c6253;
+  padding: 7px 14px;
+  border-radius: 5px;
+}
+.marker-dialog-actions .primary {
+  background: #66d99a;
+  color: #142019;
+}
+.marker-dialog-actions .marker-delete {
+  margin-right: auto;
+  color: #f49a9d;
+}
