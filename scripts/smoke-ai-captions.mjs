@@ -11,6 +11,19 @@ const requests = [];
 let rejectRequests = false;
 const server = http.createServer(async (request, response) => {
   try {
+    if (request.method === "GET" && request.url === "/v1/models") {
+      response.setHeader("Content-Type", "application/json");
+      response.end(
+        JSON.stringify({
+          data: [
+            { id: "local-test-model" },
+            { id: "second-test-model" },
+            { id: "unrelated-model" },
+          ],
+        }),
+      );
+      return;
+    }
     let body = "";
     for await (const chunk of request) body += chunk;
     const data = JSON.parse(body);
@@ -53,53 +66,79 @@ try {
   app = await electron.launch({ args: ["."], env });
   const page = await app.firstWindow();
   page.on("pageerror", (error) => errors.push(error.message));
-  await page.getByRole("button", { name: "首选项", exact: true }).click();
-  await expect(page.getByLabel("AI 模型名称")).toBeEnabled();
+  const openPreferences = async () => {
+    await expect(
+      page.getByRole("button", { name: "编辑", exact: true }),
+    ).toBeVisible();
+    await app.evaluate(({ Menu, BrowserWindow }) =>
+      Menu.getApplicationMenu()
+        .getMenuItemById("edit-preferences")
+        .click(null, BrowserWindow.getAllWindows()[0], {}),
+    );
+    await expect(
+      page.getByRole("dialog", { name: "首选项", exact: true }),
+    ).toBeVisible();
+    await page.getByRole("tab", { name: "AI 模型", exact: true }).click();
+  };
+  await openPreferences();
+  await page.getByRole("button", { name: "添加服务", exact: true }).click();
   await page.getByLabel("AI API 基础地址").fill(endpoint);
-  await page.getByLabel("AI 模型名称").fill("local-test-model");
   await page.getByLabel("AI API 密钥").fill("local-test-secret");
+  await page.getByRole("button", { name: "获取模型列表", exact: true }).click();
+  await page.getByLabel("搜索可用模型").fill("test-model");
+  await expect(
+    page.getByLabel("选择模型 unrelated-model", { exact: true }),
+  ).toHaveCount(0);
+  await page.getByLabel("选择模型 local-test-model", { exact: true }).check();
+  await page.getByLabel("选择模型 second-test-model", { exact: true }).check();
+  await page
+    .getByRole("button", { name: "添加所选模型（2）", exact: true })
+    .click();
   await page.getByRole("button", { name: "测试连接", exact: true }).click();
   await expect(page.getByRole("status")).toContainText("AI 连接测试成功", {
     timeout: 20000,
   });
   await page.screenshot({ path: path.join(root, "preferences.png") });
-  await page.getByRole("button", { name: "保存首选项", exact: true }).click();
+  await page.getByRole("button", { name: "确定", exact: true }).click();
   await expect(page.getByRole("dialog")).toHaveCount(0);
   const preferences = await fs.readFile(
     path.join(profile, "preferences.json"),
     "utf8",
   );
   assert(!preferences.includes("local-test-secret"));
-  await page.getByRole("button", { name: "首选项", exact: true }).click();
-  await expect(page.getByLabel("AI 模型名称")).toHaveValue("local-test-model");
+  await openPreferences();
   await expect(page.getByLabel("AI API 密钥")).toHaveValue("");
-  await page.getByRole("button", { name: "添加模型", exact: true }).click();
-  await page.getByLabel("AI API 基础地址").fill(endpoint);
-  await page.getByLabel("AI 模型名称").fill("second-test-model");
-  await page.getByLabel("AI API 密钥").fill("second-test-secret");
   const firstId = await page
     .getByLabel("当前 AI 模型")
     .locator("option")
     .first()
     .getAttribute("value");
-  const secondId = await page.getByLabel("当前 AI 模型").inputValue();
+  const secondId = await page
+    .getByLabel("当前 AI 模型")
+    .locator("option")
+    .nth(1)
+    .getAttribute("value");
   await page.getByLabel("当前 AI 模型").selectOption(firstId);
-  await expect(page.getByLabel("AI 模型名称")).toHaveValue("local-test-model");
+  await expect(
+    page.getByLabel("使用模型 local-test-model", { exact: true }),
+  ).toBeChecked();
   await page.getByLabel("当前 AI 模型").selectOption(secondId);
-  await expect(page.getByLabel("AI API 密钥")).toHaveValue(
-    "second-test-secret",
-  );
-  await page.getByRole("button", { name: "保存首选项", exact: true }).click();
+  await expect(
+    page.getByLabel("使用模型 second-test-model", { exact: true }),
+  ).toBeChecked();
+  await page.getByRole("button", { name: "确定", exact: true }).click();
   await expect(page.getByRole("dialog")).toHaveCount(0);
-  await page.getByRole("button", { name: "首选项", exact: true }).click();
+  await openPreferences();
   await expect(page.getByLabel("当前 AI 模型").locator("option")).toHaveCount(
     2,
   );
-  await expect(page.getByLabel("AI 模型名称")).toHaveValue("second-test-model");
+  await expect(
+    page.getByLabel("使用模型 second-test-model", { exact: true }),
+  ).toBeChecked();
   await page.getByRole("button", { name: "测试连接", exact: true }).click();
   await expect(page.getByRole("status")).toContainText("AI 连接测试成功");
   assert.equal(requests.at(-1).model, "second-test-model");
-  assert.equal(requests.at(-1).authorization, "Bearer second-test-secret");
+  assert.equal(requests.at(-1).authorization, "Bearer local-test-secret");
   await page.screenshot({ path: path.join(root, "multiple-models.png") });
   await page.getByRole("button", { name: "关闭首选项", exact: true }).click();
   await page.getByRole("button", { name: "新建项目", exact: true }).click();
@@ -239,10 +278,7 @@ try {
       (request, index) =>
         request.model ===
           (index === 0 ? "local-test-model" : "second-test-model") &&
-        request.authorization ===
-          (index === 0
-            ? "Bearer local-test-secret"
-            : "Bearer second-test-secret"),
+        request.authorization === "Bearer local-test-secret",
     ),
   );
   assert.deepEqual(errors, []);

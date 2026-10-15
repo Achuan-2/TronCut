@@ -62,6 +62,7 @@ export function setVideoZoomPan(
   project: Project,
   patch: Partial<Transform>,
   time: number,
+  animationDuration = 1,
 ): Project {
   const view = clampCamera({ ...zoomPanAt(project, time), ...patch });
   const targets = new Set(zoomPanVideos(project, time).map((clip) => clip.id));
@@ -84,6 +85,7 @@ export function setVideoZoomPan(
         },
         local,
         true,
+        animationDuration,
       );
       const timeInCurve = local + (clip.animationOffset ?? 0);
       return {

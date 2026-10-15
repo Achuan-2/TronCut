@@ -5,9 +5,16 @@ import type { TtsOptions, WindowsSpeechVoice } from "./tts";
 import type { ClonedVoice, CreateClonedVoice } from "./cloned-voices";
 import type { OnnxModel, PreparedOnnxModel } from "./onnx";
 import type { RecentProject, RecoveryInfo } from "./recent-projects";
-import type { Preferences, PreferencesUpdate } from "./preferences";
+import type {
+  Preferences,
+  PreferencesUpdate,
+  AiProviderUpdate,
+} from "./preferences";
 import type { RecordingBackground, RecordingSettings } from "./recording";
 import type { VideoExportRequest } from "./export-settings";
+import type { EditMenuState } from "./edit-menu";
+import type { z } from "zod";
+import type { textEditSchema } from "./edit-menu";
 import type {
   CaptionProcessingOptions,
   CaptionProcessingResult,
@@ -40,6 +47,8 @@ export interface FrameCraftBridge {
   preferences(): Promise<Preferences>;
   savePreferences(update: PreferencesUpdate): Promise<Preferences>;
   testAiConnection(update: PreferencesUpdate): Promise<void>;
+  listAiModels(provider: AiProviderUpdate): Promise<string[]>;
+  openPreferencesFolder(): Promise<void>;
   refineCaptions(
     cues: Cue[],
     options: CaptionProcessingOptions,
@@ -50,6 +59,8 @@ export interface FrameCraftBridge {
   toggleMaximizeWindow(): Promise<void>;
   closeWindow(): Promise<void>;
   showWindowMenu(menu: "edit" | "view", x: number, y: number): Promise<void>;
+  updateEditMenu(state: EditMenuState): Promise<void>;
+  editText(command: z.infer<typeof textEditSchema>): Promise<void>;
   onWindowState(callback: (state: WindowState) => void): () => void;
   importMedia(): Promise<Asset[]>;
   importDroppedMedia(files: File[]): Promise<Asset[]>;

@@ -249,7 +249,11 @@ export default function CaptionsPanel({
   const addCaption = () => {
     const start = editor.playhead;
     const ids = addCues(editor, [
-      { start, end: start + 3, text: "在这里输入字幕" },
+      {
+        start,
+        end: start + editor.preferences.timing.caption,
+        text: "在这里输入字幕",
+      },
     ]);
     if (ids[0]) {
       editor.select(ids[0]);

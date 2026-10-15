@@ -130,9 +130,9 @@ try {
     "2.5",
   );
   const settings = JSON.parse(
-    await fs.readFile(path.join(profile, "recording-settings.json"), "utf8"),
+    await fs.readFile(path.join(profile, "preferences.json"), "utf8"),
   );
-  expect(settings).toMatchObject({
+  expect(settings.recording).toMatchObject({
     preset: "sunset",
     padding: 0.12,
     radius: 24,

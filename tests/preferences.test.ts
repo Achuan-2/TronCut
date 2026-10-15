@@ -7,6 +7,7 @@ import {
   aiSettingsSchema,
   preferencesUpdateSchema,
 } from "../shared/preferences";
+import { defaultRecordingSettings } from "../shared/recording";
 const secrets = {
   isEncryptionAvailable: () => true,
   encryptString: (value: string) =>
@@ -166,7 +167,7 @@ it("旧单模型配置保留密钥和字幕设置，保存后迁移为多模型�
     const data = JSON.parse(await fs.readFile(file, "utf8"));
     expect(data.ai).toBeUndefined();
     expect(data.encryptedKey).toBeUndefined();
-    expect(data.aiModels).toHaveLength(1);
+    expect(data.aiProviders).toHaveLength(1);
     expect(data.captions.maxChars).toBe(20);
   } finally {
     await fs.rm(root, { recursive: true, force: true });
@@ -193,6 +194,121 @@ it("拒绝重复模型 ID 和无效选择，并保持已有设置", async () => 
       "不存在",
     );
     expect((await store.get()).activeAiModelId).toBe(model.id);
+  } finally {
+    await fs.rm(root, { recursive: true, force: true });
+  }
+});
+
+it("一个服务的多个模型共享密钥，列表获取和切换不修改选择，修改来源不泄露密钥", async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "troncut-provider-"));
+  const file = path.join(root, "preferences.json"),
+    store = new PreferencesStore(file, secrets);
+  const provider = {
+    id: "service",
+    name: "测试服务",
+    baseUrl: "https://service.example/v1",
+    models: [
+      { id: "a", model: "model-a" },
+      { id: "b", model: "model-b" },
+    ],
+  };
+  try {
+    await store.save({
+      aiProviders: [{ ...provider, apiKey: "shared-secret" }],
+      activeAiModelId: "a",
+    });
+    expect((await store.resolveAi()).apiKey).toBe("shared-secret");
+    await store.save({ activeAiModelId: "b" });
+    expect(await store.resolveAi()).toEqual({
+      baseUrl: provider.baseUrl,
+      model: "model-b",
+      apiKey: "shared-secret",
+    });
+    expect((await store.resolveProvider(provider)).apiKey).toBe(
+      "shared-secret",
+    );
+    expect(
+      (
+        await store.resolveProvider({
+          ...provider,
+          baseUrl: "https://other.example/v1",
+        })
+      ).apiKey,
+    ).toBe("");
+    expect(
+      (await store.resolveProvider({ ...provider, id: "new-service" })).apiKey,
+    ).toBe("");
+    expect((await store.get()).activeAiModelId).toBe("b");
+    expect((await store.get()).aiProviders).toHaveLength(1);
+    const disk = await fs.readFile(file, "utf8");
+    expect(disk).not.toContain("shared-secret");
+    expect(JSON.parse(disk).aiProviders[0].models).toHaveLength(2);
+    await store.save({
+      aiProviders: [{ ...provider, models: [] }],
+      activeAiModelId: "",
+    });
+    expect((await store.get()).aiModels).toHaveLength(0);
+    expect((await store.resolveProvider(provider)).apiKey).toBe(
+      "shared-secret",
+    );
+    await store.save({ aiProviders: [provider], activeAiModelId: "a" });
+    expect((await store.resolveAi()).apiKey).toBe("shared-secret");
+  } finally {
+    await fs.rm(root, { recursive: true, force: true });
+  }
+});
+
+it("分组首选项串行合并保存，旧配置补全默认值，配置损坏不会覆盖原文件", async () => {
+  const root = await fs.mkdtemp(
+    path.join(os.tmpdir(), "troncut-grouped-preferences-"),
+  );
+  const file = path.join(root, "preferences.json"),
+    store = new PreferencesStore(file, secrets);
+  try {
+    expect((await store.get()).timing).toMatchObject({
+      image: 5,
+      animation: 1,
+    });
+    await Promise.all([
+      store.save({ program: { snapping: false, waveforms: false } }),
+      store.save({ timing: { image: 8, animation: 2 } }),
+      store.save({ project: { width: 1080, height: 1920, fps: 60 } }),
+    ]);
+    const saved = await new PreferencesStore(file, secrets).get();
+    expect(saved.program).toMatchObject({ snapping: false, waveforms: false });
+    expect(saved.timing).toMatchObject({ image: 8, animation: 2 });
+    expect(saved.project).toMatchObject({ width: 1080, height: 1920, fps: 60 });
+    await fs.writeFile(file, "{invalid");
+    await expect(store.save({ captions: {} })).rejects.toThrow("读取失败");
+    expect(await fs.readFile(file, "utf8")).toBe("{invalid");
+  } finally {
+    await fs.rm(root, { recursive: true, force: true });
+  }
+});
+
+it("迁移旧录屏默认值后与首选项统一保存，后续不被旧文件覆盖", async () => {
+  const root = await fs.mkdtemp(
+    path.join(os.tmpdir(), "troncut-recording-preferences-"),
+  );
+  try {
+    const legacy = {
+      ...defaultRecordingSettings,
+      cursor: { ...defaultRecordingSettings.cursor, size: 72 },
+      autoZoom: false,
+    };
+    const file = path.join(root, "recording-settings.json");
+    await fs.writeFile(file, JSON.stringify(legacy));
+    const store = new PreferencesStore(
+      path.join(root, "preferences.json"),
+      secrets,
+    );
+    expect((await store.get()).recording).toEqual(legacy);
+    await store.save({
+      recording: { ...legacy, cursor: { ...legacy.cursor, size: 56 } },
+    });
+    await fs.writeFile(file, JSON.stringify(defaultRecordingSettings));
+    expect((await store.get()).recording.cursor.size).toBe(56);
+    expect((await store.get()).recording.autoZoom).toBe(false);
   } finally {
     await fs.rm(root, { recursive: true, force: true });
   }

@@ -95,7 +95,7 @@ export default function CaptionProcessingFields({
           </details>
           <p className="caption-processing-note">
             AI
-            功能使用顶部“首选项”中的模型，字幕文本会发送到所配置的服务。失败时自动保留规则断句和原文。
+            功能使用“编辑 → 首选项 → AI 模型”中选择的模型，字幕文本会发送到所配置的服务。失败时自动保留规则断句和原文。
           </p>
         </>
       )}

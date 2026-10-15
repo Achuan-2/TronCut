@@ -13,7 +13,6 @@ import {
   Square,
   Copy,
   Home as HomeIcon,
-  Settings2,
 } from "lucide-react";
 import { createProject, type Clip, type Asset, uid } from "../shared/model";
 import type { Capabilities, WindowState } from "../shared/bridge";
@@ -39,9 +38,17 @@ import type { RecentProject, RecoveryInfo } from "../shared/recent-projects";
 import PreferencesDialog from "./PreferencesDialog";
 import ExportDialog from "./ExportDialog";
 import type { VideoExportRequest } from "../shared/export-settings";
+import {
+  defaultEditorPreferences,
+  type EditorPreferences,
+} from "../shared/editor-preferences";
+import { textEditSchema } from "../shared/edit-menu";
 
 export default function App() {
-  const editor = useEditor(),
+  const [editorPreferences, setEditorPreferences] = useState<EditorPreferences>(
+    defaultEditorPreferences,
+  );
+  const editor = useEditor(editorPreferences),
     [screen, setScreen] = useState<"home" | "editor">("home"),
     [hasSession, setHasSession] = useState(false),
     [recent, setRecent] = useState<RecentProject[]>([]),
@@ -65,6 +72,9 @@ export default function App() {
     [file, setFile] = useState(""),
     [importReport, setImportReport] = useState<string[] | null>(null);
   const [preferencesOpen, setPreferencesOpen] = useState(false);
+  const [preferencesTab, setPreferencesTab] = useState("program");
+  const [editingInput, setEditingInput] = useState(false);
+  const nativeEditMenu = useRef("");
   const [exportOpen, setExportOpen] = useState(false);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
       undefined,
@@ -117,6 +127,83 @@ export default function App() {
       throw new Error("此功能需要桌面版，请运行 pnpm dev");
     return window.framecraft;
   };
+  useEffect(() => {
+    void window.framecraft
+      ?.preferences()
+      .then(setEditorPreferences)
+      .catch((error) => toast(String(error)));
+    const focused = () =>
+      setEditingInput(
+        document.activeElement instanceof HTMLElement &&
+          !!document.activeElement.closest(
+            'input, textarea, [contenteditable="true"]',
+          ),
+      );
+    document.addEventListener("focusin", focused);
+    document.addEventListener("focusout", focused);
+    return () => {
+      document.removeEventListener("focusin", focused);
+      document.removeEventListener("focusout", focused);
+    };
+  }, [toast]);
+  useEffect(
+    () => editor.setCanvasMode(editorPreferences.program.defaultTool),
+    [editorPreferences.program.defaultTool],
+  );
+  useEffect(() => {
+    const selected = editor.project.clips.filter((clip) =>
+      editor.selectedIds.includes(clip.id),
+    );
+    const editable = selected.filter(
+      (clip) =>
+        !editor.project.tracks.find((track) => track.id === clip.trackId)
+          ?.locked,
+    );
+    const state = {
+      blocked:
+        busy ||
+        mediaImporting ||
+        recording ||
+        exportOpen ||
+        preferencesOpen ||
+        !!editor.narrationRecording,
+      editingText: editingInput,
+      session: screen === "editor",
+      canUndo: editor.canUndo,
+      canRedo: editor.canRedo,
+      selected: selected.length,
+      editable: editable.length > 0,
+      canGroup: editable.length > 1,
+      canUngroup: editable.some((clip) => !!clip.groupId),
+      canSplit: editable.some(
+        (clip) =>
+          clip.start < editor.playhead &&
+          clip.start + clip.duration > editor.playhead,
+      ),
+    };
+    const signature = JSON.stringify(state);
+    if (nativeEditMenu.current === signature) return;
+    nativeEditMenu.current = signature;
+    void window.framecraft?.updateEditMenu(state).catch((error) => {
+      nativeEditMenu.current = "";
+      toast(String(error));
+    });
+  }, [
+    editor.project,
+    editor.selectedIds.join(","),
+    editor.playhead,
+    editor.canUndo,
+    editor.canRedo,
+    busy,
+    mediaImporting,
+    recording,
+    exportOpen,
+    preferencesOpen,
+    editingInput,
+    screen,
+    !!editor.narrationRecording,
+    toast,
+  ]);
   useEffect(() => {
     const desktop = window.framecraft;
     void desktop
@@ -352,7 +439,10 @@ export default function App() {
       return;
     void run(async () => {
       await window.framecraft?.newProject();
-      editor.replace(createProject());
+      editor.replace({
+        ...createProject(),
+        canvas: { ...editorPreferences.project },
+      });
       setFile("");
       setRecovery(null);
       enterEditor();
@@ -386,6 +476,24 @@ export default function App() {
   const commands = useRef<(command: string) => void>(() => {});
   commands.current = (command) => {
     if (actionsBlocked || preferencesOpen) return;
+    if (command === "preferences") {
+      editor.setPlaying(false);
+      setPreferencesTab("program");
+      setPreferencesOpen(true);
+      return;
+    }
+    const input =
+      document.activeElement instanceof HTMLElement &&
+      document.activeElement.closest(
+        'input, textarea, [contenteditable="true"]',
+      );
+    const textCommand = textEditSchema.safeParse(command);
+    if (input && textCommand.success) {
+      void bridge()
+        .editText(textCommand.data)
+        .catch((error) => toast(String(error)));
+      return;
+    }
     if (command === "openPending") {
       void run(async () => {
         if (
@@ -404,6 +512,76 @@ export default function App() {
     }
     if (screen === "home" && !["new", "open", "camtasia"].includes(command))
       return;
+    if (["cut", "copy"].includes(command)) {
+      const selected = editor.selected;
+      const locked = editor.project.tracks.find(
+        (track) => track.id === selected?.trackId,
+      )?.locked;
+      if (
+        !selected ||
+        (command === "cut" &&
+          locked &&
+          (editor.selectedBehavior || editor.selectedAnimation))
+      )
+        return;
+      if (
+        command === "cut" &&
+        !editor.project.clips.some(
+          (clip) =>
+            editor.selectedIds.includes(clip.id) &&
+            !editor.project.tracks.find((track) => track.id === clip.trackId)
+              ?.locked,
+        )
+      )
+        return;
+      if (editor.selectedBehavior) {
+        const { clipId, behaviorId } = editor.selectedBehavior;
+        editor.copyBehavior(clipId, behaviorId);
+        if (command === "cut") editor.removeBehavior(clipId, behaviorId);
+      } else if (editor.selectedAnimation)
+        copyAnimation(selected.id, editor.selectedAnimation, command === "cut");
+      else {
+        editor.clearAnimationClipboard();
+        editor.clearBehaviorClipboard();
+        clipClipboard.current = structuredClone(
+          editor.project.clips.filter(
+            (clip) =>
+              editor.selectedIds.includes(clip.id) &&
+              (command !== "cut" ||
+                !editor.project.tracks.find(
+                  (track) => track.id === clip.trackId,
+                )?.locked),
+          ),
+        );
+        clipClipboardToken.current = uid();
+        void bridge()
+          .copyClipClipboard(clipClipboardToken.current)
+          .catch((error) => toast(String(error)));
+        if (command === "cut") {
+          editor.apply((p) => deleteClips(p, editor.selectedIds));
+          editor.select(null);
+        }
+      }
+      return;
+    }
+    if (["delete", "rippleDelete"].includes(command)) {
+      if (editor.selectedTransition)
+        editor.updateTransition(editor.selectedTransition, null);
+      else if (editor.selectedBehavior)
+        editor.removeBehavior(
+          editor.selectedBehavior.clipId,
+          editor.selectedBehavior.behaviorId,
+        );
+      else if (editor.selectedAnimation && editor.selected)
+        editor.deleteAnimation(editor.selected.id, editor.selectedAnimation);
+      else {
+        editor.apply((p) =>
+          deleteClips(p, editor.selectedIds, command === "rippleDelete"),
+        );
+        editor.select(null);
+      }
+      return;
+    }
     (
       ({
         new: () => newProject(),
@@ -415,6 +593,34 @@ export default function App() {
         export: exportVideo,
         undo: editor.undo,
         redo: editor.redo,
+        paste: () => void paste(),
+        selectAll: () =>
+          editor.selectMany(editor.project.clips.map((clip) => clip.id)),
+        deselect: () => editor.select(null),
+        split: () =>
+          editor.apply((p) =>
+            splitSelection(p, editor.selectedIds, editor.playhead),
+          ),
+        group: () => editor.apply((p) => groupSelection(p, editor.selectedIds)),
+        ungroup: () =>
+          editor.apply((p) => groupSelection(p, editor.selectedIds, true)),
+        duplicate: () => {
+          const selected = editor.project.clips.filter((clip) =>
+            editor.selectedIds.includes(clip.id),
+          );
+          if (!selected.length) return;
+          let ids: string[] = [];
+          editor.apply((p) => {
+            const result = pasteClips(
+              p,
+              selected,
+              Math.max(...selected.map((clip) => clip.start + clip.duration)),
+            );
+            ids = result.ids;
+            return result.project;
+          });
+          editor.selectMany(ids);
+        },
       }) as Record<string, () => void>
     )[command]?.();
   };
@@ -439,6 +645,18 @@ export default function App() {
         (t) => t.id === selected?.trackId,
       )?.locked;
     const animation = editor.selectedAnimation;
+    if (
+      (event.ctrlKey || event.metaKey) &&
+      ["d", "x", "y"].includes(event.key.toLowerCase())
+    ) {
+      event.preventDefault();
+      commands.current(
+        ({ d: "duplicate", x: "cut", y: "redo" } as Record<string, string>)[
+          event.key.toLowerCase()
+        ],
+      );
+      return;
+    }
     if (
       editor.selectedTransition &&
       ["Delete", "Backspace"].includes(event.key)
@@ -554,11 +772,22 @@ export default function App() {
   }, []);
   useEffect(() => {
     const timer = setTimeout(() => {
-      if (window.framecraft && hasSession && editor.dirty)
+      if (
+        window.framecraft &&
+        hasSession &&
+        editor.dirty &&
+        editorPreferences.program.autoRecovery
+      )
         void window.framecraft.writeRecovery(editor.project).catch(() => {});
-    }, 2000);
+    }, editorPreferences.program.recoveryDelay * 1000);
     return () => clearTimeout(timer);
-  }, [editor.project, editor.dirty, hasSession]);
+  }, [
+    editor.project,
+    editor.dirty,
+    hasSession,
+    editorPreferences.program.autoRecovery,
+    editorPreferences.program.recoveryDelay,
+  ]);
   useEffect(() => {
     void (async () => {
       if (initialized.current) return;
@@ -643,11 +872,7 @@ export default function App() {
             <HomeIcon size={16} />
           </button>
         )}
-        <nav
-          className="header-menus"
-          aria-label="主菜单"
-          hidden={screen === "home"}
-        >
+        <nav className="header-menus" aria-label="主菜单">
           <button
             className="project-menu-trigger"
             disabled={actionsBlocked}
@@ -664,6 +889,7 @@ export default function App() {
             <>
               <button
                 disabled={actionsBlocked}
+                onMouseDown={(event) => event.preventDefault()}
                 onClick={(event) => showWindowMenu("edit", event.currentTarget)}
               >
                 编辑
@@ -747,19 +973,6 @@ export default function App() {
                   : "浏览器预览"}
           </span>
         </span>
-        <button
-          className="preferences-trigger"
-          title="首选项"
-          aria-label="首选项"
-          disabled={actionsBlocked}
-          onClick={() => {
-            editor.setPlaying(false);
-            setPreferencesOpen(true);
-          }}
-        >
-          <Settings2 size={16} />
-          <span>首选项</span>
-        </button>
         <div className="header-actions" hidden={screen === "home"}>
           <button
             className="record-button"
@@ -858,7 +1071,10 @@ export default function App() {
               capabilities={caps}
               refreshCapabilities={refreshCapabilities}
               busy={busy || mediaImporting}
-              onPreferences={() => setPreferencesOpen(true)}
+              onPreferences={() => {
+                setPreferencesTab("ai");
+                setPreferencesOpen(true);
+              }}
             />
             <Preview editor={editor} />
             <Inspector editor={editor} />
@@ -874,8 +1090,12 @@ export default function App() {
       )}
       {preferencesOpen && (
         <PreferencesDialog
+          initialTab={preferencesTab}
+          onSaved={(value) => {
+            setEditorPreferences(value);
+            void bridge().capabilities().then(setCaps);
+          }}
           onClose={() => setPreferencesOpen(false)}
-          run={(fn) => void run(fn)}
           toast={toast}
           busy={busy}
         />

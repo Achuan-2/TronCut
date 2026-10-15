@@ -154,6 +154,7 @@ export function normalizeTransitions(project: Project): Project {
 export function addTransition(
   project: Project,
   target: TransitionTarget,
+  duration = 1,
 ): Project {
   const endpoints = transitionTargets(target);
   if (
@@ -179,7 +180,7 @@ export function addTransition(
       for (const { side } of sides)
         transitions[side] = {
           type: "smooth-slide",
-          duration: 1,
+          duration,
           enabled: true,
           reverse: false,
           pairId,

@@ -773,6 +773,10 @@ export default function Preview({ editor }: { editor: Editor }) {
     [size, setSize] = useState({ width: 700, height: 400 });
   const { canvasMode: mode, setCanvasMode: setMode } = editor;
   const [zoom, setZoom] = useState<CanvasZoom>("fit");
+  useEffect(() => {
+    const initial = editor.preferences.program.previewZoom;
+    setZoom(initial === "fit" ? "fit" : Number(initial));
+  }, [editor.preferences.program.previewZoom, editor.project.id]);
   const [fullscreen, setFullscreen] = useState(false);
   const [fullscreenError, setFullscreenError] = useState("");
   const zoomAnchor = useRef<{ x: number; y: number; point: ZoomPoint } | null>(

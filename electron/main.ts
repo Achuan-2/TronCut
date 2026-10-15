@@ -10,6 +10,7 @@ import {
   session,
   screen,
   safeStorage,
+  shell,
 } from "electron";
 import fs from "node:fs/promises";
 import type { FileHandle } from "node:fs/promises";
@@ -47,13 +48,14 @@ import { importMediaPaths } from "./import-media";
 import { RecentProjects } from "./recent-projects";
 import { runCli } from "./cli";
 import { PreferencesStore } from "./preferences";
-import { preferencesUpdateSchema } from "../shared/preferences";
+import { preferencesUpdateSchema, aiProviderUpdateSchema } from "../shared/preferences";
 import { captionProcessingSchema, cueSchema } from "../shared/caption-processing";
 import { processCaptionCues } from "./caption-processing";
-import { requestAi } from "./ai";
+import { requestAi, listAiModels } from "./ai";
 import { RecordingStyleStore } from "./recording-style";
 import { videoExportRequestSchema } from "../shared/export-settings";
 import { assertExportTarget, videoExportTarget } from "./video-export-target";
+import { editCommands, editCommandEnabled, editMenuStateSchema, textEditSchema } from "../shared/edit-menu";
 import {
   recordingBackgroundSchema,
   recordingSettingsSchema,
@@ -170,6 +172,18 @@ async function chooseFile(
 function installHandlers() {
   handle("preferences:get", () => preferences.get());
   handle("preferences:save", (input: unknown) => preferences.save(preferencesUpdateSchema.parse(input)));
+  handle("preferences:folder", async () => {
+    await fs.mkdir(app.getPath("userData"), { recursive: true });
+    const error = await shell.openPath(app.getPath("userData"));
+    if (error) throw new Error(error);
+  });
+  handle("preferences:ai:models", async (input: unknown) => {
+    if (task) throw new Error("已有后台任务正在执行");
+    const provider = aiProviderUpdateSchema.parse(input);
+    task = new AbortController();
+    try { return await listAiModels(await preferences.resolveProvider(provider), task.signal); }
+    finally { task = null; }
+  });
   handle("preferences:ai:test", async (input: unknown) => {
     if (task) throw new Error("已有后台任务正在执行");
     task = new AbortController();
@@ -190,9 +204,9 @@ function installHandlers() {
     } finally { task = null; }
   });
   handle("window:state", windowState);
-  handle("recording:settings", () => recordingStyle.read());
-  handle("recording:settings:save", (input: unknown) =>
-    recordingStyle.save(recordingSettingsSchema.parse(input)),
+  handle("recording:settings", async () => (await preferences.get()).recording);
+  handle("recording:settings:save", async (input: unknown) =>
+    (await preferences.save({ recording: recordingSettingsSchema.parse(input) })).recording,
   );
   handle("recording:background", async (width: unknown, height: unknown, preset: unknown) =>
     register(await recordingStyle.background(
@@ -217,6 +231,18 @@ function installHandlers() {
     const y = Math.round(Math.min(bounds.height, Math.max(0, z.number().finite().parse(inputY))));
     const label = name === "edit" ? "编辑" : "视图";
     Menu.getApplicationMenu()?.items.find((item) => item.label === label)?.submenu?.popup({ window, x, y });
+  });
+  handle("window:edit-menu", (input: unknown) => {
+    const state = editMenuStateSchema.parse(input);
+    for (const command of editCommands) {
+      const item = Menu.getApplicationMenu()?.getMenuItemById(`edit-${command.id}`);
+      if (item) item.enabled = editCommandEnabled(command.id, state);
+    }
+  });
+  handle("window:edit-text", (input: unknown) => {
+    const command = textEditSchema.parse(input);
+    if (command === "delete") window.webContents.delete();
+    else window.webContents[command]();
   });
   handle("clipboard:clips", (token: unknown) =>
     copyClipClipboard(z.string().uuid().parse(token)),
@@ -1057,22 +1083,15 @@ async function createWindow() {
       },
       {
         label: "编辑",
-        submenu: [
-          {
-            label: "撤销",
-            accelerator: "CmdOrCtrl+Z",
-            click: () => shortcut("undo"),
+        submenu: editCommands.flatMap((command, index) => [
+          ...(index && editCommands[index - 1].group !== command.group ? [{ type: "separator" as const }] : []),
+          { id: `edit-${command.id}`, label: command.label,
+            // Single-key timeline shortcuts must not intercept typing into text fields.
+            accelerator: command.shortcut,
+            registerAccelerator: command.shortcut.includes("CmdOrCtrl"),
+            click: () => shortcut(command.id),
           },
-          {
-            label: "重做",
-            accelerator: "CmdOrCtrl+Shift+Z",
-            click: () => shortcut("redo"),
-          },
-          { role: "cut" },
-          { role: "copy" },
-          { role: "paste" },
-          { role: "selectAll" },
-        ],
+        ]),
       },
       {
         label: "视图",

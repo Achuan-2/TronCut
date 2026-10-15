@@ -42,13 +42,17 @@ export function addMediaAssets(
     newTrackForImages?: boolean;
     pasteToTop?: boolean;
     trackId?: string;
+    imageDuration?: number;
   } = {},
 ): Project {
   const tracks = [...project.tracks],
     clips = [...project.clips];
   if (toTimeline)
     for (const asset of assets) {
-      const duration = asset.duration || 5;
+      const duration =
+        asset.kind === "image"
+          ? (options.imageDuration ?? (asset.duration || 5))
+          : asset.duration || 5;
       const pasteVisual = options.pasteToTop && asset.kind !== "audio";
       const top = tracks[0];
       let track = pasteVisual
@@ -347,12 +351,14 @@ export function animation(
   clip: Clip,
   type: "fade" | "zoom" | "slide",
   localTime: number,
+  animationDuration = 0.6,
 ): Clip {
   const localStart = Math.max(0, Math.min(localTime, clip.duration - 0.1));
   const start = Math.max(0, localStart + (clip.animationOffset ?? 0));
   const end = Math.max(
     start + 0.01,
-    Math.min(clip.duration, localStart + 0.6) + (clip.animationOffset ?? 0),
+    Math.min(clip.duration, localStart + animationDuration) +
+      (clip.animationOffset ?? 0),
   );
   const target = transformAt(clip, localStart);
   const from = {

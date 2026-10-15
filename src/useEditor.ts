@@ -65,6 +65,10 @@ import {
 } from "../shared/animation-edit";
 import { uid } from "../shared/model";
 import {
+  defaultEditorPreferences,
+  type EditorPreferences,
+} from "../shared/editor-preferences";
+import {
   createBehavior,
   supportsBehaviors,
   fitBehaviorDuration,
@@ -103,7 +107,11 @@ export function demoProject(): Project {
   project.canvas.background = "#142821";
   return { ...project, tracks: numberTracks(project.tracks) };
 }
-export function useEditor() {
+export function useEditor(
+  preferences: EditorPreferences = defaultEditorPreferences,
+) {
+  const defaults = useRef(preferences);
+  defaults.current = preferences;
   const [project, setProject] = useState<Project>(() => createProject());
   const [editingTextId, setEditingTextId] = useState<string | null>(null);
   const [zoomPanDraft, setZoomPanDraft] = useState<Transform | null>(null);
@@ -224,7 +232,7 @@ export function useEditor() {
     setProject(next);
     setEditingTextId(null);
     setZoomPanDraft(null);
-    setCanvasMode("select");
+    setCanvasMode(defaults.current.program.defaultTool);
     select(null);
     seek(0);
     setPlaying(false);
@@ -346,6 +354,7 @@ export function useEditor() {
         animateContent(clip, patch, {
           time: playhead - clip.start,
           auto: autoAnimate,
+          duration: defaults.current.timing.animation,
           endpoint: frame?.clipId === id ? frame : undefined,
         }),
       );
@@ -371,6 +380,7 @@ export function useEditor() {
           {
             time: playhead - clip.start,
             auto: autoAnimate,
+            duration: defaults.current.timing.animation,
             endpoint: frame?.clipId === id ? frame : undefined,
           },
           resetContent,
@@ -462,7 +472,13 @@ export function useEditor() {
               frame.time,
               frame.side === "start",
             )
-          : setTransform(source, patch, playhead - clip.start, autoAnimate);
+          : setTransform(
+              source,
+              patch,
+              playhead - clip.start,
+              autoAnimate,
+              defaults.current.timing.animation,
+            );
       });
     },
     [updateClip, updateTextAppearance, playhead, autoAnimate],
@@ -477,7 +493,12 @@ export function useEditor() {
           !project.tracks.find((track) => track.id === clip.trackId)?.hidden,
       )
       .map((clip) =>
-        addAnimationKeyframe(clip, playhead - clip.start, project.canvas.fps),
+        addAnimationKeyframe(
+          clip,
+          playhead - clip.start,
+          project.canvas.fps,
+          defaults.current.timing.animation,
+        ),
       )
       .filter((result) => result !== null);
     if (!results.length) return;
@@ -508,7 +529,7 @@ export function useEditor() {
           clips: p.clips,
         },
         playhead,
-        5,
+        defaults.current.timing.text,
       );
       const tracks = [...p.tracks];
       if (!track) {
@@ -516,6 +537,7 @@ export function useEditor() {
         tracks.unshift(track);
       }
       const clip = newText(track.id, playhead, preset, text);
+      clip.duration = defaults.current.timing.text;
       apply({ ...p, tracks, clips: [...p.clips, clip] });
       select(clip.id);
     },
@@ -537,7 +559,7 @@ export function useEditor() {
       let track = availableTrack(
         { tracks: preferred, clips: p.clips },
         time,
-        5,
+        defaults.current.timing.annotation,
       );
       const tracks = [...p.tracks];
       if (!track) {
@@ -545,6 +567,7 @@ export function useEditor() {
         tracks.unshift(track);
       }
       const clip = annotationClip(template, track.id, time);
+      clip.duration = defaults.current.timing.annotation;
       if (clip.kind === "shape")
         clip.transform.scale = Math.max(
           0.05,
@@ -595,7 +618,11 @@ export function useEditor() {
   const addTransition = useCallback(
     (target: TransitionTarget) => {
       const before = current.current;
-      const next = addProjectTransition(before, target);
+      const next = addProjectTransition(
+        before,
+        target,
+        defaults.current.timing.transition,
+      );
       if (next === before) return;
       apply(next);
       selectTransition({ clipId: target.clipId, side: target.side });
@@ -762,7 +789,7 @@ export function useEditor() {
         assets,
         options.time ?? playhead,
         toTimeline,
-        options,
+        { ...options, imageDuration: defaults.current.timing.image },
       );
       apply(next);
       if (
@@ -802,7 +829,14 @@ export function useEditor() {
   const updateVideoZoomPan = useCallback(
     (patch: Partial<Transform>, time = playhead) => {
       setPlaying(false);
-      apply((project) => setVideoZoomPan(project, patch, time));
+      apply((project) =>
+        setVideoZoomPan(
+          project,
+          patch,
+          time,
+          defaults.current.timing.animation,
+        ),
+      );
     },
     [apply, playhead],
   );
@@ -919,6 +953,7 @@ export function useEditor() {
   }, [keyframeSelection, selectedKeyframe, clearKeyframeEdit]);
   return {
     project,
+    preferences,
     apply,
     replace,
     markSaved,
@@ -938,6 +973,8 @@ export function useEditor() {
     setDirty,
     undo,
     redo,
+    canUndo: past.current.length > 0,
+    canRedo: future.current.length > 0,
     updateClip,
     updateTextAppearance,
     updateContentTransform,

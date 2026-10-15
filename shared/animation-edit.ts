@@ -21,6 +21,7 @@ export function addAnimationKeyframe(
   clip: Clip,
   localTime: number,
   fps: number,
+  duration = 1,
 ): { clip: Clip; time: number } | null {
   if (
     !Number.isFinite(localTime) ||
@@ -29,7 +30,8 @@ export function addAnimationKeyframe(
     localTime > clip.duration
   )
     return null;
-  const localEnd = localTime < 1 / fps ? Math.min(1, clip.duration) : localTime;
+  const localEnd =
+    localTime < 1 / fps ? Math.min(duration, clip.duration) : localTime;
   const offset = clip.animationOffset ?? 0;
   const end = localEnd + offset;
   const frames = [...clip.keyframes].sort((a, b) => a.time - b.time);
@@ -38,7 +40,7 @@ export function addAnimationKeyframe(
   );
   if (existingRange) return { clip, time: localEnd };
   const previous = frames.filter((frame) => frame.time < end).at(-1);
-  const start = Math.max(0, offset, end - 1, previous?.time ?? 0);
+  const start = Math.max(0, offset, end - duration, previous?.time ?? 0);
   if (start >= end) return null;
   if (!frames.some((frame) => Math.abs(frame.time - start) < 1e-6))
     frames.push({ time: start, value: transformAt(clip, start - offset) });

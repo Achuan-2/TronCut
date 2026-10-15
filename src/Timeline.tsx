@@ -111,6 +111,10 @@ export default function Timeline({
       id: string;
     } | null>(null);
   const panel = useRef<HTMLElement>(null);
+  useEffect(
+    () => setSnap(editor.preferences.program.snapping),
+    [editor.preferences.program.snapping, project.id],
+  );
   const zoomAnchor = useRef<{ time: number; x: number } | null>(null);
   const scroll = useRef<HTMLDivElement>(null),
     captionClipboard = useRef<Clip[]>([]),
@@ -1338,7 +1342,8 @@ export default function Timeline({
                                 ? c.text
                                 : `${timeLabel(c.duration)}${c.podcast ? " · 播客人声" : ""}`}
                             </div>
-                            {c.assetId &&
+                            {editor.preferences.program.waveforms &&
+                              c.assetId &&
                               project.assets.find((a) => a.id === c.assetId)
                                 ?.hasAudio &&
                               (() => {

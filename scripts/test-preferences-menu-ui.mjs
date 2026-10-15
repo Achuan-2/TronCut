@@ -1,0 +1,198 @@
+import { _electron as electron, expect } from "@playwright/test";
+import fs from "node:fs/promises";
+import path from "node:path";
+import sharp from "sharp";
+
+const root = path.resolve(
+  "test-output/preferences-menu-ui",
+  `run-${Date.now()}`,
+);
+const profile = path.join(root, "profile");
+await fs.mkdir(profile, { recursive: true });
+const image = path.join(root, "default-image.png");
+await sharp({
+  create: { width: 160, height: 90, channels: 3, background: "#76e5b5" },
+})
+  .png()
+  .toFile(image);
+const env = {
+  ...process.env,
+  FRAMECRAFT_SMOKE: "1",
+  FRAMECRAFT_USER_DATA: profile,
+};
+delete env.ELECTRON_RUN_AS_NODE;
+const app = await electron.launch({ args: ["."], env });
+try {
+  const page = await app.firstWindow(),
+    errors = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  await expect(
+    page.getByRole("button", { name: "编辑", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "首选项", exact: true }),
+  ).toHaveCount(0);
+  const enabled = (id) =>
+    app.evaluate(
+      ({ Menu }, id) =>
+        Menu.getApplicationMenu().getMenuItemById(`edit-${id}`).enabled,
+      id,
+    );
+  const command = async (id) => {
+    await expect.poll(() => enabled(id)).toBe(true);
+    await app.evaluate(
+      ({ Menu, BrowserWindow }, id) =>
+        Menu.getApplicationMenu()
+          .getMenuItemById(`edit-${id}`)
+          .click(null, BrowserWindow.getAllWindows()[0], {}),
+      id,
+    );
+  };
+  await expect.poll(() => enabled("undo")).toBe(false);
+  await command("preferences");
+  await expect(
+    page.getByRole("tablist", { name: "首选项分组" }).getByRole("tab"),
+  ).toHaveCount(6);
+  await page.getByLabel("默认启用时间线吸附", { exact: true }).uncheck();
+  await page.getByLabel("显示时间线音频波形", { exact: true }).uncheck();
+  await page.screenshot({ path: path.join(root, "program.png") });
+  await page.getByRole("tab", { name: "计时", exact: true }).click();
+  for (const [label, value] of [
+    ["图像", "8"],
+    ["文字", "7"],
+    ["注释", "9"],
+    ["动画", "2"],
+    ["手动字幕", "4"],
+    ["转换", "1.5"],
+  ])
+    await page.getByLabel(`${label}默认时长`, { exact: true }).fill(value);
+  await page.screenshot({ path: path.join(root, "timing.png") });
+  await page.getByRole("tab", { name: "项目", exact: true }).click();
+  await page
+    .getByLabel("默认画布规格", { exact: true })
+    .selectOption("1280x720");
+  await page.getByLabel("默认项目帧率", { exact: true }).selectOption("60");
+  await page.getByLabel("默认鼠标样式", { exact: true }).selectOption("circle");
+  await page.getByLabel("默认鼠标大小", { exact: true }).fill("56");
+  await page.screenshot({ path: path.join(root, "project.png") });
+  await page.getByRole("button", { name: "确定", exact: true }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  expect(
+    await page.evaluate(() => window.framecraft.recordingSettings()),
+  ).toMatchObject({ cursor: { style: "circle", size: 56 } });
+  await page.getByRole("button", { name: "新建项目", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "吸附", exact: true }),
+  ).not.toHaveClass(/active-tool/);
+  await page.getByRole("button", { name: "添加文本", exact: true }).click();
+  await expect
+    .poll(
+      async () =>
+        (await page.evaluate(() => window.framecraft.readRecovery()))?.project
+          .clips[0]?.duration,
+    )
+    .toBe(7);
+  const recovery = await page.evaluate(() => window.framecraft.readRecovery());
+  expect(recovery.project.canvas).toMatchObject({
+    width: 1280,
+    height: 720,
+    fps: 60,
+  });
+  await page.getByRole("button", { name: "添加关键帧", exact: true }).click();
+  await expect
+    .poll(
+      async () =>
+        (
+          await page.evaluate(() => window.framecraft.readRecovery())
+        )?.project.clips[0]?.keyframes.at(-1)?.time,
+    )
+    .toBe(2);
+  await command("deselect");
+  await page.locator(".timeline-clip.text").click({ position: { x: 8, y: 8 } });
+  await page.keyboard.press("Control+d");
+  await expect(page.locator(".timeline-clip.text")).toHaveCount(2);
+  await command("undo");
+  await expect(page.locator(".timeline-clip.text")).toHaveCount(1);
+  await command("redo");
+  await expect(page.locator(".timeline-clip.text")).toHaveCount(2);
+  await command("cut");
+  await expect(page.locator(".timeline-clip.text")).toHaveCount(1);
+  await command("paste");
+  await expect(page.locator(".timeline-clip.text")).toHaveCount(2);
+  await command("selectAll");
+  await expect(page.locator(".timeline-clip.selected")).toHaveCount(2);
+  await command("group");
+  await command("ungroup");
+  await page.keyboard.press("ArrowRight");
+  await command("split");
+  await expect(page.locator(".timeline-clip.text")).toHaveCount(4);
+  await command("undo");
+  await expect(page.locator(".timeline-clip.text")).toHaveCount(2);
+  const lock = page
+    .locator(".track-header")
+    .first()
+    .getByTitle("锁定 / 解锁轨道", { exact: true });
+  await lock.click();
+  await expect.poll(() => enabled("cut")).toBe(false);
+  const clipboardBefore = (
+    await page.evaluate(() => window.framecraft.importClipboardMedia())
+  ).clipToken;
+  await page.keyboard.press("Control+x");
+  expect(
+    (await page.evaluate(() => window.framecraft.importClipboardMedia()))
+      .clipToken,
+  ).toBe(clipboardBefore);
+  await expect(page.locator(".timeline-clip.text")).toHaveCount(2);
+  await lock.click();
+  const title = page.getByLabel("工程名称", { exact: true });
+  await title.fill("文本复制测试");
+  await command("selectAll");
+  await command("copy");
+  await expect
+    .poll(() => app.evaluate(({ clipboard }) => clipboard.readText()))
+    .toBe("文本复制测试");
+  await app.evaluate(({ dialog }, file) => {
+    dialog.showOpenDialog = async () => ({
+      canceled: false,
+      filePaths: [file],
+    });
+  }, image);
+  await page.getByRole("button", { name: "导入媒体", exact: true }).click();
+  await expect(page.locator(".asset-card")).toHaveCount(1);
+  await page.locator(".asset-card").dblclick();
+  await expect
+    .poll(
+      async () =>
+        (
+          await page.evaluate(() => window.framecraft.readRecovery())
+        )?.project.clips.find((c) => c.kind === "image")?.duration,
+    )
+    .toBe(8);
+  await command("preferences");
+  await page.getByRole("tab", { name: "项目", exact: true }).click();
+  await page
+    .getByLabel("默认画布规格", { exact: true })
+    .selectOption("3840x2160");
+  await page.getByRole("button", { name: "取消", exact: true }).click();
+  expect(
+    (await page.evaluate(() => window.framecraft.preferences())).project.width,
+  ).toBe(1280);
+  await command("preferences");
+  await page.getByRole("tab", { name: "快捷键", exact: true }).click();
+  await page.getByLabel("搜索快捷键", { exact: true }).fill("分割");
+  await expect(page.locator(".preferences-shortcuts > div")).toHaveCount(1);
+  await page.getByRole("button", { name: "取消", exact: true }).click();
+  expect(errors).toEqual([]);
+  console.log(
+    `分组首选项保存与取消、新项目画布帧率、文字图片时长、原生编辑菜单、复制剪切粘贴、组合与分割通过：${root}`,
+  );
+} catch (error) {
+  await app
+    .windows()[0]
+    ?.screenshot({ path: path.join(root, "failure.png") })
+    .catch(() => {});
+  console.error(`失败截图：${root}`);
+  throw error;
+} finally {
+  await app.close();
+}

@@ -1,5 +1,12 @@
 import { z } from "zod";
 import { captionProcessingSchema } from "./caption-processing";
+import { recordingSettingsSchema } from "./recording";
+import {
+  programPreferencesSchema,
+  timingPreferencesSchema,
+  projectPreferencesSchema,
+  type EditorPreferences,
+} from "./editor-preferences";
 
 export const aiSettingsSchema = z.object({
   baseUrl: z
@@ -28,16 +35,42 @@ export const aiModelUpdateSchema = aiSettingsSchema.extend({
   apiKey: z.string().trim().max(8192).optional(),
   clearApiKey: z.boolean().optional(),
 });
+export const aiProviderUpdateSchema = aiSettingsSchema
+  .pick({ baseUrl: true })
+  .extend({
+    id: z.string().trim().min(1).max(200),
+    name: z.string().trim().min(1).max(100),
+    models: z
+      .array(
+        z.object({
+          id: z.string().trim().min(1).max(200),
+          model: z.string().trim().min(1).max(200),
+        }),
+      )
+      .max(100)
+      .refine(
+        (models) => new Set(models.map((m) => m.model)).size === models.length,
+        "同一服务不能重复添加相同模型",
+      ),
+    apiKey: z.string().trim().max(8192).optional(),
+    clearApiKey: z.boolean().optional(),
+  });
+export type AiProviderUpdate = z.input<typeof aiProviderUpdateSchema>;
+export type AiProviderProfile = Omit<
+  AiProviderUpdate,
+  "apiKey" | "clearApiKey"
+> & { hasApiKey: boolean };
 export interface AiModelProfile {
   id: string;
   baseUrl: string;
   model: string;
   hasApiKey: boolean;
 }
-export interface Preferences {
+export interface Preferences extends EditorPreferences {
   ai: { baseUrl: string; model: string };
   hasApiKey: boolean;
   aiModels: AiModelProfile[];
+  aiProviders: AiProviderProfile[];
   activeAiModelId: string;
   captions: z.infer<typeof captionProcessingSchema>;
 }
@@ -55,8 +88,23 @@ export const preferencesUpdateSchema = z
         "模型配置 ID 不能重复",
       )
       .optional(),
+    aiProviders: z
+      .array(aiProviderUpdateSchema)
+      .max(100)
+      .refine(
+        (providers) =>
+          new Set(providers.map((p) => p.id)).size === providers.length &&
+          new Set(providers.flatMap((p) => p.models.map((m) => m.id))).size ===
+            providers.flatMap((p) => p.models).length,
+        "服务与模型配置 ID 不能重复",
+      )
+      .optional(),
     activeAiModelId: z.string().max(200).optional(),
     captions: captionProcessingSchema.optional(),
+    program: programPreferencesSchema.optional(),
+    timing: timingPreferencesSchema.optional(),
+    project: projectPreferencesSchema.optional(),
+    recording: recordingSettingsSchema.optional(),
   })
   .strict();
 export type PreferencesUpdate = z.input<typeof preferencesUpdateSchema>;

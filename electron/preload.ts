@@ -11,6 +11,8 @@ const bridge: FrameCraftBridge = {
   savePreferences: (update) => ipcRenderer.invoke("preferences:save", update),
   testAiConnection: (update) =>
     ipcRenderer.invoke("preferences:ai:test", update),
+  listAiModels: (provider) => ipcRenderer.invoke("preferences:ai:models", provider),
+  openPreferencesFolder: () => ipcRenderer.invoke("preferences:folder"),
   refineCaptions: (cues, options) =>
     ipcRenderer.invoke("subtitles:refine", cues, options),
   platform: process.platform,
@@ -19,6 +21,8 @@ const bridge: FrameCraftBridge = {
   toggleMaximizeWindow: () => ipcRenderer.invoke("window:maximize"),
   closeWindow: () => ipcRenderer.invoke("window:close"),
   showWindowMenu: (menu, x, y) => ipcRenderer.invoke("window:menu", menu, x, y),
+  updateEditMenu: (state) => ipcRenderer.invoke("window:edit-menu", state),
+  editText: (command) => ipcRenderer.invoke("window:edit-text", command),
   onWindowState: (callback) => {
     const fn = (_: unknown, state: Parameters<typeof callback>[0]) =>
       callback(state);

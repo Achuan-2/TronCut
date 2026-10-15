@@ -19,6 +19,7 @@ export interface VisualEdit {
   time: number;
   auto: boolean;
   endpoint?: { time: number; side: "start" | "end" };
+  duration?: number;
 }
 function setVisual(
   clip: Clip,
@@ -46,7 +47,7 @@ function setVisual(
         edit.endpoint.time,
         edit.endpoint.side === "start",
       )
-    : setTransform(source, patch, edit.time, edit.auto);
+    : setTransform(source, patch, edit.time, edit.auto, edit.duration);
   return next;
 }
 export function animateContent(

@@ -1,6 +1,8 @@
 # 字幕断句、精修与 AI 模型
 
-顶部工具栏的“首选项”用于配置 AI API 基础地址、模型名称和密钥。接口兼容 Chat Completions，可使用云端服务或提供兼容接口的本地模型。地址填写 API 基础路径（例如包含 `/v1` 的地址），软件会追加 `/chat/completions`；也支持填写完整的 Chat Completions 地址。“测试连接”使用当前填写的配置发出一次简短请求，测试通过后点击“保存首选项”。密钥通过 Electron 的系统安全存储加密保存在应用数据目录，不会进入工程文件，也不会在再次打开首选项时返回界面。更换地址的来源后需要重新填写密钥。
+通过“编辑 → 首选项 → AI 模型”配置服务。先添加服务，填写名称、API 基础地址和密钥，再点击“获取模型列表”；搜索模型名称后，可勾选多个模型并一次添加。同一服务下的模型共用地址和密钥，可以在“当前使用的模型”中切换。没有模型列表接口的服务也可以手动填写模型 ID。点击“测试连接”验证当前服务的模型，再点击“确定”保存。
+
+模型列表按 [List models 接口约定](https://developers.openai.com/api/reference/resources/models/methods/list) 从服务的 `/models` 获取。聊天接口兼容 Chat Completions，可使用云端服务或提供兼容接口的本地模型。地址填写 API 基础路径（例如包含 `/v1` 的地址），软件会追加 `/chat/completions`；也支持填写完整的 Chat Completions 地址。密钥通过系统安全存储加密保存在应用数据目录，不会进入工程，也不会在再次打开首选项时返回界面。更换服务来源后需要重新填写密钥。旧配置会保留原有模型和密钥。
 
 请求字段使用 [Chat Completions 接口约定](https://developers.openai.com/api/reference/resources/chat/subresources/completions/methods/create) 的 `model`、`messages` 和非流式响应。交互参考 SmartSub 的“断句与精修”，实现代码与设置存储独立于 SmartSub。
 

@@ -85,7 +85,12 @@ export default function AnimationsPanel({
                       return;
                     }
                     editor.updateClip(editor.selected.id, (clip) =>
-                      animation(clip, type, editor.playhead - clip.start),
+                      animation(
+                        clip,
+                        type,
+                        editor.playhead - clip.start,
+                        editor.preferences.timing.animation,
+                      ),
                     );
                   }}
                 >
