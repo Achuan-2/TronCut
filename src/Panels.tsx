@@ -11,20 +11,17 @@ import {
   Music2,
   Image,
   WandSparkles,
-  Diamond,
   AlignCenter,
-  Check,
   FileJson,
   ArrowRight,
   Mic,
   MousePointer2,
-  Scan,
   Link2,
   Paintbrush,
   ArrowRightLeft,
 } from "lucide-react";
 import { type Clip, textPresets, defaultTransform } from "../shared/model";
-import { animation, transformAt } from "../shared/editor";
+import { transformAt } from "../shared/editor";
 import type { Capabilities } from "../shared/bridge";
 import type { Editor } from "./useEditor";
 import { timeLabel } from "./Preview";
@@ -33,7 +30,7 @@ import { textBoxFor } from "./text";
 import { MediaThumbnail } from "./MediaThumbnail";
 import { defaultCursorStyle } from "../shared/cursor";
 import NarrationPanel from "./NarrationPanel";
-import ZoomPanPanel from "./ZoomPanPanel";
+import AnimationsPanel from "./AnimationsPanel";
 import { defaultContentTransform } from "../shared/crop";
 import { visualClipAt } from "../shared/visual-state";
 import { ScaleControl, RotationControls } from "./TransformControls";
@@ -54,7 +51,6 @@ export type Tab =
   | "annotations"
   | "captions"
   | "animations"
-  | "zoompan"
   | "narration"
   | "effects"
   | "behaviors"
@@ -67,7 +63,6 @@ const tabs = [
   { id: "animations", name: "动画", icon: Sparkles },
   { id: "behaviors", name: "行为", icon: Paintbrush },
   { id: "transitions", name: "转换", icon: ArrowRightLeft },
-  { id: "zoompan", name: "缩放与平移", icon: Scan },
   { id: "effects", name: "视觉效果", icon: WandSparkles },
   { id: "narration", name: "旁白", icon: Mic },
   { id: "settings", name: "设置", icon: Settings2 },
@@ -87,7 +82,7 @@ interface Props {
 }
 export default function Panels(props: Props) {
   const { editor, tab, setTab, run, toast } = props,
-    { project, selected, updateClip } = editor;
+    { project } = editor;
   const [query, setQuery] = useState("");
   const bridge = () => {
     if (!window.framecraft)
@@ -100,7 +95,7 @@ export default function Panels(props: Props) {
         {tabs.map((t) => (
           <button
             key={t.id}
-            className={`${tab === t.id ? "selected" : ""} ${t.id === "zoompan" ? "zoom-pan-tab" : ""}`}
+            className={tab === t.id ? "selected" : ""}
             onClick={() => setTab(t.id)}
           >
             <t.icon size={21} />
@@ -109,9 +104,9 @@ export default function Panels(props: Props) {
         ))}
       </nav>
       <div
-        className={`library-content ${tab === "captions" ? "captions-library" : tab === "narration" ? "narration-library" : ""}`}
+        className={`library-content ${tab === "captions" ? "captions-library" : tab === "narration" ? "narration-library" : tab === "animations" ? "animations-library" : ""}`}
       >
-        {tab !== "captions" && (
+        {tab !== "captions" && tab !== "animations" && (
           <div className="library-heading">
             <h2>
               {tabs.find((t) => t.id === tab)?.name === "媒体"
@@ -255,52 +250,12 @@ export default function Panels(props: Props) {
             onPreferences={props.onPreferences}
           />
         )}
-        {tab === "zoompan" && <ZoomPanPanel editor={editor} />}
-        {tab === "animations" && (
-          <>
-            <p className="panel-intro">
-              选中片段，点击即添加。
-              <br />
-              也可以在时间线上右键添加动画。
-            </p>
-            <div className="animation-presets">
-              {(["fade", "zoom", "slide"] as const).map((type, i) => (
-                <button
-                  key={type}
-                  onClick={() => {
-                    if (!selected) {
-                      toast("请先选中片段");
-                      return;
-                    }
-                    updateClip(selected.id, (c) =>
-                      animation(c, type, editor.playhead - c.start),
-                    );
-                  }}
-                >
-                  <div className={`animation-demo ${type}`}>
-                    <span />
-                  </div>
-                  <span>{["轻柔淡入", "平滑缩放", "侧边滑入"][i]}</span>
-                  <small>0.6 秒 · 平滑曲线</small>
-                </button>
-              ))}
-            </div>
-            <div className="tip-card">
-              <Diamond size={19} />
-              <b>开启自动动画</b>
-              <p>
-                移动播放头，再修改右侧属性。TronCut
-                会自动记录位置、缩放和不透明度，无需拖拽动画箭头。
-              </p>
-              <button
-                onClick={() => editor.setAutoAnimate(!editor.autoAnimate)}
-              >
-                {editor.autoAnimate ? "已开启" : "开启自动动画"}
-                {editor.autoAnimate && <Check size={14} />}
-              </button>
-            </div>
-          </>
-        )}
+        <AnimationsPanel
+          key={project.id}
+          editor={editor}
+          active={tab === "animations"}
+          toast={toast}
+        />
         {tab === "settings" && (
           <>
             <h3 className="section-title">工程画布</h3>

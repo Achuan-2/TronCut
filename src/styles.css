@@ -591,9 +591,6 @@ fieldset:disabled {
   color: #93edc7;
   background: #2b3b32;
 }
-.tool-rail .zoom-pan-tab {
-  font-size: 9px;
-}
 .tool-rail button.selected:before {
   content: "";
   position: absolute;
@@ -626,6 +623,30 @@ fieldset:disabled {
 .library-heading > span {
   color: #74817a;
   font-size: 10px;
+}
+.library-content.animations-library {
+  padding-top: 0;
+}
+.animation-panel-tabs {
+  display: flex;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  margin: 0 -17px 16px;
+  border-bottom: 1px solid var(--line);
+  background: var(--panel);
+}
+.animation-panel-tabs button {
+  flex: 1;
+  height: 43px;
+  border-radius: 0;
+  border-bottom: 2px solid transparent;
+  color: var(--muted);
+}
+.animation-panel-tabs button[aria-selected="true"] {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+  background: #ffffff05;
 }
 .wide-button {
   width: 100%;

@@ -896,7 +896,8 @@ try {
   await page.getByTitle("撤销 Ctrl+Z", { exact: true }).click();
   await expect(page.locator(".timeline-clip.video .clip-animation")).toHaveCount(0);
   await seek(8);
-  await page.getByRole("button", { name: "缩放与平移", exact: true }).click();
+  await page.getByRole("button", { name: "动画", exact: true }).click();
+  await page.getByRole("tab", { name: "缩放与平移", exact: true }).click();
   await expect(page.getByLabel("取景中心 X (%)")).toHaveCount(0);
   await expect(page.getByLabel("取景中心 Y (%)")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "添加当前位置关键帧", exact: true })).toHaveCount(0);
