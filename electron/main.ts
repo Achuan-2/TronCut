@@ -43,6 +43,7 @@ import { createClonedVoiceSchema } from "../shared/cloned-voices";
 import { mediaThumbnail } from "./thumbnails";
 import { serveMediaFile } from "./media-protocol";
 import { NativeRecording } from "./native-recording";
+import { RecordingBorder } from "./recording-border";
 import { copyClipClipboard, importClipboardMedia } from "./clipboard-media";
 import { importMediaPaths } from "./import-media";
 import { RecentProjects } from "./recent-projects";
@@ -112,6 +113,11 @@ app.on("open-file", (event, file) => {
 let captureSelection: { id: string; systemAudio: boolean } | null = null;
 let task: AbortController | null = null;
 let nativeRecording: NativeRecording | null = null;
+const recordingBorder = new RecordingBorder();
+function requestRecordingStop() {
+  if (window && !window.isDestroyed() && !window.webContents.isDestroyed())
+    window.webContents.send("shortcut", "stopRecording");
+}
 const assets = new Map<string, Asset>();
 const speechVoicePreviews = new SpeechVoicePreviews();
 const clonedVoices = new ClonedVoices(app.getPath("userData"));
@@ -119,7 +125,7 @@ const temporaryReferences = new Set<string>();
 const approvedPaths = new Set<string>();
 const recordings = new Map<
   string,
-  { file: string; handle: FileHandle; bytes: number }
+  { file: string; handle: FileHandle; bytes: number; kind: string }
 >();
 const register = (asset: Asset) => {
   assets.set(asset.id, asset);
@@ -296,6 +302,9 @@ function installHandlers() {
       const recording = new NativeRecording();
       nativeRecording = recording;
       try {
+        await recordingBorder.start(
+          id, bounds, process.resourcesPath, requestRecordingStop,
+        );
         await recording.start(
           {
             sourceId: id,
@@ -312,9 +321,13 @@ function installHandlers() {
           path.join(app.getPath("userData"), "recordings"),
           process.resourcesPath,
           bounds,
-          () => window.webContents.send("shortcut", "stopRecording"),
+          () => {
+            void recordingBorder.stop();
+            requestRecordingStop();
+          },
         );
       } catch (error) {
+        await recordingBorder.stop();
         recording.abort();
         nativeRecording = null;
         throw error;
@@ -325,6 +338,7 @@ function installHandlers() {
     nativeRecording?.pause(z.boolean().parse(paused)),
   );
   handle("capture:native:stop", async () => {
+    await recordingBorder.stop();
     if (!nativeRecording) throw new Error("原生录制未启动");
     const recording = nativeRecording;
     try {
@@ -925,7 +939,29 @@ function installHandlers() {
     await fs.mkdir(folder, { recursive: true });
     const file = path.join(folder, `${label}-${id}.raw.webm`),
       handle = await fs.open(file, "wx");
-    recordings.set(id, { file, handle, bytes: 0 });
+    try {
+      if (label === "screen" && process.platform === "win32") {
+        if (!captureSelection) throw new Error("请先选择录屏目标");
+        const selectedId = captureSelection.id;
+        const sources = await desktopCapturer.getSources({
+          types: ["screen", "window"],
+        });
+        const source = sources.find((s) => s.id === selectedId);
+        if (!source) throw new Error("录屏目标已经关闭，请重新选择");
+        const display = screen.getAllDisplays()
+          .find((d) => String(d.id) === source.display_id) ?? screen.getPrimaryDisplay();
+        await recordingBorder.start(
+          source.id, screen.dipToScreenRect(null, display.bounds),
+          process.resourcesPath, requestRecordingStop,
+        );
+      }
+      recordings.set(id, { file, handle, bytes: 0, kind: label });
+    } catch (error) {
+      await recordingBorder.stop();
+      await handle.close();
+      await fs.rm(file, { force: true });
+      throw error;
+    }
     return id;
   });
   handle("recording:chunk", async (id: unknown, input: unknown) => {
@@ -954,6 +990,7 @@ function installHandlers() {
       duration = z.number().finite().positive().parse(inputDuration),
       rec = recordings.get(id);
     if (!rec) throw new Error("录屏会话不存在");
+    if (rec.kind === "screen") await recordingBorder.stop();
     recordings.delete(id);
     await rec.handle.close();
     if (!rec.bytes) throw new Error("录屏没有产生数据");
@@ -978,6 +1015,7 @@ function installHandlers() {
     const id = z.string().parse(inputId),
       rec = recordings.get(id);
     if (rec) {
+      if (rec.kind === "screen") await recordingBorder.stop();
       recordings.delete(id);
       await rec.handle.close();
       await fs.rm(rec.file, { force: true });
@@ -1009,6 +1047,10 @@ async function createWindow() {
   window.on("enter-full-screen", notifyWindowState);
   window.on("leave-full-screen", notifyWindowState);
   window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
+  window.webContents.on("render-process-gone", () => {
+    void recordingBorder.stop();
+    nativeRecording?.abort();
+  });
   window.webContents.on("will-navigate", (event, url) => {
     const current = window.webContents.getURL();
     if (url !== current) event.preventDefault();
@@ -1187,6 +1229,7 @@ app
     app.quit();
   });
 app.on("window-all-closed", () => {
+  void recordingBorder.stop();
   task?.abort();
   nativeRecording?.abort();
   globalShortcut.unregisterAll();
@@ -1194,6 +1237,7 @@ app.on("window-all-closed", () => {
 });
 let closingOnnx = false;
 app.on("will-quit", (event) => {
+  void recordingBorder.stop();
   if (closingOnnx) return;
   event.preventDefault();
   closingOnnx = true;

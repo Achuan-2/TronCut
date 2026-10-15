@@ -107,6 +107,11 @@ target_link_libraries(cursor-sampler PRIVATE
   winmm
 )
 
+add_executable(recording-border src/recording-border.cpp src/dpi_awareness.h)
+target_compile_definitions(recording-border PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN _WIN32_WINNT=0x0A00)
+target_compile_options(recording-border PRIVATE /EHsc /W4 /utf-8)
+target_link_libraries(recording-border PRIVATE gdi32 dwmapi)
+
 add_executable(audio_sample_utils_test
   src/audio_sample_utils.cpp
   src/audio_sample_utils.h

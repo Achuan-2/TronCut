@@ -7,9 +7,9 @@ if (-not (Get-Command $CMake -ErrorAction SilentlyContinue)) {
 }
 & $CMake -S native/windows -B .cache/native-troncut -G 'Visual Studio 17 2022' -A x64
 if ($LASTEXITCODE -ne 0) { throw '原生捕获配置失败' }
-& $CMake --build .cache/native-troncut --config Release --target wgc-capture cursor-sampler -j 4
+& $CMake --build .cache/native-troncut --config Release --target wgc-capture cursor-sampler recording-border -j 4
 if ($LASTEXITCODE -ne 0) { throw '原生捕获构建失败' }
-foreach ($binary in @('wgc-capture', 'cursor-sampler')) {
+foreach ($binary in @('wgc-capture', 'cursor-sampler', 'recording-border')) {
     Copy-Item -LiteralPath ".cache/native-troncut/Release/$binary.exe" -Destination "resources/bin/$binary.exe"
 }
 Copy-Item -LiteralPath native/windows/LICENSE -Destination resources/bin/OpenScreen-LICENSE.txt

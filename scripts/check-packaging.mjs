@@ -25,7 +25,12 @@ for (const name of [
     throw new Error(`安装包缺少第三方许可声明：${name}`);
 }
 if (process.platform === "win32") {
-  for (const name of ["wgc-capture.exe", "cursor-sampler.exe"]) {
+  const helpers = ["wgc-capture.exe", "cursor-sampler.exe"];
+  // Release tooling may also be used to rebuild a tag from before the border
+  // component existed. Current sources must always package their helper.
+  if (fs.existsSync(path.resolve("electron/recording-border.ts")))
+    helpers.push("recording-border.exe");
+  for (const name of helpers) {
     if (!fs.existsSync(path.resolve("resources/bin", name)))
       throw new Error(`安装包缺少原生录屏组件：${name}`);
   }
