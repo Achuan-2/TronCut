@@ -42,7 +42,7 @@ export default function SpeedProperties({
             min={speedLimits.min}
             max={speedLimits.max}
             step="0.01"
-            value={Number(clip.speed.toFixed(4))}
+            value={Number(clip.speed.toFixed(2))}
             onChange={(event) =>
               editor.changeClipSpeed(clip.id, Number(event.target.value))
             }

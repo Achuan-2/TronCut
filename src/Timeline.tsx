@@ -1276,7 +1276,9 @@ export default function Timeline({
                                 {c.groupId ? "▧ " : ""}
                                 {c.name}
                               </span>
-                              {c.speed !== 1 && <b>{c.speed}×</b>}
+                              {c.speed !== 1 && (
+                                <b>{Number(c.speed.toFixed(2))}×</b>
+                              )}
                             </div>
                             <div className="clip-detail">
                               {c.kind === "text"
