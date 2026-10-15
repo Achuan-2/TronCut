@@ -12,8 +12,9 @@ import {
   type Asset,
   type Clip,
 } from "../shared/model";
-import { transformAt } from "../shared/editor";
-import { animationRanges } from "../shared/animation-ranges";
+import { splitClip, transformAt } from "../shared/editor";
+import { animationRanges, retimeAnimation } from "../shared/animation-ranges";
+import { animateContent, animateCrop } from "../shared/crop-animation";
 
 const asset: Asset = {
   id: "screen",
@@ -157,4 +158,60 @@ it("录屏、镜头和背景分层导入，保留素材与原工程；禁用美�
   );
   expect(fallback.clips[0].transform.scale).toBe(1);
   expect(fallback.clips[0].keyframes).toEqual([]);
+});
+
+it("录后自动缩放可编辑端点、裁剪和时间，拆分与工程序列化保留动画和原始素材", () => {
+  const screen = { ...asset, cursor: { samples: [sample(2, 0.8, 0.1, true)] } };
+  const project = addRecordedAssets(
+    createProject(),
+    [{ asset: screen, kind: "screen" }],
+    defaultRecordingSettings,
+    3,
+  );
+  const recording = project.clips[0];
+  const range = animationRanges(recording)[0];
+  const edited = animateContent(
+    recording,
+    { scale: 2.5, x: -0.3, y: 0.2 },
+    {
+      time: range.end,
+      auto: false,
+      endpoint: { time: range.end, side: "end" },
+    },
+  );
+  expect(animationRanges(edited)).toHaveLength(2);
+  expect(transformAt(edited, range.start).contentScale).toBe(1);
+  expect(transformAt(edited, range.end)).toMatchObject({
+    scale: 1,
+    contentScale: 2.5,
+    contentX: -0.3,
+    contentY: 0.2,
+  });
+  // Editing the zoom-in endpoint also updates its hold, but leaves zoom-out intact.
+  expect(transformAt(edited, 3).contentScale).toBe(2.5);
+  expect(transformAt(edited, 5).contentScale).toBe(1);
+  const cropped = animateCrop(
+    edited,
+    { left: 0.1, top: 0, right: 0, bottom: 0 },
+    { width: 1920, height: 1080 },
+    project.canvas,
+    {
+      time: range.end,
+      auto: false,
+      endpoint: { time: range.end, side: "end" },
+    },
+  );
+  expect(transformAt(cropped, range.end).cropLeft).toBe(0.1);
+  expect(transformAt(cropped, range.start).cropLeft).toBe(0);
+  const retimed = retimeAnimation(cropped, range, "end", 0.2, 30);
+  expect(animationRanges(retimed)[0].end).toBeGreaterThan(range.end);
+  const changed = { ...project, clips: [retimed] };
+  const reopened = validateProject(JSON.parse(JSON.stringify(changed)));
+  expect(reopened.clips[0].keyframes).toEqual(retimed.keyframes);
+  expect(reopened.assets[0]).toEqual(screen);
+  const split = splitClip(reopened, recording.id, recording.start + 2.5);
+  const right = split.clips[1];
+  for (const time of [0, 0.5, 2])
+    expect(transformAt(right, time)).toEqual(transformAt(retimed, time + 2.5));
+  expect(right.assetId).toBe(screen.id);
 });

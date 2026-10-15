@@ -636,7 +636,7 @@ export default function Recorder({
                 checked={settings.autoZoom}
                 onChange={(e) => changeSettings({ autoZoom: e.target.checked })}
               />
-              根据鼠标点击和停留自动缩放
+              根据鼠标点击和停留生成缩放动画
             </label>
           </fieldset>
           <p className="small-note">

@@ -432,6 +432,9 @@ export function useEditor(
       const selection = { clipId, time: frame?.time ?? 0, side: target.side };
       keyframeRef.current = selection;
       setKeyframeSelection(selection);
+      // Recording zooms animate the content inside a fixed video frame.
+      // Expose those same crop/pan controls when selecting their endpoints.
+      if (frame?.recordingZoom) setCanvasMode("crop");
       selectMany((previous) =>
         keepSelection
           ? [...previous.filter((id) => id !== clipId), clipId]

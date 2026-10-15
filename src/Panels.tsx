@@ -820,6 +820,12 @@ export function Inspector({ editor }: { editor: Editor }) {
                 <div className="recording-zoom-controls">
                   <h3 className="section-title">自动缩放</h3>
                   <button
+                    disabled={locked}
+                    onClick={() => editor.setCanvasMode("crop")}
+                  >
+                    编辑缩放与移动
+                  </button>
+                  <button
                     disabled={
                       locked ||
                       c.keyframes.some((frame) => !frame.recordingZoom)
@@ -857,7 +863,7 @@ export function Inspector({ editor }: { editor: Editor }) {
                     移除自动缩放
                   </button>
                   <p className="field-help">
-                    缩放动画可在时间线上编辑。已有手动动画时，请先调整或移除动画再重新生成；轨迹没有有效点击或停留时不生成动画。
+                    选中时间线上的动画起点或终点，可修改框内缩放、位置和裁剪范围；拖动箭头或端点可调整动画时间。已有手动动画时，请先调整或移除动画再重新生成。
                   </p>
                 </div>
               )}

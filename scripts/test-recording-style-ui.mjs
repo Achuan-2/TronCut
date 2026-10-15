@@ -51,7 +51,7 @@ try {
   await native.uncheck();
   await expect(page.getByLabel("录屏鼠标样式", { exact: true })).toBeDisabled();
   await expect(
-    page.getByLabel("根据鼠标点击和停留自动缩放", { exact: true }),
+    page.getByLabel("根据鼠标点击和停留生成缩放动画", { exact: true }),
   ).toBeDisabled();
   await expect(page.getByLabel("录屏背景", { exact: true })).toBeEnabled();
   await native.check();
