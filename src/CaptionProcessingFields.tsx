@@ -14,7 +14,9 @@ export default function CaptionProcessingFields({
   const usesAi = value.segmentation === "ai" || value.refinement !== "none";
   return (
     <fieldset className="caption-processing-fields">
-      <legend>{segmentationOnly ? "断句设置" : "断句与精修"}</legend>
+      <legend>
+        {segmentationOnly ? "断句设置" : existing ? "AI纠错精修" : "断句与精修"}
+      </legend>
       {!existing && (
         <>
           <label className="field vertical">
@@ -56,7 +58,7 @@ export default function CaptionProcessingFields({
           </p>
         </>
       )}
-      {!segmentationOnly && (
+      {!segmentationOnly && !existing && (
         <label className="field vertical">
           文字精修
           <select
@@ -84,7 +86,7 @@ export default function CaptionProcessingFields({
               aria-label="字幕精修补充要求"
               rows={2}
               maxLength={2000}
-              placeholder="例如：保留专业名词，使用中文标点，保持口语表达。"
+              placeholder="可补充提供原文稿，或填写要求，例如：保留专业名词，使用中文标点，保持口语表达。"
               value={value.instruction}
               onChange={(event) =>
                 onChange({ ...value, instruction: event.target.value })

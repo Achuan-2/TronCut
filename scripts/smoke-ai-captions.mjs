@@ -73,6 +73,34 @@ try {
   await page.getByRole("button", { name: "首选项", exact: true }).click();
   await expect(page.getByLabel("AI 模型名称")).toHaveValue("local-test-model");
   await expect(page.getByLabel("AI API 密钥")).toHaveValue("");
+  await page.getByRole("button", { name: "添加模型", exact: true }).click();
+  await page.getByLabel("AI API 基础地址").fill(endpoint);
+  await page.getByLabel("AI 模型名称").fill("second-test-model");
+  await page.getByLabel("AI API 密钥").fill("second-test-secret");
+  const firstId = await page
+    .getByLabel("当前 AI 模型")
+    .locator("option")
+    .first()
+    .getAttribute("value");
+  const secondId = await page.getByLabel("当前 AI 模型").inputValue();
+  await page.getByLabel("当前 AI 模型").selectOption(firstId);
+  await expect(page.getByLabel("AI 模型名称")).toHaveValue("local-test-model");
+  await page.getByLabel("当前 AI 模型").selectOption(secondId);
+  await expect(page.getByLabel("AI API 密钥")).toHaveValue(
+    "second-test-secret",
+  );
+  await page.getByRole("button", { name: "保存首选项", exact: true }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await page.getByRole("button", { name: "首选项", exact: true }).click();
+  await expect(page.getByLabel("当前 AI 模型").locator("option")).toHaveCount(
+    2,
+  );
+  await expect(page.getByLabel("AI 模型名称")).toHaveValue("second-test-model");
+  await page.getByRole("button", { name: "测试连接", exact: true }).click();
+  await expect(page.getByRole("status")).toContainText("AI 连接测试成功");
+  assert.equal(requests.at(-1).model, "second-test-model");
+  assert.equal(requests.at(-1).authorization, "Bearer second-test-secret");
+  await page.screenshot({ path: path.join(root, "multiple-models.png") });
   await page.getByRole("button", { name: "关闭首选项", exact: true }).click();
   await page.getByRole("button", { name: "新建项目", exact: true }).click();
   await page.getByRole("button", { name: "字幕", exact: true }).click();
@@ -98,22 +126,33 @@ try {
   const original = "大家好这个字幕需要润色。";
   await text.fill(original);
   await page.getByRole("button", { name: "字幕操作", exact: true }).click();
+  await page.getByRole("menuitem", { name: "AI纠错精修", exact: true }).click();
+  await expect(page.getByRole("dialog").getByRole("combobox")).toHaveCount(0);
+  await page.getByText("补充要求（可选）", { exact: true }).click();
+  await expect(page.getByLabel("字幕精修补充要求")).toHaveAttribute(
+    "placeholder",
+    /可补充提供原文稿/,
+  );
   await page
-    .getByRole("menuitem", { name: "AI 精修与润色", exact: true })
-    .click();
+    .getByLabel("字幕精修补充要求")
+    .fill("原文稿：大家好，这条字幕更自然。");
   await page.getByRole("button", { name: "开始精修", exact: true }).click();
   await expect(text).toHaveValue("大家好，这条字幕更自然。", {
     timeout: 20000,
   });
+  assert.equal(requests.at(-1).model, "second-test-model");
+  assert.equal(
+    JSON.parse(requests.at(-1).messages[1].content).instruction,
+    "原文稿：大家好，这条字幕更自然。",
+  );
+  assert(requests.at(-1).messages[0].content.includes("纠正明显的同音错字"));
   await page.screenshot({ path: path.join(root, "polished.png") });
   // Undo restores only this edit, with the caption and its timing retained.
   await page.getByTitle("撤销 Ctrl+Z", { exact: true }).click();
   await expect(text).toHaveValue(original);
   rejectRequests = true;
   await page.getByRole("button", { name: "字幕操作", exact: true }).click();
-  await page
-    .getByRole("menuitem", { name: "AI 精修与润色", exact: true })
-    .click();
+  await page.getByRole("menuitem", { name: "AI纠错精修", exact: true }).click();
   await page.getByRole("button", { name: "开始精修", exact: true }).click();
   await expect(page.getByRole("status")).toContainText("已保留规则结果或原文");
   await expect(text).toHaveValue(original);
@@ -197,14 +236,18 @@ try {
   );
   assert(
     requests.every(
-      (request) =>
-        request.model === "local-test-model" &&
-        request.authorization === "Bearer local-test-secret",
+      (request, index) =>
+        request.model ===
+          (index === 0 ? "local-test-model" : "second-test-model") &&
+        request.authorization ===
+          (index === 0
+            ? "Bearer local-test-secret"
+            : "Bearer second-test-secret"),
     ),
   );
   assert.deepEqual(errors, []);
   console.log(
-    "首选项、AI 润色、已有字幕四种断句、一次撤销和锁定轨道保护通过，重新断句未调用语音识别",
+    "多模型保存与切换、AI纠错精修、原文稿要求、已有字幕四种断句、撤销和锁定轨道保护通过，重新断句未调用语音识别",
   );
   await fs.writeFile(
     path.join(root, "result.json"),

@@ -1166,7 +1166,8 @@ fieldset:disabled {
 .preferences-dialog .field {
   margin: 14px 0;
 }
-.preferences-dialog .field.vertical input:not([type="checkbox"]) {
+.preferences-dialog .field.vertical input:not([type="checkbox"]),
+.preferences-dialog .field.vertical select {
   width: 100%;
   min-width: 0;
 }
@@ -1212,12 +1213,14 @@ fieldset:disabled {
   padding: 4px 0;
   font-size: 12px;
 }
+.preferences-model-actions,
 .preferences-actions {
   display: flex;
   justify-content: flex-end;
   gap: 12px;
   margin-top: 20px;
 }
+.preferences-model-actions button,
 .preferences-actions button {
   padding: 8px 14px;
   border: 1px solid #50685a;

@@ -81,7 +81,7 @@ export default function CaptionsPanel({
     useState<CaptionProcessingOptions>(() =>
       captionProcessingSchema.parse({
         segmentation: "unlimited",
-        refinement: "polish",
+        refinement: "correct",
       }),
     );
   const [segmentation, setSegmentation] = useState<CaptionProcessingOptions>(
@@ -267,7 +267,7 @@ export default function CaptionsPanel({
                   onClick={() => open("refine")}
                 >
                   <Sparkles size={14} />
-                  AI 精修与润色
+                  AI纠错精修
                 </button>
                 <button
                   role="menuitem"
@@ -357,7 +357,7 @@ export default function CaptionsPanel({
                     : dialog === "replace"
                       ? "搜索和替换"
                       : dialog === "refine"
-                        ? "AI 精修与润色"
+                        ? "AI纠错精修"
                         : dialog === "segment"
                           ? "字幕断句"
                           : "统一字幕样式"}
