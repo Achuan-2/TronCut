@@ -42,10 +42,16 @@ mkdir -p "$cache_dir" "$bin_dir"
 
 download_checked() {
   local url="$1" output="$2" sha="$3"
-  if [[ ! -f "$output" ]]; then
-    curl --fail --location --retry 3 --retry-all-errors --output "$output" "$url"
-  fi
   local actual
+  # The source checkout contains Windows license files at these shared paths.
+  # Reuse a cached file only when it matches this platform's pinned digest.
+  if [[ -f "$output" ]]; then
+    actual="$(shasum -a 256 "$output" | awk '{print $1}')"
+    if [[ "$actual" == "$sha" ]]; then
+      return
+    fi
+  fi
+  curl --fail --location --retry 3 --retry-all-errors --output "$output" "$url"
   actual="$(shasum -a 256 "$output" | awk '{print $1}')"
   if [[ "$actual" != "$sha" ]]; then
     echo "SHA256 mismatch for $output: $actual" >&2
