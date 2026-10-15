@@ -2822,7 +2822,12 @@ fieldset:disabled {
   flex-shrink: 0;
   border-right: 1px solid #323c34;
   background: #202728;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+.track-headers::-webkit-scrollbar {
+  display: none;
 }
 .ruler-label {
   position: sticky;

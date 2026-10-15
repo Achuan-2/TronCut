@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   Eye,
@@ -280,15 +280,22 @@ export default function Timeline({
       element.scrollTop = top + height - element.clientHeight;
   }, [selected?.trackId, project.tracks.length, layoutKey]);
   const [viewport, setViewport] = useState({ left: 0, width: 1600 });
-  useEffect(() => {
+  useLayoutEffect(() => {
     const element = scroll.current;
-    if (!element) return;
-    const observer = new ResizeObserver(() =>
-      setViewport({ left: element.scrollLeft, width: element.clientWidth }),
-    );
+    const labels = headers.current;
+    if (!element || !labels) return;
+    const syncGeometry = () => {
+      // The clip pane's horizontal scrollbar shortens its vertical viewport.
+      // Reserve the same space on the labels so both scroll ranges stay equal.
+      labels.style.paddingBottom = `${element.offsetHeight - element.clientHeight}px`;
+      labels.scrollTop = element.scrollTop;
+      setViewport({ left: element.scrollLeft, width: element.clientWidth });
+    };
+    syncGeometry();
+    const observer = new ResizeObserver(syncGeometry);
     observer.observe(element);
     return () => observer.disconnect();
-  }, []);
+  }, [layoutKey, width]);
   const locked =
     selected && project.tracks.find((t) => t.id === selected.trackId)?.locked;
   function remove(id: string) {
@@ -619,7 +626,14 @@ export default function Timeline({
         </div>
       </div>
       <div className="timeline-body">
-        <div className="track-headers" ref={headers}>
+        <div
+          className="track-headers"
+          ref={headers}
+          onScroll={(event) => {
+            if (scroll.current)
+              scroll.current.scrollTop = event.currentTarget.scrollTop;
+          }}
+        >
           <div className="ruler-label">
             时间线 <span>{project.tracks.length} 轨</span>
           </div>
