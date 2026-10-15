@@ -1,14 +1,14 @@
 # 本地语音字幕引擎
 
-字幕默认使用 CPU，通过 sherpa-onnx 运行 Qwen3-ASR 0.6B INT8，也可选择 SenseVoiceSmall。字幕面板的“语音转文本”弹窗可选择模型与识别设备，再点击“开始识别”，无需选择片段。TronCut 自动复用自己的 `models/onnx/` 缓存，缺少模型时下载。CPU Qwen3-ASR 使用卷积前端、INT8 encoder/decoder 与 tokenizer，SenseVoice 使用 `model.int8.onnx` 和 `tokens.txt`；两者共用单独缓存的 `models/onnx/silero_vad.onnx`。
+字幕统一使用 CPU，通过 sherpa-onnx 运行 Qwen3-ASR 0.6B INT8，也可选择 SenseVoiceSmall。字幕面板的“语音转文本”弹窗选择模型后点击“开始识别”，无需选择片段。TronCut 自动复用自己的 `models/onnx/` 缓存，缺少模型时下载。Qwen3-ASR 使用卷积前端、INT8 encoder/decoder 与 tokenizer，SenseVoice 使用 `model.int8.onnx` 和 `tokens.txt`；两者共用单独缓存的 `models/onnx/silero_vad.onnx`。
 
-Qwen3-ASR 可选择“GPU · NVIDIA CUDA”，通过官方 `qwen-asr` 和 PyTorch 使用 FP16 推理，支持 Windows/Linux 上的 NVIDIA 显卡。首次使用自动安装 CUDA 依赖并下载官方 0.6B 模型，运行环境位于 `workers/onnx/.venv-cuda/`，模型位于 `models/onnx/qwen3-asr-0.6b-cuda/`，均属于 TronCut 自己的应用数据目录。CPU 环境、CPU INT8 模型和配音不受影响。GPU 不可用或显存不足时明确报错，可切换 CPU 重试；SenseVoiceSmall 仍使用 CPU。`auto` 为兼容旧请求继续使用 CPU，只有明确选择 `cuda` 才准备 GPU 依赖。
+Qwen3-ASR 的 CUDA 识别入口及依赖已移除，弹窗不再显示设备选择。CLI 的 `auto` 与 `cpu` 均使用 CPU，`cuda` 请求会被拒绝。旧 GPU 环境与模型缓存的清理说明见 [本地 ONNX 语音说明](TTS.md)。
 
 字幕面板只显示按时间排列、可直接修改的字幕。右上角菜单提供导入、导出、语音转文本、字幕转普通文本及搜索替换；底部可在播放头处添加字幕。语音识别每执行一次都会新建一条字幕轨道，重复识别不会把结果堆到原轨道；手动新增和导入字幕继续写入已有字幕轨道。统一样式按钮可批量修改字体、字号、颜色、描边、位置和不透明度。
 
 “语音转文本”支持标准断句、AI 语义断句、自定义字数上限和不限制长度，可独立开启 AI 纠错精修或润色。顶部“首选项”设置 AI 接口、模型和密钥；已有字幕也可从右上角菜单执行 AI 精修。默认不启用 AI，失败时保留规则结果或原文。配置、段内时间估算与验证边界见 [字幕断句与 AI 精修](AI-CAPTIONS.md)。
 
-识别整个时间线的最终混音，保留片段裁剪、变速、音量、淡入淡出、播客处理和时间线空白，跳过静音与隐藏轨道。CPU/GPU 共用 16 kHz 单声道 PCM16 混音与 CPU Silero VAD，按真实语音段识别，字幕时间直接对应工程时间。有 token 时间戳时细分字幕，否则保留完整语音段；GPU 模式未加载强制对齐模型，使用真实 VAD 边界。Qwen3-ASR 支持自动识别语言，CLI 也支持中文、英语、日语、韩语和粤语提示。工作进程与真实验证命令见 [本地 ONNX 语音说明](TTS.md)。
+识别整个时间线的最终混音，保留片段裁剪、变速、音量、淡入淡出、播客处理和时间线空白，跳过静音与隐藏轨道。使用 16 kHz 单声道 PCM16 混音与 CPU Silero VAD，按真实语音段识别，字幕时间直接对应工程时间。有 token 时间戳时细分字幕，否则保留完整语音段与真实 VAD 边界。Qwen3-ASR 支持自动识别语言，CLI 也支持中文、英语、日语、韩语和粤语提示。工作进程与真实验证命令见 [本地 ONNX 语音说明](TTS.md)。
 
 ## 2026-10-15 Qwen3-ASR 真实 CPU 转录
 
@@ -16,7 +16,9 @@ Qwen3-ASR 可选择“GPU · NVIDIA CUDA”，通过官方 `qwen-asr` 和 PyTorc
 
 全局流程另将该语音放在两个不同轨道的第 2 秒和第 10 秒，经时间线混音后一次识别，分别得到 2.762–7.106 秒和 10.762–15.106 秒两条字幕，保留片段位置与中间空白。服务调用直接使用 TronCut 自己的模型缓存及独立运行环境，结果位于 `test-output/qwen3-asr-real/project-captions.json`。
 
-## 2026-10-15 NVIDIA CUDA 真实对照
+## 2026-10-15 NVIDIA CUDA 历史对照（功能已移除）
+
+以下保留旧实现的测量记录；当前版本已移除 CUDA 识别和相应验证脚本。
 
 RTX 4050 Laptop 6GB、PyTorch 2.9.1+cu128 上，将同一短语音重复组成素材并放入两个时间线位置，总输入音频约 90 秒，CPU/GPU 均输出 16 个语音段并保留时间线位置。GPU 每批最多处理 4 段，尾批不足 4 段时照常识别；只延迟加载当前不使用的日语强制对齐依赖。CPU INT8 在模型就绪后的识别耗时为 21.32 秒，GPU FP16 为 9.13 秒，约快 2.3 倍；包含混音、进程启动、依赖初始化、模型加载及结果处理的总耗时分别为 29.46 秒和 34.01 秒。短任务仍可能 CPU 更快，不能将推理加速比直接当作全流程加速比。本次为同一样本重复验证，不代表多样录音的准确率或通用性能基准。结果位于 `test-output/asr-gpu/result.json`，通过 `TRONCUT_GPU_TEST_OFFLINE=1` 验证了缓存环境和模型可离线调用。
 

@@ -36,7 +36,6 @@ for (const name of [
   "pyproject.toml",
   "uv.lock",
   "transcribe.py",
-  "qwen_gpu.py",
   "prepare.py",
   "synthesize.py",
   "models.py",

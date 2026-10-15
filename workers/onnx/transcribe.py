@@ -30,24 +30,15 @@ def transcribe(request):
     if engine not in ("qwen3-asr", "sensevoice"):
         raise ValueError("请选择 Qwen3-ASR 或 SenseVoiceSmall ONNX 模型")
     device = request.get("device", "cpu")
-    if device not in ("auto", "cpu", "cuda"):
-        raise ValueError("请选择 CPU 或 NVIDIA CUDA 识别设备")
-    if device == "cuda" and engine != "qwen3-asr":
-        raise ValueError("GPU 加速目前仅支持 Qwen3-ASR")
+    if device not in ("auto", "cpu"):
+        raise ValueError("语音识别仅支持 CPU")
     language = request.get("language", "auto")
     if language != "auto" and language not in QWEN_LANGUAGES:
         raise ValueError("不支持的识别语言")
-    label = "GPU · CUDA" if device == "cuda" else "CPU"
-    if device == "cuda":
-        from qwen_gpu import GPU_BATCH_SIZE, load_gpu_recognizer
-        recognize = load_gpu_recognizer(request, progress)
-        batch_size = GPU_BATCH_SIZE
-    else:
-        recognize = load_cpu_recognizer(request)
-        batch_size = 1
-        progress(10, f"{engine} CPU 模型已就绪")
+    recognize = load_cpu_recognizer(request)
+    progress(10, f"{engine} CPU 模型已就绪")
     vad_model = resolve_vad(request.get("modelDir"), request.get("offline", False), progress)
-    return recognize_wav(request["input"], recognize, vad_model, engine, label, language, batch_size)
+    return recognize_wav(request["input"], recognize, vad_model, engine, "CPU", language)
 
 
 def load_cpu_recognizer(request):
@@ -90,8 +81,8 @@ def load_cpu_recognizer(request):
     return recognize
 
 
-def recognize_wav(input_path, recognize, vad_model, engine, label, language, batch_size=1):
-    """Both backends share streaming VAD and the same project-time mapping."""
+def recognize_wav(input_path, recognize, vad_model, engine, label, language):
+    """Stream VAD segments through the CPU recognizer, preserving project time."""
     config = sherpa_onnx.VadModelConfig()
     config.silero_vad.model = str(vad_model)
     config.silero_vad.min_silence_duration = 0.35
@@ -114,7 +105,7 @@ def recognize_wav(input_path, recognize, vad_model, engine, label, language, bat
         if len(results) != len(pending):
             raise RuntimeError("识别结果数量与语音段不一致，请重试")
         for result, (start, end, _) in zip(results, pending):
-            # Segment once in the shared editor pipeline; batching never changes times.
+            # Segment once in the shared editor pipeline.
             cues.extend(recognition_cues(result, start, end))
         count += len(pending)
         pending.clear()
@@ -127,8 +118,7 @@ def recognize_wav(input_path, recognize, vad_model, engine, label, language, bat
             end = min(total_samples / SAMPLE_RATE, start + len(samples) / SAMPLE_RATE)
             if len(samples) and end > start:
                 pending.append((start, end, samples))
-                if len(pending) >= batch_size:
-                    decode_pending()
+                decode_pending()
             vad.pop()
 
     with wave.open(input_path, "rb") as audio:

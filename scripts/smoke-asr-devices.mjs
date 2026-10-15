@@ -18,33 +18,22 @@ try {
   await page.getByRole("button", { name: "字幕", exact: true }).click();
   await page.getByRole("button", { name: "字幕操作", exact: true }).click();
   await page.getByRole("menuitem", { name: "语音转文本", exact: true }).click();
-  const device = page.getByLabel("识别设备");
-  await expect(device).toHaveValue("cpu");
-  await device.selectOption("cuda");
-  await expect(device).toHaveValue("cuda");
+  await expect(page.getByLabel("识别模型")).toHaveValue("qwen3-asr");
+  await expect(page.getByLabel("识别设备")).toHaveCount(0);
   await expect(
-    page.getByText(
-      "需要 NVIDIA 显卡；首次使用会自动下载 GPU 环境与模型，准备时间较长。",
-    ),
-  ).toBeVisible();
-  await page.screenshot({ path: path.join(root, "qwen-cuda.png") });
+    page.getByText("GPU · NVIDIA CUDA", { exact: true }),
+  ).toHaveCount(0);
+  await page.screenshot({ path: path.join(root, "qwen-cpu.png") });
   await page.getByLabel("识别模型").selectOption("sensevoice");
-  await expect(device).toHaveValue("cpu");
-  await expect(device.locator('option[value="cuda"]')).toHaveAttribute(
-    "disabled",
-    "",
-  );
+  await expect(page.getByLabel("识别设备")).toHaveCount(0);
   await page.getByLabel("识别模型").selectOption("qwen3-asr");
-  await expect(device.locator('option[value="cuda"]')).not.toHaveAttribute(
-    "disabled",
-  );
-  await device.selectOption("cuda");
   await page.getByRole("button", { name: "关闭", exact: true }).click();
   await page.getByRole("button", { name: "字幕操作", exact: true }).click();
   await page.getByRole("menuitem", { name: "语音转文本", exact: true }).click();
-  await expect(device).toHaveValue("cuda");
+  await expect(page.getByLabel("识别模型")).toHaveValue("qwen3-asr");
+  await expect(page.getByLabel("识别设备")).toHaveCount(0);
   expect(errors).toEqual([]);
-  console.log("字幕设备选择、GPU 提示、模型切换与会话内设备保留通过", root);
+  console.log("字幕 CPU 模型选择、CUDA 入口移除与弹窗重开通过", root);
 } finally {
   await app.close();
 }

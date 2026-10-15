@@ -8,13 +8,6 @@ import urllib.request
 
 RELEASE = "https://github.com/k2-fsa/sherpa-onnx/releases/download"
 MODELS = {
-    "qwen3-asr-cuda": {
-        "directory": "qwen3-asr-0.6b-cuda",
-        "repo": "Qwen/Qwen3-ASR-0.6B",
-        "files": ("config.json", "generation_config.json", "model.safetensors",
-                  "preprocessor_config.json", "tokenizer_config.json",
-                  "chat_template.json", "merges.txt", "vocab.json"),
-    },
     "qwen3-asr": {
         "directory": "qwen3-asr-0.6b",
         "release": "asr-models",

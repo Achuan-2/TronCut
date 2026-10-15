@@ -169,7 +169,7 @@ export const cliHelp = {
     build: "--plan 剪辑计划.json；创建可编辑工程，不执行语音或导出",
     edit: "--project 工程 --edits 编辑操作.json --output 新工程",
     transcribe:
-      "--project 工程 --output 新工程 [--engine qwen3-asr --device cpu|cuda --language auto --model-dir 路径 --offline --srt 字幕.srt]",
+      "--project 工程 --output 新工程 [--engine qwen3-asr --device cpu --language auto --model-dir 路径 --offline --srt 字幕.srt]",
     narrate:
       "--project 工程 --script 分段文案.json --output 新工程 [--srt 字幕.srt]",
     export: "--project 工程 --output 视频.mp4 [--software]",

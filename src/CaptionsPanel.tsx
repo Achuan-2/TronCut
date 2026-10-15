@@ -73,7 +73,6 @@ export default function CaptionsPanel({
   const [menuOpen, setMenuOpen] = useState(false);
   const [dialog, setDialog] = useState<Dialog>(null);
   const [engine, setEngine] = useState<SpeechEngine>("qwen3-asr");
-  const [device, setDevice] = useState<"cpu" | "cuda">("cpu");
   const [searchMode, setSearchMode] = useState<"find" | "replace" | null>(null);
   const [searchResults, setSearchResults] = useState<{
     matches: CaptionMatch[];
@@ -486,7 +485,6 @@ export default function CaptionsPanel({
                     value={engine}
                     onChange={(event) => {
                       setEngine(event.target.value as SpeechEngine);
-                      if (event.target.value !== "qwen3-asr") setDevice("cpu");
                     }}
                   >
                     <option value="qwen3-asr">Qwen3-ASR 0.6B · 多语言</option>
@@ -495,27 +493,6 @@ export default function CaptionsPanel({
                     </option>
                   </select>
                 </label>
-                <label className="field vertical">
-                  识别设备
-                  <select
-                    aria-label="识别设备"
-                    value={device}
-                    onChange={(event) =>
-                      setDevice(event.target.value as "cpu" | "cuda")
-                    }
-                  >
-                    <option value="cpu">CPU</option>
-                    <option value="cuda" disabled={engine !== "qwen3-asr"}>
-                      GPU · NVIDIA CUDA
-                    </option>
-                  </select>
-                </label>
-                {device === "cuda" && (
-                  <p className="hint">
-                    需要 NVIDIA 显卡；首次使用会自动下载 GPU
-                    环境与模型，准备时间较长。
-                  </p>
-                )}
                 <CaptionProcessingFields
                   value={processing}
                   onChange={setProcessing}
@@ -541,7 +518,7 @@ export default function CaptionsPanel({
                         engine,
                         "auto",
                         {
-                          device,
+                          device: "cpu",
                           processing,
                         },
                       );

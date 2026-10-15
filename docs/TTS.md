@@ -4,7 +4,7 @@ Windows 默认使用本机 Windows 系统语音，自动优先微软云希；也
 
 在“旁白”面板输入文稿，从右上角更多菜单打开“AI 配音设置”弹窗，选择模型、音色和 0.5–2 倍语速。点击“试听音色”播放独立示例，试听不会加入时间线或媒体库；更换音色、语速或关闭弹窗时停止播放并清理临时音频。完成设置后，在面板点击“生成音频”将正式配音加入时间线。更多菜单也可读取选中的文本或字幕，原来的读取配音参数、模型目录、设备和下载按钮已从界面移除。Kokoro 支持中英文混读；VITS 仅支持中文。生成音频统一为 48 kHz、单声道、PCM16 WAV，语速仅在最终 FFmpeg 转换时应用一次。
 
-两种配音模型均通过 sherpa-onnx 调用，使用 CPU 运行环境，无需 PyTorch 或 CUDA。CPU 字幕与配音共用 `workers/onnx/.venv/` 下的 Python 3.12 环境，`uv.lock` 锁定 `sherpa-onnx` 和配套 `sherpa-onnx-core` 原生库。Qwen3-ASR 的可选 GPU 识别单独使用 `.venv-cuda/` 与 `qwen-gpu` 依赖组，不改变配音环境。应用数据目录的 `models/onnx/` 保存下载模型；生成记录保留实际模型目录、精度、采样率、加载和推理耗时。
+两种配音模型均通过 sherpa-onnx 调用，使用 CPU 运行环境，无需 PyTorch 或 CUDA。字幕与配音共用 `workers/onnx/.venv/` 下的 Python 3.12 环境，`uv.lock` 锁定 `sherpa-onnx` 和配套 `sherpa-onnx-core` 原生库。应用数据目录的 `models/onnx/` 保存下载模型；生成记录保留实际模型目录、精度、采样率、加载和推理耗时。
 
 本地 ONNX 模型仅从 TronCut 自己的缓存读取；缺少时自动下载官方完整模型包。CLI 仍可用 `modelDir` 指定完整模型文件夹，不会自动检查其他应用目录。Kokoro 需要 `model.int8.onnx`、`voices.bin`、`tokens.txt`、中英文词典、`espeak-ng-data/` 和中文规范化 FST；VITS 需要 `model.onnx`、`tokens.txt`、`lexicon.txt` 与规范化 FST。指定目录不完整时直接提示缺失文件，应用不会修改该目录或自动替换成其他模型。
 
@@ -27,7 +27,7 @@ node scripts/verify-onnx.mjs
 
 真实验证脚本支持 `TRONCUT_TEST_KOKORO_DIR`、`TRONCUT_TEST_SENSEVOICE_DIR` 和 `TRONCUT_TEST_QWEN3_ASR_DIR` 指定模型目录；默认从 TronCut 测试缓存下载模型。结果写入 `test-output/onnx-integration/result.json`，涵盖配音、一次语速转换、字幕、工程保存重开和离线生成。
 
-GPU 识别在字幕弹窗中选择“GPU · NVIDIA CUDA”，或通过 CLI 的 `transcribe --device cuda` 使用。首次运行下载 CUDA 依赖与官方 FP16 模型，已有 CPU INT8 模型不能直接复用为 GPU 模型。CLI 的 `--model-dir` 在 GPU 模式下应指向包含 `model.safetensors`、配置和 tokenizer 的官方模型目录；`--offline` 同时禁止依赖与模型下载。真实对照命令为 `node scripts/verify-asr-gpu.mjs 语音文件.wav`，在两个时间线位置识别同一音频，分别保存 CPU/GPU 字幕与耗时到 `test-output/asr-gpu/result.json`。可设置 `TRONCUT_GPU_TEST_USER_DATA` 指定 TronCut 缓存根目录，设置 `TRONCUT_GPU_TEST_OFFLINE=1` 验证已缓存环境。
+Qwen3-ASR CUDA 识别已移除。退出应用后，可清理应用数据目录的 `workers/onnx/.venv-cuda/`、旧 `qwen_gpu.py` 和 `models/onnx/qwen3-asr-0.6b-cuda/`。保留 `workers/onnx/.venv/` 可复用当前 CPU 环境；删除整个 `workers/` 不会删除工程和 `models/` 中的模型，但下次使用本地语音时需要重新准备运行环境，离线时可能无法完成。
 
 设置 `TRONCUT_TEST_DOWNLOAD=1` 可额外验证 VITS 的真实下载、完整解压与缓存离线推理；`TRONCUT_TEST_DOWNLOAD_ONLY=1` 只运行此项。`node scripts/smoke-onnx-ui.mjs` 使用上述 Kokoro/SenseVoice 目录设置与已准备好的验证环境，检查实际 Electron 配音、试听、字幕及保存。
 

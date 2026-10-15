@@ -119,11 +119,6 @@ async function recognizeAudio(
   progress: (percent: number, label: string) => void,
 ) {
   const output = path.join(paths.temp, "captions.json");
-  const cuda = options.device === "cuda";
-  if (cuda && engine !== "qwen3-asr")
-    throw new Error("GPU 加速目前仅支持 Qwen3-ASR，请切换识别模型或选择 CPU");
-  if (cuda && !["win32", "linux"].includes(process.platform))
-    throw new Error("CUDA 加速需要 Windows 或 Linux 上的 NVIDIA 显卡");
   const request = path.join(paths.temp, "request.json");
   const workers = await prepareOnnxWorker(paths.workers, paths.userData);
   await fs.writeFile(
@@ -135,7 +130,7 @@ async function recognizeAudio(
     0,
     options.offline
       ? `正在加载本地 ${engine} 识别环境与模型`
-      : `正在准备 ${engine}${cuda ? " CUDA 环境与模型（首次下载可能较久）" : "；优先复用本地模型，缺少时下载"}`,
+      : `正在准备 ${engine}；优先复用本地模型，缺少时下载`,
   );
   await runOnnxWorker(
     findBinary("uv", paths.resources),
@@ -145,12 +140,11 @@ async function recognizeAudio(
       request,
       output,
       options.offline,
-      cuda,
     ),
     {
       signal,
       cwd: workers,
-      env: onnxEnvironment(paths.userData, workers, cuda),
+      env: onnxEnvironment(paths.userData, workers),
       onLine(line) {
         const prefix = "FRAMECRAFT_PROGRESS ";
         if (!line.startsWith(prefix)) return;

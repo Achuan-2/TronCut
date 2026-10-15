@@ -2,7 +2,7 @@
 
 ## 未发布
 
-- Qwen3-ASR 新增 CPU / NVIDIA CUDA 识别设备选项，GPU 使用独立运行环境与官方 FP16 模型，首次使用自动下载；CLI 支持 `--device cuda`。
+- 移除 Qwen3-ASR CUDA 识别入口、独立 GPU 环境及依赖，保留 Qwen3-ASR INT8 CPU 与 SenseVoiceSmall；字幕弹窗不再显示识别设备选择。
 
 ## v0.4.1 · 2026-10-15
 
