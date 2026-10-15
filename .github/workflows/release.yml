@@ -91,6 +91,16 @@ jobs:
           cache-dependency-path: app/pnpm-lock.yaml
       - name: Install locked dependencies
         run: pnpm install --frozen-lockfile
+      - name: Prepare Rust timeline engine
+        run: |
+          if (Test-Path Cargo.toml) {
+            rustup target add wasm32-unknown-unknown
+            if ($LASTEXITCODE -ne 0) { throw 'Rust target installation failed' }
+            pnpm build:rust
+            if ($LASTEXITCODE -ne 0) { throw 'Rust engine build failed' }
+            cargo test --locked --workspace
+            if ($LASTEXITCODE -ne 0) { throw 'Rust engine tests failed' }
+          }
       - name: Download and verify pinned engines
         run: "& ../ci/scripts/prepare-windows-ci.ps1"
       - name: Compile native recording helpers
@@ -197,6 +207,13 @@ jobs:
           cache-dependency-path: app/pnpm-lock.yaml
       - name: Install locked dependencies
         run: pnpm install --frozen-lockfile
+      - name: Prepare Rust timeline engine
+        run: |
+          if [[ -f Cargo.toml ]]; then
+            rustup target add wasm32-unknown-unknown
+            pnpm build:rust
+            cargo test --locked --workspace
+          fi
       - name: Prepare pinned macOS engines
         run: bash ../ci/scripts/prepare-macos-ci.sh "$TRONCUT_RELEASE_ARCH"
       - name: Check packaging inputs

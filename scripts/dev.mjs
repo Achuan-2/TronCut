@@ -1,5 +1,6 @@
 import { spawn } from "node:child_process";
 import { createServer } from "vite";
+import "./build-rust.mjs";
 import "./build-electron.mjs";
 import electron from "electron";
 const server = await createServer();

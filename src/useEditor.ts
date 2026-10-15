@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type SetStateAction,
@@ -148,8 +149,13 @@ export function useEditor(
     behaviorId: string;
     locked: boolean;
   } | null>(null);
-  const selectedIds = selection.filter((id) =>
-    project.clips.some((c) => c.id === id),
+  const clipsById = useMemo(
+    () => new Map(project.clips.map((clip) => [clip.id, clip])),
+    [project.clips],
+  );
+  const selectedIds = useMemo(
+    () => selection.filter((id) => clipsById.has(id)),
+    [selection, clipsById],
   );
   const selectedId = selectedIds.at(-1) ?? null;
   const select = useCallback((id: string | null, additive = false) => {
@@ -912,7 +918,7 @@ export function useEditor(
     );
     return true;
   }, [selectedId, playhead, updateClip, editKeyframe]);
-  const selected = project.clips.find((c) => c.id === selectedId);
+  const selected = selectedId ? clipsById.get(selectedId) : undefined;
   const editingTrack = project.tracks.find(
     (track) => track.id === selected?.trackId,
   );

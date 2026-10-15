@@ -390,7 +390,10 @@ export function validateProject(data: unknown): Project {
   return project;
 }
 export function projectDuration(project: Project): number {
-  return Math.max(0, ...project.clips.map((c) => c.start + c.duration));
+  let duration = 0;
+  for (const clip of project.clips)
+    duration = Math.max(duration, clip.start + clip.duration);
+  return duration;
 }
 export function newText(
   trackId: string,

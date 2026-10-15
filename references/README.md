@@ -13,6 +13,8 @@
 
 ## 推荐阅读位置
 
+2026-10-15 额外阅读了 [storytold/filmcraft 的架构文档](https://github.com/storytold/filmcraft/blob/main/docs/architecture.md)，参考独立 Rust 引擎、可替换界面和媒体管线分层。此次未克隆或复制其代码，也未采用其编解码器；TronCut 自行实现的 Rust 时间线索引及验证范围见 [Rust 引擎](../docs/RUST-ENGINE.md)。
+
 OpenScreen：`electron/ipc/recordingStream.ts` 展示写入流生命周期；`electron/native-bridge/cursor/recording/windowsNativeRecordingSession.ts` 展示光标采样器；`electron/native/wgc-capture/` 为采用的 Windows 原生组件。TronCut 的应用生命周期、工程、鼠标预览与导出自行实现，未复制 OpenScreen 整体应用。
 
 Recordly：`electron/native/windows-capture/src/` 中的 `wasapi_loopback.*`、`mf_encoder.*` 与 `main.cpp` 适合研究系统音频和原生编码；`electron/cursorHider.ts` 用于理解光标隐藏。没有作为 TronCut 依赖或编译进产品。

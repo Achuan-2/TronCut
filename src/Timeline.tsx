@@ -1,4 +1,11 @@
-import { Fragment, useEffect, useLayoutEffect, useRef, useState } from "react";
+import {
+  Fragment,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { createPortal } from "react-dom";
 import {
   Eye,
@@ -65,6 +72,7 @@ import {
 import { displayTrackName, isTrackActive } from "../shared/tracks";
 import TrackContextMenu, { type TrackMenuPosition } from "./TrackContextMenu";
 import { useViewportZoom, type ZoomPoint } from "./useViewportZoom";
+import { projectIndex } from "../shared/project-index";
 
 interface Drag {
   id: string;
@@ -118,7 +126,10 @@ export default function Timeline({
   const zoomAnchor = useRef<{ time: number; x: number } | null>(null);
   const scroll = useRef<HTMLDivElement>(null),
     captionClipboard = useRef<Clip[]>([]),
-    duration = Math.max(20, projectDuration(project) + 5),
+    duration = useMemo(
+      () => Math.max(20, projectDuration(project) + 5),
+      [project.clips],
+    ),
     width = duration * zoom;
   const changeZoom = (next: number, point?: ZoomPoint) => {
     const element = scroll.current;
@@ -173,22 +184,17 @@ export default function Timeline({
         ...Object.fromEntries(added.map((id) => [id, true])),
       }));
   }, [project.clips]);
-  const trackHeights = project.tracks.map(
-    (track) =>
-      70 +
-      24 *
-        Math.max(
-          0,
-          ...project.clips
-            .filter(
-              (clip) => clip.trackId === track.id && expandedEffects[clip.id],
-            )
-            .map(
-              (clip) =>
-                Number(hasClipSpeed(clip)) + (clip.behaviors?.length ?? 0),
-            ),
-        ),
-  );
+  const trackHeights = useMemo(() => {
+    const rows = new Map<string, number>();
+    for (const clip of project.clips) {
+      if (expandedEffects[clip.id]) {
+        const count =
+          Number(hasClipSpeed(clip)) + (clip.behaviors?.length ?? 0);
+        rows.set(clip.trackId, Math.max(rows.get(clip.trackId) ?? 0, count));
+      }
+    }
+    return project.tracks.map((track) => 70 + 24 * (rows.get(track.id) ?? 0));
+  }, [project.clips, project.tracks, expandedEffects]);
   const layoutKey = trackHeights.join(",");
   const trackTop = (id: string) => {
     const index = project.tracks.findIndex((track) => track.id === id);
@@ -256,11 +262,15 @@ export default function Timeline({
       window.removeEventListener("keydown", escape, true);
     };
   }, [deleteMenu]);
-  const editableSelection = project.clips.filter(
-    (clip) =>
-      editor.selectedIds.includes(clip.id) &&
-      !project.tracks.find((track) => track.id === clip.trackId)?.locked,
-  );
+  const editableSelection = useMemo(() => {
+    const ids = new Set(editor.selectedIds);
+    const lockedTracks = new Set(
+      project.tracks.filter((track) => track.locked).map((track) => track.id),
+    );
+    return project.clips.filter(
+      (clip) => ids.has(clip.id) && !lockedTracks.has(clip.trackId),
+    );
+  }, [project.clips, project.tracks, editor.selectedIds]);
   const canAddKeyframe = editableSelection.some(
     (clip) =>
       clip.kind !== "audio" &&
@@ -299,6 +309,20 @@ export default function Timeline({
       element.scrollTop = top + height - element.clientHeight;
   }, [selected?.trackId, project.tracks.length, layoutKey]);
   const [viewport, setViewport] = useState({ left: 0, width: 1600 });
+  const visibleClips = useMemo(() => {
+    const index = projectIndex(project);
+    return new Map(
+      project.tracks.map((track) => [
+        track.id,
+        index.visible(
+          track.id,
+          (viewport.left - 200) / zoom,
+          (viewport.left + viewport.width + 200) / zoom,
+          drag?.ids,
+        ),
+      ]),
+    );
+  }, [project.clips, project.tracks, viewport, zoom, drag?.ids]);
   useLayoutEffect(() => {
     const element = scroll.current;
     const labels = headers.current;
@@ -1022,15 +1046,11 @@ export default function Timeline({
                   select(clip.id);
                 }}
               >
-                {project.clips
-                  .filter(
-                    (c) =>
-                      c.trackId === track.id &&
-                      (drag?.ids.includes(c.id) ||
-                        ((c.start + c.duration) * zoom >= viewport.left - 200 &&
-                          c.start * zoom <=
-                            viewport.left + viewport.width + 200)),
-                  )
+                {visibleClips
+                  .get(
+                    // Every track has a cached result, including empty tracks.
+                    track.id,
+                  )!
                   .map((original) => {
                     const leader = drag ? dragClip(drag) : null;
                     const c =

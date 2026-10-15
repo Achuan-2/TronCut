@@ -2,9 +2,9 @@
 
 ## Development / 开发
 
-Use Node.js 22+ and pnpm. Clone the repository, run `pnpm install --frozen-lockfile`, then `pnpm dev`. Development data stays in `.framecraft-dev/`; this legacy directory name is retained for compatibility. Installed builds use the OS application-data directory.
+Use Node.js 22+, pnpm, and Rust 1.85+. Install the Wasm target with `rustup target add wasm32-unknown-unknown`, run `pnpm install --frozen-lockfile`, then `pnpm dev`. Development data stays in `.framecraft-dev/`; this legacy directory name is retained for compatibility. Installed builds use the OS application-data directory.
 
-使用 Node.js 22+ 与 pnpm。语音环境使用 uv 与 Python 3.11/3.12，独立模型在第一次转录时下载；不要将模型或虚拟环境提交到源码仓库。
+使用 Node.js 22+、pnpm 与 Rust 1.85+，首次构建前执行 `rustup target add wasm32-unknown-unknown`。`pnpm dev` 和 `pnpm build` 自动构建并嵌入 Rust 时间线引擎，终端用户无需 Rust。详见 [Rust 引擎与性能](RUST-ENGINE.md)。语音环境使用 uv 与 Python 3.11/3.12，独立模型在第一次转录时下载；不要将模型或虚拟环境提交到源码仓库。
 
 ## Windows engines / Windows 引擎
 

@@ -72,7 +72,7 @@ pnpm --silent cli help
 pnpm --silent cli run --plan plan.json
 ```
 
-Use **Node.js 22+ and pnpm**. Speech development uses **uv and Python 3.11/3.12**. Windows native helpers require the Visual Studio 2022 C++ toolchain, Windows SDK 10.0.22621+, and CMake.
+Use **Node.js 22+, pnpm, and Rust 1.85+**. Install the Wasm target with `rustup target add wasm32-unknown-unknown`. Speech development uses **uv and Python 3.11/3.12**. Windows native helpers require the Visual Studio 2022 C++ toolchain, Windows SDK 10.0.22621+, and CMake. Timeline queries use the Rust engine; see [migration scope and benchmarks](docs/RUST-ENGINE.md).
 
 ```sh
 git clone https://github.com/Achuan-2/TronCut.git

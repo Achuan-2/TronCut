@@ -1,6 +1,7 @@
 import {
   useEffect,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
   type CSSProperties,
@@ -59,7 +60,8 @@ import type { Editor } from "./useEditor";
 import { visualClipAt } from "../shared/visual-state";
 import { annotationMime, parseAnnotation } from "../shared/annotations";
 import { behaviorTransform, supportsBehaviors } from "../shared/behaviors";
-import { transitionRange, transitionTransform } from "../shared/transitions";
+import { transitionTransform } from "../shared/transitions";
+import { projectIndex } from "../shared/project-index";
 import BehaviorText from "./BehaviorText";
 import { useViewportZoom, type ZoomPoint } from "./useViewportZoom";
 
@@ -173,7 +175,10 @@ function PreviewLayer({
     editor.playhead < clip.start ||
     editor.playhead >= clip.start + clip.duration;
   const transform = transformAt(clip, localTime),
-    asset = project.assets.find((a) => a.id === clip.assetId);
+    asset = useMemo(
+      () => project.assets.find((a) => a.id === clip.assetId),
+      [project.assets, clip.assetId],
+    );
   clip = visualClipAt(clip, transform);
   const editing = interactive && editor.editingTextId === clip.id;
   const textInput = useRef<HTMLTextAreaElement>(null);
@@ -719,15 +724,12 @@ export function ScenePreview({
       ? setVideoZoomPan(editor.project, editor.zoomPanDraft, playhead)
       : editor.project;
   const camera = applyCamera ? cameraAt(project, playhead) : null;
-  const active = project.clips.filter((clip) => {
-    const range = transitionRange(project, clip);
-    return (
-      playhead >= range.start &&
-      (playhead < range.end ||
-        (editor.selectedKeyframe?.clipId === clip.id &&
-          Math.abs(playhead - clip.start - clip.duration) < 1e-6))
-    );
-  });
+  const active = projectIndex(editor.project).active(
+    editor.project,
+    playhead,
+    editor.selectedKeyframe?.clipId,
+    project.clips,
+  );
   return (
     <div
       className="canvas-scene"
@@ -804,7 +806,7 @@ export default function Preview({ editor }: { editor: Editor }) {
     }
   };
   const { project, playing, playhead, seek, setPlaying } = editor,
-    duration = projectDuration(project);
+    duration = useMemo(() => projectDuration(project), [project.clips]);
   useEffect(() => {
     const element = holder.current;
     if (!element) return;

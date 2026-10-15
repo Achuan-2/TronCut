@@ -73,7 +73,7 @@ pnpm --silent cli help
 pnpm --silent cli run --plan plan.json
 ```
 
-需要 **Node.js 22+、pnpm**；字幕开发使用 **uv 与 Python 3.11/3.12**。Windows 原生组件构建需要 Visual Studio 2022 C++ 工具链、Windows SDK 10.0.22621+ 和 CMake。
+需要 **Node.js 22+、pnpm、Rust 1.85+**，并通过 `rustup target add wasm32-unknown-unknown` 安装 Wasm 目标；字幕开发使用 **uv 与 Python 3.11/3.12**。Windows 原生组件构建需要 Visual Studio 2022 C++ 工具链、Windows SDK 10.0.22621+ 和 CMake。时间线查询已采用 Rust 引擎，迁移范围与基准见 [Rust 引擎与性能](docs/RUST-ENGINE.md)。
 
 ```sh
 git clone https://github.com/Achuan-2/TronCut.git

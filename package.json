@@ -15,14 +15,18 @@
   "main": "dist-electron/main.cjs",
   "scripts": {
     "dev": "node scripts/dev.mjs",
-    "build": "tsc --noEmit && vite build && node scripts/build-electron.mjs",
+    "build": "pnpm build:rust && tsc --noEmit && vite build && node scripts/build-electron.mjs",
+    "build:rust": "node scripts/build-rust.mjs",
+    "test:rust": "node scripts/test-rust.mjs",
+    "bench:engine": "node scripts/bench-engine.mjs",
+    "bench:editor": "pnpm build && node scripts/bench-editor.mjs",
     "start": "node scripts/start.mjs",
     "cli": "node scripts/cli.mjs",
-    "test": "vitest run",
+    "test": "pnpm build:rust && vitest run",
     "test:smoke": "node scripts/smoke.mjs",
     "dist:win": "pnpm build && node scripts/check-packaging.mjs && electron-builder --win nsis",
     "dist:mac": "pnpm build && node scripts/check-packaging.mjs && electron-builder --mac dmg",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "pnpm build:rust && tsc --noEmit"
   },
   "dependencies": {
     "lucide-react": "^0.468.0",
