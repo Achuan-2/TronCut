@@ -35,7 +35,7 @@ export default function VisualEffectsPanel({ editor }: { editor: Editor }) {
         应用到所选片段
       </button>
       <p className="small-note">
-        展开片段下方的效果条，拖动末端调整速度。属性面板可输入倍速或持续时间。
+        展开片段底部的效果区，拖动剪辑速度条末端调整速度。属性面板可输入倍速或持续时间。
       </p>
     </div>
   );

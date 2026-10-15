@@ -119,7 +119,7 @@ export default function Timeline({
   const trackHeights = project.tracks.map(
     (track) =>
       70 +
-      28 *
+      24 *
         Math.max(
           0,
           ...project.clips
@@ -823,6 +823,14 @@ export default function Timeline({
                           style={{
                             left: c.start * zoom,
                             width: Math.max(4, c.duration * zoom),
+                            height:
+                              50 +
+                              (editor.selectedIds.includes(c.id) ? 2 : 0) +
+                              (expandedEffects[c.id]
+                                ? 24 *
+                                  (Number(hasClipSpeed(c)) +
+                                    (c.behaviors?.length ?? 0))
+                                : 0),
                             translate:
                               drag?.id === c.id
                                 ? `0 ${trackTop(drag.trackId) - trackTop(original.trackId)}px`
@@ -1003,84 +1011,93 @@ export default function Timeline({
                             });
                           }}
                         >
-                          <span className="trim-handle left" data-trim="left" />
-                          <div className="clip-label">
-                            {c.kind === "text" ? (
-                              <Type size={13} />
-                            ) : c.kind === "audio" ? (
-                              <Volume2 size={13} />
-                            ) : (
-                              <span className="clip-media-icon">▣</span>
-                            )}
-                            <span>
-                              {c.groupId ? "▧ " : ""}
-                              {c.name}
-                            </span>
-                            {c.speed !== 1 && <b>{c.speed}×</b>}
+                          <div className="clip-content">
+                            <span
+                              className="trim-handle left"
+                              data-trim="left"
+                            />
+                            <div className="clip-label">
+                              {c.kind === "text" ? (
+                                <Type size={13} />
+                              ) : c.kind === "audio" ? (
+                                <Volume2 size={13} />
+                              ) : (
+                                <span className="clip-media-icon">▣</span>
+                              )}
+                              <span>
+                                {c.groupId ? "▧ " : ""}
+                                {c.name}
+                              </span>
+                              {c.speed !== 1 && <b>{c.speed}×</b>}
+                            </div>
+                            <div className="clip-detail">
+                              {c.kind === "text"
+                                ? c.text
+                                : `${timeLabel(c.duration)}${c.podcast ? " · 播客人声" : ""}`}
+                            </div>
+                            {c.assetId &&
+                              project.assets.find((a) => a.id === c.assetId)
+                                ?.hasAudio &&
+                              (() => {
+                                const asset = project.assets.find(
+                                  (a) => a.id === c.assetId,
+                                )!;
+                                return (
+                                  <div className="clip-waveform">
+                                    <MediaThumbnail
+                                      asset={asset}
+                                      waveform
+                                      style={{
+                                        width: `${Math.max(c.duration, asset.duration / c.speed) * zoom}px`,
+                                        left: `${(-c.sourceIn / c.speed) * zoom}px`,
+                                      }}
+                                    />
+                                  </div>
+                                );
+                              })()}
+                            <TimelineAnimations
+                              clip={c}
+                              zoom={zoom}
+                              playhead={playhead}
+                              fps={project.canvas.fps}
+                              selected={editor.selectedIds.includes(c.id)}
+                              selectedFrame={
+                                editor.selectedKeyframe?.clipId === c.id
+                                  ? editor.selectedKeyframe
+                                  : null
+                              }
+                              locked={track.locked}
+                              copy={(range, cut) =>
+                                onCopyAnimation(c.id, range, cut)
+                              }
+                              remove={(range) =>
+                                editor.deleteAnimation(c.id, range)
+                              }
+                              commit={(clip) =>
+                                editor.updateClip(c.id, (current) => ({
+                                  ...current,
+                                  transform: clip.transform,
+                                  keyframes: clip.keyframes,
+                                }))
+                              }
+                              locate={(time, side) => {
+                                if (track.locked) {
+                                  editor.setPlaying(false);
+                                  select(c.id);
+                                  seek(time);
+                                } else
+                                  editor.editKeyframe(
+                                    c.id,
+                                    time - c.start,
+                                    side,
+                                  );
+                              }}
+                            />
+                            <span
+                              className="trim-handle right"
+                              data-trim="right"
+                            />
                           </div>
-                          <div className="clip-detail">
-                            {c.kind === "text"
-                              ? c.text
-                              : `${timeLabel(c.duration)}${c.podcast ? " · 播客人声" : ""}`}
-                          </div>
-                          {c.assetId &&
-                            project.assets.find((a) => a.id === c.assetId)
-                              ?.hasAudio &&
-                            (() => {
-                              const asset = project.assets.find(
-                                (a) => a.id === c.assetId,
-                              )!;
-                              return (
-                                <div className="clip-waveform">
-                                  <MediaThumbnail
-                                    asset={asset}
-                                    waveform
-                                    style={{
-                                      width: `${Math.max(c.duration, asset.duration / c.speed) * zoom}px`,
-                                      left: `${(-c.sourceIn / c.speed) * zoom}px`,
-                                    }}
-                                  />
-                                </div>
-                              );
-                            })()}
-                          <TimelineAnimations
-                            clip={c}
-                            zoom={zoom}
-                            playhead={playhead}
-                            fps={project.canvas.fps}
-                            selected={editor.selectedIds.includes(c.id)}
-                            selectedFrame={
-                              editor.selectedKeyframe?.clipId === c.id
-                                ? editor.selectedKeyframe
-                                : null
-                            }
-                            locked={track.locked}
-                            copy={(range, cut) =>
-                              onCopyAnimation(c.id, range, cut)
-                            }
-                            remove={(range) =>
-                              editor.deleteAnimation(c.id, range)
-                            }
-                            commit={(clip) =>
-                              editor.updateClip(c.id, (current) => ({
-                                ...current,
-                                transform: clip.transform,
-                                keyframes: clip.keyframes,
-                              }))
-                            }
-                            locate={(time, side) => {
-                              if (track.locked) {
-                                editor.setPlaying(false);
-                                select(c.id);
-                                seek(time);
-                              } else
-                                editor.editKeyframe(c.id, time - c.start, side);
-                            }}
-                          />
-                          <span
-                            className="trim-handle right"
-                            data-trim="right"
-                          />
                           {(hasClipSpeed(c) || hasBehaviors(c)) && (
                             <button
                               className="clip-effects-toggle"
@@ -1108,47 +1125,42 @@ export default function Timeline({
                               )}
                             </button>
                           )}
+                          {expandedEffects[c.id] && (
+                            <div
+                              className="clip-effects-tray"
+                              aria-label="片段效果"
+                            >
+                              {hasClipSpeed(c) && (
+                                <TimelineSpeedEffect
+                                  clip={c}
+                                  zoom={zoom}
+                                  fps={project.canvas.fps}
+                                  locked={track.locked}
+                                  selected={
+                                    activeSpeed === c.id &&
+                                    selectedId === c.id &&
+                                    !editor.selectedBehavior &&
+                                    !editor.selectedKeyframe
+                                  }
+                                  select={() => selectSpeed(c.id)}
+                                  preview={setSpeedDraft}
+                                  commit={(next) =>
+                                    editor.updateClip(next.id, next)
+                                  }
+                                />
+                              )}
+                              {c.behaviors?.map((behavior) => (
+                                <TimelineBehaviorEffect
+                                  key={behavior.id}
+                                  clip={c}
+                                  behavior={behavior}
+                                  locked={track.locked}
+                                  editor={editor}
+                                />
+                              ))}
+                            </div>
+                          )}
                         </div>
-                        {hasClipSpeed(c) && expandedEffects[c.id] && (
-                          <TimelineSpeedEffect
-                            clip={c}
-                            zoom={zoom}
-                            fps={project.canvas.fps}
-                            locked={track.locked}
-                            selected={
-                              activeSpeed === c.id &&
-                              selectedId === c.id &&
-                              !editor.selectedKeyframe
-                            }
-                            offsetY={
-                              drag?.id === c.id
-                                ? trackTop(drag.trackId) -
-                                  trackTop(original.trackId)
-                                : 0
-                            }
-                            select={() => selectSpeed(c.id)}
-                            preview={setSpeedDraft}
-                            commit={(next) => editor.updateClip(next.id, next)}
-                          />
-                        )}
-                        {expandedEffects[c.id] &&
-                          c.behaviors?.map((behavior, index) => (
-                            <TimelineBehaviorEffect
-                              key={behavior.id}
-                              clip={c}
-                              behavior={behavior}
-                              zoom={zoom}
-                              row={index + Number(hasClipSpeed(c))}
-                              locked={track.locked}
-                              editor={editor}
-                              offsetY={
-                                drag?.id === c.id
-                                  ? trackTop(drag.trackId) -
-                                    trackTop(original.trackId)
-                                  : 0
-                              }
-                            />
-                          ))}
                       </Fragment>
                     );
                   })}

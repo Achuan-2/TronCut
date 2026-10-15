@@ -95,6 +95,32 @@ const env = {
 delete env.ELECTRON_RUN_AS_NODE;
 const app = await electron.launch({ args: [".", file], env, timeout: 30000 });
 const errors = [];
+async function checkEffectsInsideClips(page) {
+  const effects = await page
+    .locator(".clip-speed-effect, .clip-behavior-effect")
+    .evaluateAll((elements) =>
+      elements.map((effect) => {
+        const clip = effect.closest(".timeline-clip");
+        if (!clip) return { contained: false };
+        const bounds = effect.getBoundingClientRect(),
+          parent = clip.getBoundingClientRect();
+        const content = clip
+          .querySelector(".clip-content")
+          .getBoundingClientRect();
+        const lane = clip.closest(".track-lane").getBoundingClientRect();
+        return {
+          contained:
+            bounds.left >= parent.left &&
+            bounds.right <= parent.right &&
+            bounds.top >= content.bottom &&
+            bounds.bottom <= parent.bottom &&
+            parent.bottom <= lane.bottom,
+        };
+      }),
+    );
+  expect(effects.length).toBeGreaterThan(0);
+  expect(effects.every((effect) => effect.contained)).toBe(true);
+}
 try {
   const page = await app.firstWindow();
   page.on("pageerror", (error) => errors.push(error.message));
@@ -129,6 +155,7 @@ try {
   await page.getByRole("switch").uncheck();
   await expect(page.locator(".clip-behavior-effect")).toHaveClass(/disabled/);
   await page.getByRole("switch").check();
+  await checkEffectsInsideClips(page);
   await page.screenshot({ path: path.join(root, "text-behavior.png") });
   // Drag onto each visual media kind, then independently edit the effect.
   for (const kind of ["image", "video"]) {
@@ -187,6 +214,59 @@ try {
   expect(
     saved.clips.find((clip) => clip.id === "text").behaviors[0].during.loops,
   ).toBe(2);
+  // Both effect kinds share the object's internal tray. Changing clip speed
+  // from its own handle must not start a clip-move or source-trim gesture.
+  const videoClip = page.locator(".timeline-clip.video");
+  const speedTransfer = await page.evaluateHandle(() => {
+    const value = new DataTransfer();
+    value.setData("troncut-effect", "clip-speed");
+    return value;
+  });
+  await videoClip.dispatchEvent("drop", { dataTransfer: speedTransfer });
+  await expect(videoClip.locator(".clip-speed-effect")).toHaveCount(1);
+  await expect(videoClip.locator(".clip-behavior-effect")).toHaveCount(1);
+  await checkEffectsInsideClips(page);
+  const expandedHeight = (await videoClip.boundingBox()).height;
+  await videoClip
+    .getByRole("button", { name: "收起片段效果", exact: true })
+    .click();
+  await expect(videoClip.locator(".clip-effects-tray")).toHaveCount(0);
+  expect((await videoClip.boundingBox()).height).toBeLessThan(expandedHeight);
+  await videoClip
+    .getByRole("button", { name: "展开片段效果", exact: true })
+    .click();
+  const originalBounds = await videoClip.boundingBox();
+  const speedHandle = await videoClip
+    .getByRole("button", { name: "拖动末端调整剪辑速度", exact: true })
+    .boundingBox();
+  await page.mouse.move(
+    speedHandle.x + speedHandle.width / 2,
+    speedHandle.y + speedHandle.height / 2,
+  );
+  await page.mouse.down();
+  await page.mouse.move(
+    speedHandle.x - 65,
+    speedHandle.y + speedHandle.height / 2,
+    { steps: 6 },
+  );
+  await page.mouse.up();
+  expect((await videoClip.boundingBox()).x).toBeCloseTo(originalBounds.x);
+  expect((await videoClip.boundingBox()).width).toBeLessThan(
+    originalBounds.width - 30,
+  );
+  await checkEffectsInsideClips(page);
+  await videoClip.locator(".clip-behavior-effect").dblclick();
+  await expect(videoClip.locator(".clip-behavior-effect")).toHaveClass(
+    /selected/,
+  );
+  await expect(videoClip.locator(".clip-speed-effect")).not.toHaveClass(
+    /selected/,
+  );
+  await expect(videoClip.locator(".clip-behavior-effect")).toHaveCSS(
+    "background-color",
+    "rgb(230, 190, 86)",
+  );
+  await page.screenshot({ path: path.join(root, "effects-inside-clip.png") });
   await page.screenshot({ path: path.join(root, "media-behaviors.png") });
   expect(errors).toEqual([]);
   console.log(

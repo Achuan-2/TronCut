@@ -1951,22 +1951,33 @@ fieldset:disabled {
 }
 .clip-effects-toggle {
   position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   bottom: 0;
   left: calc(50% - 12px);
   width: 24px;
-  height: 12px;
+  height: 10px;
   padding: 0;
   color: #d7e5dc;
+  background: #20272b99;
+  border-radius: 8px 8px 0 0;
   z-index: 6;
 }
+.clip-effects-toggle svg {
+  width: 10px;
+  height: 10px;
+  pointer-events: none;
+}
 .clip-speed-effect {
-  position: absolute;
-  top: 67px;
+  position: relative;
+  width: 100%;
+  flex: 0 0 24px;
   height: 24px;
   display: flex;
   align-items: center;
   border: 1px solid #49867d;
-  border-radius: 3px;
+  border-radius: 0;
   background: #28574d;
   color: #c1e9dc;
   cursor: pointer;
@@ -1987,10 +1998,10 @@ fieldset:disabled {
 }
 .speed-effect-handle {
   position: absolute;
-  right: -4px;
-  top: -1px;
+  right: 0;
+  top: 0;
   width: 9px;
-  height: 24px;
+  height: 100%;
   padding: 0;
   cursor: ew-resize;
   touch-action: none;
@@ -2053,13 +2064,15 @@ fieldset:disabled {
   position: relative;
 }
 .clip-behavior-effect {
-  position: absolute;
+  position: relative;
+  width: 100%;
+  flex: 0 0 24px;
   height: 24px;
   display: flex;
   align-items: center;
   padding: 0 8px;
   border: 1px solid #d96a76;
-  border-radius: 3px;
+  border-radius: 0;
   background: #b74b58;
   color: #fff;
   cursor: pointer;
@@ -2458,6 +2471,16 @@ fieldset:disabled {
 .timeline-clip.locked {
   cursor: not-allowed;
   opacity: 0.7;
+}
+.clip-content {
+  position: relative;
+  height: 48px;
+  overflow: hidden;
+}
+.clip-effects-tray {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
 }
 .clip-label {
   padding: 7px 10px 0;

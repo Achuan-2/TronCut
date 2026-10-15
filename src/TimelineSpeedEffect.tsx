@@ -8,7 +8,6 @@ export default function TimelineSpeedEffect({
   fps,
   locked,
   selected,
-  offsetY = 0,
   select,
   preview,
   commit,
@@ -18,7 +17,6 @@ export default function TimelineSpeedEffect({
   fps: number;
   locked: boolean;
   selected: boolean;
-  offsetY?: number;
   select: () => void;
   preview: (clip: Clip | null) => void;
   commit: (clip: Clip) => void;
@@ -29,12 +27,12 @@ export default function TimelineSpeedEffect({
   return (
     <div
       className={`clip-speed-effect ${selected ? "selected" : ""} ${locked ? "locked" : ""}`}
-      style={{
-        left: clip.start * zoom,
-        width: Math.max(4, clip.duration * zoom),
-        translate: offsetY ? `0 ${offsetY}px` : undefined,
+      onPointerDown={(event) => event.stopPropagation()}
+      onClick={(event) => {
+        event.stopPropagation();
+        select();
       }}
-      onClick={select}
+      onDoubleClick={(event) => event.stopPropagation()}
     >
       <span>剪辑速度 · {Number(clip.speed.toFixed(2))}×</span>
       <button
