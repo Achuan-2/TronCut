@@ -11,6 +11,7 @@ import { onnxWorkerArguments } from "../shared/onnx";
 import { findBinary, runProcess } from "./process";
 import { onnxEnvironment, prepareOnnxWorker, runOnnxWorker } from "./onnx";
 import { renderTimelineAudio } from "./timeline-audio";
+import { cueSchema } from "../shared/caption-processing";
 
 type TranscriptionPaths = {
   userData: string;
@@ -50,11 +51,6 @@ export async function transcribeProject(
   );
 }
 
-const cueSchema = z.object({
-  start: z.number().finite().nonnegative(),
-  end: z.number().finite().positive(),
-  text: z.string(),
-});
 const progressSchema = z.object({
   percent: z.number().finite().min(0).max(100),
   label: z.string().max(5000),
@@ -173,6 +169,17 @@ async function recognizeAudio(
       ...c,
       start: c.start + options.sourceIn,
       end: Math.min(c.end, duration) + options.sourceIn,
+      ...(c.words
+        ? {
+            words: c.words
+              .filter((word) => word.start < duration)
+              .map((word) => ({
+                ...word,
+                start: word.start + options.sourceIn,
+                end: Math.min(word.end, duration) + options.sourceIn,
+              })),
+          }
+        : {}),
     }));
   if (!converted.length)
     throw new Error("转录没有产生有效字幕，可能是音频中没有语音");

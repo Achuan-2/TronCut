@@ -15,6 +15,10 @@ import {
 } from "../shared/model";
 import { type Cue } from "../shared/subtitles";
 import { captionDefaults } from "../shared/captions";
+import {
+  captionProcessingSchema,
+  segmentCaptionCues,
+} from "../shared/caption-processing";
 import { setClipSpeed, supportsClipSpeed } from "../shared/clip-speed";
 import { deleteClips } from "../shared/timeline";
 import { probeMedia } from "./media";
@@ -241,7 +245,7 @@ export async function transcribeCliProject(
   await fs.mkdir(tempRoot, { recursive: true });
   const temp = await fs.mkdtemp(path.join(tempRoot, "asr-"));
   try {
-    const cues = await transcribeProject(
+    const recognized = await transcribeProject(
       input,
       options.engine,
       options.language,
@@ -249,6 +253,10 @@ export async function transcribeCliProject(
       { ...context, temp },
       context.signal,
       context.progress,
+    );
+    const cues = segmentCaptionCues(
+      recognized,
+      captionProcessingSchema.parse({}),
     );
     return { project: addCaptionCues(project, cues, style), cues };
   } catch (error) {

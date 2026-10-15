@@ -50,7 +50,7 @@ export default function CaptionProcessingFields({
             </label>
           )}
           <p className="caption-processing-note">
-            按语音段保留停顿；缺少逐字时间时，拆分后的段内时间为估算。
+            标准断句优先按标点和词语切分，保留英文名称；缺少逐字时间时，段内时间为估算。
           </p>
         </>
       )}

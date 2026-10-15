@@ -8,40 +8,59 @@ import unittest
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from caption_utils import result_cues
+from caption_utils import recognition_cues
 from models import MODELS, installed, resolve_model, resolve_vad
 from synthesize import text_chunks
 
 
 class OnnxTests(unittest.TestCase):
+    def test_recognition_preserves_full_text_before_shared_segmentation(self):
+        text = "我这里用的是豆包电脑版，你就直接和豆包提供数据，指定分析方法，让它画图就可以了。"
+        result = SimpleNamespace(text=text, tokens=list(text), timestamps=[i * 0.1 for i in range(len(text))])
+        cues = recognition_cues(result, 1, 8)
+        self.assertEqual(len(cues), 1)
+        self.assertEqual(cues[0]["text"], text)
+        self.assertEqual("".join(word["text"] for word in cues[0]["words"]), text)
+        self.assertAlmostEqual(cues[0]["words"][0]["start"], 1)
+        self.assertEqual(cues[0]["words"][-1]["end"], 8)
+
+    def test_raw_recognition_keeps_spaces_and_rejects_unreliable_timing(self):
+        result = SimpleNamespace(text="AI操控GraphPad Prism", tokens=["AI", "操控", "GraphPad", "▁Prism"], timestamps=[0.1, 0.5, 1, 2])
+        cue = recognition_cues(result, 0, 3)[0]
+        self.assertEqual("".join(word["text"] for word in cue["words"]), result.text)
+        result.timestamps = [0.1, 0.5, 0.3, 2]
+        self.assertNotIn("words", recognition_cues(result, 0, 3)[0])
+        result.timestamps = []
+        self.assertEqual(recognition_cues(result, 0, 3), [{"start": 0, "end": 3, "text": result.text}])
+
     def test_unlimited_preserves_original_speech_interval_even_with_word_timestamps(self):
         result = SimpleNamespace(text="第一句。第二句。", tokens=["第一句。", "第二句。"],
             timestamps=[0, 6], durations=[2, 2])
-        self.assertEqual(result_cues(result, 2, 10, max_chars=float("inf"),
-            split_sentences=False, max_seconds=float("inf")),
-            [{"start": 2, "end": 10, "text": "第一句。第二句。"}])
+        cue = recognition_cues(result, 2, 10)[0]
+        self.assertEqual((cue["start"], cue["end"], cue["text"]), (2, 10, "第一句。第二句。"))
 
     def test_missing_timestamps_keep_real_vad_boundaries(self):
         result = SimpleNamespace(text="<|zh|>完整的字幕", tokens=["完", "整"], timestamps=[])
-        self.assertEqual(result_cues(result, 2, 5), [{"start": 2, "end": 5, "text": "完整的字幕"}])
+        self.assertEqual(recognition_cues(result, 2, 5), [{"start": 2, "end": 5, "text": "完整的字幕"}])
 
-    def test_timestamps_split_captions_and_clip_to_segment(self):
+    def test_timestamps_preserve_word_times_and_clip_to_segment(self):
         result = SimpleNamespace(text="你好。世界", tokens=["你", "好。", "世", "界"],
                                  timestamps=[0.1, 0.3, 0.7, 0.9], durations=[0.2, 0.2, 0.2, 0.2])
-        self.assertEqual(result_cues(result, 10, 11), [
-            {"start": 10.1, "end": 10.5, "text": "你好。"},
-            {"start": 10.7, "end": 11, "text": "世界"},
-        ])
+        cue = recognition_cues(result, 10, 11)[0]
+        self.assertEqual(cue["text"], "你好。世界")
+        self.assertEqual(cue["words"][0]["start"], 10.1)
+        self.assertEqual(cue["words"][-1]["end"], 11)
         result.timestamps = [0.1, 0.3, 0.2, 0.9]
-        self.assertEqual(result_cues(result, 10, 11), [{"start": 10, "end": 11, "text": "你好。世界"}])
+        self.assertEqual(recognition_cues(result, 10, 11), [{"start": 10, "end": 11, "text": "你好。世界"}])
 
     def test_no_orphan_punctuation_or_spaces_inside_subwords(self):
         result = SimpleNamespace(text="hello world.", tokens=["hel", "lo", "▁world", "."],
                                  timestamps=[0.1, 0.3, 0.7, 0.9])
-        self.assertEqual(result_cues(result, 0, 1), [{"start": 0.1, "end": 1, "text": "hello world."}])
+        cue = recognition_cues(result, 0, 1)[0]
+        self.assertEqual("".join(word["text"] for word in cue["words"]), "hello world.")
         result = SimpleNamespace(text="这是完整字幕。", tokens=["这", "是", "完", "整", "字", "幕", "。"],
                                  timestamps=[0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6])
-        cues = result_cues(result, 0, 1, max_chars=6)
+        cues = recognition_cues(result, 0, 1)
         self.assertEqual(len(cues), 1)
         self.assertEqual(cues[0]["text"], "这是完整字幕。")
 

@@ -8,7 +8,7 @@ import wave
 import numpy as np
 import sherpa_onnx
 
-from caption_utils import result_cues
+from caption_utils import recognition_cues
 from models import resolve_model, resolve_vad
 
 SAMPLE_RATE = 16000
@@ -82,14 +82,9 @@ def transcribe(request):
                     stream.set_option("language", QWEN_LANGUAGES[language])
                 stream.accept_waveform(SAMPLE_RATE, samples)
                 recognizer.decode_stream(stream)
-                processing = request.get("processing") or {}
-                mode = processing.get("segmentation", "standard")
-                # Unlimited/AI modes start from complete original speech intervals.
-                whole_segment = mode in ("unlimited", "ai")
-                max_chars = float("inf") if whole_segment else (processing.get("maxChars", 22) if mode == "custom" else 22)
-                cues.extend(result_cues(stream.result, start, end, max_chars=max_chars,
-                    split_sentences=not whole_segment,
-                    max_seconds=float("inf") if whole_segment else 5))
+                # Segment once in the shared editor pipeline. Cutting model tokens
+                # here first irreversibly splits Chinese words and product names.
+                cues.extend(recognition_cues(stream.result, start, end))
                 count += 1
             vad.pop()
 

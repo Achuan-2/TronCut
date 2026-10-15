@@ -2,6 +2,7 @@ export interface Cue {
   start: number;
   end: number;
   text: string;
+  words?: { start: number; end: number; text: string }[];
 }
 function seconds(s: string): number {
   const p = s.replace(",", ".").split(":").map(Number);

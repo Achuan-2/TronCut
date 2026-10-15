@@ -131,7 +131,9 @@ export async function processCaptionCues(
             ...items.flatMap((item, id) =>
               distributeCaptionParts(
                 group[id],
-                item.segments.flatMap((part) => splitCaptionText(part, 22)),
+                item.segments.flatMap((part) =>
+                  splitCaptionText(part, 22, true),
+                ),
               ),
             ),
           );
