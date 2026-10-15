@@ -3,6 +3,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { speechEngineSchema, speechOptionsSchema } from "../shared/asr";
 import { onnxWorkerArguments } from "../shared/onnx";
+import { onnxEnvironment } from "../electron/onnx";
 import { transcribeAsset, transcribeProject } from "../electron/transcription";
 import { createProject, newText } from "../shared/model";
 import { runProcess } from "../electron/process";
@@ -30,6 +31,7 @@ describe("字幕引擎与源时间映射", () => {
     expect(args).not.toContain("--extra");
   });
   it("拒绝无效设备和识别区间", () => {
+    expect(speechOptionsSchema.parse({ device: "cuda" }).device).toBe("cuda");
     expect(() => speechOptionsSchema.parse({ device: "shell" })).toThrow();
     expect(() => speechOptionsSchema.parse({ sourceDuration: -1 })).toThrow();
     expect(speechOptionsSchema.parse({})).toEqual({
@@ -38,6 +40,71 @@ describe("字幕引擎与源时间映射", () => {
       modelDir: "",
       offline: false,
     });
+  });
+  it("GPU 识别使用独立 CUDA 环境并保留离线约束", async () => {
+    const temp = path.resolve("test-output/asr-gpu-contract");
+    await fs.mkdir(temp, { recursive: true });
+    vi.mocked(runProcess).mockImplementation(async (_binary, args, options) => {
+      if (args.includes("--request")) {
+        expect(args).toContain("qwen-gpu");
+        expect(args).toContain("--offline");
+        expect(options?.env?.UV_PROJECT_ENVIRONMENT).toBe(
+          path.join(temp, "profile/workers/onnx/.venv-cuda"),
+        );
+        expect(
+          JSON.parse(await fs.readFile(args.at(-3)!, "utf8")),
+        ).toMatchObject({
+          engine: "qwen3-asr",
+          device: "cuda",
+          offline: true,
+        });
+        await fs.writeFile(
+          args.at(-1)!,
+          JSON.stringify([{ start: 0.2, end: 1, text: "GPU 字幕" }]),
+        );
+      }
+      return "";
+    });
+    const asset = {
+      id: "gpu",
+      path: "source.wav",
+      name: "source.wav",
+      kind: "audio" as const,
+      duration: 2,
+      width: 0,
+      height: 0,
+      hasAudio: true,
+    };
+    const paths = {
+      temp,
+      userData: path.join(temp, "profile"),
+      workers: path.resolve("workers/onnx"),
+      resources: "",
+    };
+    const result = await transcribeAsset(
+      asset,
+      "qwen3-asr",
+      "zh",
+      { device: "cuda", offline: true },
+      paths,
+      new AbortController().signal,
+      () => {},
+    );
+    expect(result[0].text).toBe("GPU 字幕");
+    expect(
+      onnxEnvironment(paths.userData, "workers").UV_PROJECT_ENVIRONMENT,
+    ).toBe(path.join("workers", ".venv"));
+    await expect(
+      transcribeAsset(
+        asset,
+        "sensevoice",
+        "zh",
+        { device: "cuda" },
+        paths,
+        new AbortController().signal,
+        () => {},
+      ),
+    ).rejects.toThrow("仅支持 Qwen3-ASR");
   });
   it("只提取指定源区间，转换为全局源时间并裁掉末尾越界", async () => {
     const temp = path.resolve("test-output/asr-contract");

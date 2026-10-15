@@ -29,11 +29,31 @@ def transcribe(request):
     engine = request["engine"]
     if engine not in ("qwen3-asr", "sensevoice"):
         raise ValueError("请选择 Qwen3-ASR 或 SenseVoiceSmall ONNX 模型")
-    if request.get("device", "cpu") not in ("auto", "cpu"):
-        raise ValueError("当前 sherpa-onnx 运行环境仅支持 CPU")
+    device = request.get("device", "cpu")
+    if device not in ("auto", "cpu", "cuda"):
+        raise ValueError("请选择 CPU 或 NVIDIA CUDA 识别设备")
+    if device == "cuda" and engine != "qwen3-asr":
+        raise ValueError("GPU 加速目前仅支持 Qwen3-ASR")
+    language = request.get("language", "auto")
+    if language != "auto" and language not in QWEN_LANGUAGES:
+        raise ValueError("不支持的识别语言")
+    label = "GPU · CUDA" if device == "cuda" else "CPU"
+    if device == "cuda":
+        from qwen_gpu import GPU_BATCH_SIZE, load_gpu_recognizer
+        recognize = load_gpu_recognizer(request, progress)
+        batch_size = GPU_BATCH_SIZE
+    else:
+        recognize = load_cpu_recognizer(request)
+        batch_size = 1
+        progress(10, f"{engine} CPU 模型已就绪")
+    vad_model = resolve_vad(request.get("modelDir"), request.get("offline", False), progress)
+    return recognize_wav(request["input"], recognize, vad_model, engine, label, language, batch_size)
+
+
+def load_cpu_recognizer(request):
+    engine = request["engine"]
     language = request.get("language", "auto")
     directory = resolve_model(engine, request.get("modelDir"), request.get("offline", False), progress)
-    vad_model = resolve_vad(request.get("modelDir"), request.get("offline", False), progress)
     threads = min(4, os.cpu_count() or 1)
     common = dict(num_threads=threads, provider="cpu")
     progress(8, f"正在加载 {engine} ONNX 模型（CPU）")
@@ -56,6 +76,22 @@ def transcribe(request):
             **common, tokens=str(directory / "tokens.txt"),
             model=str(directory / "model.int8.onnx"),
             language="" if language == "auto" else language, use_itn=True)
+    def recognize(batch, language):
+        results = []
+        for samples in batch:
+            stream = recognizer.create_stream()
+            if engine == "qwen3-asr" and language:
+                stream.set_option("language", language)
+            stream.accept_waveform(SAMPLE_RATE, samples)
+            recognizer.decode_stream(stream)
+            results.append(stream.result)
+        return results
+
+    return recognize
+
+
+def recognize_wav(input_path, recognize, vad_model, engine, label, language, batch_size=1):
+    """Both backends share streaming VAD and the same project-time mapping."""
     config = sherpa_onnx.VadModelConfig()
     config.silero_vad.model = str(vad_model)
     config.silero_vad.min_silence_duration = 0.35
@@ -68,27 +104,34 @@ def transcribe(request):
     vad = sherpa_onnx.VoiceActivityDetector(config, buffer_size_in_seconds=30)
     cues = []
     count = 0
+    pending = []
+
+    def decode_pending():
+        nonlocal count
+        if not pending:
+            return
+        results = recognize([samples for _, _, samples in pending], QWEN_LANGUAGES.get(language))
+        if len(results) != len(pending):
+            raise RuntimeError("识别结果数量与语音段不一致，请重试")
+        for result, (start, end, _) in zip(results, pending):
+            # Segment once in the shared editor pipeline; batching never changes times.
+            cues.extend(recognition_cues(result, start, end))
+        count += len(pending)
+        pending.clear()
 
     def drain(total_samples):
-        nonlocal count
         while not vad.empty():
             segment = vad.front
             start = segment.start / SAMPLE_RATE
             samples = np.asarray(segment.samples, dtype=np.float32)
             end = min(total_samples / SAMPLE_RATE, start + len(samples) / SAMPLE_RATE)
             if len(samples) and end > start:
-                stream = recognizer.create_stream()
-                if engine == "qwen3-asr" and language != "auto":
-                    stream.set_option("language", QWEN_LANGUAGES[language])
-                stream.accept_waveform(SAMPLE_RATE, samples)
-                recognizer.decode_stream(stream)
-                # Segment once in the shared editor pipeline. Cutting model tokens
-                # here first irreversibly splits Chinese words and product names.
-                cues.extend(recognition_cues(stream.result, start, end))
-                count += 1
+                pending.append((start, end, samples))
+                if len(pending) >= batch_size:
+                    decode_pending()
             vad.pop()
 
-    with wave.open(request["input"], "rb") as audio:
+    with wave.open(input_path, "rb") as audio:
         if (audio.getframerate(), audio.getnchannels(), audio.getsampwidth()) != (SAMPLE_RATE, 1, 2):
             raise ValueError("识别输入必须为 16 kHz 单声道 PCM16 WAV")
         total = audio.getnframes()
@@ -102,11 +145,12 @@ def transcribe(request):
             drain(total)
             percent = 12 + int(86 * processed / max(total, 1))
             if percent != reported:
-                progress(percent, f"{engine} · CPU：已识别 {count} 个语音段")
+                progress(percent, f"{engine} · {label}：已识别 {count} 个语音段")
                 reported = percent
         # Flush preserves a final utterance even without trailing silence.
         vad.flush()
         drain(total)
+        decode_pending()
     return sorted(cues, key=lambda cue: cue["start"])
 
 

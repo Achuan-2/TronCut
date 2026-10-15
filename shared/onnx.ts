@@ -12,13 +12,14 @@ export interface PreparedOnnxModel {
   directory: string;
 }
 
-/** One isolated CPU runtime serves both recognition and synthesis. */
+/** CUDA recognition uses an optional extra in a separate virtual environment. */
 export function onnxWorkerArguments(
   workers: string,
   script: "transcribe.py" | "synthesize.py" | "prepare.py",
   request: string,
   output: string,
   offline = false,
+  cuda = false,
 ): string[] {
   return [
     "run",
@@ -27,6 +28,7 @@ export function onnxWorkerArguments(
     "--python",
     "3.12",
     "--frozen",
+    ...(cuda ? ["--extra", "qwen-gpu"] : []),
     ...(offline ? ["--offline"] : []),
     "python",
     `${workers}/${script}`,

@@ -17,6 +17,7 @@ export async function prepareOnnxWorker(source: string, userData: string) {
     "models.py",
     "caption_utils.py",
     "transcribe.py",
+    "qwen_gpu.py",
     "synthesize.py",
     "prepare.py",
   ])
@@ -27,14 +28,16 @@ export async function prepareOnnxWorker(source: string, userData: string) {
 export function onnxEnvironment(
   userData: string,
   workers: string,
+  cuda = false,
 ): NodeJS.ProcessEnv {
   return {
     ...process.env,
     PYTHONUTF8: "1",
     UV_CACHE_DIR: path.join(userData, "uv-cache"),
     UV_PYTHON_INSTALL_DIR: path.join(userData, "python"),
-    UV_PROJECT_ENVIRONMENT: path.join(workers, ".venv"),
+    UV_PROJECT_ENVIRONMENT: path.join(workers, cuda ? ".venv-cuda" : ".venv"),
     TRONCUT_ONNX_MODELS: path.join(userData, "models", "onnx"),
+    HF_HOME: path.join(userData, "models", "huggingface"),
   };
 }
 

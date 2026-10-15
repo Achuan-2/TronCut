@@ -56,7 +56,7 @@ See the [user documentation](docs/README.md) for media, recording cursors, timel
 | macOS                            | Apple Silicon and Intel DMGs are provided unsigned and unnotarized; installation, permissions, recording, and export remain for users to validate.                                                   |
 | Camtasia `.tscproj`              | Converts common media references, flat clips, timing, speed, and some transforms. An import report and the original JSON are retained.                                                               |
 | TREC and proprietary backgrounds | **Complete import is not supported.** A real project test skipped three TREC recordings and a water-ripple background; only the music was converted.                                                 |
-| Speech engines                   | Qwen3-ASR 0.6B is the default recognizer; SenseVoiceSmall recognition and Kokoro/VITS narration remain available through sherpa-onnx on CPU. |
+| Speech engines                   | Qwen3-ASR 0.6B defaults to INT8 on CPU, with optional NVIDIA CUDA FP16 acceleration; SenseVoiceSmall recognition and Kokoro/VITS narration use sherpa-onnx on CPU. |
 | Voice enhancement                | DSP processing is available. Canvas playback uses the original audio; processed audition and export use the filters. AI voice reconstruction is not included.                                        |
 
 A complete effects library, nested sequences, TREC cursor metadata, proxy media, a shared GPU compositor, and GIF/audio/interactive exports remain unfinished. Hardware encoding does not mean the entire pipeline is GPU accelerated. Professional audio blind tests and large-project performance comparisons have not been completed.

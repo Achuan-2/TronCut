@@ -57,7 +57,7 @@ TronCut 将录屏、剪辑、文字、字幕和声音处理放在同一个工作
 | macOS               | 提供 Apple Silicon 与 Intel DMG；未签名、未公证，也未进行安装、权限、录制和导出真机验收，由使用者自行验证并反馈。        |
 | Camtasia `.tscproj` | 转换常见媒体引用、平面片段、时间、速度与部分变换；附导入报告并保留原 JSON。                                              |
 | TREC 与专有背景     | **暂不支持完整导入。** 实际工程测试中 3 段 TREC 与水波背景被跳过，仅音乐转换成功。                                       |
-| 字幕引擎            | 默认使用 Qwen3-ASR 0.6B INT8，也可选择 SenseVoiceSmall ONNX；使用 Silero VAD。 |
+| 字幕引擎            | 默认使用 Qwen3-ASR 0.6B INT8 CPU，可选 NVIDIA CUDA FP16 加速或 SenseVoiceSmall CPU；使用 Silero VAD。 |
 | 声音增强            | 当前为 DSP 处理；画布播放原音，处理后试听与导出使用滤镜结果，不包含 AI 人声重建。                                        |
 
 完整效果库、嵌套序列、TREC 鼠标元数据、代理媒体、统一 GPU 合成及 GIF/音频/交互导出尚未完成。硬件编码不等于全流程 GPU 加速；本版未经过专业软件音质盲测或大工程性能对比。

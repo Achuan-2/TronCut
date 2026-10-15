@@ -63,6 +63,14 @@ try {
   await page.getByRole("menuitem", { name: "语音转文本", exact: true }).click();
   await expect(page.getByLabel("识别模型")).toHaveValue("qwen3-asr");
   await expect(page.getByLabel("识别模型").locator("option")).toHaveCount(2);
+  await expect(page.getByLabel("识别设备")).toHaveValue("cpu");
+  await page.getByLabel("识别设备").selectOption("cuda");
+  await expect(
+    page.getByText(
+      "需要 NVIDIA 显卡；首次使用会自动下载 GPU 环境与模型，准备时间较长。",
+    ),
+  ).toBeVisible();
+  await page.getByLabel("识别设备").selectOption("cpu");
   await expect(
     page.getByRole("button", { name: "开始识别", exact: true }),
   ).toBeEnabled();
@@ -72,8 +80,13 @@ try {
   );
   await page.getByRole("button", { name: "字幕操作", exact: true }).click();
   await page.getByRole("menuitem", { name: "语音转文本", exact: true }).click();
+  await page.getByLabel("识别设备").selectOption("cuda");
   await page.getByLabel("识别模型").selectOption("sensevoice");
   await expect(page.getByLabel("识别模型")).toHaveValue("sensevoice");
+  await expect(page.getByLabel("识别设备")).toHaveValue("cpu");
+  await expect(
+    page.getByLabel("识别设备").locator('option[value="cuda"]'),
+  ).toHaveAttribute("disabled", "");
   await page.getByRole("button", { name: "关闭", exact: true }).click();
   await page.getByRole("button", { name: "添加字幕", exact: true }).click();
   await expect(

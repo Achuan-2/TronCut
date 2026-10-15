@@ -39,6 +39,7 @@ const optionDefinitions = {
   srt: { type: "string" },
   result: { type: "string" },
   engine: { type: "string" },
+  device: { type: "string" },
   language: { type: "string" },
   "model-dir": { type: "string" },
   clips: { type: "string" },
@@ -322,6 +323,7 @@ export async function executeCli(
       "engine",
       "language",
       "model-dir",
+      "device",
       "clips",
       "offline",
     ],
@@ -429,6 +431,7 @@ export async function executeCli(
     if (command === "transcribe") {
       const configuration = transcriptionSchema.parse({
         engine: options.engine,
+        device: options.device,
         language: options.language,
         modelDir: options["model-dir"],
         offline: options.offline,

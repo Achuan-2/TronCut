@@ -8,6 +8,13 @@ import urllib.request
 
 RELEASE = "https://github.com/k2-fsa/sherpa-onnx/releases/download"
 MODELS = {
+    "qwen3-asr-cuda": {
+        "directory": "qwen3-asr-0.6b-cuda",
+        "repo": "Qwen/Qwen3-ASR-0.6B",
+        "files": ("config.json", "generation_config.json", "model.safetensors",
+                  "preprocessor_config.json", "tokenizer_config.json",
+                  "chat_template.json", "merges.txt", "vocab.json"),
+    },
     "qwen3-asr": {
         "directory": "qwen3-asr-0.6b",
         "release": "asr-models",
@@ -96,14 +103,14 @@ def resolve_model(engine, model_dir, offline, progress):
         if not installed(directory, spec):
             missing = [name for name in spec["files"] if not (directory / name).is_file()]
             raise RuntimeError(f"模型目录不完整：{directory}；需要 {', '.join(missing) or '非空模型文件'}")
-        progress(5, f"使用指定 ONNX 模型：{directory}")
+        progress(5, f"使用指定模型：{directory}")
         return directory
     cached = cache_root() / spec["directory"]
     if installed(cached, spec):
-        progress(5, f"使用本地 ONNX 模型：{cached}")
+        progress(5, f"使用本地模型：{cached}")
         return cached
     if offline:
-        raise RuntimeError(f"本地缺少 {spec['directory']} ONNX 模型；请选择完整模型目录，或关闭仅使用本地模型")
+        raise RuntimeError(f"本地缺少 {spec['directory']} 模型；请选择完整模型目录，或关闭仅使用本地模型")
     cached.parent.mkdir(parents=True, exist_ok=True)
     # Download into our own staging directory, never into the user's supplied directory.
     with tempfile.TemporaryDirectory(prefix=".prepare-", dir=staging_root()) as staging:

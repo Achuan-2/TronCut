@@ -49,6 +49,10 @@ describe("Codex CLI 工程与命令协议", () => {
 
   it("拒绝未知计划字段、重叠文案、无效裁剪与锁定轨道编辑", () => {
     expect(transcriptionSchema.parse({}).engine).toBe("qwen3-asr");
+    expect(transcriptionSchema.parse({ device: "cuda" }).device).toBe("cuda");
+    expect(transcriptionSchema.safeParse({ device: "invalid" }).success).toBe(
+      false,
+    );
     expect(
       cliPlanSchema.safeParse({
         version: 1,

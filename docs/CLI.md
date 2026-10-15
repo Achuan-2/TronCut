@@ -117,11 +117,14 @@ pnpm --silent cli edit --project project.troncut --edits edits.json --output edi
 
 ```powershell
 pnpm --silent cli transcribe --project project.troncut --output captioned/project.troncut --srt captioned/captions.srt --engine sensevoice --language zh
+pnpm --silent cli transcribe --project project.troncut --output gpu/project.troncut --engine qwen3-asr --device cuda
 pnpm --silent cli models --engine sensevoice
 pnpm --silent cli models --engine vits-onnx
 ```
 
 识别支持 `qwen3-asr`（默认）、`sensevoice`，配音支持 `kokoro-onnx`、`vits-onnx`。默认识别整个时间线的混音，保留空白、裁剪、变速、音量和音频效果，跳过静音与隐藏轨道，每次生成新的字幕轨道。模型缺失时自动下载，缓存与 GUI 共用。`--offline` 仅使用已有环境和模型；转录可用 `--model-dir` 指定目录，文案配音可在脚本中填写 `modelDir`。`--clips id1,id2` 可显式限制参与混音的片段。
+
+Qwen3-ASR 可通过 `--device cuda` 使用 NVIDIA GPU，首次使用自动准备独立 CUDA 环境与官方 FP16 模型；`cpu` 或默认 `auto` 使用现有 INT8 CPU 模型。计划文件的 `transcribe.device` 接受相同取值。GPU 模式的 `--model-dir` 必须是官方 Transformers 模型目录，不能填写 CPU ONNX 模型目录；SenseVoiceSmall 只支持 CPU。
 
 创建 `--cancel-file` 指定的文件可取消长任务；源码启动器还支持 Ctrl+C，并等待工作进程清理。`--software` 可让 `run` 或 `export` 使用软件编码，默认沿用软件的硬件探测与回退策略。
 
