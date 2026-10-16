@@ -9,4 +9,4 @@ export const recordingControlsStateSchema = z.object({
 export type RecordingControlsState = z.infer<
   typeof recordingControlsStateSchema
 >;
-export type RecordingControlCommand = "pause" | "stop" | "editor";
+export type RecordingControlCommand = "pause" | "stop" | "editor" | "minimize";

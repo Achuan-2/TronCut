@@ -134,13 +134,31 @@ try {
         top: controls.isAlwaysOnTop(),
         parent: controls.getParentWindow()?.id,
         sandbox: controls.webContents.getLastWebPreferences().sandbox,
+        // Windows rounds the scaled frameless border up by up to 2 DIP.
+        compact:
+          controls.getBounds().width <= 274 &&
+          controls.getBounds().height <= 44,
+        minimizable: controls.isMinimizable(),
       };
     });
-    expect(properties).toEqual({ top: true, parent: undefined, sandbox: true });
+    expect(properties).toEqual({
+      top: true,
+      parent: undefined,
+      sandbox: true,
+      compact: true,
+      minimizable: true,
+    });
+    expect(
+      await controls
+        .locator("main")
+        .evaluate((element) => element.scrollWidth <= element.clientWidth),
+    ).toBe(true);
     await controls
       .getByRole("button", { name: "暂停录制", exact: true })
       .click();
     await expect(controls.getByRole("status")).toHaveText("已暂停");
+    await expect(controls.locator("#play-icon")).toBeVisible();
+    await expect(controls.locator("#pause-icon")).toBeHidden();
     await page.waitForTimeout(350);
     const pausedTime = await controls.locator("time").textContent();
     await page.waitForTimeout(1100);
@@ -152,12 +170,29 @@ try {
       .getByRole("button", { name: "继续录制", exact: true })
       .click();
     await expect(controls.getByRole("status")).toHaveText("正在录制");
+    await expect(controls.locator("#pause-icon")).toBeVisible();
+    await expect(controls.locator("#play-icon")).toBeHidden();
     await controls
       .getByRole("button", { name: "显示编辑器", exact: true })
       .click();
     await mainRestored();
     const recall = page.getByRole("button", { name: "录制控制", exact: true });
     await expect(recall).toBeEnabled();
+    const beforeMinimize = await controls.locator("time").textContent();
+    await controls.getByRole("button", { name: "最小化", exact: true }).click();
+    const controlsMinimized = () =>
+      app.evaluate(({ BrowserWindow }) =>
+        BrowserWindow.getAllWindows()
+          .find((w) => w.getTitle() === "TronCut 录制控制")
+          .isMinimized(),
+      );
+    await expect.poll(controlsMinimized).toBe(true);
+    await page.waitForTimeout(1200);
+    expect(await controlsMinimized()).toBe(true);
+    await expect(controls.getByRole("status")).toHaveText("正在录制");
+    await expect(controls.locator("time")).not.toHaveText(beforeMinimize);
+    await recall.click();
+    await recordingControls(app);
     await app.evaluate(({ BrowserWindow }) => {
       const controls = BrowserWindow.getAllWindows().find(
         (w) => w.getTitle() === "TronCut 录制控制",
