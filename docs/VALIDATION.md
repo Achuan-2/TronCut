@@ -1,5 +1,15 @@
 # 验证记录（含历史与 TronCut 0.3）
 
+## v0.4.4 发布前检查（2026-10-16）
+
+本地 `pnpm test` 的 71 个文件、308 项测试全部通过，包含新增视觉效果、效果时间范围、遮罩关键帧、真实 FFmpeg 导出和截帧、字幕单条编辑、宽高独立缩放及预设库。`pnpm run test:rust` 的 2 项 Rust 单元测试通过；TypeScript、Vite、Electron 构建和 `scripts/check-packaging.mjs` 检查通过。
+
+`scripts/test-editing-ui.mjs` 完整开发程序回归通过，覆盖播放、全屏、复制粘贴、缩放裁剪、关键帧、文本框、保存和未保存退出确认。脚本的画布定位已适配新增效果容器，正常退出同时校验进程退出码。
+
+`scripts/smoke-visual-effect-range.mjs`、`scripts/smoke-mask-animation.mjs`、`scripts/smoke-caption-edit-scope.mjs` 和 `scripts/smoke-visual-effect-preview.mjs` 专项通过，覆盖效果条拖动/取消/撤销、八点遮罩缩放与滑动显示、单条字幕隔离、九种卡片预览像素、移开停止、减少动态效果、收藏夹、拖放及保存重开，前端运行错误为零。
+
+上述为本地源码与桌面验证。发布工作流另行构建 Windows x64 与 macOS arm64/x64，执行 Windows 打包版编辑回归并生成统一 SHA256 校验文件；Mac CI 打包不等同于真机安装、权限、录制或导出验收。
+
 ## v0.4.3 发布前检查（2026-10-16）
 
 本地 `pnpm test` 的 66 个文件、288 项测试全部通过，包含真实 FFmpeg 视频导出、区域标记、百分比圆角与旧工程兼容、行为动画、录屏样式、Rust/Wasm 区间索引和工程归档。`pnpm run test:rust` 的 2 项 Rust 单元测试通过；`scripts/check-packaging.mjs` 确认随包媒体引擎、原生录屏组件、许可文件及语音 worker 齐全。
