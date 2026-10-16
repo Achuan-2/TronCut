@@ -12,6 +12,7 @@ import { exportVideo, exportFrame } from "../electron/export";
 import { probeMedia } from "../electron/media";
 import { findBinary, runProcess } from "../electron/process";
 import { saveProject, openProject } from "../electron/project-store";
+import { recordingBackgrounds } from "../shared/recording-settings";
 
 it("真实导出和归档重开保留背景、圆角与自动缩放，放大画面时背景像素不变", async () => {
   const root = path.resolve(`test-output/recording-style-${Date.now()}`);
@@ -121,74 +122,115 @@ it("真实导出和归档重开保留背景、圆角与自动缩放，放大画�
   expect(data[(90 * info.width + 160) * 3 + 1]).toBeLessThan(40);
 }, 90000);
 
-it("透视网格按画布栅格化为黑底灰线，归档后可导出录屏及背景", async () => {
-  const root = path.resolve(`test-output/perspective-grid-${Date.now()}`);
-  const store = new RecordingStyleStore(root);
-  const settings = {
-    ...defaultRecordingSettings,
-    preset: "perspective-grid" as const,
-    autoZoom: false,
-  };
-  await store.save(settings);
-  expect((await store.read()).preset).toBe("perspective-grid");
-  const background = await store.background(320, 180, settings.preset);
-  expect(background).toMatchObject({ kind: "image", width: 320, height: 180 });
-  expect(path.extname(background.path)).toBe(".png");
-  const portrait = await store.background(180, 320, settings.preset);
-  expect(portrait).toMatchObject({ width: 180, height: 320 });
-  expect(portrait.path).not.toBe(background.path);
-  const { data, info } = await sharp(background.path)
-    .removeAlpha()
-    .raw()
-    .toBuffer({ resolveWithObject: true });
-  expect(info.channels).toBe(3);
-  expect(data.includes(0)).toBe(true);
-  expect(data.some((value) => value > 25)).toBe(true);
-  expect(data.every((value) => value < 80)).toBe(true);
-  expect(
-    data.every((value, index) => value === data[index - (index % 3)]),
-  ).toBe(true);
-  const source = path.join(root, "screen.mp4");
-  await runProcess(findBinary("ffmpeg"), [
-    "-y",
-    "-f",
-    "lavfi",
-    "-i",
-    "color=white:s=320x180:r=10:d=0.4",
-    "-c:v",
-    "libx264",
-    "-pix_fmt",
-    "yuv420p",
-    source,
-  ]);
-  const project = createProject();
-  project.canvas = { width: 320, height: 180, fps: 10, background: "#000000" };
-  project.exportSettings = { encoder: "software" };
-  const styled = addRecordedAssets(
-    project,
-    [{ asset: await probeMedia(source), kind: "screen" }],
-    settings,
-    0,
-    background,
-  );
-  const archive = path.join(root, "grid.troncut");
-  await saveProject(styled, archive);
-  const reopened = await openProject(archive);
-  expect(reopened.clips[0].recording?.preset).toBe("perspective-grid");
-  const frame = path.join(root, "frame.png");
-  await exportFrame(
-    reopened,
-    0,
-    frame,
-    path.join(root, "render"),
-    AbortSignal.timeout(20000),
-  );
-  const border = await sharp(frame)
-    .extract({ left: 0, top: 0, width: 320, height: 10 })
-    .removeAlpha()
-    .raw()
-    .toBuffer();
-  expect(Math.min(...border)).toBe(0);
-  expect(Math.max(...border)).toBeGreaterThan(25);
-  expect(Math.max(...border)).toBeLessThan(80);
-});
+it.each([
+  "perspective-grid",
+  "moving-grid",
+  "moving-dots",
+  "wave-dots",
+] as const)(
+  "动态背景 %s 归档后保持运动，导出超过素材时长后无缝循环",
+  async (preset) => {
+    const root = path.resolve(`test-output/${preset}-${Date.now()}`);
+    const store = new RecordingStyleStore(root);
+    const settings = {
+      ...defaultRecordingSettings,
+      preset,
+      autoZoom: false,
+      padding: 0.2,
+    };
+    await store.save(settings);
+    expect((await store.read()).preset).toBe(preset);
+    expect(recordingBackgrounds[preset].animated).toBe(true);
+    const background = await store.background(320, 180, settings.preset);
+    expect(background).toMatchObject({
+      kind: "video",
+      width: 1920,
+      height: 1080,
+      hasAudio: false,
+    });
+    expect(path.extname(background.path)).toBe(".mp4");
+    expect(background.duration).toBeCloseTo(6);
+    // All canvases reuse the bundled video; recording objects fit/crop it to fill.
+    expect((await store.background(180, 320, preset)).path).toBe(
+      background.path,
+    );
+    const source = path.join(root, "screen.mp4");
+    await runProcess(findBinary("ffmpeg"), [
+      "-y",
+      "-f",
+      "lavfi",
+      "-i",
+      "color=white:s=320x180:r=10:d=7",
+      "-c:v",
+      "libx264",
+      "-pix_fmt",
+      "yuv420p",
+      source,
+    ]);
+    const project = createProject();
+    project.canvas = {
+      width: 320,
+      height: 180,
+      fps: 10,
+      background: "#000000",
+    };
+    project.exportSettings = { encoder: "software" };
+    const styled = addRecordedAssets(
+      project,
+      [{ asset: await probeMedia(source), kind: "screen" }],
+      settings,
+      0,
+      background,
+    );
+    const archive = path.join(root, "grid.troncut");
+    await saveProject(styled, archive);
+    const reopened = await openProject(archive);
+    expect(reopened.clips[0].recording?.preset).toBe(preset);
+    expect(
+      reopened.clips.find((clip) => clip.recordingRole === "background"),
+    ).toMatchObject({
+      kind: "video",
+      loop: true,
+      duration: 7,
+      volume: 0,
+    });
+    const output = path.join(root, "recording.mp4");
+    await exportVideo(
+      reopened,
+      output,
+      path.join(root, "render"),
+      false,
+      AbortSignal.timeout(60000),
+      () => {},
+    );
+    const borders: Buffer[] = [];
+    for (const time of [0, 0.7, background.duration + 0.7]) {
+      const frame = path.join(root, `frame-${time}.png`);
+      await runProcess(findBinary("ffmpeg"), [
+        "-y",
+        "-ss",
+        String(time),
+        "-i",
+        output,
+        "-frames:v",
+        "1",
+        frame,
+      ]);
+      const border = await sharp(frame)
+        .extract({ left: 0, top: 0, width: 320, height: 30 })
+        .removeAlpha()
+        .raw()
+        .toBuffer();
+      expect(Math.min(...border)).toBeLessThanOrEqual(4);
+      expect(Math.max(...border)).toBeGreaterThan(15);
+      expect(Math.max(...border)).toBeLessThan(100);
+      borders.push(border);
+    }
+    const difference = (a: Buffer, b: Buffer) =>
+      a.reduce((sum, value, index) => sum + Math.abs(value - b[index]), 0) /
+      a.length;
+    expect(difference(borders[0], borders[1])).toBeGreaterThan(0.2);
+    expect(difference(borders[1], borders[2])).toBeLessThan(2);
+  },
+  90000,
+);

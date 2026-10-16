@@ -154,10 +154,34 @@ try {
   const background = page.getByLabel("录屏对象背景", { exact: true });
   await expect(background).toHaveAttribute("data-value", "violet");
   await expect(page.getByLabel("背景图库")).toHaveCount(0);
-  await selectPreview(page, "录屏对象背景", "perspective-grid");
-  await expect(
-    page.getByAltText("透视网格（黑）", { exact: true }),
-  ).toBeVisible();
+  for (const preset of [
+    "perspective-grid",
+    "moving-grid",
+    "moving-dots",
+    "wave-dots",
+  ]) {
+    await selectPreview(page, "录屏对象背景", preset);
+    const video = page.locator(".recording-background-swatch > video");
+    await expect(video).toBeVisible();
+    await expect(video).toHaveAttribute("src", new RegExp(`${preset}\\.mp4$`));
+    await expect
+      .poll(() =>
+        video.evaluate(
+          (node) =>
+            node.readyState >= 2 &&
+            !node.paused &&
+            node.loop &&
+            node.muted &&
+            node.currentTime > 0.1,
+        ),
+      )
+      .toBe(true);
+    const time = await video.evaluate((node) => node.currentTime);
+    await expect
+      .poll(() => video.evaluate((node) => node.currentTime))
+      .toBeGreaterThan(time + 0.15);
+    await page.screenshot({ path: path.join(root, `${preset}.png`) });
+  }
   await selectPreview(page, "录屏对象背景", "mint");
   await expect(
     page.locator(".recording-background-swatch > div"),
@@ -197,7 +221,7 @@ try {
   await expect(page.locator(".recording-background-swatch")).toHaveCount(0);
   await selectPreview(page, "录屏对象背景", "perspective-grid");
   await expect(
-    page.getByAltText("透视网格（黑）", { exact: true }),
+    page.locator(".recording-background-swatch > video"),
   ).toBeVisible();
   await expect(
     page.getByRole("button", { name: "取消组合", exact: true }),
@@ -223,10 +247,9 @@ try {
   await expect(
     page.getByRole("img", { name: "录屏组合", exact: true }),
   ).toHaveCount(0);
-  await expect(page.locator(".timeline-clip.video")).toHaveCSS(
-    "background-color",
-    "rgb(53, 74, 61)",
-  );
+  await expect(
+    page.locator(".timeline-clip.video").filter({ hasText: asset.name }),
+  ).toHaveCSS("background-color", "rgb(53, 74, 61)");
   await expect(
     page.getByRole("tab", { name: "录屏", exact: true }),
   ).toHaveCount(0);
