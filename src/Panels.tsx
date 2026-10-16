@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { type Asset, type Clip, textPresets, defaultTransform } from "../shared/model";
 import { createTransformSampler } from "../shared/editor";
+import { dimensionTransform } from "../shared/canvas";
 import type { Capabilities } from "../shared/bridge";
 import type { Editor } from "./useEditor";
 import { timeLabel } from "./Preview";
@@ -447,12 +448,16 @@ export function Inspector({ editor }: { editor: Editor }) {
   const resize = (axis: "width" | "height", pixels: number) => {
     if (!c || locked) return;
     if (c.kind === "text" && editor.selectedKeyframe?.clipId !== c.id) {
-      const dimension = pixels / value.scale;
+      const dimension =
+        pixels / (value.scale * (value[axis === "width" ? "scaleX" : "scaleY"] ?? 1));
       if (dimension >= 16 && dimension <= 32768)
         update({ textBox: { ...size, [axis]: dimension } });
     } else {
-      const scale = pixels / size[axis];
-      if (scale >= 0.05 && scale <= 8) transform("scale", scale);
+      const patch = dimensionTransform(
+        value, size, axis, pixels,
+        c.kind === "text" || c.lockAspectRatio !== false,
+      );
+      if (patch) editor.updateTransform(c.id, patch);
     }
   };
   const numberField = (
@@ -746,6 +751,7 @@ export function Inspector({ editor }: { editor: Editor }) {
                     clip={c} value={value} canvas={editor.project.canvas} size={size}
                     editingContent={!!editingContent} content={content} disabled={locked}
                     onTransform={transform} onContentOrFrame={contentOrFrame} onResize={resize}
+                    onToggleAspectRatio={() => update({ lockAspectRatio: c.lockAspectRatio === false })}
                     onPosition={(position) => {
                       if (!locked) editor.updateTransform(c.id, position);
                     }}

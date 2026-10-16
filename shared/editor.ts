@@ -10,7 +10,12 @@ import {
 } from "./model";
 import { sameTransform } from "./animation-ranges";
 import { easeProgress } from "./easing";
-import { normalizeRotationAxes, optionalTransformKeys } from "./rotation";
+import {
+  normalizeRotationAxes,
+  optionalTransformKeys,
+  optionalTransformDefault,
+  axisScaleKeys,
+} from "./rotation";
 import { visualKeys, visualValues } from "./visual-state";
 import { fitBehaviorDuration } from "./behaviors";
 import { markerEnd } from "./markers";
@@ -132,7 +137,9 @@ export function createTransformSampler(
     clip.rotation !== undefined ||
     clip.transform.rotation !== undefined ||
     frames.some((frame) => frame.value.rotation !== undefined);
-  const axes = (["rotationX", "rotationY", "skew", "z"] as const).filter(
+  const axes = (
+    ["rotationX", "rotationY", "skew", "z", ...axisScaleKeys] as const
+  ).filter(
     (key) =>
       clip.transform[key] !== undefined ||
       frames.some((frame) => frame.value[key] !== undefined),
@@ -151,7 +158,10 @@ export function createTransformSampler(
         }
       : {}),
     ...Object.fromEntries(
-      axes.map((key) => [key, value[key] ?? clip.transform[key] ?? 0]),
+      axes.map((key) => [
+        key,
+        value[key] ?? clip.transform[key] ?? optionalTransformDefault(key),
+      ]),
     ),
     ...(hasVisual ? visualValues(clip, value) : {}),
   });
@@ -190,6 +200,8 @@ export function createTransformSampler(
           return [k, start + (end - start) * ease];
         }),
       ) as Transform;
+      for (const key of axisScaleKeys)
+        if (value[key] !== undefined) value[key] = Math.max(0.05, value[key]!);
       return {
         ...value,
         scale: Math.max(0.05, value.scale),

@@ -169,6 +169,8 @@ export function pasteAnimation(
     x: [-4, 4],
     y: [-4, 4],
     scale: [0.05, 8],
+    scaleX: [0.05, 8],
+    scaleY: [0.05, 8],
     opacity: [0, 1],
     rotation: [-3600, 3600],
     rotationX: [-3600, 3600],
@@ -190,8 +192,11 @@ export function pasteAnimation(
       copied.to[key] === undefined
     )
       continue;
+    const fallback = key === "scaleX" || key === "scaleY" ? 1 : 0;
     const value =
-      (from[key] ?? 0) + (copied.to[key] ?? 0) - (copied.from[key] ?? 0);
+      (from[key] ?? fallback) +
+      (copied.to[key] ?? fallback) -
+      (copied.from[key] ?? fallback);
     to[key] = Math.max(bounds[key][0], Math.min(bounds[key][1], value));
   }
   if (visualKeys.some((key) => to[key] !== undefined))

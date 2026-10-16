@@ -134,9 +134,11 @@ function baseExpression(
     clip.transform[key] ??
     (key === "rotation"
       ? (clip.rotation ?? 0)
-      : visualKeys.includes(key as (typeof visualKeys)[number])
-        ? visualDefaults(clip)[key as (typeof visualKeys)[number]]
-        : 0);
+      : key === "scaleX" || key === "scaleY"
+        ? 1
+        : visualKeys.includes(key as (typeof visualKeys)[number])
+          ? visualDefaults(clip)[key as (typeof visualKeys)[number]]
+          : 0);
   const frameValue = (value: Transform) => value[key] ?? baseValue;
   if (!frames.length) return String(baseValue);
   if (frames[0].time > 0) frames.unshift({ time: 0, value: clip.transform });
@@ -158,7 +160,7 @@ function baseExpression(
   const value = `if(lt(${clock},${origin + frames[0].time}),${frameValue(frames[0].value)},${result})`;
   return key === "opacity"
     ? `clip(${value},0,1)`
-    : key === "scale" || key === "contentScale"
+    : ["scale", "contentScale", "scaleX", "scaleY"].includes(key)
       ? `max(0.05,${value})`
       : value;
 }
@@ -542,7 +544,7 @@ async function renderProject(
       const pose = (key: keyof Transform, name = "t") =>
         expression(clip, key, clock(name));
       const scale = `(${pose("scale")})*2000/(2000-clip((${pose("z")}),-10000,1000))`;
-      const transform = `scale=w='max(2,trunc(${cropWidth * fit}*(${scale})/2)*2)':h='max(2,trunc(${cropHeight * fit}*(${scale})/2)*2)':eval=frame`;
+      const transform = `scale=w='max(2,trunc(${cropWidth * fit}*(${scale})*(${pose("scaleX")})/2)*2)':h='max(2,trunc(${cropHeight * fit}*(${scale})*(${pose("scaleY")})/2)*2)':eval=frame`;
       // Per-glyph motion is already rasterized. Only run outer-frame filters
       // for channels that actually contain object motion.
       const objectMotion = objectBehaviorExpressions(clip, clock("t"));
@@ -631,8 +633,16 @@ async function renderProject(
         fit,
         animatedViewport ? (key) => pose(key, "T") : undefined,
       );
+      // An implicit RGBA -> YUVA converter can retain the first frame's size.
+      // Negotiate that conversion on an explicit frame-evaluated scale filter
+      // for axis-scaled layers, including later proportional animations.
+      const independentScale =
+        clip.transform.scaleX !== undefined || clip.transform.scaleY !== undefined ||
+        clip.keyframes.some((frame) => frame.value.scaleX !== undefined || frame.value.scaleY !== undefined);
+      const outputFormat = independentScale
+        ? ["scale=w=iw:h=ih:eval=frame", "format=yuva420p"] : [];
       filters.push(
-        `[${source}]${timing}${animatedText ? `fps=${fps},` : ""}format=rgba,${[...(animatedViewport ? animatedViewportFilters((key) => pose(key, "T")) : contentFilters(clip)), ...visualEffects, ...frameFilters, transform, "setsar=1", ...rotate, alpha].join(",")}[${visual}]`,
+        `[${source}]${timing}${animatedText ? `fps=${fps},` : ""}format=rgba,${[...(animatedViewport ? animatedViewportFilters((key) => pose(key, "T")) : contentFilters(clip)), ...visualEffects, ...frameFilters, transform, "setsar=1", ...rotate, alpha, ...outputFormat].join(",")}[${visual}]`,
       );
       // Composite text before chroma subsampling so rounded fills and glyphs
       // retain the same pixel position in video and frame captures.

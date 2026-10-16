@@ -1,4 +1,4 @@
-import { AlignCenter, LockKeyhole, RotateCcw } from "lucide-react";
+import { AlignCenter, LockKeyhole, Unlock, RotateCcw } from "lucide-react";
 import type { Clip, Transform } from "../shared/model";
 import { framePosition } from "../shared/canvas";
 import {
@@ -32,6 +32,7 @@ export default function FrameTransformProperties({
   onResize,
   onCenter,
   onPosition,
+  onToggleAspectRatio,
 }: {
   clip: Clip;
   value: Transform;
@@ -45,6 +46,7 @@ export default function FrameTransformProperties({
   onResize: (axis: "width" | "height", pixels: number) => void;
   onCenter: () => void;
   onPosition: (position: Pick<Transform, "x" | "y">) => void;
+  onToggleAspectRatio: () => void;
 }) {
   const positions = editingContent
     ? [content.x * 100, content.y * 100]
@@ -195,7 +197,13 @@ export default function FrameTransformProperties({
               min={1}
               max={262144}
               step={0.1}
-              value={Number((size[axis] * value.scale).toFixed(3))}
+              value={Number(
+                (
+                  size[axis] *
+                  value.scale *
+                  (value[axis === "width" ? "scaleX" : "scaleY"] ?? 1)
+                ).toFixed(3),
+              )}
               disabled={disabled || editingContent}
               onChange={(event) => {
                 const pixels = Number(event.target.value);
@@ -206,9 +214,25 @@ export default function FrameTransformProperties({
           </label>
         ))}
         {clip.kind !== "text" && (
-          <span className="dimension-lock" title="宽高保持比例">
-            <LockKeyhole size={13} />
-          </span>
+          <button
+            type="button"
+            className="dimension-lock"
+            aria-label="锁定宽高比例"
+            aria-pressed={clip.lockAspectRatio !== false}
+            title={
+              clip.lockAspectRatio !== false
+                ? "解锁宽高比例，可分别调整宽高"
+                : "锁定宽高比例"
+            }
+            disabled={disabled || editingContent}
+            onClick={onToggleAspectRatio}
+          >
+            {clip.lockAspectRatio !== false ? (
+              <LockKeyhole size={13} />
+            ) : (
+              <Unlock size={13} />
+            )}
+          </button>
         )}
       </div>
       {!editingContent && (

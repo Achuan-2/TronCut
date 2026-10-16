@@ -252,7 +252,7 @@ function PreviewLayer({
     left: `${displayed.x * 100}%`,
     top: `${displayed.y * 100}%`,
     opacity: editing ? 1 : displayed.opacity * fadeOpacity(clip, localTime),
-    transform: `translate(-50%, -50%) rotateZ(${displayed.rotation ?? clip.rotation ?? 0}deg) rotateY(${displayed.rotationY ?? 0}deg) rotateX(${displayed.rotationX ?? 0}deg) scale(${displayed.scale * depthScale(displayed.z)}) skewX(${displayed.skew ?? 0}deg)`,
+    transform: `translate(-50%, -50%) rotateZ(${displayed.rotation ?? clip.rotation ?? 0}deg) rotateY(${displayed.rotationY ?? 0}deg) rotateX(${displayed.rotationX ?? 0}deg) scale(${displayed.scale * depthScale(displayed.z)}) skewX(${displayed.skew ?? 0}deg) scale(${displayed.scaleX ?? 1}, ${displayed.scaleY ?? 1})`,
     "--canvas-scale": scale,
   } as CSSProperties;
   if (textBox) {
@@ -449,6 +449,7 @@ function PreviewLayer({
                 },
                 project.canvas,
                 gesture.original.rotation ?? clip.rotation,
+                clip.lockAspectRatio !== false,
               )
             : {
                 ...gesture.original,
@@ -488,6 +489,8 @@ function PreviewLayer({
           (drag.original.x !== drag.value.x ||
             drag.original.y !== drag.value.y ||
             drag.original.scale !== drag.value.scale ||
+            (drag.original.scaleX ?? 1) !== (drag.value.scaleX ?? 1) ||
+            (drag.original.scaleY ?? 1) !== (drag.value.scaleY ?? 1) ||
             (drag.box &&
               (drag.box.width !== drag.originalBox?.width ||
                 drag.box.height !== drag.originalBox?.height)))
@@ -498,7 +501,13 @@ function PreviewLayer({
               x: drag.value.x,
               y: drag.value.y,
               ...(drag.mode === "resize" && !drag.box
-                ? { scale: drag.value.scale }
+                ? {
+                    scale: drag.value.scale,
+                    ...(drag.value.scaleX === undefined
+                      ? {} : { scaleX: drag.value.scaleX }),
+                    ...(drag.value.scaleY === undefined
+                      ? {} : { scaleY: drag.value.scaleY }),
+                  }
                 : {}),
             },
             drag.box ? { textBox: drag.box } : {},
@@ -679,12 +688,14 @@ function PreviewLayer({
                 ? "拖动边缘裁剪素材"
                 : clip.kind === "text"
                   ? "拖动调整文本框尺寸"
-                  : "拖动调整尺寸（保持比例）"
+                  : clip.lockAspectRatio === false
+                    ? "拖动独立调整宽高"
+                    : "拖动调整尺寸（保持比例）"
             }
             style={{
               left: `${(handle.x + 1) * 50}%`,
               top: `${(handle.y + 1) * 50}%`,
-              transform: `translate(-50%, -50%) scale(${1 / (displayed.scale * depthScale(displayed.z) * cameraScale)})`,
+              transform: `translate(-50%, -50%) scale(${1 / (displayed.scale * (displayed.scaleX ?? 1) * depthScale(displayed.z) * cameraScale)}, ${1 / (displayed.scale * (displayed.scaleY ?? 1) * depthScale(displayed.z) * cameraScale)})`,
             }}
             onPointerDown={(event) => {
               if (event.button !== 0) return;

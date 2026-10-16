@@ -1,5 +1,9 @@
 import type { Clip, Transform } from "./model";
-import { normalizeRotationAxes, optionalTransformKeys } from "./rotation";
+import {
+  normalizeRotationAxes,
+  optionalTransformKeys,
+  axisScaleKeys,
+} from "./rotation";
 import { visualKeys, visualDefaults } from "./visual-state";
 const defaultVisual = visualDefaults({});
 
@@ -14,6 +18,12 @@ export function sameTransform(
       (key) => Math.abs(a[key] - b[key]) < 1e-9,
     ) &&
     Math.abs((a.rotation ?? rotation) - (b.rotation ?? rotation)) < 1e-9 &&
+    axisScaleKeys.every(
+      (key) =>
+        Math.abs(
+          (a[key] ?? fallback[key] ?? 1) - (b[key] ?? fallback[key] ?? 1),
+        ) < 1e-9,
+    ) &&
     (["rotationX", "rotationY", "skew", "z"] as const).every(
       (key) =>
         Math.abs(

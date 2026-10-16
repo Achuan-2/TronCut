@@ -45,6 +45,8 @@ export const transformSchema = z.object({
   x: finite.min(-4).max(4),
   y: finite.min(-4).max(4),
   scale: finite.min(0.05).max(8),
+  scaleX: finite.min(0.05).max(8).optional(),
+  scaleY: finite.min(0.05).max(8).optional(),
   opacity: finite.min(0).max(1),
 });
 const cameraTransformSchema = transformSchema
@@ -168,6 +170,7 @@ export const projectSchema = z.object({
           })
           .optional(),
         autoResizeText: z.boolean().optional(),
+        lockAspectRatio: z.boolean().optional(),
         volume: finite.min(0).max(4),
         podcast: z.boolean(),
         shape: z.enum(["rectangle", "ellipse", "arrow"]).optional(),

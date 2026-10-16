@@ -2623,7 +2623,7 @@ fieldset:disabled {
 .dimension-controls { position: relative; padding: 6px 22px 3px 0; }
 .dimension-axis { display: flex; justify-content: space-between; align-items: center; margin: 7px 0; }
 .dimension-axis > input { width: 64px; text-align: right; padding: 4px; }
-.dimension-lock { position: absolute; right: 90px; top: 23px; color: #a8b4ba; border-left: 1px solid #64727a; padding: 3px 1px; }
+.dimension-lock { position: absolute; right: 90px; top: 23px; color: #a8b4ba; border: 0; padding: 3px; }
 .visual-effect-card > span {
   font-size: 11px;
   color: var(--muted);

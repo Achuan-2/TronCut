@@ -20,6 +20,20 @@ export const resizeHandles = [
 const clamp = (value: number, min: number, max: number) =>
   Math.max(min, Math.min(max, value));
 
+export function dimensionTransform(
+  value: Transform,
+  size: { width: number; height: number },
+  axis: "width" | "height",
+  pixels: number,
+  lockAspectRatio: boolean,
+): Partial<Transform> | null {
+  const key = axis === "width" ? "scaleX" : "scaleY";
+  const scale =
+    pixels / (size[axis] * (lockAspectRatio ? (value[key] ?? 1) : value.scale));
+  if (!Number.isFinite(scale) || scale < 0.05 || scale > 8) return null;
+  return lockAspectRatio ? { scale } : { [key]: scale };
+}
+
 // Align the projected frame bounds, including scale, rotation, skew and depth.
 export function framePosition(
   value: Transform,
@@ -41,7 +55,7 @@ export function framePosition(
 }
 
 // Delta and size are measured in source canvas pixels, before preview/camera zoom.
-// Keep the opposite handle anchored while preserving aspect ratio and rotation.
+// Keep the opposite handle anchored; the lock controls proportional resizing.
 export function resizeTransform(
   value: Transform,
   delta: { x: number; y: number },
@@ -49,8 +63,40 @@ export function resizeTransform(
   size: { width: number; height: number },
   canvas: { width: number; height: number },
   rotation = 0,
+  lockAspectRatio = true,
 ): Transform {
   const { x: dx, y: dy } = localDelta(value, delta, rotation);
+  if (!lockAspectRatio) {
+    const beforeX = value.scaleX ?? 1,
+      beforeY = value.scaleY ?? 1;
+    const scaleX = clamp(
+      beforeX +
+        (dx * beforeX * handle.x) / Math.max(1, size.width * value.scale),
+      0.05,
+      8,
+    );
+    const scaleY = clamp(
+      beforeY +
+        (dy * beforeY * handle.y) / Math.max(1, size.height * value.scale),
+      0.05,
+      8,
+    );
+    const shift = projectDelta(
+      { ...value, scaleX: 1, scaleY: 1 },
+      {
+        x: (handle.x * size.width * value.scale * (scaleX - beforeX)) / 2,
+        y: (handle.y * size.height * value.scale * (scaleY - beforeY)) / 2,
+      },
+      rotation,
+    );
+    return {
+      ...value,
+      scaleX,
+      scaleY,
+      x: clamp(value.x + shift.x / canvas.width, -4, 4),
+      y: clamp(value.y + shift.y / canvas.height, -4, 4),
+    };
+  }
   const vx = handle.x * size.width,
     vy = handle.y * size.height;
   const scale = clamp(
