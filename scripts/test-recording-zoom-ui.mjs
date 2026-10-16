@@ -37,7 +37,7 @@ await runProcess(findBinary("ffmpeg"), [
   "-f",
   "lavfi",
   "-i",
-  "testsrc2=s=320x180:r=10:d=8",
+  "testsrc2=s=320x180:r=10:d=14",
   "-c:v",
   "libx264",
   "-pix_fmt",
@@ -46,7 +46,12 @@ await runProcess(findBinary("ffmpeg"), [
 ]);
 const asset = await probeMedia(source);
 asset.cursor = {
-  samples: [{ time: 2, x: 0.7, y: 0.5, click: true, visible: true }],
+  samples: [
+    { time: 4, x: 0.2, y: 0.5, click: true, visible: true },
+    { time: 5, x: 0.2, y: 0.5, click: false, visible: true },
+    { time: 6, x: 0.8, y: 0.5, click: true, visible: true },
+    { time: 7, x: 0.2, y: 0.5, click: false, visible: true },
+  ],
 };
 const project = addRecordedAssets(
   createProject("录屏缩放编辑验收"),
@@ -54,6 +59,29 @@ const project = addRecordedAssets(
   { ...defaultRecordingSettings, background: false, zoom: 2 },
   0,
 );
+if (process.argv.includes("--legacy")) {
+  const clip = project.clips[0];
+  const incomingEnd = clip.keyframes.findLast(
+    (frame) => frame.recordingMotion === "zoom-in",
+  ).time;
+  // Reproduce the old reducer's missing hold boundary and two broad groups.
+  clip.keyframes = clip.keyframes
+    .filter(
+      (frame, index) =>
+        index === 0 ||
+        index === clip.keyframes.length - 1 ||
+        frame.recordingSegment,
+    )
+    .map((frame) => ({
+      ...frame,
+      recordingMotion: undefined,
+      recordingSegment: frame.recordingSegment
+        ? frame.time <= incomingEnd
+          ? 1
+          : 2
+        : undefined,
+    }));
+}
 await fs.writeFile(
   path.join(profile, "recovery.json"),
   JSON.stringify({ project, file: null }),
@@ -75,7 +103,26 @@ try {
   const zoom = page.getByLabel("缩放 (%)", { exact: true });
   const pan = page.getByLabel("内容位置 X (%)", { exact: true });
   const cropMode = page.getByRole("button", { name: "裁剪模式", exact: true });
-  await expect(arrows).toHaveCount(2);
+  await expect(arrows).toHaveCount(4);
+  expect(
+    Number(await arrows.first().getAttribute("data-start")),
+  ).toBeGreaterThan(3);
+  const startTime = Number(await arrows.first().getAttribute("data-start"));
+  const startScale =
+    project.clips[0].keyframes.find(
+      (frame) => Math.abs(frame.time - startTime) < 1e-6,
+    ).value.contentScale * 100;
+  await expect(
+    arrows.filter({ has: page.locator(".animation-arrow[title^='平移']") }),
+  ).toHaveCount(2);
+  expect(
+    await arrows.evaluateAll((items) =>
+      items.map((item) => item.dataset.motion),
+    ),
+  ).toEqual(["zoom-in", "pan", "pan", "zoom-out"]);
+  await page.screenshot({
+    path: path.join(root, "recording-motion-arrows.png"),
+  });
   const arrowCount = await arrows.count();
   await video.click();
   for (const name of ["编辑缩放与移动", "根据鼠标重新生成缩放", "移除自动缩放"])
@@ -112,7 +159,7 @@ try {
   await page.getByTitle("重做 Ctrl+Shift+Z", { exact: true }).click();
   await expect(pan).toHaveValue("-30");
   await arrows.first().locator(".animation-point.start").click({ force: true });
-  await expect(zoom).toHaveValue("100");
+  expect(Number(await zoom.inputValue())).toBeCloseTo(startScale, 2);
   await arrows.last().locator(".animation-point.end").click();
   await expect(zoom).toHaveValue("100");
   // Retiming uses the same editable arrows as manually created animations.
@@ -159,6 +206,7 @@ try {
     .locator(".recent-project")
     .filter({ hasText: project.name })
     .click();
+  await video.click({ position: { x: 30, y: 10 } });
   await arrows.first().locator(".animation-point.end").click();
   await expect(cropMode).toHaveAttribute("aria-pressed", "true");
   await expect(zoom).toHaveValue("250");

@@ -6,6 +6,7 @@ import {
 } from "./rotation";
 import { visualKeys, visualDefaults } from "./visual-state";
 import { maskKeys, maskDefaults, maskValues } from "./mask-state";
+import { recordingMotionSpans, type RecordingMotion } from "./recording-motion";
 const defaultVisual = visualDefaults({});
 const defaultMask = maskDefaults({});
 
@@ -71,6 +72,7 @@ export interface AnimationRange {
   end: number;
   hasStart: boolean;
   hasEnd: boolean;
+  motion?: RecordingMotion;
 }
 
 /** Ranges from animationRanges are ordered and do not overlap. Keep the global
@@ -110,15 +112,45 @@ export type AnimationDragMode = "start" | "end" | "move";
 
 /** Destination samples with one ID form a single editable recording animation. */
 export function recordingSegments(frames: Clip["keyframes"]) {
-  const groups: { id: number; start: number; end: number }[] = [];
+  const groups: {
+    id: number;
+    start: number;
+    end: number;
+    motion?: RecordingMotion;
+  }[] = [];
   for (let i = 1; i < frames.length; i++) {
     const id = frames[i].recordingSegment;
     if (!id) continue;
     const last = groups.at(-1);
     if (last?.id === id && last.end === i - 1) last.end = i;
-    else groups.push({ id, start: i - 1, end: i });
+    else
+      groups.push({
+        id,
+        start: i - 1,
+        end: i,
+        motion: frames[i].recordingMotion,
+      });
   }
-  return groups;
+  return groups.flatMap((group) => {
+    // New paths carry explicit phase boundaries, and pasted animations keep
+    // their user-defined range. Reinterpret legacy two-arrow shots read-only.
+    if (frames[group.end].animation || frames[group.end].recordingMotion)
+      return [group];
+    const samples = frames.slice(group.start, group.end + 1).map((frame) => ({
+      time: frame.time,
+      x: frame.value.contentX ?? frame.value.x,
+      y: frame.value.contentY ?? frame.value.y,
+      scale: frame.value.contentScale ?? frame.value.scale,
+    }));
+    return recordingMotionSpans(samples)
+      .filter((span) => span.motion)
+      .map((span) => ({
+        id: group.id,
+        start: group.start + span.start,
+        end: group.start + span.end,
+        motion: span.motion,
+      }));
+  });
 }
 
 export function retimeAnimation(
@@ -363,38 +395,32 @@ export function animationRanges(
   if (frames[0]?.time > 0) frames.unshift({ time: 0, value: clip.transform });
   const offset = clip.animationOffset ?? 0;
   const ranges: AnimationRange[] = [];
+  const groups = new Map(
+    recordingSegments(frames).map((group) => [group.start + 1, group]),
+  );
   for (let i = 1; i < frames.length; i++) {
     const a = frames[i - 1],
       b = frames[i];
+    const group = groups.get(i);
+    if (b.recordingZoom && !group && !b.animation) continue;
     const unchanged = sameTransform(
       a.value,
       b.value,
       clip.transform.rotation ?? clip.rotation ?? 0,
       clip.transform,
     );
-    if (!(b.time > a.time) || (unchanged && !b.animation)) continue;
+    if (!(b.time > a.time) || (unchanged && !b.animation && !group)) continue;
+    if (group) i = group.end;
     const start = a.time - offset,
-      end = b.time - offset;
+      end = frames[i].time - offset;
     if (end <= 0 || start >= clip.duration) continue;
     ranges.push({
       start: Math.max(0, start),
       end: Math.min(clip.duration, end),
       hasStart: start >= 0,
       hasEnd: end <= clip.duration,
+      ...(group?.motion ? { motion: group.motion } : {}),
     });
-    if (
-      b.recordingSegment &&
-      frames[i + 1]?.recordingSegment === b.recordingSegment
-    ) {
-      while (
-        i + 1 < frames.length &&
-        frames[i + 1].recordingSegment === b.recordingSegment
-      )
-        i++;
-      const last = ranges.at(-1)!;
-      last.end = Math.min(clip.duration, frames[i].time - offset);
-      last.hasEnd = frames[i].time - offset <= clip.duration;
-    }
   }
   return ranges;
 }

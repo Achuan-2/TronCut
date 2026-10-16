@@ -235,8 +235,10 @@ export function TimelineAnimations({
           const start = clip.start + range.start,
             end = clip.start + range.end;
           const width = (range.end - range.start) * zoom;
-          const sharedStart = index > 0 && Math.abs(ranges[index - 1].end - range.start) < 1e-6;
-          const sharedEnd = index + 1 < ranges.length && Math.abs(ranges[index + 1].start - range.end) < 1e-6;
+          const motion = range.motion ? { "zoom-in": "放大", "zoom-out": "缩小", pan: "平移" }[range.motion] : "动画";
+          // Nearby endpoints also need separate hit targets at the current zoom.
+          const sharedStart = index > 0 && (range.start - ranges[index - 1].end) * zoom < 12;
+          const sharedEnd = index + 1 < ranges.length && (ranges[index + 1].start - range.end) * zoom < 12;
           const head = range.hasEnd ? Math.min(12, width * 0.4) : 0;
           const active = selected && Math.abs(playhead - end) <= 0.5 / fps;
           const startSelected =
@@ -261,13 +263,14 @@ export function TimelineAnimations({
               }}
               data-start={start}
               data-end={end}
+              data-motion={range.motion}
               style={{ left: range.start * zoom, width }}
             >
               <button
                 type="button"
                 className="animation-arrow"
-                aria-label={`动画 ${timeLabel(start)} 至 ${timeLabel(end)}`}
-                title={`${timeLabel(start)} → ${timeLabel(end)} · 持续 ${timeLabel(end - start)}`}
+                aria-label={`${motion} ${timeLabel(start)} 至 ${timeLabel(end)}`}
+                title={`${motion} · ${timeLabel(start)} → ${timeLabel(end)} · 持续 ${timeLabel(end - start)}`}
                 onPointerDown={(event) => begin(event, range, "move", index)}
                 onClick={(event) => click(event, end, "end")}
               >

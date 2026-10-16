@@ -165,6 +165,7 @@ export const projectSchema = z.object({
               animation: z.literal(true).optional(),
               recordingZoom: z.literal(true).optional(),
               recordingSegment: z.number().int().positive().optional(),
+              recordingMotion: z.enum(["zoom-in", "zoom-out", "pan"]).optional(),
               zoomPan: cameraTransformSchema.optional(),
             }),
           )

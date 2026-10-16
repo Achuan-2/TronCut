@@ -11,6 +11,7 @@ import {
 } from "./recordly/motionSmoothing";
 import { computeRegionStrength } from "./recordly/zoomRegionUtils";
 import type { CursorTelemetryPoint, ZoomRegion } from "./recordly/types";
+import { recordingMotionSpans, type RecordingPose } from "./recording-motion";
 
 /** Convert native samples to Recordly telemetry without losing click edges. */
 export function recordingTelemetry(
@@ -49,7 +50,7 @@ export function recordingTelemetry(
     .sort((a, b) => a.timeMs - b.timeMs);
 }
 
-type Pose = { time: number; x: number; y: number; scale: number };
+type Pose = RecordingPose;
 /** Bound linear interpolation error, avoiding one editable arrow per video frame. */
 function simplify(points: Pose[], tolerance = 0.001): Pose[] {
   if (points.length < 3) return points;
@@ -158,45 +159,49 @@ export function recordingCameraFrames(
       pose.scale = 1 + (pose.scale - 1) * weight;
     }
   }
-  let reduced = simplify(poses);
-  // Stay inside the project's editable-keyframe limit for unusually busy sessions.
-  for (let tolerance = 0.002; reduced.length > 9900; tolerance *= 2)
-    reduced = simplify(poses, tolerance);
-  const frames: Clip["keyframes"] = reduced.map((pose) => ({
-    time: pose.time,
-    value: {
-      ...clip.transform,
-      contentX: pose.x || 0,
-      contentY: pose.y || 0,
-      contentScale: pose.scale,
-    },
-    easing: "linear" as const,
-    recordingZoom: true as const,
-  }));
-  // Expose two editable arrows per shot; dense spring samples remain inside
-  // those ranges instead of overlapping dozens of tiny endpoint handles.
-  let segment = 0;
-  for (let i = 1; i < frames.length; i++) {
-    if ((frames[i].value.contentScale ?? 1) <= 1) continue;
-    const start = i - 1;
-    let end = i,
-      peak = i;
-    while (
-      end < frames.length - 1 &&
-      (frames[end].value.contentScale ?? 1) > 1
-    ) {
-      if (
-        (frames[end].value.contentScale ?? 1) >
-        (frames[peak].value.contentScale ?? 1)
-      )
-        peak = end;
-      end++;
+  // Simplify each motion/hold separately: simplifying a whole shot removes its
+  // last still sample and makes an arrow appear to start before the camera moves.
+  let spans = recordingMotionSpans(poses);
+  const reduce = (tolerance: number) => {
+    const frames: Clip["keyframes"] = [];
+    let segment = 0;
+    for (const span of spans) {
+      const reduced = simplify(
+        poses.slice(span.start, span.end + 1),
+        tolerance,
+      );
+      if (span.motion) segment++;
+      for (let i = frames.length ? 1 : 0; i < reduced.length; i++) {
+        const pose = reduced[i];
+        frames.push({
+          time: pose.time,
+          value: {
+            ...clip.transform,
+            contentX: pose.x || 0,
+            contentY: pose.y || 0,
+            contentScale: pose.scale,
+          },
+          easing: "linear" as const,
+          recordingZoom: true as const,
+          ...(span.motion && i > 0
+            ? { recordingSegment: segment, recordingMotion: span.motion }
+            : {}),
+        });
+      }
     }
-    const incoming = ++segment,
-      outgoing = ++segment;
-    for (let j = start + 1; j <= end; j++)
-      frames[j].recordingSegment = j <= peak ? incoming : outgoing;
-    i = end;
+    return frames;
+  };
+  let frames = reduce(0.001);
+  // Busy recordings can exceed the project limit from boundaries alone. Raise
+  // the display threshold only in that case, then simplify the original poses.
+  let minimumSpeed = 0.002;
+  for (let tolerance = 0.002; frames.length > 9900; tolerance *= 2) {
+    if (tolerance > 1) {
+      minimumSpeed *= 2;
+      spans = recordingMotionSpans(poses, minimumSpeed);
+      tolerance = 0.001;
+    }
+    frames = reduce(tolerance);
   }
   return frames;
 }
