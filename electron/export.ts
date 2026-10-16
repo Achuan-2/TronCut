@@ -1,4 +1,5 @@
 import fs from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 import sharp from "sharp";
 import {
@@ -417,7 +418,7 @@ async function renderProject(
     "-y",
     "-hide_banner",
     "-filter_complex_threads",
-    "1",
+    String(Math.max(1, Math.min(8, os.cpus().length))),
     "-f",
     "lavfi",
     "-i",
@@ -536,7 +537,9 @@ async function renderProject(
     else
       args.push(
         "-threads",
-        "1",
+        clip.loop || clip.speed !== 1
+          ? "1"
+          : String(Math.max(1, Math.min(4, os.cpus().length))),
         ...(clip.loop ? ["-stream_loop", "-1"] : []),
         ...(still || (seekInput && sourceSeek > 0)
           ? ["-ss", String(sourceSeek)]
@@ -580,15 +583,37 @@ async function renderProject(
       const alphaAnimated =
         objectMotion.opacity !== "1" ||
         clip.keyframes.some((k) => k.value.opacity !== clip.transform.opacity);
-      let alpha = alphaAnimated
-        ? `geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='alpha(X,Y)*(${pose("opacity", "T")})'`
-        : `colorchannelmixer=aa=${clip.transform.opacity}`;
       const { incoming, outgoing } = fadeDurations(clip);
       let regionOpacity = pose("opacity", "T");
-      if (incoming || outgoing) {
-        const fade = `min(1,min(${incoming ? `(${clock("T")}-${clip.start})/${incoming}` : "1"},${outgoing ? `(${clip.start + clip.duration}-${clock("T")})/${outgoing}` : "1"}))`;
-        alpha = `geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='alpha(X,Y)*(${pose("opacity", "T")})*max(0,${fade})'`;
-        regionOpacity = `(${regionOpacity})*max(0,${fade})`;
+      let alpha: string;
+      if (!alphaAnimated) {
+        const filters: string[] = [];
+        if (clip.transform.opacity !== 1) {
+          filters.push(`colorchannelmixer=aa=${clip.transform.opacity}`);
+        }
+        if (incoming) {
+          filters.push(`fade=t=in:st=${clip.start}:d=${incoming}:alpha=1`);
+        }
+        if (outgoing) {
+          filters.push(
+            `fade=t=out:st=${clip.start + clip.duration - outgoing}:d=${outgoing}:alpha=1`,
+          );
+        }
+        alpha = filters.join(",") || "null";
+        if (incoming || outgoing) {
+          const fade = `min(1,min(${incoming ? `(${clock("T")}-${clip.start})/${incoming}` : "1"},${outgoing ? `(${clip.start + clip.duration}-${clock("T")})/${outgoing}` : "1"}))`;
+          regionOpacity = `(${regionOpacity})*max(0,${fade})`;
+        }
+      } else {
+        const fade =
+          incoming || outgoing
+            ? `*max(0,min(1,min(${incoming ? `(${clock("T")}-${clip.start})/${incoming}` : "1"},${outgoing ? `(${clip.start + clip.duration}-${clock("T")})/${outgoing}` : "1"})))`
+            : "";
+        alpha = `geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='alpha(X,Y)*(${pose("opacity", "T")})${fade}'`;
+        if (incoming || outgoing) {
+          const fadeExpr = `min(1,min(${incoming ? `(${clock("T")}-${clip.start})/${incoming}` : "1"},${outgoing ? `(${clip.start + clip.duration}-${clock("T")})/${outgoing}` : "1"}))`;
+          regionOpacity = `(${regionOpacity})*max(0,${fadeExpr})`;
+        }
       }
       // Keep the spotlight hole opaque; fade its inverted outside mask instead.
       if (clip.annotationEffect?.type === "spotlight") alpha = "null";
@@ -631,12 +656,44 @@ async function renderProject(
                 `rotate=${(rotation * Math.PI) / 180}:ow=rotw(${(rotation * Math.PI) / 180}):oh=roth(${(rotation * Math.PI) / 180}):c=none`,
               ]
             : [];
-      const recordingViewport = !still && clip.kind === "video" &&
-        clip.keyframes.length > 0 && clip.keyframes.every(frame => frame.recordingZoom) &&
-        !Object.values(clip.crop ?? {}).some(Boolean) &&
-        !clip.keyframes.some(frame =>
-          [frame.value.cropLeft, frame.value.cropTop, frame.value.cropRight, frame.value.cropBottom].some(Boolean)) &&
-        !clip.keyframes.some(frame => (frame.value.contentScale ?? 1) < 1);
+      const hasCrop =
+        Object.values(clip.crop ?? {}).some(Boolean) ||
+        clip.keyframes.some((frame) =>
+          [
+            frame.value.cropLeft,
+            frame.value.cropTop,
+            frame.value.cropRight,
+            frame.value.cropBottom,
+          ].some(Boolean),
+        ) ||
+        [
+          clip.transform.cropLeft,
+          clip.transform.cropTop,
+          clip.transform.cropRight,
+          clip.transform.cropBottom,
+        ].some(Boolean);
+      const hasContentScaleBelowOne =
+        (clip.contentTransform?.scale ?? 1) < 1 ||
+        (clip.transform.contentScale ?? 1) < 1 ||
+        clip.keyframes.some((frame) => (frame.value.contentScale ?? 1) < 1);
+      const hasContentMotion =
+        clip.keyframes.length > 0 &&
+        (clip.keyframes.some((frame) => frame.recordingZoom) ||
+          clip.keyframes.some(
+            (frame) =>
+              frame.value.contentScale !== undefined ||
+              frame.value.contentX !== undefined ||
+              frame.value.contentY !== undefined,
+          ) ||
+          clip.transform.contentScale !== undefined ||
+          clip.transform.contentX !== undefined ||
+          clip.transform.contentY !== undefined);
+      const recordingViewport =
+        !still &&
+        clip.kind === "video" &&
+        hasContentMotion &&
+        !hasCrop &&
+        !hasContentScaleBelowOne;
       // Captured screen frames are opaque. Keep cursor compositing and camera
       // sampling in 4:4:4 YUV, preserving cursor color detail until final output.
       const content = contentFilters(clip);
