@@ -31,7 +31,9 @@ describe("通用编号轨道与图片粘贴", () => {
     expect(reopened.tracks[1].height).toBeUndefined();
     expect(project.tracks[0].height).toBeUndefined();
     expect(setTrackHeight(changed, id, 136)).toBe(changed);
-    expect(setTrackHeight(project, id, 0).tracks[0].height).toBe(56);
+    const compact = setTrackHeight(project, id, 0);
+    expect(compact.tracks[0].height).toBe(32);
+    expect(validateProject(JSON.parse(JSON.stringify(compact))).tracks[0].height).toBe(32);
     expect(setTrackHeight(project, id, 1000).tracks[0].height).toBe(360);
     expect(setTrackHeight(project, id, NaN)).toBe(project);
   });

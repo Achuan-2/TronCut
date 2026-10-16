@@ -3388,6 +3388,25 @@ fieldset:disabled {
   padding: 0 3px;
   color: #647f6e;
 }
+.track-header.compact-track {
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px;
+}
+.track-header.compact-track > div:first-child {
+  min-width: 0;
+  gap: 4px;
+}
+.track-header.compact-track .track-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.track-header.compact-track .track-controls {
+  flex-shrink: 0;
+  gap: 2px;
+}
 .track-header.locked {
   background: #252725;
 }
@@ -3625,6 +3644,17 @@ fieldset:disabled {
 }
 .timeline-clip.has-animation .clip-detail {
   display: none;
+}
+.compact-track .clip-label {
+  height: 100%;
+  padding: 0 8px;
+}
+.compact-track .clip-detail,
+.compact-track .has-animation .clip-label {
+  display: none;
+}
+.compact-track .clip-animations {
+  bottom: 0;
 }
 .clip-animations {
   position: absolute;

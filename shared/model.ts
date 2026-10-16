@@ -128,7 +128,7 @@ export const projectSchema = z.object({
         solo: z.boolean().optional(),
         customName: z.boolean().optional(),
         captionTrack: z.boolean().optional(),
-        height: z.number().int().min(56).max(360).optional(),
+        height: z.number().int().min(32).max(360).optional(),
       }),
     )
     .max(128),

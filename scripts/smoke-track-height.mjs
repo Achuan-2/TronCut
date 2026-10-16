@@ -28,6 +28,10 @@ project.clips[0].behaviors = [
   createBehavior("fade", 5),
   createBehavior("pop", 5),
 ];
+project.clips[2].keyframes = [
+  { time: 0, value: { ...project.clips[2].transform } },
+  { time: 1, value: { ...project.clips[2].transform, x: 0.8 } },
+];
 const file = path.join(root, "project.troncut");
 await fs.writeFile(file, JSON.stringify(project));
 const env = {
@@ -125,7 +129,9 @@ try {
   await second.getByRole("separator").focus();
   await page.keyboard.press("ArrowUp");
   await page.keyboard.press("ArrowUp");
-  await expect.poll(() => height(second)).toBe(56);
+  await expect.poll(() => height(second)).toBe(54);
+  await page.keyboard.press("Shift+ArrowUp");
+  await expect.poll(() => height(second)).toBe(32);
   await page.keyboard.press("Home");
   await expect.poll(() => height(second)).toBe(70);
   await page.locator(".timeline-scroll").evaluate((node) => {
@@ -147,6 +153,39 @@ try {
       }),
     )
     .toBeLessThanOrEqual(1);
+  const shrink = page.getByRole("button", { name: "缩小轨道高度", exact: true });
+  for (let i = 0; i < 8 && await shrink.isEnabled(); i++) await shrink.click();
+  await expect(shrink).toBeDisabled();
+  await expect.poll(() => height(page.locator(".track-header").nth(1))).toBe(32);
+  await expect.poll(() => height(page.locator(".track-header").nth(2))).toBe(32);
+  const contained = await page.locator(".track-lane").evaluateAll((lanes) =>
+    lanes.every((lane) => {
+      const bounds = lane.getBoundingClientRect();
+      return [...lane.querySelectorAll(".timeline-clip, .animation-point")].every((node) => {
+        const clip = node.getBoundingClientRect();
+        return clip.top >= bounds.top && clip.bottom <= bounds.bottom;
+      });
+    }),
+  );
+  expect(contained).toBe(true);
+  const controlsFit = await page.locator(".track-controls").evaluateAll((controls) =>
+    controls.every((node) => {
+      const bounds = node.getBoundingClientRect();
+      const header = node.closest(".track-header").getBoundingClientRect();
+      return bounds.top >= header.top && bounds.bottom <= header.bottom;
+    }),
+  );
+  expect(controlsFit).toBe(true);
+  await page.locator(".timeline-body").screenshot({ path: path.join(root, "compact.png") });
+  await page.getByTitle("保存工程 Ctrl+S", { exact: true }).click();
+  await expect.poll(async () =>
+    JSON.parse(await fs.readFile(file, "utf8")).tracks.every((track) => track.height === 32),
+  ).toBe(true);
+  await app.close();
+  app = await electron.launch({ args: [".", file], env });
+  page = await app.firstWindow();
+  page.on("pageerror", (error) => errors.push(error.message));
+  await expect.poll(() => height(page.locator(".track-header").nth(2))).toBe(32);
   expect(errors).toEqual([]);
   console.log(
     JSON.stringify({

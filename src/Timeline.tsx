@@ -272,9 +272,7 @@ export default function Timeline({
   } | null>(null);
   const trackLayouts = useMemo(() => {
     const rows = new Map<string, number>();
-    const animated = new Set<string>();
     for (const clip of project.clips) {
-      if (clip.keyframes.length > 1) animated.add(clip.trackId);
       if (expandedEffects[clip.id]) {
         const count =
           Number(hasClipSpeed(clip)) +
@@ -284,20 +282,21 @@ export default function Timeline({
       }
     }
     return timelineTracks.map((track) => {
-      // Keep animation arrows and expanded effect rows inside the resized lane.
-      const minHeight = animated.has(track.id)
-        ? defaultTrackHeight
-        : minTrackHeight;
       const baseHeight = Math.max(
-        minHeight,
+        minTrackHeight,
         trackHeightDraft?.projectId === project.id &&
           trackHeightDraft.trackId === track.id
           ? trackHeightDraft.height
           : track.height ?? defaultTrackHeight,
       );
+      const compact = baseHeight < 56;
+      const clipInset = compact ? 4 : 9;
       return {
         baseHeight,
-        minHeight,
+        minHeight: minTrackHeight,
+        compact,
+        clipInset,
+        contentHeight: baseHeight - 2 * clipInset - 4,
         height: baseHeight + 24 * (rows.get(track.id) ?? 0),
       };
     });
@@ -339,8 +338,9 @@ export default function Timeline({
     const top = Math.min(next.startY, next.y);
     const bottom = Math.max(next.startY, next.y);
     const trackIds = timelineTracks.flatMap((track, index) => {
-      const clipTop = 36 + trackTop(track.id) + 8;
-      const clipBottom = 36 + trackTop(track.id) + trackHeights[index] - 9;
+      const inset = trackLayouts[index].clipInset;
+      const clipTop = 36 + trackTop(track.id) + inset - 1;
+      const clipBottom = 36 + trackTop(track.id) + trackHeights[index] - inset;
       return clipTop <= bottom && clipBottom >= top ? [track.id] : [];
     });
     const hits = clipsInTimelineRange(
@@ -841,7 +841,7 @@ export default function Timeline({
           </div>
           {timelineTracks.map((track, index) => (
             <div
-              className={`track-header ${track.locked ? "locked" : ""} ${track.captionTrack ? "caption-track" : ""} ${track.solo ? "solo-track" : ""} ${project.tracks.some((item) => item.solo) && !track.solo ? "inactive-solo-track" : ""}`}
+              className={`track-header ${trackLayouts[index].compact ? "compact-track" : ""} ${track.locked ? "locked" : ""} ${track.captionTrack ? "caption-track" : ""} ${track.solo ? "solo-track" : ""} ${project.tracks.some((item) => item.solo) && !track.solo ? "inactive-solo-track" : ""}`}
               key={`${project.id}-${track.id}`}
               data-track-id={track.id}
               style={{ height: trackHeights[index] }}
@@ -1139,7 +1139,7 @@ export default function Timeline({
             {timelineTracks.map((track, trackIndex) => (
               <div
                 key={track.id}
-                className={`track-lane ${!isTrackActive(project.tracks, track.id) ? "hidden-track" : ""} ${fileDrop?.trackId === track.id ? "external-drop-target" : ""}`}
+                className={`track-lane ${trackLayouts[trackIndex].compact ? "compact-track" : ""} ${!isTrackActive(project.tracks, track.id) ? "hidden-track" : ""} ${fileDrop?.trackId === track.id ? "external-drop-target" : ""}`}
                 data-track={track.id}
                 onContextMenu={(event) => {
                   if (event.target !== event.currentTarget) return;
@@ -1155,7 +1155,7 @@ export default function Timeline({
                   {
                     backgroundSize: `${zoom * rulerStep}px 100%`,
                     height: trackHeights[trackIndex],
-                    "--track-content-height": `${trackLayouts[trackIndex].baseHeight - 22}px`,
+                    "--track-content-height": `${trackLayouts[trackIndex].contentHeight}px`,
                   } as CSSProperties
                 }
                 onClick={(event) => {
@@ -1272,8 +1272,10 @@ export default function Timeline({
                           style={{
                             left: c.start * zoom,
                             width: Math.max(4, c.duration * zoom),
+                            top: trackLayouts[trackIndex].clipInset -
+                              (editor.selectedIds.includes(c.id) ? 1 : 0),
                             height:
-                              trackLayouts[trackIndex].baseHeight - 20 +
+                              trackLayouts[trackIndex].contentHeight + 2 +
                               (editor.selectedIds.includes(c.id) ? 2 : 0) +
                               (expandedEffects[c.id]
                                 ? 24 *
@@ -1537,7 +1539,7 @@ export default function Timeline({
                         >
                           <div
                             className="clip-content"
-                            style={{ height: trackLayouts[trackIndex].baseHeight - 22 }}
+                            style={{ height: trackLayouts[trackIndex].contentHeight }}
                           >
                             <span
                               className="trim-handle left"

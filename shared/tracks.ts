@@ -18,7 +18,7 @@ function recordingTracks(project: Project, id: string) {
 export type Track = Project["tracks"][number];
 
 export const defaultTrackHeight = 70;
-export const minTrackHeight = 56;
+export const minTrackHeight = 32;
 export const maxTrackHeight = 360;
 
 export function setTrackHeight(
