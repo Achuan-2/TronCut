@@ -84,7 +84,27 @@ try {
   page.on("pageerror", (error) => errors.push(error.message));
   await page.getByRole("button", { name: "恢复编辑", exact: true }).click();
   await expect(page.locator(".timeline-clip")).toHaveCount(1);
+  await expect(
+    page
+      .locator(".recording-object .clip-label")
+      .getByRole("img", { name: "录屏组合", exact: true }),
+  ).toBeVisible();
   await page.locator(".recording-object").click({ position: { x: 30, y: 10 } });
+  await expect(
+    page
+      .locator(".inspector-selection .selection-icon.recording-object-selection")
+      .getByRole("img", { name: "录屏组合", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page
+      .getByRole("tab", { name: "录屏", exact: true })
+      .locator("svg.lucide-monitor-dot"),
+  ).toBeVisible();
+  await expect(page.locator(".recording-object")).toHaveCSS(
+    "background-color",
+    "rgb(41, 63, 77)",
+  );
+  await page.screenshot({ path: path.join(root, "recording-object-icon.png") });
   await expect(
     page.getByRole("tab", { name: "录屏", exact: true }),
   ).toHaveAttribute("aria-selected", "true");
@@ -177,6 +197,13 @@ try {
   await page.getByRole("button", { name: "取消组合", exact: true }).click();
   await expect(page.locator(".timeline-clip")).toHaveCount(2);
   await expect(
+    page.getByRole("img", { name: "录屏组合", exact: true }),
+  ).toHaveCount(0);
+  await expect(page.locator(".timeline-clip.video")).toHaveCSS(
+    "background-color",
+    "rgb(53, 74, 61)",
+  );
+  await expect(
     page.getByRole("tab", { name: "录屏", exact: true }),
   ).toHaveCount(0);
   await expect(
@@ -187,6 +214,11 @@ try {
   ).toBeVisible();
   await page.getByTitle("撤销 Ctrl+Z", { exact: true }).click();
   await expect(page.locator(".recording-object")).toHaveCount(1);
+  await expect(
+    page
+      .locator(".recording-object .clip-label")
+      .getByRole("img", { name: "录屏组合", exact: true }),
+  ).toBeVisible();
   await expect(page.locator(".timeline-clip")).toHaveCount(1);
   await page.getByRole("button", { name: "返回首页", exact: true }).click();
   await page

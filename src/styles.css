@@ -2303,6 +2303,9 @@ fieldset:disabled {
   color: #bdace4;
   flex-shrink: 0;
 }
+.selection-icon.recording-object-selection { color: #9ddfee; background: #263e49; border-color: #487886; }
+.recording-object-icon { color: #9ddfee; }
+.recording-object-icon circle { fill: currentColor; }
 .inspector-selection > div {
   flex: 1;
   min-width: 0;
@@ -3494,6 +3497,8 @@ fieldset:disabled {
 .timeline-clip.selected.text {
   border-color: #d6baff;
 }
+.timeline-clip.recording-object { color: #d2e9f2; background: #293f4d; border-color: #557f96; }
+.timeline-clip.recording-object.selected { border-color: #97d9f1; box-shadow: 0 0 0 1px #97d9f126; }
 .timeline-clip.locked {
   cursor: not-allowed;
   opacity: 0.7;

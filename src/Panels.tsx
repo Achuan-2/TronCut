@@ -7,6 +7,7 @@ import {
   AudioLines,
   Settings2,
   Film,
+  MonitorDot,
   Music2,
   WandSparkles,
   Mic,
@@ -407,7 +408,7 @@ export function Inspector({ editor }: { editor: Editor }) {
   const hasCursor = c?.kind === "video" && !!selectedAsset?.cursor;
   const hasText = c?.kind === "text";
   const tabs = [
-    ...(isRecording ? [{ name: "recording", label: "录屏", icon: Film }] : []),
+    ...(isRecording ? [{ name: "recording", label: "录屏", icon: MonitorDot }] : []),
     ...(!isRecording && c?.kind !== "audio"
       ? [{ name: "video", label: hasCursor ? "视频" : "画面", icon: Film }]
       : []),
@@ -593,8 +594,10 @@ export function Inspector({ editor }: { editor: Editor }) {
         ) : (
           <fieldset disabled={!!locked}>
             <div className="inspector-selection">
-              <span className={`selection-icon ${c.kind}`}>
-                {c.kind === "text" ? (
+              <span className={`selection-icon ${isRecording ? "recording-object-selection" : c.kind}`}>
+                {isRecording ? (
+                  <MonitorDot size={20} className="recording-object-icon" role="img" aria-label="录屏组合" />
+                ) : c.kind === "text" ? (
                   <Type size={20} />
                 ) : c.kind === "audio" ? (
                   <AudioLines size={20} />

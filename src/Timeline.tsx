@@ -30,6 +30,7 @@ import {
   ChevronDown,
   Camera,
   ChevronUp,
+  MonitorDot,
 } from "lucide-react";
 import {
   type Clip, type Marker, projectDuration, uid, newTrack,
@@ -101,7 +102,7 @@ import TrackResizeHandle from "./TrackResizeHandle";
 import TrackContextMenu, { type TrackMenuPosition } from "./TrackContextMenu";
 import { useViewportZoom, type ZoomPoint } from "./useViewportZoom";
 import { projectIndex } from "../shared/project-index";
-import { recordingTimeline, trimRecordingObject } from "../shared/recording-objects";
+import { recordingGroups, recordingTimeline, trimRecordingObject } from "../shared/recording-objects";
 
 interface Drag {
   id: string;
@@ -141,6 +142,7 @@ export default function Timeline({
     editor;
   const timeline = useMemo(() => recordingTimeline(project), [project.clips, project.tracks]);
   const timelineTracks = timeline.tracks;
+  const recordingObjects = useMemo(() => recordingGroups(project), [project.clips]);
   const assetsById = useMemo(
     () => new Map(project.assets.map((asset) => [asset.id, asset])),
     [project.assets],
@@ -1260,10 +1262,11 @@ export default function Timeline({
                             : visualDraft?.id === original.id
                               ? visualDraft
                               : original;
+                    const isRecording = !!c.groupId && recordingObjects.get(c.groupId)?.id === c.id;
                     return (
                       <Fragment key={c.id}>
                         <div
-                          className={`timeline-clip ${c.kind} ${c.recording && c.groupId ? "recording-object" : ""} ${c.caption ? "caption" : ""} ${animationRanges(c).length ? "has-animation" : ""} ${editor.selectedIds.includes(c.id) ? "selected" : ""} ${track.locked ? "locked" : ""} ${effectDrop === c.id ? "effect-drop-target" : ""} ${transitionHighlights.some((item) => item.clipId === c.id) ? "transition-drop-target" : ""}`}
+                          className={`timeline-clip ${c.kind} ${isRecording ? "recording-object" : ""} ${c.caption ? "caption" : ""} ${animationRanges(c).length ? "has-animation" : ""} ${editor.selectedIds.includes(c.id) ? "selected" : ""} ${track.locked ? "locked" : ""} ${effectDrop === c.id ? "effect-drop-target" : ""} ${transitionHighlights.some((item) => item.clipId === c.id) ? "transition-drop-target" : ""}`}
                           style={{
                             left: c.start * zoom,
                             width: Math.max(4, c.duration * zoom),
@@ -1539,15 +1542,17 @@ export default function Timeline({
                               data-trim="left"
                             />
                             <div className="clip-label">
-                              {c.kind === "text" ? (
+                              {isRecording ? (
+                                <MonitorDot size={15} className="recording-object-icon" role="img" aria-label="录屏组合" />
+                              ) : c.kind === "text" ? (
                                 <Type size={13} />
                               ) : c.kind === "audio" ? (
                                 <Volume2 size={13} />
                               ) : (
                                 <span className="clip-media-icon">▣</span>
                               )}
-                              <span title={c.kind === "text" ? c.text : c.name}>
-                                {c.groupId ? "▧ " : ""}
+                              <span title={isRecording ? `录屏组合 · ${c.name}` : c.kind === "text" ? c.text : c.name}>
+                                {c.groupId && !isRecording ? "▧ " : ""}
                                 {c.kind === "text"
                                   ? c.text?.replace(/\s+/g, " ").trim() || c.name
                                   : c.name}
