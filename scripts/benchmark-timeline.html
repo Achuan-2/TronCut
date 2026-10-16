@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Timeline RAF 节流基准测试</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      max-width: 800px;
+      margin: 2rem auto;
+      padding: 0 1rem;
+      background: #1a1a1a;
+      color: #e0e0e0;
+    }
+
+    h1 {
+      border-bottom: 2px solid #4a90e2;
+      padding-bottom: 0.5rem;
+    }
+
+    .test-container {
+      margin: 2rem 0;
+      padding: 1.5rem;
+      border: 1px solid #333;
+      border-radius: 8px;
+      background: #222;
+    }
+
+    .box {
+      width: 100px;
+      height: 100px;
+      background: #4a90e2;
+      cursor: move;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+    }
+
+    .stats {
+      margin-top: 1rem;
+      padding: 1rem;
+      background: #2a2a2a;
+      border-radius: 4px;
+      font-family: 'Courier New', monospace;
+    }
+
+    .stat-row {
+      display: flex;
+      justify-content: space-between;
+      margin: 0.5rem 0;
+    }
+
+    .good { color: #4ade80; }
+    .bad { color: #f87171; }
+    .neutral { color: #94a3b8; }
+
+    button {
+      background: #4a90e2;
+      color: white;
+      border: none;
+      padding: 0.75rem 1.5rem;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 1rem;
+      margin: 0.5rem 0.5rem 0.5rem 0;
+    }
+
+    button:hover {
+      background: #357abd;
+    }
+
+    button:disabled {
+      background: #666;
+      cursor: not-allowed;
+    }
+  </style>
+</head>
+<body>
+  <h1>🎯 Timeline RAF 节流性能基准测试</h1>
+
+  <div class="test-container">
+    <h3>测试 1: 未节流 vs RAF 节流</h3>
+    <p>在这个框内拖拽来测试性能。观察更新频率和流畅度。</p>
+
+    <div style="margin-bottom: 1rem;">
+      <button id="mode-none">无节流</button>
+      <button id="mode-raf">RAF 节流</button>
+      <button id="reset">重置统计</button>
+    </div>
+
+    <div style="position: relative; height: 200px; background: #333; border-radius: 4px; overflow: hidden;">
+      <div id="box" class="box" style="position: absolute;">
+        拖动我
+      </div>
+    </div>
+
+    <div class="stats">
+      <div class="stat-row">
+        <span>当前模式:</span>
+        <span id="current-mode" class="neutral">无节流</span>
+      </div>
+      <div class="stat-row">
+        <span>总事件数:</span>
+        <span id="event-count" class="neutral">0</span>
+      </div>
+      <div class="stat-row">
+        <span>状态更新数:</span>
+        <span id="update-count" class="neutral">0</span>
+      </div>
+      <div class="stat-row">
+        <span>更新效率:</span>
+        <span id="efficiency" class="neutral">0%</span>
+      </div>
+      <div class="stat-row">
+        <span>平均 FPS:</span>
+        <span id="fps" class="neutral">0</span>
+      </div>
+      <div class="stat-row">
+        <span>节流比率:</span>
+        <span id="throttle-ratio" class="neutral">1:1</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="test-container">
+    <h3>📊 结果解读</h3>
+    <ul>
+      <li><strong>无节流</strong>: 每个 pointermove 事件都触发状态更新（120+ Hz）</li>
+      <li><strong>RAF 节流</strong>: 状态更新同步到浏览器刷新率（~60 Hz）</li>
+      <li><strong>期望</strong>: RAF 模式应该减少 50% 的更新，同时保持流畅</li>
+    </ul>
+  </div>
+
+  <script>
+    const box = document.getElementById('box');
+    const eventCountEl = document.getElementById('event-count');
+    const updateCountEl = document.getElementById('update-count');
+    const efficiencyEl = document.getElementById('efficiency');
+    const fpsEl = document.getElementById('fps');
+    const throttleRatioEl = document.getElementById('throttle-ratio');
+    const currentModeEl = document.getElementById('current-mode');
+
+    let mode = 'none';
+    let isDragging = false;
+    let startX = 0, startY = 0;
+    let boxX = 0, boxY = 0;
+    let eventCount = 0;
+    let updateCount = 0;
+    let lastUpdateTime = 0;
+    let frameCount = 0;
+    let lastFpsTime = performance.now();
+
+    // RAF throttle state
+    let rafId = null;
+    let pendingUpdate = null;
+
+    function updateStats() {
+      eventCountEl.textContent = eventCount;
+      updateCountEl.textContent = updateCount;
+
+      const efficiency = eventCount > 0 ? Math.round((updateCount / eventCount) * 100) : 0;
+      efficiencyEl.textContent = `${efficiency}%`;
+      efficiencyEl.className = efficiency < 60 ? 'good' : efficiency < 90 ? 'neutral' : 'bad';
+
+      const ratio = eventCount > 0 ? Math.round(eventCount / Math.max(1, updateCount)) : 1;
+      throttleRatioEl.textContent = `${ratio}:1`;
+      throttleRatioEl.className = ratio > 1.5 ? 'good' : 'neutral';
+
+      // Calculate FPS
+      const now = performance.now();
+      if (now - lastFpsTime >= 1000) {
+        const fps = Math.round((frameCount * 1000) / (now - lastFpsTime));
+        fpsEl.textContent = fps;
+        fpsEl.className = fps >= 50 ? 'good' : fps >= 30 ? 'neutral' : 'bad';
+        frameCount = 0;
+        lastFpsTime = now;
+      }
+    }
+
+    function applyUpdate(x, y) {
+      box.style.transform = `translate(${x}px, ${y}px)`;
+      boxX = x;
+      boxY = y;
+      updateCount++;
+      frameCount++;
+      updateStats();
+    }
+
+    function scheduleUpdate(x, y) {
+      if (mode === 'none') {
+        // No throttling - update immediately
+        applyUpdate(x, y);
+      } else {
+        // RAF throttling
+        pendingUpdate = { x, y };
+        if (!rafId) {
+          rafId = requestAnimationFrame(() => {
+            if (pendingUpdate) {
+              applyUpdate(pendingUpdate.x, pendingUpdate.y);
+              pendingUpdate = null;
+            }
+            rafId = null;
+          });
+        }
+      }
+    }
+
+    box.addEventListener('pointerdown', (e) => {
+      isDragging = true;
+      startX = e.clientX - boxX;
+      startY = e.clientY - boxY;
+      box.setPointerCapture(e.pointerId);
+    });
+
+    box.addEventListener('pointermove', (e) => {
+      if (!isDragging) return;
+
+      eventCount++;
+      const newX = Math.max(0, Math.min(700, e.clientX - startX));
+      const newY = Math.max(0, Math.min(100, e.clientY - startY));
+
+      scheduleUpdate(newX, newY);
+    });
+
+    box.addEventListener('pointerup', (e) => {
+      isDragging = false;
+      box.releasePointerCapture(e.pointerId);
+    });
+
+    document.getElementById('mode-none').addEventListener('click', () => {
+      mode = 'none';
+      currentModeEl.textContent = '无节流';
+      currentModeEl.className = 'bad';
+    });
+
+    document.getElementById('mode-raf').addEventListener('click', () => {
+      mode = 'raf';
+      currentModeEl.textContent = 'RAF 节流';
+      currentModeEl.className = 'good';
+    });
+
+    document.getElementById('reset').addEventListener('click', () => {
+      eventCount = 0;
+      updateCount = 0;
+      frameCount = 0;
+      lastFpsTime = performance.now();
+      updateStats();
+    });
+
+    // Initial update
+    updateStats();
+  </script>
+</body>
+</html>
