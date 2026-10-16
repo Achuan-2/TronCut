@@ -3,6 +3,7 @@ import { build } from "esbuild";
 import { createRequire } from "node:module";
 import fs from "node:fs/promises";
 import path from "node:path";
+import { selectPreview } from "./preview-select.mjs";
 const root = path.resolve(
   "test-output/recording-object-ui",
   `run-${Date.now()}`,
@@ -151,21 +152,27 @@ try {
   await expect(page.getByLabel("录屏对象背景", { exact: true })).toHaveCount(0);
   await page.getByRole("tab", { name: "录屏", exact: true }).click();
   const background = page.getByLabel("录屏对象背景", { exact: true });
-  await expect(background).toHaveValue("violet");
+  await expect(background).toHaveAttribute("data-value", "violet");
   await expect(page.getByLabel("背景图库")).toHaveCount(0);
-  await background.selectOption("perspective-grid");
+  await selectPreview(page, "录屏对象背景", "perspective-grid");
   await expect(
     page.getByAltText("透视网格（黑）", { exact: true }),
   ).toBeVisible();
-  await background.selectOption("mint");
+  await selectPreview(page, "录屏对象背景", "mint");
   await expect(
     page.locator(".recording-background-swatch > div"),
   ).toBeVisible();
-  await page.getByLabel("录屏对象留白", { exact: true }).fill("12");
-  await page.getByLabel("圆角 (%)", { exact: true }).fill("30");
-  await page
-    .getByLabel("录屏对象鼠标样式", { exact: true })
-    .selectOption("windows11");
+  for (const [label, value] of [
+    ["录屏对象留白", "12"],
+    ["圆角 (%)", "30"],
+  ]) {
+    const input = page.getByLabel(label, { exact: true });
+    await input.fill("");
+    await expect(input).toHaveValue("");
+    await input.pressSequentially(value);
+    await expect(input).toHaveValue(value);
+  }
+  await selectPreview(page, "录屏对象鼠标样式", "windows11");
   await page.getByLabel("录屏对象鼠标大小", { exact: true }).fill("56");
   const recovery = async () =>
     (await page.evaluate(() => window.framecraft.readRecovery())).project;
@@ -186,9 +193,9 @@ try {
   expect(screen.keyframes.map((frame) => frame.value.contentScale)).toEqual(
     originalFrames.map((frame) => frame.value.contentScale),
   );
-  await background.selectOption("none");
+  await selectPreview(page, "录屏对象背景", "none");
   await expect(page.locator(".recording-background-swatch")).toHaveCount(0);
-  await background.selectOption("perspective-grid");
+  await selectPreview(page, "录屏对象背景", "perspective-grid");
   await expect(
     page.getByAltText("透视网格（黑）", { exact: true }),
   ).toBeVisible();
@@ -244,7 +251,7 @@ try {
     .click();
   await expect(page.locator(".timeline-clip")).toHaveCount(1);
   await page.locator(".recording-object").click({ position: { x: 30, y: 10 } });
-  await expect(background).toHaveValue("perspective-grid");
+  await expect(background).toHaveAttribute("data-value", "perspective-grid");
   await expect(page.getByLabel("圆角 (%)", { exact: true })).toHaveValue("30");
   await expect(
     page.getByLabel("录屏对象鼠标大小", { exact: true }),

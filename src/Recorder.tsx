@@ -19,9 +19,11 @@ import {
   type RecordedAsset,
   type RecordingSettings,
 } from "../shared/recording";
-import { cursorSvg, cursorStyles, cursorAspect } from "../shared/cursor";
+import { cursorSvg, cursorAspect } from "../shared/cursor";
 import { recordingWallpaperUrl } from "../shared/recording-backgrounds";
 import RecordingBackgroundSelect from "./RecordingBackgroundSelect";
+import CursorStyleSelect from "./CursorStyleSelect";
+import NumberInput from "./NumberInput";
 
 interface Session {
   id: string;
@@ -546,32 +548,24 @@ export default function Recorder({
             <RecordingBackgroundSelect settings={settings} onChange={changeSettings} />
             <label className="field">
               留白 (%)
-              <input
+              <NumberInput
                 aria-label="录屏留白"
                 disabled={!settings.background}
-                type="number"
                 min={0}
                 max={25}
-                value={Math.round(settings.padding * 100)}
-                onChange={(e) => {
-                  const n = e.target.valueAsNumber;
-                  if (n >= 0 && n <= 25) changeSettings({ padding: n / 100 });
-                }}
+                value={Number((settings.padding * 100).toFixed(2))}
+                onValueChange={(value) => changeSettings({ padding: value / 100 })}
               />
             </label>
             <label className="field">
               圆角 (px)
-              <input
+              <NumberInput
                 aria-label="录屏圆角"
                 disabled={!settings.background}
-                type="number"
                 min={0}
                 max={200}
                 value={settings.radius}
-                onChange={(e) => {
-                  const n = e.target.valueAsNumber;
-                  if (n >= 0 && n <= 200) changeSettings({ radius: n });
-                }}
+                onValueChange={(radius) => changeSettings({ radius })}
               />
             </label>
           </div>
@@ -579,25 +573,19 @@ export default function Recorder({
             <div className="recording-style-fields">
               <label className="field">
                 鼠标样式
-                <select
-                  aria-label="录屏鼠标样式"
+                <CursorStyleSelect
+                  label="录屏鼠标样式"
                   value={settings.cursor.style}
-                  onChange={(e) =>
+                  color={settings.cursor.color}
+                  onChange={(style) =>
                     changeSettings({
                       cursor: {
                         ...settings.cursor,
-                        style: e.target
-                          .value as RecordingSettings["cursor"]["style"],
+                        style,
                       },
                     })
                   }
-                >
-                  {Object.entries(cursorStyles).map(([id, name]) => (
-                    <option key={id} value={id}>
-                      {name}
-                    </option>
-                  ))}
-                </select>
+                />
               </label>
               <label className="field">
                 鼠标大小 (px)
@@ -655,15 +643,6 @@ export default function Recorder({
               </select>
             </label>
           </fieldset>
-          <p className="small-note">
-            自动缩放、背景与鼠标样式参考 Recordly（AGPL-3.0）。
-          </p>
-          <p className="small-note">
-            背景作为独立轨道添加，缩放生成可编辑动画。
-            {nativeAvailable && useNative
-              ? "录制后可在“视频”“鼠标”属性中继续调整。"
-              : "兼容录制没有独立鼠标轨迹，无法修改鼠标或生成自动缩放。"}
-          </p>
         </fieldset>
         <p className="small-note">
           开始录制或关闭窗口时会记住美化设置，下次录制继续使用。录制后仍可在时间线和属性中调整。

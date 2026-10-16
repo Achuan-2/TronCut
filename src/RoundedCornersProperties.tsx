@@ -5,6 +5,7 @@ import {
   mediaFrameRadiusPercent,
 } from "../shared/media-frame";
 import EffectSection from "./EffectSection";
+import NumberInput from "./NumberInput";
 import type { Editor } from "./useEditor";
 
 export default function RoundedCornersProperties({
@@ -71,19 +72,14 @@ export default function RoundedCornersProperties({
               update({ radius: Number(event.target.value), unit: "percent" })
             }
           />
-          <input
+          <NumberInput
             aria-label="圆角 (%)"
             title="100% 为画面短边的一半"
-            type="number"
             min={0}
             max={100}
             step={1}
             value={percent}
-            onChange={(event) => {
-              const radius = Number(event.target.value);
-              if (Number.isFinite(radius) && radius >= 0 && radius <= 100)
-                update({ radius, unit: "percent" });
-            }}
+            onValueChange={(radius) => update({ radius, unit: "percent" })}
           />
           <span>%</span>
         </div>

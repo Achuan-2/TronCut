@@ -4,6 +4,7 @@ import path from "node:path";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import sharp from "sharp";
+import { selectPreview } from "./preview-select.mjs";
 
 const root = path.resolve("test-output/editing-ui", `run-${Date.now()}`);
 const profile = path.join(root, "profile");
@@ -319,13 +320,13 @@ try {
   ).toHaveAttribute("aria-selected", "true");
   await expect(page.getByLabel("鼠标样式")).toBeHidden();
   await page.getByRole("tab", { name: "鼠标", exact: true }).click();
-  await page.getByLabel("鼠标样式").selectOption("circle");
+  await selectPreview(page, "鼠标样式", "circle");
   await page.getByLabel("鼠标大小").fill("48");
   await expect(page.getByLabel("位置 X (px)")).toBeHidden();
   await page.getByRole("tab", { name: "视频", exact: true }).click();
   await expect(page.getByLabel("位置 X (px)")).toBeVisible();
   await page.getByRole("tab", { name: "鼠标", exact: true }).click();
-  await expect(page.getByLabel("鼠标样式")).toHaveValue("circle");
+  await expect(page.getByLabel("鼠标样式")).toHaveAttribute("data-value", "circle");
   await expect(page.getByLabel("鼠标大小")).toHaveValue("48");
   await page.getByRole("tab", { name: "视频", exact: true }).click();
   const canvasVideo = page.locator(".preview-panel .preview-layer.video");

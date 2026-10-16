@@ -1,6 +1,7 @@
 import { _electron as electron, expect } from "@playwright/test";
 import path from "node:path";
 import fs from "node:fs/promises";
+import { selectPreview } from "./preview-select.mjs";
 const base = path.resolve("test-output/smoke");
 const root = path.join(base, `run-${Date.now()}`);
 await fs.mkdir(root, { recursive: true });
@@ -272,7 +273,7 @@ try {
       await recordingClip.click();
       await page.getByRole("tab", { name: "鼠标", exact: true }).click();
       await expect(page.getByLabel("鼠标样式")).toBeVisible();
-      await page.getByLabel("鼠标样式").selectOption("circle");
+      await selectPreview(page, "鼠标样式", "circle");
       await page.getByRole("button", { name: "保存", exact: true }).click();
       await expect(page.getByRole("status")).toContainText("工程已保存", {
         timeout: 20000,

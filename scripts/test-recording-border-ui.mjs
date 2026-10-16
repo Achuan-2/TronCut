@@ -8,6 +8,25 @@ import sharp from "sharp";
 if (process.platform !== "win32")
   throw new Error("Windows recording border test");
 const run = promisify(execFile);
+// Compatible capture includes the user's system cursor. Inspect the frame's
+// perimeter so a colored cursor inside the white fixture is not a border leak.
+function greenBorderPixels(data, { width, height }) {
+  let green = 0;
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      if (x >= 12 && x < width - 12 && y >= 12 && y < height - 12) continue;
+      const i = (y * width + x) * 3;
+      if (
+        data[i] < 170 &&
+        data[i + 1] > 200 &&
+        data[i + 2] > 120 &&
+        data[i + 2] < 210
+      )
+        green++;
+    }
+  }
+  return green;
+}
 const root = path.resolve("test-output/recording-border", `run-${Date.now()}`);
 await fs.mkdir(root, { recursive: true });
 const env = {
@@ -129,22 +148,23 @@ try {
     ["-y", "-ss", "0.5", "-i", recording.path, "-frames:v", "1", frame],
     { windowsHide: true },
   );
-  const { data } = await sharp(frame)
+  const { data, info } = await sharp(frame)
     .removeAlpha()
     .raw()
     .toBuffer({ resolveWithObject: true });
-  let red = 0;
-  for (let i = 0; i < data.length; i += 3)
-    if (data[i] > 220 && data[i + 1] < 100 && data[i + 2] < 100) red++;
-  expect(red).toBe(0);
+  const green = greenBorderPixels(data, info);
+  expect(green).toBe(0);
   // Cover the selected display with our white fixture so screen-capture checks
-  // neither record unrelated desktop content nor confuse red UI with the border.
+  // neither record unrelated desktop content nor confuse green UI with the border.
   const display = await app.evaluate(
     async ({ BrowserWindow, desktopCapturer, screen }, id) => {
       const target = BrowserWindow.fromId(id);
       const display = screen.getDisplayMatching(target.getBounds());
       target.setBounds(display.bounds);
       target.setFullScreen(true);
+      target.setAlwaysOnTop(true, "screen-saver");
+      target.showInactive();
+      target.moveTop();
       BrowserWindow.getAllWindows()
         .find((w) => w.id !== id)
         .hide();
@@ -184,10 +204,8 @@ try {
       .removeAlpha()
       .raw()
       .toBuffer({ resolveWithObject: true });
-    let red = 0;
-    for (let i = 0; i < data.length; i += 3)
-      if (data[i] > 220 && data[i + 1] < 100 && data[i + 2] < 100) red++;
-    expect(red).toBe(0);
+    const green = greenBorderPixels(data, info);
+    expect(green).toBe(0);
     // Check every side: exclusion must reveal the fixture, not a black frame.
     for (const [x, y] of [
       [20, 0],
@@ -263,7 +281,7 @@ try {
       {
         border,
         displayBorder,
-        recordedRedPixels: red,
+        recordedGreenPixels: green,
         nativeScreen: screenRecording.path,
         compatibleScreen: compatible.path,
         rendererErrors: errors,

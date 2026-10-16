@@ -1,7 +1,7 @@
 import { type Clip, type Project, uid } from "./model";
 import { splitClip } from "./editor";
 import { markerEnd } from "./markers";
-import { recordingGroups } from "./recording-objects";
+import { recordingGroups, releasedRecordingTracks } from "./recording-objects";
 
 export function editableIds(
   project: Project,
@@ -201,6 +201,7 @@ export function groupSelection(
   const groupId = ungroup ? undefined : uid();
   return {
     ...project,
+    tracks: ungroup ? releasedRecordingTracks(project, selected) : project.tracks,
     clips: project.clips.map((c) =>
       selected.has(c.id)
         ? {

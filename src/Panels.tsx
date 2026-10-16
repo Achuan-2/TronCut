@@ -25,7 +25,8 @@ import { timeLabel } from "./Preview";
 import { defaultCrop, defaultEffects } from "../shared/effects";
 import { textBoxFor } from "./text";
 import MediaLibrary from "./MediaLibrary";
-import { defaultCursorStyle, cursorStyles } from "../shared/cursor";
+import { defaultCursorStyle } from "../shared/cursor";
+import CursorStyleSelect from "./CursorStyleSelect";
 import NarrationPanel from "./NarrationPanel";
 import AnimationsPanel from "./AnimationsPanel";
 import { defaultContentTransform } from "../shared/crop";
@@ -318,14 +319,11 @@ function CursorProperties({
       <h3 className="section-title">鼠标</h3>
       <label className="field">
         鼠标样式
-        <select
+        <CursorStyleSelect
           value={style.style}
-          onChange={(event) =>
-            change({ style: event.target.value as typeof style.style })
-          }
-        >
-{Object.entries(cursorStyles).map(([id, name]) => <option key={id} value={id}>{name}</option>)}
-        </select>
+          color={style.color}
+          onChange={(style) => change({ style })}
+        />
       </label>
       <label className="field">
         鼠标大小

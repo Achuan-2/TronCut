@@ -1,6 +1,8 @@
 import { useState } from "react";
 import type { Clip } from "../shared/model";
-import { cursorStyles, defaultCursorStyle } from "../shared/cursor";
+import { defaultCursorStyle } from "../shared/cursor";
+import CursorStyleSelect from "./CursorStyleSelect";
+import NumberInput from "./NumberInput";
 import {
   recordingBackgrounds,
   type RecordingSettings,
@@ -104,18 +106,13 @@ export default function RecordingObjectProperties({
         )}
         <label className="field">
           留白 (%)
-          <input
+          <NumberInput
             aria-label="录屏对象留白"
-            type="number"
             min={0}
             max={25}
             disabled={!settings.background}
             value={Number((settings.padding * 100).toFixed(2))}
-            onChange={(event) => {
-              const value = event.target.valueAsNumber;
-              if (value >= 0 && value <= 25)
-                void change({ padding: value / 100 });
-            }}
+            onValueChange={(value) => void change({ padding: value / 100 })}
           />
         </label>
       </EffectSection>
@@ -134,25 +131,20 @@ export default function RecordingObjectProperties({
       <EffectSection title="鼠标样式">
         <label className="field">
           鼠标样式
-          <select
-            aria-label="录屏对象鼠标样式"
+          <CursorStyleSelect
+            label="录屏对象鼠标样式"
             disabled={!hasCursor}
             value={cursor.style}
-            onChange={(event) =>
+            color={cursor.color}
+            onChange={(style) =>
               void change({
                 cursor: {
                   ...cursor,
-                  style: event.target.value as typeof cursor.style,
+                  style,
                 },
               })
             }
-          >
-            {Object.entries(cursorStyles).map(([id, name]) => (
-              <option key={id} value={id}>
-                {name}
-              </option>
-            ))}
-          </select>
+          />
         </label>
         <label className="field">
           鼠标大小 (px)

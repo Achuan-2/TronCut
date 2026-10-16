@@ -10,7 +10,7 @@ import {
   type EditorPreferences,
 } from "../shared/editor-preferences";
 import { editCommands } from "../shared/edit-menu";
-import { cursorStyles } from "../shared/cursor";
+import CursorStyleSelect from "./CursorStyleSelect";
 import AiProvidersFields, {
   providerUpdate,
   type ProviderDraft,
@@ -466,25 +466,23 @@ export default function PreferencesDialog({
                   </label>
                   <label className="field">
                     默认鼠标样式
-                    <select
-                      aria-label="默认鼠标样式"
+                    <CursorStyleSelect
+                      label="默认鼠标样式"
                       value={settings.recording.cursor.style}
-                      onChange={(e) =>
+                      color={settings.recording.cursor.color}
+                      onChange={(style) =>
                         setSettings((s) => ({
                           ...s,
                           recording: {
                             ...s.recording,
                             cursor: {
                               ...s.recording.cursor,
-                              style: e.target
-                                .value as typeof s.recording.cursor.style,
+                              style,
                             },
                           },
                         }))
                       }
-                    >
-{Object.entries(cursorStyles).map(([id, name]) => <option key={id} value={id}>{name}</option>)}
-                    </select>
+                    />
                   </label>
                   <label className="field">
                     默认鼠标大小

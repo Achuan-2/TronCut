@@ -40,6 +40,44 @@ export function recordingMaster(
   return clip?.groupId ? recordingGroups(project).get(clip.groupId) : undefined;
 }
 
+/** Repair older recording groups on release, without moving unrelated tracks. */
+export function releasedRecordingTracks(
+  project: Project,
+  selected: Set<string>,
+) {
+  let tracks = project.tracks;
+  for (const groupId of recordingGroups(project).keys()) {
+    const members = project.clips.filter((clip) => clip.groupId === groupId);
+    if (!members.every((clip) => selected.has(clip.id))) continue;
+    const owned = new Map(members.map((clip) => [clip.trackId, clip]));
+    // A shared track must retain its position for the other clips on it.
+    if (
+      project.clips.some(
+        (clip) => owned.has(clip.trackId) && clip.groupId !== groupId,
+      )
+    )
+      continue;
+    const rank = (id: string) => {
+      const role = owned.get(id)!.recordingRole;
+      return role === "camera"
+        ? 0
+        : role === "screen"
+          ? 1
+          : role === "microphone"
+            ? 2
+            : 3;
+    };
+    const ordered = tracks
+      .filter((track) => owned.has(track.id))
+      .sort((a, b) => rank(a.id) - rank(b.id));
+    let index = 0;
+    tracks = tracks.map((track) =>
+      owned.has(track.id) ? ordered[index++] : track,
+    );
+  }
+  return tracks;
+}
+
 export function recordingTimeline(project: Project) {
   const groups = recordingGroups(project);
   const hidden = new Set(

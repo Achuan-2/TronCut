@@ -94,10 +94,11 @@ export function addRecordedAssets(
   const groupId = results.some((result) => result.kind === "screen")
     ? uid()
     : undefined;
+  const layers = new Map<string, number>();
   for (const { asset, kind } of results) {
     const track = newTrack(tracks.length);
-    if (kind === "camera") tracks.unshift(track);
-    else tracks.push(track);
+    tracks.push(track);
+    layers.set(track.id, kind === "camera" ? 0 : kind === "screen" ? 1 : 2);
     const framed = kind === "screen" && settings.background && !!background;
     const clip: Clip = {
       id: uid(),
@@ -133,6 +134,8 @@ export function addRecordedAssets(
       clip.keyframes = recordingZoomFrames(asset, clip, settings.zoom);
     clips.push(clip);
   }
+  // Native capture finishes after the microphone; completion order is not layer order.
+  tracks.sort((a, b) => layers.get(a.id)! - layers.get(b.id)!);
   const screen = results.find((r) => r.kind === "screen");
   const screenClip = clips.find((c) => c.assetId === screen?.asset.id);
   const contentFrames = screenClip?.keyframes ?? [];

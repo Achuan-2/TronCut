@@ -1,6 +1,7 @@
 import { _electron as electron, expect } from "@playwright/test";
 import fs from "node:fs/promises";
 import path from "node:path";
+import { selectPreview } from "./preview-select.mjs";
 
 const root = path.resolve(
   "test-output/recording-style-ui",
@@ -22,9 +23,20 @@ try {
   await page.getByRole("button", { name: "新建录制", exact: true }).click();
   await expect(page.getByLabel("录屏背景", { exact: true })).toBeEnabled();
   await expect(page.getByLabel("录屏圆角", { exact: true })).toHaveValue("0");
-  await page.getByLabel("录屏背景", { exact: true }).selectOption("violet");
-  await page.getByLabel("录屏留白", { exact: true }).fill("10");
-  await page.getByLabel("录屏圆角", { exact: true }).fill("7");
+  await selectPreview(page, "录屏背景", "violet");
+  for (const [label, value] of [
+    ["录屏留白", "10"],
+    ["录屏圆角", "7"],
+  ]) {
+    const input = page.getByLabel(label, { exact: true });
+    await input.fill("");
+    await expect(input).toHaveValue("");
+    await input.pressSequentially(value);
+    await expect(input).toHaveValue(value);
+    await input.fill("");
+    await input.blur();
+    await expect(input).toHaveValue(value);
+  }
   await page.getByRole("button", { name: "关闭录制设置", exact: true }).click();
   await expect(page.locator(".recorder-modal")).toHaveCount(0);
   // No recording has started: closing the configuration must still persist it.
@@ -36,7 +48,8 @@ try {
     BrowserWindow.getAllWindows()[0].getMediaSourceId(),
   );
   await page.getByRole("button", { name: "新建录制", exact: true }).click();
-  await expect(page.getByLabel("录屏背景", { exact: true })).toHaveValue(
+  await expect(page.getByLabel("录屏背景", { exact: true })).toHaveAttribute(
+    "data-value",
     "violet",
   );
   await expect(page.getByLabel("录屏留白", { exact: true })).toHaveValue("10");
@@ -57,10 +70,10 @@ try {
   await native.check();
   await page.getByLabel("麦克风", { exact: true }).uncheck();
   await page.getByLabel("录制帧率", { exact: true }).selectOption("15");
-  await page.getByLabel("录屏背景", { exact: true }).selectOption("sunset");
+  await selectPreview(page, "录屏背景", "sunset");
   await page.getByLabel("录屏留白", { exact: true }).fill("12");
   await page.getByLabel("录屏圆角", { exact: true }).fill("24");
-  await page.getByLabel("录屏鼠标样式", { exact: true }).selectOption("circle");
+  await selectPreview(page, "录屏鼠标样式", "circle");
   await page.getByLabel("录屏鼠标大小", { exact: true }).fill("56");
   await page.getByLabel("自动缩放倍数", { exact: true }).selectOption("2.5");
   await page.screenshot({ path: path.join(root, "configure.png") });
@@ -96,7 +109,9 @@ try {
   expect(screen.cursorStyle).toMatchObject({ style: "circle", size: 56 });
   expect(screen.mediaFrame).toEqual({ radius: 24 });
   const asset = recorded.assets.find((a) => a.id === screen.assetId);
-  expect(asset.name).toMatch(/^录屏 \d{4}-\d{2}-\d{2} \d{2}-\d{2}-\d{2}-\d{3}\.mp4$/);
+  expect(asset.name).toMatch(
+    /^录屏 \d{4}-\d{2}-\d{2} \d{2}-\d{2}-\d{2}-\d{3}\.mp4$/,
+  );
   expect(path.basename(asset.path)).toBe(asset.name);
   expect(screen.name).toBe(asset.name);
   expect(asset.cursor.samples.length).toBeGreaterThan(0);
@@ -105,7 +120,7 @@ try {
   await page.getByRole("tab", { name: "鼠标", exact: true }).click();
   await expect(
     page.getByRole("combobox", { name: "鼠标样式", exact: true }),
-  ).toHaveValue("circle");
+  ).toHaveAttribute("data-value", "circle");
   await expect(
     page.getByRole("spinbutton", { name: "鼠标大小", exact: true }),
   ).toHaveValue("56");
@@ -127,9 +142,7 @@ try {
   await page.getByLabel("缩放 (%)", { exact: true }).fill("75");
   await expect(page.getByLabel("缩放 (%)", { exact: true })).toHaveValue("75");
   await page.getByRole("tab", { name: "鼠标", exact: true }).click();
-  await page
-    .getByRole("combobox", { name: "鼠标样式", exact: true })
-    .selectOption("cross");
+  await selectPreview(page, "鼠标样式", "cross");
   await page
     .getByRole("spinbutton", { name: "鼠标大小", exact: true })
     .fill("48");
@@ -175,7 +188,8 @@ try {
     .toBe(true);
   await page.screenshot({ path: path.join(root, "recorded.png") });
   await page.getByRole("button", { name: "录制", exact: true }).click();
-  await expect(page.getByLabel("录屏背景", { exact: true })).toHaveValue(
+  await expect(page.getByLabel("录屏背景", { exact: true })).toHaveAttribute(
+    "data-value",
     "sunset",
   );
   await expect(page.getByLabel("录屏鼠标大小", { exact: true })).toHaveValue(
@@ -215,7 +229,7 @@ try {
   await page.getByRole("tab", { name: "鼠标", exact: true }).click();
   await expect(
     page.getByRole("combobox", { name: "鼠标样式", exact: true }),
-  ).toHaveValue("cross");
+  ).toHaveAttribute("data-value", "cross");
   await expect(
     page.getByRole("spinbutton", { name: "鼠标大小", exact: true }),
   ).toHaveValue("48");

@@ -8,7 +8,7 @@
 namespace {
 constexpr wchar_t kClassName[] = L"TronCutRecordingBorder";
 constexpr COLORREF kTransparent = RGB(0, 0, 0);
-constexpr COLORREF kRed = RGB(255, 48, 48);
+constexpr COLORREF kBorderColor = RGB(118, 229, 181); // Match the editor's green accent.
 HWND target = nullptr;
 HANDLE parent = nullptr;
 RECT bounds{};
@@ -19,7 +19,7 @@ void paintBorder(HWND window, HDC dc) {
     FillRect(dc, &client, static_cast<HBRUSH>(GetStockObject(BLACK_BRUSH)));
     const int stroke = std::max(2, MulDiv(3, GetDpiForWindow(window), 96));
     const int dash = stroke * 4, period = dash + stroke * 2;
-    HBRUSH brush = CreateSolidBrush(kRed);
+    HBRUSH brush = CreateSolidBrush(kBorderColor);
     for (int x = 0; x < client.right; x += period) {
         RECT top{x, 0, std::min<LONG>(x + dash, client.right), stroke};
         RECT bottom{x, client.bottom - stroke, top.right, client.bottom};

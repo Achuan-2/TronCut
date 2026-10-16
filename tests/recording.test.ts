@@ -144,6 +144,22 @@ it("录屏、镜头和背景分层导入，保留素材与原工程；禁用美�
   expect(added.tracks[0].id).toBe(
     added.clips.find((c) => c.assetId === camera.id)!.trackId,
   );
+  const nativeOrder = addRecordedAssets(
+    project,
+    [results[2], results[1], results[0]],
+    defaultRecordingSettings,
+    5,
+    background,
+  );
+  expect(
+    nativeOrder.tracks
+      .map(
+        (track) =>
+          nativeOrder.clips.find((clip) => clip.trackId === track.id)
+            ?.recordingRole,
+      )
+      .filter(Boolean),
+  ).toEqual(["camera", "screen", "microphone", "background"]);
   expect(JSON.stringify(project)).toBe(original);
   expect(screen.cursor.samples).toHaveLength(1);
   const plain = addRecordedAssets(

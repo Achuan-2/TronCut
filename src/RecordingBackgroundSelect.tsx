@@ -3,6 +3,9 @@ import {
   type RecordingSettings,
   type RecordingBackground,
 } from "../shared/recording-settings";
+import { Ban } from "lucide-react";
+import { recordingWallpaperUrl } from "../shared/recording-backgrounds";
+import PreviewSelect from "./PreviewSelect";
 
 export default function RecordingBackgroundSelect({
   settings,
@@ -19,51 +22,51 @@ export default function RecordingBackgroundSelect({
   label?: string;
 }) {
   const entries = Object.entries(recordingBackgrounds);
-  const groups: { name: string; items: typeof entries }[] = [
-    {
-      name: "静态背景",
-      items: entries.filter(([, entry]) => "file" in entry && !entry.animated),
-    },
-    {
-      name: "动态背景",
-      items: entries.filter(([, entry]) => "file" in entry && entry.animated),
-    },
-    {
-      name: "渐变背景",
-      items: entries.filter(([, entry]) => "colors" in entry),
-    },
-  ];
   return (
     <label className="field">
       背景
-      <select
-        aria-label={label}
+      <PreviewSelect
+        label={label}
         disabled={disabled}
         value={settings.background ? settings.preset : "none"}
-        onChange={(event) =>
+        onChange={(value) =>
           onChange(
-            event.target.value === "none"
+            value === "none"
               ? { background: false }
               : {
                   background: true,
-                  preset: event.target.value as RecordingBackground,
+                  preset: value as RecordingBackground,
                 },
           )
         }
-      >
-        <option value="none">无背景</option>
-        {groups
-          .filter(({ items }) => items.length > 0)
-          .map(({ name, items }) => (
-            <optgroup key={name} label={name}>
-              {items.map(([id, entry]) => (
-                <option key={id} value={id}>
-                  {entry.name}
-                </option>
-              ))}
-            </optgroup>
-          ))}
-      </select>
+        options={[
+          { value: "none", label: "无背景", preview: <Ban size={18} /> },
+          ...entries.map(([id, entry]) => ({
+            value: id,
+            label: entry.name,
+            preview:
+              "file" in entry ? (
+                entry.animated ? (
+                  <video
+                    src={recordingWallpaperUrl(entry.file)}
+                    autoPlay
+                    loop
+                    muted
+                    playsInline
+                  />
+                ) : (
+                  <img src={recordingWallpaperUrl(entry.file)} alt="" />
+                )
+              ) : (
+                <span
+                  style={{
+                    background: `linear-gradient(135deg,${entry.colors.join(",")})`,
+                  }}
+                />
+              ),
+          })),
+        ]}
+      />
     </label>
   );
 }

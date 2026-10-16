@@ -1,6 +1,7 @@
 import { _electron as electron, expect } from "@playwright/test";
 import fs from "node:fs/promises";
 import path from "node:path";
+import { selectPreview } from "./preview-select.mjs";
 import sharp from "sharp";
 
 const root = path.resolve(
@@ -72,7 +73,7 @@ try {
     .getByLabel("默认画布规格", { exact: true })
     .selectOption("1280x720");
   await page.getByLabel("默认项目帧率", { exact: true }).selectOption("60");
-  await page.getByLabel("默认鼠标样式", { exact: true }).selectOption("circle");
+  await selectPreview(page, "默认鼠标样式", "circle");
   await page.getByLabel("默认鼠标大小", { exact: true }).fill("56");
   await page.screenshot({ path: path.join(root, "project.png") });
   await page.getByRole("button", { name: "确定", exact: true }).click();

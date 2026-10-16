@@ -4169,6 +4169,18 @@ fieldset:disabled {
   object-fit: cover;
 }
 .recording-style :disabled { opacity: 0.5; }
+.preview-select { display: flex; align-items: center; gap: 8px; min-width: 0; width: 180px; padding: 5px 9px; border: 1px solid var(--line); border-radius: 6px; background: #151819; color: #d5dade; text-align: left; font: inherit; }
+.preview-select:disabled { opacity: 0.5; cursor: default; }
+.preview-select > svg { flex-shrink: 0; }
+.preview-select-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.preview-select-thumbnail { display: flex; align-items: center; justify-content: center; flex-shrink: 0; width: 40px; height: 28px; border-radius: 4px; overflow: hidden; background: #30383c; color: #bfcbd1; }
+.preview-select-thumbnail > img, .preview-select-thumbnail > video, .preview-select-thumbnail > span { display: block; width: 100%; height: 100%; object-fit: cover; }
+.preview-select-thumbnail > img.cursor-style-thumbnail { width: 25px; height: 25px; object-fit: contain; }
+.preview-select-popup { position: fixed; z-index: 500; overflow-y: auto; overscroll-behavior: contain; padding: 4px; border: 1px solid #4c575c; border-radius: 7px; background: #1c2225; color: #dbe4e8; box-shadow: 0 8px 28px #0008; }
+.preview-select-popup > button { display: flex; align-items: center; gap: 10px; width: 100%; height: 52px; padding: 6px 10px; border: 0; border-radius: 4px; background: transparent; color: inherit; text-align: left; font-size: 12px; }
+.preview-select-popup > button.active { background: #33443e; }
+.preview-select-popup > button[aria-selected="true"] { color: var(--accent); }
+.recording-style-fields .preview-select, .preferences-grouped .preview-select { width: 100%; }
 .inspector .recording-object-properties { min-width: 0; padding: 0; border: 0; }
 .recording-object-properties > .visual-effect-properties:first-child { margin-top: 0; border-top: 0; }
 .recording-background-swatch { width: 100%; aspect-ratio: 16 / 9; margin: 8px 0 16px; overflow: hidden; border-radius: 6px; }

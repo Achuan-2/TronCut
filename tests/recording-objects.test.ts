@@ -101,6 +101,37 @@ it("录屏及镜头、声音、背景自动组成一个对象，取消组合释�
   expect(released.clips.map((clip) => clip.keyframes)).toEqual(
     project.clips.map((clip) => clip.keyframes),
   );
+  const screenTrack = master.trackId;
+  const micTrack = project.clips.find(
+    (clip) => clip.recordingRole === "microphone",
+  )!.trackId;
+  const legacy = {
+    ...project,
+    tracks: [
+      project.tracks.find((track) => track.id === micTrack)!,
+      ...project.tracks.filter((track) => track.id !== micTrack),
+    ],
+  };
+  const ordered = groupSelection(legacy, [master.id], true);
+  expect(
+    ordered.tracks.findIndex((track) => track.id === screenTrack) + 1,
+  ).toBe(ordered.tracks.findIndex((track) => track.id === micTrack));
+  const sharedTrack = {
+    ...legacy,
+    clips: [
+      ...legacy.clips,
+      {
+        ...legacy.clips.find((clip) => clip.trackId === micTrack)!,
+        id: "unrelated-audio",
+        groupId: undefined,
+        recordingRole: undefined,
+        start: 20,
+      },
+    ],
+  };
+  expect(groupSelection(sharedTrack, [master.id], true).tracks).toEqual(
+    legacy.tracks,
+  );
 });
 
 it("对象移动、复制、删除与拆分保持子素材同步，副本和拆分分别成为独立对象", () => {
