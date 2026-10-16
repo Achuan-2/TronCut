@@ -479,6 +479,15 @@ export default function Timeline({
   }, [selected?.trackId, project.tracks.length, layoutKey, trackHeightDraft]);
   const [viewport, setViewport] = useState({ left: 0, width: 1600 });
   const rulerStep = timelineRulerStep(zoom, project.canvas.fps);
+  const rulerTicks = useMemo(() => {
+    const count =
+      Math.ceil((viewport.width + 400) / zoom / rulerStep) + 1;
+    const start = Math.max(
+      0,
+      Math.floor((viewport.left - 200) / zoom / rulerStep),
+    );
+    return Array.from({ length: count }, (_, i) => (start + i) * rulerStep);
+  }, [viewport.left, viewport.width, zoom, rulerStep]);
   const visibleClips = useMemo(() => {
     const index = projectIndex(project);
     return new Map(
@@ -1073,23 +1082,7 @@ export default function Timeline({
               onPointerCancel={() => setMarkerRange(null)}
               onLostPointerCapture={() => setMarkerRange(null)}
             >
-              {Array.from(
-                {
-                  length:
-                    Math.ceil(
-                      (viewport.width + 400) / zoom / rulerStep,
-                    ) + 1,
-                },
-                (_, i) =>
-                  (Math.max(
-                    0,
-                    Math.floor(
-                      (viewport.left - 200) / zoom / rulerStep,
-                    ),
-                  ) +
-                    i) *
-                  rulerStep,
-              ).map((t) => (
+              {rulerTicks.map((t) => (
                 <span key={t} style={{ left: t * zoom }}>
                   {timelineRulerLabel(t, project.canvas.fps, rulerStep)}
                 </span>

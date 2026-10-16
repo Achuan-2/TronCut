@@ -66,7 +66,7 @@ class TranscribeTests(unittest.TestCase):
                 repeated = recognize_wav(audio, recognize, "vad.onnx", "qwen3-asr", "CPU", "zh")
                 create_vad.assert_called_once()
         self.assertEqual(cues, repeated)
-        self.assertEqual(batches, [1] * 12)
+        self.assertEqual(batches, [4, 2, 4, 2])
         self.assertEqual([(cue["start"], cue["end"]) for cue in cues],
                          [(i, i + 0.5) for i in (0, 1, 2, 3, 4, 6)])
 

@@ -52,15 +52,19 @@ def load_cpu_recognizer(request):
     if cached:
         progress(8, f"复用已加载的 {engine} ONNX 模型（CPU）")
     def recognize(batch, language):
-        results = []
+        streams = []
         for samples in batch:
             stream = recognizer.create_stream()
             if engine == "qwen3-asr" and language:
                 stream.set_option("language", language)
             stream.accept_waveform(SAMPLE_RATE, samples)
-            recognizer.decode_stream(stream)
-            results.append(stream.result)
-        return results
+            streams.append(stream)
+        if hasattr(recognizer, "decode_streams"):
+            recognizer.decode_streams(streams)
+        else:
+            for stream in streams:
+                recognizer.decode_stream(stream)
+        return [stream.result for stream in streams]
 
     return recognize
 
@@ -109,6 +113,8 @@ def recognize_wav(input_path, recognize, vad_model, engine, label, language):
     count = 0
     pending = []
 
+    BATCH_SIZE = 4
+
     def decode_pending():
         nonlocal count
         if not pending:
@@ -130,7 +136,8 @@ def recognize_wav(input_path, recognize, vad_model, engine, label, language):
             end = min(total_samples / SAMPLE_RATE, start + len(samples) / SAMPLE_RATE)
             if len(samples) and end > start:
                 pending.append((start, end, samples))
-                decode_pending()
+                if len(pending) >= BATCH_SIZE:
+                    decode_pending()
             vad.pop()
 
     with wave.open(input_path, "rb") as audio:

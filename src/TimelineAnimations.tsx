@@ -1,5 +1,6 @@
 import type { Clip } from "../shared/model";
 import {
+  memo,
   useCallback,
   useEffect,
   useMemo,
@@ -22,7 +23,7 @@ import {
 import { timeLabel } from "./Preview";
 import { animationCursor } from "./animationCursor";
 
-export function TimelineAnimations({
+export const TimelineAnimations = memo(function TimelineAnimations({
   clip,
   zoom,
   playhead,
@@ -335,4 +336,18 @@ export function TimelineAnimations({
       )}
     </>
   );
-}
+}, (prev, next) => {
+  if (prev.selected || next.selected) {
+    if (prev.selected !== next.selected) return false;
+    if (prev.selectedFrame !== next.selectedFrame) return false;
+    if (prev.playhead !== next.playhead) return false;
+  }
+  return (
+    prev.clip === next.clip &&
+    prev.zoom === next.zoom &&
+    prev.fps === next.fps &&
+    prev.locked === next.locked &&
+    prev.viewportStart === next.viewportStart &&
+    prev.viewportEnd === next.viewportEnd
+  );
+});

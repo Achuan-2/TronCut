@@ -1,5 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import os from "node:os";
 import { createHash } from "node:crypto";
 import type { Asset } from "../shared/model";
 import { findBinary, runProcess } from "./process";
@@ -7,9 +8,42 @@ import { ThumbnailMemoryCache } from "./thumbnail-cache";
 
 const pending = new Map<string, Promise<string>>();
 const memory = new ThumbnailMemoryCache();
-let queue = Promise.resolve();
 
-/** Serial thumbnail generation avoids opening dozens of simultaneous decoders on import. */
+// Bounded concurrency pool for thumbnail/waveform generation:
+// Instead of strictly serializing all media imports (1 by 1), allow multiple concurrent FFmpeg decoders,
+// bounded to prevent CPU and disk thrashing.
+const maxConcurrency = Math.max(2, Math.min(4, os.cpus()?.length || 2));
+let activeCount = 0;
+const waitingQueue: (() => void)[] = [];
+
+async function acquireSlot(): Promise<() => void> {
+  if (activeCount < maxConcurrency) {
+    activeCount++;
+    let released = false;
+    return () => {
+      if (released) return;
+      released = true;
+      activeCount--;
+      const next = waitingQueue.shift();
+      if (next) next();
+    };
+  }
+  return new Promise((resolve) => {
+    waitingQueue.push(() => {
+      activeCount++;
+      let released = false;
+      resolve(() => {
+        if (released) return;
+        released = true;
+        activeCount--;
+        const next = waitingQueue.shift();
+        if (next) next();
+      });
+    });
+  });
+}
+
+/** Parallel, bounded-concurrency thumbnail and waveform generation avoids queue starvation on multi-file import. */
 export async function mediaThumbnail(
   asset: Asset,
   waveform: boolean,
@@ -32,51 +66,57 @@ export async function mediaThumbnail(
   if (cached !== undefined) return cached;
   const requestKey = `${path.resolve(cacheDir)}|${key}`;
   if (pending.has(requestKey)) return pending.get(requestKey)!;
-  const operation = queue.then(async () => {
-    await fs.mkdir(cacheDir, { recursive: true });
-    const file = path.join(cacheDir, `${key}.png`);
-    if (
-      !(await fs.access(file).then(
-        () => true,
-        () => false,
-      ))
-    ) {
-      const temp = path.join(cacheDir, `${key}.partial.png`);
-      try {
-        const args = ["-y", "-hide_banner"];
-        if (!waveform && asset.kind === "video")
-          args.push("-ss", String(Math.min(1, asset.duration / 3)));
-        args.push("-i", asset.path);
-        if (waveform)
-          args.push(
-            "-filter_complex",
-            "aformat=channel_layouts=mono,aresample=1000,showwavespic=s=1200x64:colors=0x71e6b5:scale=sqrt:filter=peak",
-            "-an",
-          );
-        else
-          args.push(
-            "-vf",
-            "scale=320:180:force_original_aspect_ratio=decrease,pad=320:180:(ow-iw)/2:(oh-ih)/2:color=0x142821",
-            "-an",
-          );
-        args.push("-frames:v", "1", temp);
-        await runProcess(findBinary("ffmpeg", resourcesPath), args, {
-          timeout: 120000,
-        });
-        await fs.rename(temp, file);
-      } finally {
-        await fs.rm(temp, { force: true });
+
+  const operation = (async () => {
+    const release = await acquireSlot();
+    try {
+      const existing = memory.get(key);
+      if (existing !== undefined) return existing;
+
+      await fs.mkdir(cacheDir, { recursive: true });
+      const file = path.join(cacheDir, `${key}.png`);
+      if (
+        !(await fs.access(file).then(
+          () => true,
+          () => false,
+        ))
+      ) {
+        const temp = path.join(cacheDir, `${key}.partial.png`);
+        try {
+          const args = ["-y", "-hide_banner"];
+          if (!waveform && asset.kind === "video")
+            args.push("-ss", String(Math.min(1, asset.duration / 3)));
+          args.push("-i", asset.path);
+          if (waveform)
+            args.push(
+              "-filter_complex",
+              "aformat=channel_layouts=mono,aresample=1000,showwavespic=s=1200x64:colors=0x71e6b5:scale=sqrt:filter=peak",
+              "-an",
+            );
+          else
+            args.push(
+              "-vf",
+              "scale=320:180:force_original_aspect_ratio=decrease,pad=320:180:(ow-iw)/2:(oh-ih)/2:color=0x142821",
+              "-an",
+            );
+          args.push("-frames:v", "1", temp);
+          await runProcess(findBinary("ffmpeg", resourcesPath), args, {
+            timeout: 120000,
+          });
+          await fs.rename(temp, file);
+        } finally {
+          await fs.rm(temp, { force: true });
+        }
       }
+      const data = `data:image/png;base64,${(await fs.readFile(file)).toString("base64")}`;
+      memory.set(key, data);
+      return data;
+    } finally {
+      release();
     }
-    const data = `data:image/png;base64,${(await fs.readFile(file)).toString("base64")}`;
-    memory.set(key, data);
-    return data;
-  });
+  })();
+
   pending.set(requestKey, operation);
-  queue = operation.then(
-    () => {},
-    () => {},
-  );
   try {
     return await operation;
   } finally {

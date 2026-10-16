@@ -1,15 +1,16 @@
-import { useEffect, useState } from "react";
+import { memo, useEffect, useState, type CSSProperties } from "react";
 import type { Asset } from "../shared/model";
 
-export function MediaThumbnail({
-  asset,
-  waveform = false,
-  style,
-}: {
-  asset: Asset;
-  waveform?: boolean;
-  style?: React.CSSProperties;
-}) {
+export const MediaThumbnail = memo(
+  function MediaThumbnail({
+    asset,
+    waveform = false,
+    style,
+  }: {
+    asset: Asset;
+    waveform?: boolean;
+    style?: CSSProperties;
+  }) {
   const [url, setUrl] = useState<string | null>(null);
   useEffect(() => {
     let alive = true;
@@ -33,4 +34,13 @@ export function MediaThumbnail({
       style={style}
     />
   ) : null;
-}
+}, (prev, next) => {
+  return (
+    prev.waveform === next.waveform &&
+    prev.asset.id === next.asset.id &&
+    prev.asset.path === next.asset.path &&
+    prev.asset.missing === next.asset.missing &&
+    prev.style?.width === next.style?.width &&
+    prev.style?.left === next.style?.left
+  );
+});
