@@ -1,0 +1,15 @@
+.canvas-context-menu {
+  width: 240px;
+}
+.canvas-context-menu button {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+}
+.canvas-menu-arrow {
+  margin-left: auto;
+}
+.canvas-context-submenu {
+  width: 180px;
+}

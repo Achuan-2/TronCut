@@ -1095,7 +1095,10 @@ export default function App() {
                 setPreferencesOpen(true);
               }}
             />
-            <Preview editor={editor} />
+            <Preview
+              editor={editor}
+              onCommand={(command) => commands.current(command)}
+            />
             <Inspector editor={editor} />
           </div>
           <Timeline

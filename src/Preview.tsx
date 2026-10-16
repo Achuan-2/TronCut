@@ -79,6 +79,10 @@ import EffectRegionOverlay from "./EffectRegionOverlay";
 import type { Region } from "../shared/visual-effects";
 import { effectActive } from "../shared/effect-timing";
 import BehaviorText from "./BehaviorText";
+import CanvasContextMenu, {
+  type CanvasCommand,
+  type CanvasMenuPosition,
+} from "./CanvasContextMenu";
 import { useViewportZoom, type ZoomPoint } from "./useViewportZoom";
 
 export function timeLabel(t: number): string {
@@ -903,12 +907,19 @@ export function ScenePreview({
     </div>
   );
 }
-export default function Preview({ editor }: { editor: Editor }) {
+export default function Preview({
+  editor,
+  onCommand,
+}: {
+  editor: Editor;
+  onCommand: (command: CanvasCommand) => void;
+}) {
   const panel = useRef<HTMLElement>(null);
   const holder = useRef<HTMLDivElement>(null),
     [size, setSize] = useState({ width: 700, height: 400 });
   const { canvasMode: mode, setCanvasMode: setMode } = editor;
   const [zoom, setZoom] = useState<CanvasZoom>("fit");
+  const [contextMenu, setContextMenu] = useState<CanvasMenuPosition | null>(null);
   useEffect(() => {
     const initial = editor.preferences.program.previewZoom;
     setZoom(initial === "fit" ? "fit" : Number(initial));
@@ -1044,6 +1055,29 @@ export default function Preview({ editor }: { editor: Editor }) {
       <div
         className="canvas-holder"
         ref={holder}
+        onContextMenu={(event) => {
+          if (
+            fullscreen ||
+            (event.target as HTMLElement).closest(
+              'textarea, input, [contenteditable="true"]',
+            )
+          ) return;
+          event.preventDefault();
+          const hit = (event.target as HTMLElement).closest<HTMLElement>(
+            ".preview-layer[data-clip-id]",
+          );
+          const clipId = hit?.dataset.clipId;
+          const id = clipId
+            ? recordingMaster(project, clipId)?.id ?? clipId
+            : null;
+          editor.setPlaying(false);
+          editor.clearKeyframeEdit();
+          if (editor.editingTextId) editor.endTextEdit(editor.editingTextId);
+          const previous = editor.selectedIds;
+          editor.select(id);
+          if (id && previous.includes(id)) editor.selectMany(previous);
+          setContextMenu({ x: event.clientX, y: event.clientY, clipId: id });
+        }}
         onClick={() => {
           if (!fullscreen) editor.select(null);
         }}
@@ -1099,6 +1133,13 @@ export default function Preview({ editor }: { editor: Editor }) {
           </div>
         </div>
       </div>
+      <CanvasContextMenu
+        editor={editor}
+        menu={contextMenu}
+        onClose={() => setContextMenu(null)}
+        onCommand={onCommand}
+        portalTarget={panel.current}
+      />
       {fullscreenError && (
         <div className="fullscreen-error" role="alert">
           {fullscreenError}
