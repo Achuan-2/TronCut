@@ -3,11 +3,8 @@ import type { Clip } from "../shared/model";
 import { defaultCursorStyle } from "../shared/cursor";
 import CursorStyleSelect from "./CursorStyleSelect";
 import NumberInput from "./NumberInput";
-import {
-  recordingBackgrounds,
-  type RecordingSettings,
-} from "../shared/recording-settings";
-import { recordingWallpaperUrl } from "../shared/recording-backgrounds";
+import type { RecordingSettings } from "../shared/recording-settings";
+import RecordingBackgroundPreview from "./RecordingBackgroundPreview";
 import { updateRecordingObject } from "../shared/recording-objects";
 import { groupSelection } from "../shared/timeline";
 import RecordingBackgroundSelect from "./RecordingBackgroundSelect";
@@ -30,13 +27,13 @@ export default function RecordingObjectProperties({
     (asset) => asset.id === clip.assetId,
   );
   const hasCursor = !!asset?.cursor;
-  const background = recordingBackgrounds[settings.preset];
   async function change(patch: Partial<RecordingSettings>) {
     setError("");
     const next = { ...settings, ...patch };
     const needsBackground =
       next.background &&
       (patch.preset !== undefined ||
+        patch.customBackground !== undefined ||
         (patch.background === true &&
           !editor.project.clips.some(
             (member) =>
@@ -50,6 +47,7 @@ export default function RecordingObjectProperties({
             editor.project.canvas.width,
             editor.project.canvas.height,
             next.preset,
+            next.customBackground?.id,
           )
         : undefined;
       editor.apply((project) =>
@@ -75,33 +73,12 @@ export default function RecordingObjectProperties({
       <EffectSection title="录屏样式">
         <RecordingBackgroundSelect
           settings={settings}
-          onChange={(patch) => void change(patch)}
+          onChange={change}
           label="录屏对象背景"
         />
         {settings.background && (
           <div className="recording-background-swatch" aria-label="背景预览">
-            {"file" in background ? (
-              background.animated ? (
-                <video
-                  src={recordingWallpaperUrl(background.file)}
-                  autoPlay
-                  loop
-                  muted
-                  playsInline
-                />
-              ) : (
-                <img
-                  src={recordingWallpaperUrl(background.file)}
-                  alt={background.name}
-                />
-              )
-            ) : (
-              <div
-                style={{
-                  background: `linear-gradient(135deg,${background.colors.join(",")})`,
-                }}
-              />
-            )}
+            <RecordingBackgroundPreview settings={settings} />
           </div>
         )}
         <label className="field">

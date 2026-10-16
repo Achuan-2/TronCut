@@ -46,14 +46,30 @@ export const recordingBackgrounds = {
   violet: { name: "紫雾", colors: ["#30295b", "#bd9ce4"] },
   sunset: { name: "日落", colors: ["#793c63", "#f6ae7d"] },
   dark: { name: "深灰", colors: ["#111827", "#475569"] },
+  blue: { name: "蓝色渐变", colors: ["#a1c4fd", "#c2e9fb"] },
 } as const;
-export const recordingBackgroundSchema = z.enum(
-  Object.keys(recordingBackgrounds) as [
-    keyof typeof recordingBackgrounds,
-    ...(keyof typeof recordingBackgrounds)[],
-  ],
-);
+export const recordingBackgroundSchema = z.enum([
+  "custom",
+  ...Object.keys(recordingBackgrounds),
+] as [
+  keyof typeof recordingBackgrounds | "custom",
+  ...(keyof typeof recordingBackgrounds | "custom")[],
+]);
 export type RecordingBackground = z.infer<typeof recordingBackgroundSchema>;
+// Keep enough metadata to remember and preview an imported background on restart.
+export const customRecordingBackgroundSchema = z.object({
+  id: z.string().uuid(),
+  name: z.string().min(1),
+  path: z.string().min(1),
+  kind: z.enum(["image", "video"]),
+  duration: finite.positive(),
+  width: finite.positive(),
+  height: finite.positive(),
+  hasAudio: z.boolean(),
+});
+export type CustomRecordingBackground = z.infer<
+  typeof customRecordingBackgroundSchema
+>;
 export const recordingSettingsSchema = z.object({
   background: z.boolean(),
   preset: z.preprocess(
@@ -63,6 +79,7 @@ export const recordingSettingsSchema = z.object({
         : value,
     recordingBackgroundSchema,
   ),
+  customBackground: customRecordingBackgroundSchema.optional(),
   padding: z.number().finite().min(0).max(0.25),
   radius: z.number().finite().min(0).max(200),
   cursor: cursorStyleSchema,

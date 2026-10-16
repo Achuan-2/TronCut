@@ -1,7 +1,8 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import sharp from "sharp";
-import { uid } from "../shared/model";
+import { uid, type Asset } from "../shared/model";
+import { customRecordingBackgroundSchema } from "../shared/recording-settings";
 import {
   defaultRecordingSettings,
   recordingBackgrounds,
@@ -17,6 +18,7 @@ export class RecordingStyleStore {
     private readonly wallpaperRoot = path.resolve(
       "public/recording/wallpapers",
     ),
+    private readonly resourcesPath?: string,
   ) {}
   async read(): Promise<RecordingSettings> {
     try {
@@ -49,7 +51,36 @@ export class RecordingStyleStore {
     }
     return settings;
   }
-  async background(width: number, height: number, preset: RecordingBackground) {
+  async importBackground(source: string) {
+    const asset = await probeMedia(source, this.resourcesPath);
+    if (asset.kind === "audio") throw new Error("背景仅支持图片或视频，请重新选择文件");
+    const custom = customRecordingBackgroundSchema.parse(asset);
+    const folder = path.join(this.root, "recording-backgrounds", "custom");
+    await fs.mkdir(folder, { recursive: true });
+    const target = path.join(
+      folder,
+      `${custom.id}${path.extname(source).toLowerCase()}`,
+    );
+    try {
+      await fs.copyFile(source, target);
+    } catch (error) {
+      await fs.rm(target, { force: true });
+      throw error;
+    }
+    return { ...custom, path: target };
+  }
+  async background(
+    width: number,
+    height: number,
+    preset: RecordingBackground,
+    custom?: Asset,
+  ) {
+    if (preset === "custom") {
+      if (!custom) throw new Error("请先选择自定义背景图片或视频");
+      const asset = customRecordingBackgroundSchema.parse(custom);
+      await fs.access(asset.path);
+      return asset;
+    }
     const entry = recordingBackgrounds[preset];
     if ("file" in entry && !entry.file.endsWith(".svg")) {
       // External FFprobe/FFmpeg cannot open media inside app.asar.
@@ -61,7 +92,10 @@ export class RecordingStyleStore {
       } catch {
         await fs.copyFile(path.join(this.wallpaperRoot, entry.file), file);
       }
-      return { ...(await probeMedia(file)), name: `录屏背景 · ${entry.name}` };
+      return {
+        ...(await probeMedia(file, this.resourcesPath)),
+        name: `录屏背景 · ${entry.name}`,
+      };
     }
     const folder = path.join(this.root, "recording-backgrounds");
     const file = path.join(folder, `${preset}-${width}x${height}.png`);
@@ -89,7 +123,7 @@ export class RecordingStyleStore {
       }
     }
     return {
-      ...(await probeMedia(file)),
+      ...(await probeMedia(file, this.resourcesPath)),
       name: `录屏背景 · ${recordingBackgrounds[preset].name}.png`,
     };
   }

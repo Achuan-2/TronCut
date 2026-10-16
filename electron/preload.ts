@@ -7,8 +7,9 @@ const bridge: FrameCraftBridge = {
   recordingSettings: () => ipcRenderer.invoke("recording:settings"),
   saveRecordingSettings: (settings) =>
     ipcRenderer.invoke("recording:settings:save", settings),
-  createRecordingBackground: (width, height, preset) =>
-    ipcRenderer.invoke("recording:background", width, height, preset),
+  selectRecordingBackground: () => ipcRenderer.invoke("recording:background:select"),
+  createRecordingBackground: (width, height, preset, customAssetId) =>
+    ipcRenderer.invoke("recording:background", width, height, preset, customAssetId),
   preferences: () => ipcRenderer.invoke("preferences:get"),
   savePreferences: (update) => ipcRenderer.invoke("preferences:save", update),
   testAiConnection: (update) =>

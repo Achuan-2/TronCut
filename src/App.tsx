@@ -846,6 +846,7 @@ export default function App() {
           canvas.width,
           canvas.height,
           settings.preset,
+          settings.customBackground?.id,
         );
       } catch (error) {
         warning = `背景生成失败，录屏已导入：${String(error)}`;

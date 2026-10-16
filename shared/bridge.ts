@@ -11,6 +11,7 @@ import type {
   AiProviderUpdate,
 } from "./preferences";
 import type { RecordingBackground, RecordingSettings } from "./recording";
+import type { CustomRecordingBackground } from "./recording-settings";
 import type { VideoExportRequest } from "./export-settings";
 import type { EditMenuState } from "./edit-menu";
 import type { z } from "zod";
@@ -41,10 +42,12 @@ export interface FrameCraftBridge {
   saveRecordingSettings(
     settings: RecordingSettings,
   ): Promise<RecordingSettings>;
+  selectRecordingBackground(): Promise<CustomRecordingBackground | null>;
   createRecordingBackground(
     width: number,
     height: number,
     preset: RecordingBackground,
+    customAssetId?: string,
   ): Promise<Asset>;
   preferences(): Promise<Preferences>;
   savePreferences(update: PreferencesUpdate): Promise<Preferences>;

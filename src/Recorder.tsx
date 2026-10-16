@@ -15,12 +15,11 @@ import type { CaptureSource } from "../shared/bridge";
 import { timeLabel } from "./Preview";
 import {
   defaultRecordingSettings,
-  recordingBackgrounds,
   type RecordedAsset,
   type RecordingSettings,
 } from "../shared/recording";
 import { cursorSvg, cursorAspect } from "../shared/cursor";
-import { recordingWallpaperUrl } from "../shared/recording-backgrounds";
+import RecordingBackgroundPreview from "./RecordingBackgroundPreview";
 import RecordingBackgroundSelect from "./RecordingBackgroundSelect";
 import CursorStyleSelect from "./CursorStyleSelect";
 import NumberInput from "./NumberInput";
@@ -67,7 +66,6 @@ export default function Recorder({
   const recordingSettings = useRef(settings);
   const changeSettings = (patch: Partial<RecordingSettings>) =>
     setSettings((s) => ({ ...s, ...patch }));
-  const background = recordingBackgrounds[settings.preset];
   async function closeSettings() {
     if (!settingsReady || !window.framecraft) {
       onClose();
@@ -498,32 +496,17 @@ export default function Recorder({
           <div
             className="recording-style-preview"
             style={{
-              background:
-                settings.background && "colors" in background
-                  ? `linear-gradient(135deg, ${background.colors.join(",")})`
-                  : "#111827",
+              background: "#111827",
               padding: settings.background ? settings.padding * 240 : 0,
             }}
             aria-label="录屏美化预览"
           >
-            {settings.background &&
-              "file" in background &&
-              (background.animated ? (
-                <video
-                  className="recording-wallpaper-preview"
-                  src={recordingWallpaperUrl(background.file)}
-                  autoPlay
-                  loop
-                  muted
-                  playsInline
-                />
-              ) : (
-                <img
-                  className="recording-wallpaper-preview"
-                  src={recordingWallpaperUrl(background.file)}
-                  alt=""
-                />
-              ))}
+            {settings.background && (
+              <RecordingBackgroundPreview
+                settings={settings}
+                className="recording-wallpaper-preview"
+              />
+            )}
             <div
               style={{
                 borderRadius: settings.background ? settings.radius / 3 : 0,

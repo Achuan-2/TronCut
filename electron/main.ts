@@ -114,6 +114,7 @@ const recentProjects = new RecentProjects(path.join(app.getPath("userData"), "re
 const preferences = new PreferencesStore(path.join(app.getPath("userData"), "preferences.json"), safeStorage);
 const recordingStyle = new RecordingStyleStore(
   app.getPath("userData"), path.join(app.getAppPath(), "dist/recording/wallpapers"),
+  process.resourcesPath,
 );
 const recordingCountdown = new RecordingCountdown();
 async function rememberProject(project: Project, file: string) {
@@ -235,7 +236,13 @@ function installHandlers() {
     } finally { task = null; }
   });
   handle("window:state", windowState);
-  handle("recording:settings", async () => (await preferences.get()).recording);
+  handle("recording:settings", async () => {
+    const settings = (await preferences.get()).recording;
+    // Prefer a project's relocated copy when the same asset is already open.
+    if (settings.customBackground && !assets.has(settings.customBackground.id))
+      register(settings.customBackground);
+    return settings;
+  });
   handle("recording:countdown", async (sourceId: unknown) => {
     const id = z.string().parse(sourceId);
     minimizeForRecording(id);
@@ -253,11 +260,26 @@ function installHandlers() {
   handle("recording:settings:save", async (input: unknown) =>
     (await preferences.save({ recording: recordingSettingsSchema.parse(input) })).recording,
   );
-  handle("recording:background", async (width: unknown, height: unknown, preset: unknown) =>
+  handle("recording:background:select", async () => {
+    const file = await chooseFile("选择自定义录屏背景", [
+      "png", "jpg", "jpeg", "webp", "bmp", "tif", "tiff", "gif",
+      "mp4", "mov", "mkv", "webm", "avi", "m4v",
+    ]);
+    if (!file) return null;
+    const background = await recordingStyle.importBackground(file);
+    register(background);
+    const settings = (await preferences.get()).recording;
+    await preferences.save({ recording: {
+      ...settings, background: true, preset: "custom", customBackground: background,
+    } });
+    return background;
+  });
+  handle("recording:background", async (width: unknown, height: unknown, preset: unknown, customAssetId: unknown) =>
     register(await recordingStyle.background(
       z.number().int().min(16).max(7680).parse(width),
       z.number().int().min(16).max(4320).parse(height),
       recordingBackgroundSchema.parse(preset),
+      preset === "custom" ? assetById(customAssetId) : undefined,
     )),
   );
   handle("window:minimize", () => window.minimize());
