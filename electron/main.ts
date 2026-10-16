@@ -6,6 +6,7 @@ import {
   globalShortcut,
   ipcMain,
   Menu,
+  nativeTheme,
   protocol,
   session,
   screen,
@@ -66,6 +67,8 @@ import {
 const cliIndex = process.argv.indexOf("--cli");
 const cliMode = cliIndex >= 0;
 if (cliMode) app.commandLine.appendSwitch("disable-gpu");
+// The editor uses a dark palette, including native popup menus and dialogs.
+if (!cliMode) nativeTheme.themeSource = "dark";
 
 protocol.registerSchemesAsPrivileged([
   {
