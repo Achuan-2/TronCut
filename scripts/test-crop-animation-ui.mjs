@@ -114,9 +114,12 @@ try {
   await expect(arrows.first().locator(".animation-point.end")).toHaveClass(
     /selected-frame/,
   );
+  // Endpoint pointer gestures retain focus; finish the number input's draft.
+  await zoom.blur();
   await arrows.first().locator(".animation-point.start").click();
   await expect(zoom).toHaveValue("100");
   await zoom.fill("125");
+  await zoom.blur();
   await expect(arrows).toHaveCount(1);
   await arrows.first().locator(".animation-point.end").click();
   await expect(zoom).toHaveValue("300");
@@ -148,11 +151,33 @@ try {
   await checkFixed();
   await page.getByRole("button", { name: "自动动画", exact: true }).click();
   await arrows.nth(1).locator(".animation-point.start").click();
+  const playhead = page.locator(".ruler-playhead");
+  await expect(playhead).toHaveCSS("left", "260px");
+  await expect(page.locator(".keyframe-edit-status")).toContainText(
+    "编辑动画终点 · 00:02.00",
+  );
+  await expect(arrows.first().locator(".animation-point.end")).toHaveAttribute(
+    "aria-pressed", "true",
+  );
   await expect(zoom).toHaveValue("300");
+  await page.getByRole("button", { name: "添加关键帧", exact: true }).click();
+  await expect(arrows).toHaveCount(2);
+  await expect(playhead).toHaveCSS("left", "260px");
   await zoom.fill("350");
+  await expect(playhead).toHaveCSS("left", "260px");
+  await expect(zoom).toHaveValue("350");
+  await expect(arrows).toHaveCount(2);
+  await page.getByTitle("撤销 Ctrl+Z", { exact: true }).click();
+  await expect(zoom).toHaveValue("300");
+  await expect(playhead).toHaveCSS("left", "260px");
+  await page.getByTitle("重做 Ctrl+Shift+Z", { exact: true }).click();
+  await expect(zoom).toHaveValue("350");
+  await expect(playhead).toHaveCSS("left", "260px");
   await seek(3);
+  await expect(page.locator(".keyframe-edit-status")).toHaveCount(0);
   await expect(zoom).toHaveValue("350");
   await arrows.nth(1).locator(".animation-point.end").click();
+  await expect(playhead).toHaveCSS("left", "325px");
   await expect(zoom).toHaveValue("200");
   await page.screenshot({ path: path.join(root, "fixed-range-animation.png") });
   const handle = layer.locator(".crop-handle.w");

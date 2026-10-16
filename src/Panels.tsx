@@ -615,7 +615,9 @@ export function Inspector({ editor }: { editor: Editor }) {
                   编辑动画
                   {editor.selectedKeyframe.side === "start"
                     ? "起点"
-                    : "终点"} · {timeLabel(editor.playhead)}
+                    : "终点"} · {timeLabel(
+                    c.start + editor.selectedKeyframe.time - (c.animationOffset ?? 0),
+                  )}
                 </span>
                 <button type="button" onClick={editor.clearKeyframeEdit}>
                   退出

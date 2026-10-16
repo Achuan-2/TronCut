@@ -132,6 +132,8 @@ export function useEditor(
     clipId: string;
     time: number;
     side: "start" | "end";
+    // The clicked endpoint can edit an earlier frame across a hold.
+    localTime: number;
   };
   const [keyframeSelection, setKeyframeSelection] =
     useState<KeyframeSelection | null>(null);
@@ -475,7 +477,12 @@ export function useEditor(
         )
       )
         return;
-      const selection = { clipId, time: frame?.time ?? 0, side: target.side };
+      const selection = {
+        clipId,
+        time: frame?.time ?? 0,
+        side: target.side,
+        localTime,
+      };
       keyframeRef.current = selection;
       setKeyframeSelection(selection);
       // Recording zooms animate the content inside a fixed video frame.
@@ -487,7 +494,7 @@ export function useEditor(
           : [clipId],
       );
       setPlayingState(false);
-      setPlayhead(clip.start + selection.time - (clip.animationOffset ?? 0));
+      setPlayhead(clip.start + localTime);
     },
     [],
   );
@@ -534,6 +541,7 @@ export function useEditor(
   );
   const addSelectedKeyframe = useCallback(() => {
     const project = current.current;
+    const frame = keyframeRef.current;
     const results = project.clips
       .filter(
         (clip) =>
@@ -544,7 +552,9 @@ export function useEditor(
       .map((clip) =>
         addAnimationKeyframe(
           clip,
-          playhead - clip.start,
+          frame?.clipId === clip.id && frame.side === "end"
+            ? frame.time - (clip.animationOffset ?? 0)
+            : playhead - clip.start,
           project.canvas.fps,
           defaults.current.timing.animation,
         ),
@@ -566,7 +576,14 @@ export function useEditor(
     const focused =
       results.find((result) => result.clip.id === selectedId) ??
       results.at(-1)!;
-    editKeyframe(focused.clip.id, focused.time, "end", true);
+    // Reusing the selected end must preserve the clicked start's playhead.
+    if (
+      frame?.clipId !== focused.clip.id ||
+      frame.side !== "end" ||
+      Math.abs(frame.time - (focused.clip.animationOffset ?? 0) - focused.time) >=
+        1e-6
+    )
+      editKeyframe(focused.clip.id, focused.time, "end", true);
   }, [selectedIds, selectedId, playhead, apply, editKeyframe]);
   const addText = useCallback(
     (preset = 0, text?: string) => {
@@ -1006,12 +1023,9 @@ export function useEditor(
     keyframeSelection.time - (selected.animationOffset ?? 0) >= 0 &&
     keyframeSelection.time - (selected.animationOffset ?? 0) <=
       selected.duration &&
-    Math.abs(
-      playhead -
-        selected.start -
-        keyframeSelection.time +
-        (selected.animationOffset ?? 0),
-    ) < 1e-6 &&
+    keyframeSelection.localTime >= 0 &&
+    keyframeSelection.localTime <= selected.duration &&
+    Math.abs(playhead - selected.start - keyframeSelection.localTime) < 1e-6 &&
     (selected.keyframes.some(
       (frame) => Math.abs(frame.time - keyframeSelection.time) < 1e-6,
     ) ||
