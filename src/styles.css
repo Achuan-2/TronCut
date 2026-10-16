@@ -3215,6 +3215,28 @@ fieldset:disabled {
   font-size: 9px;
   color: #647d6b;
 }
+.track-header-toolbar {
+  z-index: 3;
+  padding: 0 8px 0 12px;
+  gap: 6px;
+}
+.track-header-tools {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+.track-header-tools > button {
+  width: 26px;
+  height: 26px;
+  padding: 4px;
+  justify-content: center;
+  color: #a4b9ac;
+}
+.track-header-tools > .track-add {
+  margin-left: 4px;
+  background: #2b3636;
+  border: 1px solid #445151;
+}
 .track-header {
   position: relative;
   height: 70px;

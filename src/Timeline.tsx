@@ -83,6 +83,7 @@ import {
   displayTrackName,
   isTrackActive,
   minTrackHeight,
+  maxTrackHeight,
   setTrackHeight,
 } from "../shared/tracks";
 import TrackResizeHandle from "./TrackResizeHandle";
@@ -280,6 +281,22 @@ export default function Timeline({
     trackHeightDraft,
   ]);
   const trackHeights = trackLayouts.map((layout) => layout.height);
+  const changeTrackZoom = (factor: number) => {
+    // Commit all lanes together so one zoom click is one undo step.
+    apply((project) =>
+      project.tracks.reduce(
+        (next, track, index) => setTrackHeight(
+          next,
+          track.id,
+          Math.max(
+            trackLayouts[index].minHeight,
+            trackLayouts[index].baseHeight * factor,
+          ),
+        ),
+        project,
+      ),
+    );
+  };
   const layoutKey = trackHeights.join(",");
   const trackTop = (id: string) => {
     const index = project.tracks.findIndex((track) => track.id === id);
@@ -683,18 +700,6 @@ export default function Timeline({
             截取当前帧
           </button>
           <button
-            title="添加轨道"
-            disabled={project.tracks.length >= 128}
-            onClick={() =>
-              apply((p) => ({
-                ...p,
-                tracks: [newTrack(p.tracks.length), ...p.tracks],
-              }))
-            }
-          >
-            <Plus size={17} />
-          </button>
-          <button
             title="添加标记"
             onClick={() => addMarker(playhead)}
           >
@@ -766,8 +771,48 @@ export default function Timeline({
               scroll.current.scrollTop = event.currentTarget.scrollTop;
           }}
         >
-          <div className="ruler-label">
-            时间线 <span>{project.tracks.length} 轨</span>
+          <div className="ruler-label track-header-toolbar">
+            <span title={`共 ${project.tracks.length} 条轨道`}>
+              {project.tracks.length} 轨
+            </span>
+            <div
+              className="track-header-tools"
+              role="group"
+              aria-label="轨道操作"
+              onKeyDown={(event) => event.stopPropagation()}
+            >
+              <button
+                type="button"
+                title="缩小轨道高度"
+                aria-label="缩小轨道高度"
+                disabled={!trackLayouts.some((layout) => layout.baseHeight > layout.minHeight)}
+                onClick={() => changeTrackZoom(1 / 1.25)}
+              >
+                <ZoomOut size={15} />
+              </button>
+              <button
+                type="button"
+                title="放大轨道高度"
+                aria-label="放大轨道高度"
+                disabled={!trackLayouts.some((layout) => layout.baseHeight < maxTrackHeight)}
+                onClick={() => changeTrackZoom(1.25)}
+              >
+                <ZoomIn size={15} />
+              </button>
+              <button
+                type="button"
+                className="track-add"
+                title="添加轨道"
+                aria-label="添加轨道"
+                disabled={project.tracks.length >= 128}
+                onClick={() => apply((project) => ({
+                  ...project,
+                  tracks: [newTrack(project.tracks.length), ...project.tracks],
+                }))}
+              >
+                <Plus size={17} />
+              </button>
+            </div>
           </div>
           {project.tracks.map((track, index) => (
             <div
