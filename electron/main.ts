@@ -44,6 +44,7 @@ import { createClonedVoiceSchema } from "../shared/cloned-voices";
 import { mediaThumbnail } from "./thumbnails";
 import { serveMediaFile } from "./media-protocol";
 import { NativeRecording } from "./native-recording";
+import { recordingName } from "./recording-name";
 import { RecordingBorder } from "./recording-border";
 import { copyClipClipboard, importClipboardMedia } from "./clipboard-media";
 import { importMediaPaths } from "./import-media";
@@ -947,7 +948,8 @@ function installHandlers() {
     const id = uid(),
       folder = path.join(app.getPath("userData"), "recordings");
     await fs.mkdir(folder, { recursive: true });
-    const file = path.join(folder, `${label}-${id}.raw.webm`),
+    const name = label === "screen" ? recordingName() : `${label}-${id}`;
+    const file = path.join(folder, `${name}.raw.webm`),
       handle = await fs.open(file, "wx");
     try {
       if (label === "screen" && process.platform === "win32") {

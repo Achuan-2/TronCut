@@ -92,7 +92,9 @@ try {
   await page.locator(".recording-object").click({ position: { x: 30, y: 10 } });
   await expect(
     page
-      .locator(".inspector-selection .selection-icon.recording-object-selection")
+      .locator(
+        ".inspector-selection .selection-icon.recording-object-selection",
+      )
       .getByRole("img", { name: "录屏组合", exact: true }),
   ).toBeVisible();
   await expect(
@@ -108,6 +110,20 @@ try {
   await expect(
     page.getByRole("tab", { name: "录屏", exact: true }),
   ).toHaveAttribute("aria-selected", "true");
+  await expect(page.locator(".inspector-tabs").getByRole("tab")).toHaveText([
+    "录屏",
+    "画面",
+  ]);
+  const gap = await page.locator(".inspector-selection").evaluate((heading) => {
+    const section = document.querySelector(
+      "#inspector-recording .effect-section-heading",
+    );
+    return (
+      section.getBoundingClientRect().top -
+      heading.getBoundingClientRect().bottom
+    );
+  });
+  expect(Math.abs(gap)).toBeLessThanOrEqual(1);
   for (const name of ["视频", "鼠标"]) {
     await expect(page.getByRole("tab", { name, exact: true })).toHaveCount(0);
   }
@@ -130,9 +146,10 @@ try {
     ).toHaveCount(0);
     await expand.click();
   }
-  await page.getByRole("button", { name: "展开画面属性", exact: true }).click();
+  await page.getByRole("tab", { name: "画面", exact: true }).click();
   await expect(page.getByLabel("缩放 (%)", { exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "收起画面属性", exact: true }).click();
+  await expect(page.getByLabel("录屏对象背景", { exact: true })).toHaveCount(0);
+  await page.getByRole("tab", { name: "录屏", exact: true }).click();
   const background = page.getByLabel("录屏对象背景", { exact: true });
   await expect(background).toHaveValue("violet");
   await expect(page.getByLabel("背景图库")).toHaveCount(0);

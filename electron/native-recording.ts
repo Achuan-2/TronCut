@@ -7,6 +7,7 @@ import { findBinary } from "./process";
 import { probeMedia } from "./media";
 import type { CursorSample } from "../shared/cursor";
 import { cursorType } from "../shared/cursor";
+import { recordingName } from "./recording-name";
 
 export class NativeRecording {
   private capture?: ChildProcessWithoutNullStreams;
@@ -28,7 +29,7 @@ export class NativeRecording {
     onUnexpectedStop: () => void,
   ) {
     await fs.mkdir(folder, { recursive: true });
-    this.output = path.join(folder, `${crypto.randomUUID()}-screen.mp4`);
+    this.output = path.join(folder, `${recordingName()}.mp4`);
     const capture = spawn(
       findBinary("wgc-capture", resourcesPath),
       [

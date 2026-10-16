@@ -139,6 +139,37 @@ try {
   await checkAligned();
   await page.getByLabel("时间线缩放").fill("100");
   await checkAligned();
+  const anchorTime = await page
+    .locator(".timeline-scroll")
+    .evaluate(
+      (element) => (element.scrollLeft + element.clientWidth / 2) / 100,
+    );
+  await page.getByLabel("时间线缩放").fill("2400");
+  await checkAligned();
+  await expect
+    .poll(() =>
+      page
+        .locator(".timeline-scroll")
+        .evaluate(
+          (element) => (element.scrollLeft + element.clientWidth / 2) / 2400,
+        ),
+    )
+    .toBeCloseTo(anchorTime, 2);
+  await page.getByTitle("放大时间线", { exact: true }).click();
+  await expect(page.getByLabel("时间线缩放")).toHaveValue("2400");
+  await expect(page.locator(".ruler > span").first()).toHaveText(
+    /^\d+:\d{2}:\d{2}$/,
+  );
+  const tickSpacing = await page
+    .locator(".ruler > span")
+    .evaluateAll(
+      (labels) =>
+        labels[1].getBoundingClientRect().left -
+        labels[0].getBoundingClientRect().left,
+    );
+  expect(tickSpacing).toBeCloseTo(80);
+  await page.screenshot({ path: path.join(root, "frame-zoom.png") });
+  await page.getByLabel("时间线缩放").fill("100");
   await app.evaluate(({ BrowserWindow }) => {
     BrowserWindow.getAllWindows()[0].setSize(1280, 760);
   });

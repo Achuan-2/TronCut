@@ -96,6 +96,9 @@ try {
   expect(screen.cursorStyle).toMatchObject({ style: "circle", size: 56 });
   expect(screen.mediaFrame).toEqual({ radius: 24 });
   const asset = recorded.assets.find((a) => a.id === screen.assetId);
+  expect(asset.name).toMatch(/^录屏 \d{4}-\d{2}-\d{2} \d{2}-\d{2}-\d{2}-\d{3}\.mp4$/);
+  expect(path.basename(asset.path)).toBe(asset.name);
+  expect(screen.name).toBe(asset.name);
   expect(asset.cursor.samples.length).toBeGreaterThan(0);
   expect((await fs.stat(asset.path)).size).toBeGreaterThan(1000);
   await page.locator(".timeline-clip.video").click();

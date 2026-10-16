@@ -103,6 +103,7 @@ import TrackContextMenu, { type TrackMenuPosition } from "./TrackContextMenu";
 import { useViewportZoom, type ZoomPoint } from "./useViewportZoom";
 import { projectIndex } from "../shared/project-index";
 import { recordingGroups, recordingTimeline, trimRecordingObject } from "../shared/recording-objects";
+import { timelineZoomMin, timelineZoomMax, timelineRulerStep, timelineRulerLabel } from "../shared/timeline-scale";
 
 interface Drag {
   id: string;
@@ -173,7 +174,7 @@ export default function Timeline({
     width = duration * zoom;
   const changeZoom = (next: number, point?: ZoomPoint) => {
     const element = scroll.current;
-    next = Math.max(15, Math.min(200, next));
+    next = Math.max(timelineZoomMin, Math.min(timelineZoomMax, next));
     if (next === zoom) return;
     if (element) {
       const bounds = element.getBoundingClientRect();
@@ -441,6 +442,7 @@ export default function Timeline({
       element.scrollTop = top + height - element.clientHeight;
   }, [selected?.trackId, project.tracks.length, layoutKey, trackHeightDraft]);
   const [viewport, setViewport] = useState({ left: 0, width: 1600 });
+  const rulerStep = timelineRulerStep(zoom, project.canvas.fps);
   const visibleClips = useMemo(() => {
     const index = projectIndex(project);
     return new Map(
@@ -774,8 +776,8 @@ export default function Timeline({
             aria-label="时间线缩放"
             title="时间线缩放：Ctrl/⌘ + 加减号，或 Ctrl/⌘ + 滚轮"
             type="range"
-            min="15"
-            max="200"
+            min={timelineZoomMin}
+            max={timelineZoomMax}
             step="any"
             value={zoom}
             onChange={(e) => changeZoom(Number(e.target.value))}
@@ -1098,21 +1100,21 @@ export default function Timeline({
                 {
                   length:
                     Math.ceil(
-                      (viewport.width + 400) / zoom / (zoom < 40 ? 5 : 2),
+                      (viewport.width + 400) / zoom / rulerStep,
                     ) + 1,
                 },
                 (_, i) =>
                   (Math.max(
                     0,
                     Math.floor(
-                      (viewport.left - 200) / zoom / (zoom < 40 ? 5 : 2),
+                      (viewport.left - 200) / zoom / rulerStep,
                     ),
                   ) +
                     i) *
-                  (zoom < 40 ? 5 : 2),
+                  rulerStep,
               ).map((t) => (
                 <span key={t} style={{ left: t * zoom }}>
-                  {timeLabel(t).split(".")[0]}
+                  {timelineRulerLabel(t, project.canvas.fps, rulerStep)}
                 </span>
               ))}
               <TimelineMarkers editor={editor} zoom={zoom} snap={snap} onEdit={editMarker} />
@@ -1151,7 +1153,7 @@ export default function Timeline({
                 }}
                 style={
                   {
-                    backgroundSize: `${zoom * 2}px 100%`,
+                    backgroundSize: `${zoom * rulerStep}px 100%`,
                     height: trackHeights[trackIndex],
                     "--track-content-height": `${trackLayouts[trackIndex].baseHeight - 22}px`,
                   } as CSSProperties
