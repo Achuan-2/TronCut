@@ -370,6 +370,9 @@ try {
   expect(videoAfter.width / videoAfter.height).toBeCloseTo(16 / 9, 2);
 
   // View zoom must not change media transforms or the project resolution.
+  // Canvas drags preserve focus; read the committed scale after leaving its
+  // number input, rather than the draft kept for an unfinished text edit.
+  await page.getByLabel("缩放 (%)", { exact: true }).blur();
   const viewZoom = page.getByLabel("画布显示比例", { exact: true });
   const mediaScale = await page.getByLabel("缩放 (%)", { exact: true }).inputValue();
   const fittedWidth = (await page.locator(".canvas").boundingBox()).width;
@@ -639,6 +642,7 @@ try {
   await expect(page.locator(".timeline-clip.image .clip-animation")).toHaveCount(1);
   await expect(page.locator(".timeline-clip.image .animation-point.end")).toHaveClass(/selected-frame/);
   await page.getByLabel("位置 X (px)", { exact: true }).fill("80");
+  await page.getByLabel("位置 X (px)", { exact: true }).blur();
   await seek(7);
   await expect(page.getByLabel("位置 X (px)", { exact: true })).toHaveValue(beforeKeyframeX);
   for (let i = 0; i < 2; i++) await page.getByTitle("撤销 Ctrl+Z", { exact: true }).click();
@@ -664,12 +668,14 @@ try {
   await expect(page.locator(".keyframe-edit-status")).toContainText("编辑动画终点");
   await page.getByRole("button", { name: "自动动画", exact: true }).click();
   await page.getByLabel("位置 X (px)", { exact: true }).fill("80");
+  await page.getByLabel("位置 X (px)", { exact: true }).blur();
   await expect.poll(async () => (await imageArrow.locator(".animation-point.end").boundingBox()).width).toBeGreaterThan(17);
   await expect.poll(async () => (await imageArrow.locator(".animation-point.end").boundingBox()).width).toBeCloseTo(17, 1);
   await imageArrow.locator(".animation-point.start").click();
   await expect(imageArrow.locator(".animation-point.start")).toHaveAttribute("aria-pressed", "true");
   expect(await imageArrow.locator(".animation-point.start").evaluate((element) => getComputedStyle(element).cursor)).toContain("data:image/svg+xml");
   await page.getByLabel("位置 X (px)", { exact: true }).fill("20");
+  await page.getByLabel("位置 X (px)", { exact: true }).blur();
   await imageArrow.locator(".animation-point.end").click();
   await expect(page.getByLabel("位置 X (px)", { exact: true })).toHaveValue("80");
   await page.screenshot({ path: path.join(root, "keyframe-end-edit.png") });
@@ -680,6 +686,7 @@ try {
   await page.getByTitle("撤销 Ctrl+Z", { exact: true }).click();
   await imageArrow.locator(".animation-point.end").click();
   await page.getByLabel("旋转 Z (度)", { exact: true }).fill("45");
+  await page.getByLabel("旋转 Z (度)", { exact: true }).blur();
   await imageArrow.locator(".animation-point.start").click();
   await expect(page.getByLabel("旋转 Z (度)", { exact: true })).toHaveValue("0");
   await imageArrow.locator(".animation-point.end").click();
@@ -720,6 +727,7 @@ try {
   await seek(10);
   await expect.poll(async () => (await imageArrow.locator(".animation-point.end").boundingBox()).width).toBeCloseTo(10, 1);
   await page.getByLabel("位置 X (px)", { exact: true }).fill("65");
+  await page.getByLabel("位置 X (px)", { exact: true }).blur();
   const separatedArrows = imageClip.locator(".clip-animation");
   await expect(separatedArrows).toHaveCount(2);
   expect(Number(await separatedArrows.nth(1).getAttribute("data-start"))).toBeCloseTo(9, 2);
@@ -728,11 +736,13 @@ try {
   await expect(separatedArrows.nth(0).locator(".animation-point.end")).toHaveClass(/selected-frame/);
   await expect(separatedArrows.nth(1).locator(".animation-point.start")).not.toHaveClass(/selected-frame/);
   await page.getByLabel("位置 X (px)", { exact: true }).fill("70");
+  await page.getByLabel("位置 X (px)", { exact: true }).blur();
   await seek(8.5);
   await expect(page.getByLabel("位置 X (px)", { exact: true })).toHaveValue("70");
   await expect(separatedArrows).toHaveCount(2);
   await separatedArrows.nth(0).locator(".animation-point.start").click();
   await page.getByLabel("位置 X (px)", { exact: true }).fill("20");
+  await page.getByLabel("位置 X (px)", { exact: true }).blur();
   await seek(6.5);
   await expect(page.getByLabel("位置 X (px)", { exact: true })).toHaveValue("20");
   await expect(separatedArrows).toHaveCount(2);
