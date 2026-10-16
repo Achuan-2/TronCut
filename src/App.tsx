@@ -14,7 +14,7 @@ import {
   Copy,
   Home as HomeIcon,
 } from "lucide-react";
-import { createProject, type Clip, type Asset, uid } from "../shared/model";
+import { createProject, projectDuration, type Clip, type Asset, uid } from "../shared/model";
 import type { Capabilities, WindowState } from "../shared/bridge";
 import {
   deleteClips,
@@ -838,8 +838,7 @@ export default function App() {
     results: RecordedAsset[],
     settings: RecordingSettings,
   ) => {
-    const start = editor.playhead,
-      canvas = editor.project.canvas;
+    const canvas = editor.project.canvas;
     let background: Asset | undefined;
     let warning: string | undefined;
     if (settings.background && results.some((r) => r.kind === "screen")) {
@@ -856,7 +855,13 @@ export default function App() {
     }
     let master: string | undefined;
     editor.apply((p) => {
-      const next = addRecordedAssets(p, results, settings, start, background);
+      const next = addRecordedAssets(
+        p,
+        results,
+        settings,
+        projectDuration(p),
+        background,
+      );
       master = next.clips.find(clip => !p.clips.some(before => before.id === clip.id) && clip.recording)?.id;
       return next;
     });
