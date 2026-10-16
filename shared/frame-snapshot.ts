@@ -6,6 +6,7 @@ import { shiftBehaviors } from "./behaviors";
 import { transitionRange, transitionTransform } from "./transitions";
 import { isTrackActive } from "./tracks";
 import { freezeVisualEffects } from "./visual-effects";
+import { visualClipAt } from "./visual-state";
 
 /** Freeze visible layers at one timeline instant while retaining source timestamps. */
 export function frameSnapshot(
@@ -45,7 +46,7 @@ export function frameSnapshot(
         );
         return {
           ...clip,
-          visualEffects: freezeVisualEffects(clip, local),
+          visualEffects: freezeVisualEffects(visualClipAt(clip, transform), local),
           start: 0,
           duration: 1 / project.canvas.fps,
           sourceIn: clip.sourceIn + local * clip.speed,

@@ -758,9 +758,11 @@ function PreviewLayer({
       </div>
       {regionId && selectable && !editing && !editor.playing && mode === "select" && editor.selectedIds.includes(clip.id) && <EffectRegionOverlay
         key={`${clip.id}-${regionId}`} name={regionId === "mask" ? "遮罩" : "模糊区域"} region={clip.visualEffects![regionId]!}
-        width={Number(style.width) || 1} height={Number(style.height) || 1} pose={displayed} cameraScale={cameraScale}
+        width={Number(style.width) || 1} height={Number(style.height) || 1} pose={displayed} cameraScale={cameraScale} canvasScale={scale}
         onDraft={(geometry) => setRegionDraft(geometry ? { id: regionId, geometry } : null)}
-        onCommit={(geometry) => editor.updateClip(clip.id, { visualEffects: { ...clip.visualEffects, [regionId]: { ...clip.visualEffects![regionId]!, ...geometry } } })}
+        onCommit={(geometry) => regionId === "mask"
+          ? editor.updateMask(clip.id, geometry)
+          : editor.updateClip(clip.id, (source) => ({ ...source, visualEffects: { ...source.visualEffects, [regionId]: { ...source.visualEffects![regionId]!, ...geometry } } }))}
       />}
       {selectable &&
         !editing &&

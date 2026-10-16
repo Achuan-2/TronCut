@@ -32,6 +32,7 @@ import { textFrameSize, textFillGeometry } from "../shared/text";
 import { isTrackActive } from "../shared/tracks";
 import { visualEffectFilters, effectAmountExpression } from "./visual-effects-export";
 import { visualEffectPadding } from "../shared/visual-effect-svg";
+import { maskKeys, maskDefaults, type MaskKey } from "../shared/mask-state";
 import {
   exportDimensions,
   exportQualities,
@@ -95,7 +96,7 @@ export function expression(
     "transform" | "keyframes" | "start" | "animationOffset" | "rotation"
   > &
     Partial<
-      Pick<Clip, "crop" | "contentTransform" | "behaviors" | "kind" | "text">
+      Pick<Clip, "crop" | "contentTransform" | "behaviors" | "kind" | "text" | "visualEffects">
     >,
   key: keyof Transform,
   clock = "t",
@@ -127,7 +128,7 @@ function baseExpression(
     Clip,
     "transform" | "keyframes" | "start" | "animationOffset" | "rotation"
   > &
-    Partial<Pick<Clip, "crop" | "contentTransform">>,
+    Partial<Pick<Clip, "crop" | "contentTransform" | "visualEffects">>,
   key: keyof Transform,
   clock: string,
 ): string {
@@ -140,7 +141,9 @@ function baseExpression(
         ? 1
         : visualKeys.includes(key as (typeof visualKeys)[number])
           ? visualDefaults(clip)[key as (typeof visualKeys)[number]]
-          : 0);
+          : maskKeys.includes(key as MaskKey)
+            ? maskDefaults(clip)[key as MaskKey]
+            : 0);
   const frameValue = (value: Transform) => value[key] ?? baseValue;
   if (!frames.length) return String(baseValue);
   if (frames[0].time > 0) frames.unshift({ time: 0, value: clip.transform });
@@ -648,7 +651,7 @@ async function renderProject(
       filters.push(`[${source}]${timing}${animatedText ? `fps=${fps},` : ""}format=rgba,${[...(animatedViewport ? animatedViewportFilters((key) => pose(key, "T")) : contentFilters(clip)), ...visualEffects, ...frameFilters, "null"].join(",")}[${viewport}]`);
       const attached = await visualEffectFilters({
         clip, source: viewport, layer, width: cropWidth, height: cropHeight,
-        fit, fps, duration, workDir, input,
+        fit, fps, duration, workDir, input, signal,
       });
       args.push(...attached.args);
       input += attached.inputCount;

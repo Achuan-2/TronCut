@@ -1,4 +1,5 @@
 import type { Clip, Transform } from "./model";
+import { maskClipAt } from "./mask-state";
 
 export const visualKeys = [
   "contentX",
@@ -51,6 +52,7 @@ export function visualValues(
   return result;
 }
 export function visualClipAt(clip: Clip, value: Transform): Clip {
+  clip = maskClipAt(clip, value);
   const state = visualValues(clip, value);
   return {
     ...clip,

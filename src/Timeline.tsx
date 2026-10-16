@@ -726,7 +726,7 @@ export default function Timeline({
           <button
             className={`auto-animation ${editor.autoAnimate ? "enabled" : ""}`}
             onClick={() => editor.setAutoAnimate(!editor.autoAnimate)}
-            title="启用后，修改位置、缩放、不透明度会在播放头处生成关键帧"
+            title="启用后，修改位置、缩放、不透明度或遮罩区域，会在播放头处生成关键帧"
           >
             <Diamond
               size={14}

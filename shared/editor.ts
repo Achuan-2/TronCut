@@ -1,4 +1,5 @@
 import { shiftVisualEffects, retimeVisualEffects } from "./visual-effects";
+import { maskKeys, maskValues } from "./mask-state";
 import {
   type Asset,
   type Clip,
@@ -150,6 +151,7 @@ export function createTransformSampler(
       clip.transform[key] !== undefined ||
       frames.some((frame) => frame.value[key] !== undefined),
   );
+  const hasMask = maskKeys.some((key) => clip.transform[key] !== undefined || frames.some((frame) => frame.value[key] !== undefined));
   const normalize = (value: Transform): Transform => ({
     ...value,
     ...(hasRotation
@@ -165,6 +167,7 @@ export function createTransformSampler(
       ]),
     ),
     ...(hasVisual ? visualValues(clip, value) : {}),
+    ...(hasMask ? maskValues(clip, value) : {}),
   });
   const points =
     frames.length && frames[0].time > 0
@@ -210,6 +213,7 @@ export function createTransformSampler(
         ...(visualKeys.some((key) => value[key] !== undefined)
           ? visualValues(clip, value)
           : {}),
+        ...(maskKeys.some((key) => value[key] !== undefined) ? maskValues(clip, value) : {}),
       };
     }
     return normalize(points.at(-1)!.value);

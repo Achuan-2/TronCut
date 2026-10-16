@@ -5,7 +5,9 @@ import {
   axisScaleKeys,
 } from "./rotation";
 import { visualKeys, visualDefaults } from "./visual-state";
+import { maskKeys, maskDefaults, maskValues } from "./mask-state";
 const defaultVisual = visualDefaults({});
+const defaultMask = maskDefaults({});
 
 export function sameTransform(
   a: Transform,
@@ -30,6 +32,7 @@ export function sameTransform(
           (a[key] ?? fallback[key] ?? 0) - (b[key] ?? fallback[key] ?? 0),
         ) < 1e-9,
     ) &&
+    maskKeys.every((key) => Math.abs((a[key] ?? fallback[key] ?? defaultMask[key]) - (b[key] ?? fallback[key] ?? defaultMask[key])) < 1e-9) &&
     visualKeys.every(
       (key) =>
         Math.abs(
@@ -220,6 +223,9 @@ export function retimeAnimation(
         },
       };
     }
+  }
+  if (maskKeys.some((key) => clip.transform[key] !== undefined || frames.some((frame) => frame.value[key] !== undefined))) {
+    for (let i = 0; i < frames.length; i++) frames[i] = { ...frames[i], value: { ...frames[i].value, ...maskValues(clip, frames[i].value) } };
   }
   const axes = optionalTransformKeys.filter(
     (key) =>

@@ -4,6 +4,8 @@ import {
   isAdditionalVisualEffect,
 } from "../shared/visual-effects";
 import type { VisualEffectId } from "../shared/visual-effect-drag";
+import { animateMask } from "../shared/mask-animation";
+import type { MaskGeometry } from "../shared/mask-state";
 import {
   useCallback,
   useEffect,
@@ -372,6 +374,18 @@ export function useEditor(
           endpoint: frame?.clipId === id ? frame : undefined,
         }),
       );
+    },
+    [updateClip, playhead, autoAnimate],
+  );
+  const updateMask = useCallback(
+    (id: string, patch: Partial<MaskGeometry>) => {
+      const frame = keyframeRef.current;
+      updateClip(id, (clip) => animateMask(clip, patch, {
+        time: playhead - clip.start,
+        auto: autoAnimate,
+        duration: defaults.current.timing.animation,
+        endpoint: frame?.clipId === id ? frame : undefined,
+      }));
     },
     [updateClip, playhead, autoAnimate],
   );
@@ -1032,6 +1046,7 @@ export function useEditor(
     updateTextAppearance,
     updateContentTransform,
     updateCrop,
+    updateMask,
     canvasMode,
     setCanvasMode,
     updateTransform,

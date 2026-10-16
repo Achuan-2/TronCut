@@ -7,6 +7,7 @@ import {
 } from "./animation-ranges";
 import { transformAt } from "./editor";
 import { visualKeys, visualValues } from "./visual-state";
+import { maskKeys, maskValues, maskBounds } from "./mask-state";
 
 export interface CopiedAnimation {
   duration: number;
@@ -157,15 +158,17 @@ export function pasteAnimation(
     end = localEnd + offset;
   if (start < 0) return clip;
   const sampled = transformAt(clip, localStart);
-  const from = visualKeys.some(
+  let from = visualKeys.some(
     (key) => copied.from[key] !== undefined || copied.to[key] !== undefined,
   )
     ? { ...sampled, ...visualValues(clip, sampled) }
     : sampled;
+  if (maskKeys.some((key) => copied.from[key] !== undefined || copied.to[key] !== undefined)) from = { ...from, ...maskValues(clip, sampled) };
   const to = { ...from };
   // Paste the same motion relative to the target's current state. This keeps
   // its preceding hold intact, instead of adding a transition to copied values.
   const bounds: Record<keyof Transform, [number, number]> = {
+    ...maskBounds,
     x: [-4, 4],
     y: [-4, 4],
     scale: [0.05, 8],
@@ -201,6 +204,7 @@ export function pasteAnimation(
   }
   if (visualKeys.some((key) => to[key] !== undefined))
     Object.assign(to, visualValues(clip, to));
+  if (maskKeys.some((key) => to[key] !== undefined)) Object.assign(to, maskValues(clip, to));
   let holding = true;
   const rotation = clip.transform.rotation ?? clip.rotation ?? 0;
   const frames = [...clip.keyframes]

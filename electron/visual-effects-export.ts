@@ -4,6 +4,9 @@ import type { Clip } from "../shared/model";
 import { rgb, type EffectTiming } from "../shared/visual-effects";
 import { regionSvg, visualEffectPadding } from "../shared/visual-effect-svg";
 import { loopImageInput } from "./loop-image";
+import { hasMaskAnimation, maskClipAt } from "../shared/mask-state";
+import { transformAt } from "../shared/editor";
+import { rasterizeMaskAnimation } from "./mask-export";
 
 export function effectAmountExpression(
   effect: EffectTiming,
@@ -34,6 +37,7 @@ export async function visualEffectFilters(options: {
   duration: number;
   workDir: string;
   input: number;
+  signal?: AbortSignal;
 }) {
   const { clip, layer, width, height, fit, fps, duration, workDir } = options;
   const filters: string[] = [],
@@ -59,13 +63,36 @@ export async function visualEffectFilters(options: {
   const maskInput = async (
     region: Parameters<typeof regionSvg>[0],
     expression: (coverage: string) => string,
+    mask = false,
   ) => {
-    const file = path.join(workDir, `region-${layer}-${sequence}.png`);
-    await sharp(Buffer.from(regionSvg(region, width, height, 1 / fit)))
-      .removeAlpha()
-      .png()
-      .toFile(file);
-    args.push(...loopImageInput(file, fps, duration));
+    if (mask && hasMaskAnimation(clip)) {
+      const file = await rasterizeMaskAnimation({
+        clip,
+        layer,
+        workDir,
+        width,
+        height,
+        fit,
+        fps,
+        duration,
+        signal: options.signal,
+      });
+      args.push("-f", "concat", "-safe", "0", "-threads", "1", "-i", file);
+    } else {
+      const sampled = mask
+        ? maskClipAt(clip, transformAt(clip, 0)).visualEffects!.mask!
+        : region;
+      const opacity = mask
+        ? (sampled as NonNullable<Clip["visualEffects"]>["mask"])!.opacity
+        : 0;
+      const file = path.join(workDir, `region-${layer}-${sequence}.png`);
+      await sharp(Buffer.from(regionSvg(sampled, width, height, 1 / fit)))
+        .removeAlpha()
+        .linear(1 - opacity, opacity * 255)
+        .png()
+        .toFile(file);
+      args.push(...loopImageInput(file, fps, duration));
+    }
     const output = label();
     filters.push(
       `[${input++}:v]format=gray,geq=lum='255*(${expression("lum(X,Y)/255")})'[${output}]`,
@@ -110,7 +137,8 @@ export async function visualEffectFilters(options: {
     const e = mask!;
     const coverage = await maskInput(
       e,
-      (value) => `1-(${amount(e)})*${1 - e.opacity}*(1-(${value}))`,
+      (value) => `1-(${amount(e)})*(1-(${value}))`,
+      true,
     );
     const [content, alphaSource] = split();
     const alpha = label(),

@@ -799,7 +799,7 @@ export function Inspector({ editor }: { editor: Editor }) {
                 <RoundedCornersProperties key={c.id} clip={c} editor={editor} size={size} />
               )}
               {hasClipSpeed(c) && <SpeedProperties key={c.id} clip={c} editor={editor} />}
-              {c.visualEffects && <VisualEffectProperties clip={c} editor={editor} />}
+              {c.visualEffects && <VisualEffectProperties clip={c} sampledClip={sampledVisual ?? c} editor={editor} />}
             </div>
             <div
               id="inspector-audio"

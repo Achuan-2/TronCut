@@ -31,6 +31,14 @@ export const cursorStyleSchema = z.object({
   smooth: z.boolean(),
 });
 export const transformSchema = z.object({
+  maskX: finite.min(-1).max(2).optional(),
+  maskY: finite.min(-1).max(2).optional(),
+  maskWidth: finite.min(0.01).max(3).optional(),
+  maskHeight: finite.min(0.01).max(3).optional(),
+  maskRotation: finite.min(-3600).max(3600).optional(),
+  maskOpacity: finite.min(0).max(1).optional(),
+  maskFeather: finite.min(-100).max(100).optional(),
+  maskRadius: finite.min(0).max(500).optional(),
   rotation: finite.min(-3600).max(3600).optional(),
   rotationX: finite.min(-3600).max(3600).optional(),
   rotationY: finite.min(-3600).max(3600).optional(),

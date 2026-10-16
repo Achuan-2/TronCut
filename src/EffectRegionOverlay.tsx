@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import type { Transform } from "../shared/model";
 import type { Region } from "../shared/visual-effects";
 import { localDelta } from "../shared/rotation";
+import { resizeHandles } from "../shared/canvas";
 
 type Geometry = Pick<Region, "x" | "y" | "width" | "height">;
 const clamp = (value: number, min: number, max: number) =>
@@ -14,6 +15,7 @@ export default function EffectRegionOverlay({
   height,
   pose,
   cameraScale,
+  canvasScale = 1,
   onDraft,
   onCommit,
 }: {
@@ -23,13 +25,14 @@ export default function EffectRegionOverlay({
   height: number;
   pose: Transform;
   cameraScale: number;
+  canvasScale?: number;
   onDraft: (geometry: Geometry | null) => void;
   onCommit: (geometry: Geometry) => void;
 }) {
   const gesture = useRef<{
     x: number;
     y: number;
-    resize: boolean;
+    handle?: { x: number; y: number };
     original: Geometry;
     value: Geometry;
   } | null>(null);
@@ -51,13 +54,15 @@ export default function EffectRegionOverlay({
         top: `${value.y * 100}%`,
         width: `${value.width * 100}%`,
         height: `${value.height * 100}%`,
-        borderRadius: region.shape === "ellipse" ? "50%" : region.radius,
+        borderRadius:
+          region.shape === "ellipse" ? "50%" : region.radius * canvasScale,
         transform: `translate(-50%, -50%) rotate(${region.rotation}deg)`,
       }}
       onPointerDown={(event) => {
         if (event.button !== 0) return;
         event.preventDefault();
         event.stopPropagation();
+        event.currentTarget.focus({ preventScroll: true });
         event.currentTarget.setPointerCapture(event.pointerId);
         const original = {
           x: region.x,
@@ -68,7 +73,11 @@ export default function EffectRegionOverlay({
         gesture.current = {
           x: event.clientX,
           y: event.clientY,
-          resize: (event.target as HTMLElement).dataset.resize === "true",
+          handle: resizeHandles.find(
+            (handle) =>
+              handle.name ===
+              (event.target as HTMLElement).dataset.regionHandle,
+          ),
           original,
           value: original,
         };
@@ -81,32 +90,51 @@ export default function EffectRegionOverlay({
           x: (event.clientX - drag.x) / (pose.scale * cameraScale),
           y: (event.clientY - drag.y) / (pose.scale * cameraScale),
         });
-        if (drag.resize) {
+        if (drag.handle) {
           const angle = (-region.rotation * Math.PI) / 180;
           delta = {
             x: delta.x * Math.cos(angle) - delta.y * Math.sin(angle),
             y: delta.x * Math.sin(angle) + delta.y * Math.cos(angle),
           };
         }
-        drag.value = drag.resize
-          ? {
-              ...drag.original,
-              width: clamp(
-                drag.original.width + (2 * delta.x) / width,
-                0.01,
-                3,
-              ),
-              height: clamp(
-                drag.original.height + (2 * delta.y) / height,
-                0.01,
-                3,
-              ),
-            }
-          : {
-              ...drag.original,
-              x: clamp(drag.original.x + delta.x / width, -1, 2),
-              y: clamp(drag.original.y + delta.y / height, -1, 2),
-            };
+        if (drag.handle) {
+          const nextWidth = clamp(
+            drag.original.width + (drag.handle.x * delta.x) / width,
+            0.01,
+            3,
+          );
+          const nextHeight = clamp(
+            drag.original.height + (drag.handle.y * delta.y) / height,
+            0.01,
+            3,
+          );
+          const shiftX =
+            ((nextWidth - drag.original.width) * width * drag.handle.x) / 2;
+          const shiftY =
+            ((nextHeight - drag.original.height) * height * drag.handle.y) / 2;
+          const angle = (region.rotation * Math.PI) / 180;
+          drag.value = {
+            x: clamp(
+              drag.original.x +
+                (shiftX * Math.cos(angle) - shiftY * Math.sin(angle)) / width,
+              -1,
+              2,
+            ),
+            y: clamp(
+              drag.original.y +
+                (shiftX * Math.sin(angle) + shiftY * Math.cos(angle)) / height,
+              -1,
+              2,
+            ),
+            width: nextWidth,
+            height: nextHeight,
+          };
+        } else
+          drag.value = {
+            ...drag.original,
+            x: clamp(drag.original.x + delta.x / width, -1, 2),
+            y: clamp(drag.original.y + delta.y / height, -1, 2),
+          };
         setDraft(drag.value);
         onDraft(drag.value);
       }}
@@ -171,11 +199,26 @@ export default function EffectRegionOverlay({
       }}
     >
       <span className="effect-region-caption">{name}</span>
-      <button
-        data-resize="true"
-        aria-label={`调整${name}区域大小`}
-        className="effect-region-resize"
-      />
+      {resizeHandles.map((handle) => (
+        <button
+          key={handle.name}
+          data-region-handle={handle.name}
+          aria-label={
+            handle.name === "se"
+              ? `调整${name}区域大小`
+              : `调整${name}区域 ${handle.name}`
+          }
+          className={`effect-region-resize ${handle.name}`}
+          style={{
+            left: `${(handle.x + 1) * 50}%`,
+            top: `${(handle.y + 1) * 50}%`,
+            right: "auto",
+            bottom: "auto",
+            transform: "translate(-50%, -50%)",
+            cursor: `${handle.name}-resize`,
+          }}
+        />
+      ))}
     </div>
   );
 }
