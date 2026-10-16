@@ -213,6 +213,9 @@ export function audioFilters(clip: Clip, rubberband: boolean): string[] {
     filters.push(`afade=t=out:st=${clip.duration - outgoing}:d=${outgoing}`);
   return filters;
 }
+let cachedHardwareEncoderName: string | null = null;
+let cachedFfmpegMajor: number | null = null;
+
 async function chooseEncoder(
   project: Project,
   settings: Required<ExportSettings>,
@@ -252,6 +255,13 @@ async function chooseEncoder(
             ],
           ]
         : [];
+  if (cachedHardwareEncoderName) {
+    const idx = candidates.findIndex((c) => c[1] === cachedHardwareEncoderName);
+    if (idx > 0) {
+      const [fav] = candidates.splice(idx, 1);
+      candidates.unshift(fav);
+    }
+  }
   // Listing an encoder is insufficient: driver/runtime initialization can still fail.
   for (const candidate of candidates) {
     if (signal.aborted) throw new Error("任务已取消");
@@ -273,11 +283,13 @@ async function chooseEncoder(
         ],
         { signal, timeout: 6000 },
       );
+      cachedHardwareEncoderName = candidate[1];
       return candidate;
     } catch {
       /* Try the next supported GPU; software is always available. */
     }
   }
+  cachedHardwareEncoderName = software[1];
   return software;
 }
 async function rasterize(
@@ -438,8 +450,59 @@ async function renderProject(
         .filter((c) => c.trackId === track.id)
         .map((clip) => ({ clip, track })),
     );
-  for (const { clip, track } of ordered) {
-    if (!isTrackActive(project.tracks, track.id)) continue;
+  const activeOrdered = ordered.filter(({ track }) =>
+    isTrackActive(project.tracks, track.id),
+  );
+  const rasterizedSizes = new Map<
+    number,
+    { width: number; height: number; input?: string }
+  >();
+  const preRasterizeTasks: Promise<void>[] = [];
+  for (let l = 0; l < activeOrdered.length; l++) {
+    const { clip } = activeOrdered[l];
+    if (clip.kind === "text" || clip.kind === "shape") {
+      const animatedText =
+        clip.kind === "text" &&
+        !!clip.behaviors?.some(
+          (behavior) =>
+            behavior.enabled &&
+            [behavior.incoming, behavior.during, behavior.outgoing].some(
+              (phase) => phase.type !== "whole" && phase.style !== "none",
+            ),
+        );
+      const animatedDrawing =
+        !still && clip.kind === "shape" && !!clip.drawing?.enabled;
+      const targetLayer = l;
+      preRasterizeTasks.push(
+        (async () => {
+          if (signal.aborted) throw new Error("任务已取消");
+          const image = path.join(workDir, `${targetLayer}.png`);
+          const size = animatedDrawing
+            ? await rasterizeDrawing(
+                clip,
+                path.join(workDir, `drawing-${targetLayer}`),
+                fps,
+                signal,
+              )
+            : animatedText
+              ? await rasterizeBehaviorText(
+                  clip,
+                  workDir,
+                  targetLayer,
+                  fps,
+                  still,
+                  signal,
+                )
+              : await rasterize(clip, image);
+          rasterizedSizes.set(targetLayer, size);
+        })(),
+      );
+    }
+  }
+  if (preRasterizeTasks.length > 0) {
+    await Promise.all(preRasterizeTasks);
+  }
+  for (const { clip, track } of activeOrdered) {
     if (signal.aborted) throw new Error("任务已取消");
     const asset = project.assets.find((a) => a.id === clip.assetId);
     if (asset?.missing) throw new Error(`素材离线：${asset.name}`);
@@ -511,11 +574,7 @@ async function renderProject(
       intrinsicHeight = asset?.height ?? 300;
     if (clip.kind === "text" || clip.kind === "shape") {
       const image = path.join(workDir, `${layer}.png`);
-      const size = animatedDrawing
-        ? await rasterizeDrawing(clip, path.join(workDir, `drawing-${layer}`), fps, signal)
-        : animatedText
-        ? await rasterizeBehaviorText(clip, workDir, layer, fps, still, signal)
-        : await rasterize(clip, image);
+      const size = rasterizedSizes.get(layer)!;
       intrinsicWidth = size.width;
       intrinsicHeight = size.height;
       if (animatedText || animatedDrawing)
@@ -872,12 +931,15 @@ async function renderProject(
   }
   filters.push(`[${base}]format=${still ? "rgb24" : "yuv420p"}[video]`);
   await fs.writeFile(graph, filters.join(";\n"));
-  const version = await runProcess(
-    findBinary("ffmpeg", resourcesPath),
-    ["-version"],
-    { timeout: 10000 },
-  );
-  const major = Number(version.match(/ffmpeg version (?:n)?(\d+)\./)?.[1] ?? 7);
+  if (cachedFfmpegMajor === null) {
+    const version = await runProcess(
+      findBinary("ffmpeg", resourcesPath),
+      ["-version"],
+      { timeout: 10000 },
+    );
+    cachedFfmpegMajor = Number(version.match(/ffmpeg version (?:n)?(\d+)\./)?.[1] ?? 7);
+  }
+  const major = cachedFfmpegMajor;
   const encoder = still
     ? ["-c:v", "png"]
     : await chooseEncoder(project, settings, resourcesPath, signal);
