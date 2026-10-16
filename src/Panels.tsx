@@ -48,6 +48,8 @@ import TransitionProperties from "./TransitionProperties";
 import CaptionsPanel from "./CaptionsPanel";
 import FavoritesPanel from "./FavoritesPanel";
 import RecordingObjectProperties from "./RecordingObjectProperties";
+import AnnotationProperties from "./AnnotationProperties";
+import { shapeSize } from "../shared/annotation-style";
 import { recordingMaster } from "../shared/recording-objects";
 
 export type Tab =
@@ -458,7 +460,7 @@ export function Inspector({ editor }: { editor: Editor }) {
             width: asset.width * fit * (1 - crop.left - crop.right),
             height: asset.height * fit * (1 - crop.top - crop.bottom),
           }
-        : { width: 600, height: 300 };
+        : c ? shapeSize(c) : { width: 600, height: 300 };
   const resize = (axis: "width" | "height", pixels: number) => {
     if (!c || locked) return;
     if (c.kind === "text" && editor.selectedKeyframe?.clipId !== c.id) {
@@ -766,16 +768,7 @@ export function Inspector({ editor }: { editor: Editor }) {
               aria-labelledby="inspector-video-tab"
               hidden={activeTab !== "video"}
             >
-              {c.kind === "shape" && (
-                <label className="field">
-                  填充
-                  <input
-                    type="color"
-                    value={c.fill ?? "#71e6b5"}
-                    onChange={(e) => update({ fill: e.target.value })}
-                  />
-                </label>
-              )}
+              {c.kind === "shape" && <AnnotationProperties clip={c} editor={editor} />}
               {c.kind !== "audio" && (
                 <>
                   <FrameTransformProperties

@@ -834,6 +834,11 @@ export default function App() {
       setFile(result.file);
       enterEditor();
     });
+  const removeRecent = (file: string) =>
+    run(async () => {
+      setRecent(await bridge().removeRecentProject(file));
+      toast("已从最近项目中移除");
+    });
   const recorded = async (
     results: RecordedAsset[],
     settings: RecordingSettings,
@@ -1074,6 +1079,7 @@ export default function App() {
           onRecord={() => newProject(true)}
           onOpen={() => void open()}
           onRecent={(file) => void openRecent(file)}
+          onRemoveRecent={(file) => void removeRecent(file)}
           onRecover={() => void recover()}
           onContinue={hasSession ? enterEditor : undefined}
         />

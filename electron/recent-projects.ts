@@ -6,10 +6,33 @@ import {
 } from "../shared/recent-projects";
 import { projectDuration, type Project } from "../shared/model";
 
+const sameFile = (a: string, b: string) =>
+  process.platform === "win32"
+    ? path.resolve(a).toLowerCase() === path.resolve(b).toLowerCase()
+    : path.resolve(a) === path.resolve(b);
+
 // Serialize writes so opening/saving two projects quickly cannot lose history.
 export class RecentProjects {
   private queue: Promise<void> = Promise.resolve();
   constructor(private file: string) {}
+  async hasHistory(): Promise<boolean> {
+    return fs.access(this.file).then(
+      () => true,
+      () => false,
+    );
+  }
+  async remove(file: string) {
+    const operation = this.queue.then(async () => {
+      const entries = (await this.read()).filter(
+        (entry) => !sameFile(entry.file, file),
+      );
+      await fs.mkdir(path.dirname(this.file), { recursive: true });
+      await fs.writeFile(`${this.file}.tmp`, JSON.stringify(entries));
+      await fs.rename(`${this.file}.tmp`, this.file);
+    });
+    this.queue = operation.catch(() => {});
+    return operation;
+  }
   private async read(): Promise<RecentProject[]> {
     try {
       const value: unknown = JSON.parse(await fs.readFile(this.file, "utf8"));
@@ -41,10 +64,7 @@ export class RecentProjects {
       const stat = await fs.stat(file);
       const entries = await this.read();
       const absolute = path.resolve(file);
-      const same = (entry: RecentProject) =>
-        process.platform === "win32"
-          ? path.resolve(entry.file).toLowerCase() === absolute.toLowerCase()
-          : path.resolve(entry.file) === absolute;
+      const same = (entry: RecentProject) => sameFile(entry.file, absolute);
       const previous = entries.find(same);
       const entry: RecentProject = {
         file: absolute,

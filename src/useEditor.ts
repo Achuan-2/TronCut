@@ -98,6 +98,7 @@ import {
 } from "../shared/playback";
 import { usePresetLibrary } from "./usePresetLibrary";
 import { animationDropTarget } from "../shared/animation-drag";
+import { shapeSize } from "../shared/annotation-style";
 
 export function demoProject(): Project {
   const project = createProject("我的第一个视频");
@@ -135,7 +136,8 @@ export function useEditor(
   const [project, setProject] = useState<Project>(() => createProject());
   const [editingTextId, setEditingTextId] = useState<string | null>(null);
   const [zoomPanDraft, setZoomPanDraft] = useState<Transform | null>(null);
-  const [canvasMode, setCanvasMode] = useState<"select" | "crop">("select");
+  const [canvasMode, setCanvasMode] = useState<"select" | "crop" | "draw">("select");
+  const [penSettings, setPenSettings] = useState({ color: "#ff2020", width: 8, animate: true, duration: 1 });
   const [clipProperties, setClipProperties] = useState<Clip | null>(null);
   type KeyframeSelection = {
     clipId: string;
@@ -602,7 +604,7 @@ export function useEditor(
                       height:
                         asset.height * ratio * (1 - crop.top - crop.bottom),
                     }
-                  : { width: 600, height: 300 };
+                  : shapeSize(clip);
             return setTransform(
               clip,
               fitFrameTransform(value, size, project.canvas, clip.rotation),
@@ -741,21 +743,23 @@ export function useEditor(
       }
       const clip = annotationClip(template, track.id, time);
       clip.duration = defaults.current.timing.annotation;
-      if (clip.kind === "shape")
+      if (clip.kind === "shape" && clip.shape !== "freehand")
         clip.transform.scale = Math.max(
           0.05,
           Math.min(
             1,
-            (p.canvas.width * 0.4) / 600,
-            (p.canvas.height * 0.4) / 300,
+            (p.canvas.width * 0.4) / shapeSize(clip).width,
+            (p.canvas.height * 0.4) / shapeSize(clip).height,
           ),
         );
       if (position) clip.transform = { ...clip.transform, ...position };
       apply({ ...p, tracks, clips: [...p.clips, clip] });
       setPlaying(false);
       select(clip.id);
+      if (clip.shape !== "freehand") setCanvasMode("select");
+      if (clip.drawing?.enabled) seek(time + Math.min(clip.duration, clip.drawing.duration + clip.drawing.delay));
     },
-    [apply, playhead, select, setPlaying],
+    [apply, playhead, select, setPlaying, seek],
   );
   const addRoundedCorners = useCallback((id?: string) => {
     const project = current.current;
@@ -1190,6 +1194,8 @@ export function useEditor(
     updateMask,
     canvasMode,
     setCanvasMode,
+    penSettings,
+    setPenSettings,
     updateTransform,
     copyClipProperties,
     pasteClipProperties,

@@ -10,6 +10,7 @@ import { contentLayout, defaultContentTransform } from "../shared/crop";
 import { mediaFrameRadii, roundedRectanglePath } from "../shared/media-frame";
 import { visualClipAt } from "../shared/visual-state";
 import { textBoxFor } from "./text";
+import { annotationSvgBody, drawingProgress, shapeSize } from "../shared/annotation-style";
 import { textLineHeight, textFillCss, textFillGeometry } from "../shared/text";
 import {
   behaviorTransform,
@@ -130,10 +131,10 @@ export default function MatteDefinition({
   ]);
   const sourceWidth = asset
     ? asset.width * fit * scale
-    : (box?.width ?? 600) * scale;
+    : (box?.width ?? shapeSize(clip).width) * scale;
   const sourceHeight = asset
     ? asset.height * fit * scale
-    : (box?.height ?? 300) * scale;
+    : (box?.height ?? shapeSize(clip).height) * scale;
   const width = sourceWidth * (1 - crop.left - crop.right),
     height = sourceHeight * (1 - crop.top - crop.bottom);
   const layout = contentLayout(
@@ -324,17 +325,10 @@ export default function MatteDefinition({
                   <svg
                     width={width}
                     height={height}
-                    viewBox="0 0 600 300"
+                    viewBox={`0 0 ${shapeSize(clip).width} ${shapeSize(clip).height}`}
                     fill={clip.fill}
-                  >
-                    {clip.shape === "ellipse" ? (
-                      <ellipse cx="300" cy="150" rx="296" ry="146" />
-                    ) : clip.shape === "arrow" ? (
-                      <path d="M0 110H420V20L600 150L420 280V190H0Z" />
-                    ) : (
-                      <rect x="4" y="4" width="592" height="292" rx="24" />
-                    )}
-                  </svg>
+                    dangerouslySetInnerHTML={{ __html: annotationSvgBody(clip, drawingProgress(clip, local)) }}
+                  />
                 )}
               </g>
             </g>

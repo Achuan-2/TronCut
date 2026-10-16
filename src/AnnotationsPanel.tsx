@@ -1,13 +1,29 @@
 import { useState } from "react";
-import { Type, Shapes, ArrowUpRight, Plus } from "lucide-react";
+import {
+  Type,
+  Shapes,
+  ArrowUpRight,
+  Plus,
+  Droplets,
+  Pencil,
+  PenTool,
+} from "lucide-react";
 import { textPresets } from "../shared/model";
-import { annotationMime, type AnnotationTemplate } from "../shared/annotations";
+import {
+  annotationMime,
+  arrowPresets,
+  shapePresets,
+  sketchPresets,
+  annotationEffectPresets,
+  type AnnotationTemplate,
+} from "../shared/annotations";
+import AnnotationPresetPreview from "./AnnotationPresetPreview";
 import type { Editor } from "./useEditor";
 
 export default function AnnotationsPanel({ editor }: { editor: Editor }) {
-  const [category, setCategory] = useState<"text" | "shapes" | "arrows">(
-    "text",
-  );
+  const [category, setCategory] = useState<
+    "text" | "shapes" | "arrows" | "effects" | "sketch" | "pen"
+  >("text");
   const [style, setStyle] = useState("all");
   const drag = (event: React.DragEvent, template: AnnotationTemplate) => {
     event.dataTransfer.setData(annotationMime, JSON.stringify(template));
@@ -24,6 +40,14 @@ export default function AnnotationsPanel({ editor }: { editor: Editor }) {
           { id: "text", label: "文本", name: "文字标注", icon: Type },
           { id: "shapes", label: "形状", name: "形状标注", icon: Shapes },
           { id: "arrows", label: "箭头", name: "箭头标注", icon: ArrowUpRight },
+          {
+            id: "effects",
+            label: "模糊和高亮",
+            name: "模糊和高亮",
+            icon: Droplets,
+          },
+          { id: "sketch", label: "草图运动", name: "草图运动", icon: Pencil },
+          { id: "pen", label: "涂鸦笔", name: "涂鸦笔", icon: PenTool },
         ].map(({ id, label, name, icon: Icon }) => (
           <button
             key={id}
@@ -102,39 +126,113 @@ export default function AnnotationsPanel({ editor }: { editor: Editor }) {
             双击画布文字编辑，字体、描边和自动字号在文本属性中调整。
           </p>
         </>
+      ) : category === "pen" ? (
+        <div className="annotation-pen-settings">
+          <p className="small-note">
+            开启涂鸦笔后在画布上拖动绘制，每一笔保留为独立的可编辑对象。
+          </p>
+          <label className="field">
+            颜色
+            <input
+              type="color"
+              aria-label="涂鸦笔颜色"
+              value={editor.penSettings.color}
+              onChange={(event) =>
+                editor.setPenSettings({
+                  ...editor.penSettings,
+                  color: event.target.value,
+                })
+              }
+            />
+          </label>
+          <label className="field">
+            笔宽
+            <input
+              type="number"
+              aria-label="涂鸦笔笔宽"
+              min={1}
+              max={100}
+              value={editor.penSettings.width}
+              onChange={(event) =>
+                editor.setPenSettings({
+                  ...editor.penSettings,
+                  width: Math.max(
+                    1,
+                    Math.min(100, Number(event.target.value) || 1),
+                  ),
+                })
+              }
+            />
+          </label>
+          <label className="check-field">
+            <input
+              type="checkbox"
+              checked={editor.penSettings.animate}
+              onChange={(event) =>
+                editor.setPenSettings({
+                  ...editor.penSettings,
+                  animate: event.target.checked,
+                })
+              }
+            />
+            播放绘制过程
+          </label>
+          <label className="field">
+            绘制时长（秒）
+            <input
+              type="number"
+              aria-label="涂鸦笔绘制时长"
+              min={0.1}
+              max={60}
+              step={0.1}
+              value={editor.penSettings.duration}
+              onChange={(event) =>
+                editor.setPenSettings({
+                  ...editor.penSettings,
+                  duration: Math.max(
+                    0.1,
+                    Math.min(60, Number(event.target.value) || 1),
+                  ),
+                })
+              }
+            />
+          </label>
+          <button
+            className="wide-button"
+            aria-pressed={editor.canvasMode === "draw"}
+            onClick={() => {
+              editor.setPlaying(false);
+              if (editor.editingTextId)
+                editor.endTextEdit(editor.editingTextId);
+              editor.setCanvasMode(
+                editor.canvasMode === "draw" ? "select" : "draw",
+              );
+            }}
+          >
+            {editor.canvasMode === "draw" ? "退出涂鸦笔" : "启用涂鸦笔"}
+          </button>
+        </div>
       ) : (
         <div className="shape-presets">
           {(category === "arrows"
-            ? (["arrow"] as const)
-            : (["rectangle", "ellipse"] as const)
-          ).map((shape) => (
+            ? arrowPresets
+            : category === "shapes"
+              ? shapePresets
+              : category === "sketch"
+                ? sketchPresets
+                : annotationEffectPresets
+          ).map((preset) => (
             <button
-              key={shape}
+              key={preset.id}
+              aria-label={preset.name}
+              title={preset.name}
+              data-annotation={preset.id}
               draggable
-              onDragStart={(event) => drag(event, { kind: "shape", shape })}
-              onClick={() => editor.addAnnotation({ kind: "shape", shape })}
+              onDragStart={(event) => drag(event, preset.template)}
+              onClick={() => editor.addAnnotation(preset.template)}
             >
-              <svg
-                width="100"
-                height="54"
-                viewBox="0 0 120 60"
-                fill="currentColor"
-              >
-                {shape === "rectangle" ? (
-                  <rect x="15" y="9" width="90" height="42" rx="7" />
-                ) : shape === "ellipse" ? (
-                  <ellipse cx="60" cy="30" rx="42" ry="22" />
-                ) : (
-                  <path d="M10 22H76V8L110 30L76 52V38H10Z" />
-                )}
-              </svg>
-              <span>
-                {
-                  { rectangle: "圆角矩形", ellipse: "椭圆", arrow: "箭头" }[
-                    shape
-                  ]
-                }
-              </span>
+              <AnnotationPresetPreview template={preset.template} />
+              <span>{preset.name}</span>
             </button>
           ))}
         </div>

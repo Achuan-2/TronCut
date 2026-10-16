@@ -27,6 +27,7 @@ import {
 import { frameSnapshot } from "../shared/frame-snapshot";
 import { objectBehaviorExpressions } from "./behavior-export";
 import { rasterizeBehaviorText } from "./behavior-text-export";
+import { rasterizeAnnotation, rasterizeDrawing, regionAnnotationFilters } from "./annotation-export";
 import { textFillRectangle } from "./text-fill";
 import { outlinedText } from "./text-outline";
 import { textFrameSize, textFillGeometry } from "../shared/text";
@@ -283,20 +284,7 @@ async function rasterize(
   target: string,
 ): Promise<{ width: number; height: number; input?: string }> {
   if (clip.kind === "shape") {
-    const body =
-      clip.shape === "ellipse"
-        ? '<ellipse cx="300" cy="150" rx="296" ry="146"/>'
-        : clip.shape === "arrow"
-          ? '<path d="M0 110H420V20L600 150L420 280V190H0Z"/>'
-          : '<rect x="4" y="4" width="592" height="292" rx="24"/>';
-    await sharp(
-      Buffer.from(
-        `<svg xmlns="http://www.w3.org/2000/svg" width="600" height="300"><g fill="${clip.fill ?? "#71e6b5"}">${body}</g></svg>`,
-      ),
-    )
-      .png()
-      .toFile(target);
-    return { width: 600, height: 300 };
+    return rasterizeAnnotation(clip, target);
   }
   const style = clip.style!,
     lines = (clip.text ?? "").split("\n"),
@@ -466,11 +454,12 @@ async function renderProject(
             (phase) => phase.type !== "whole" && phase.style !== "none",
           ),
       );
+    const animatedDrawing = !still && clip.kind === "shape" && !!clip.drawing?.enabled;
     // Input seeking skips discarded media before decoding, and resets both audio
     // and video timestamps. Cursor telemetry still uses the original sourceIn.
     const seekInput =
       !clip.loop && (clip.kind === "video" || clip.kind === "audio");
-    const sourceIn = still || animatedText || seekInput ? 0 : clip.sourceIn;
+    const sourceIn = still || animatedText || animatedDrawing || seekInput ? 0 : clip.sourceIn;
     let sourceSeek = clip.sourceIn;
     if (clip.loop && asset && asset.duration > 0) sourceSeek %= asset.duration;
     if (
@@ -521,12 +510,14 @@ async function renderProject(
       intrinsicHeight = asset?.height ?? 300;
     if (clip.kind === "text" || clip.kind === "shape") {
       const image = path.join(workDir, `${layer}.png`);
-      const size = animatedText
+      const size = animatedDrawing
+        ? await rasterizeDrawing(clip, path.join(workDir, `drawing-${layer}`), fps, signal)
+        : animatedText
         ? await rasterizeBehaviorText(clip, workDir, layer, fps, still, signal)
         : await rasterize(clip, image);
       intrinsicWidth = size.width;
       intrinsicHeight = size.height;
-      if (animatedText)
+      if (animatedText || animatedDrawing)
         args.push("-f", "concat", "-safe", "0", "-i", size.input!);
       else
         args.push(
@@ -593,10 +584,14 @@ async function renderProject(
         ? `geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='alpha(X,Y)*(${pose("opacity", "T")})'`
         : `colorchannelmixer=aa=${clip.transform.opacity}`;
       const { incoming, outgoing } = fadeDurations(clip);
+      let regionOpacity = pose("opacity", "T");
       if (incoming || outgoing) {
         const fade = `min(1,min(${incoming ? `(${clock("T")}-${clip.start})/${incoming}` : "1"},${outgoing ? `(${clip.start + clip.duration}-${clock("T")})/${outgoing}` : "1"}))`;
         alpha = `geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='alpha(X,Y)*(${pose("opacity", "T")})*max(0,${fade})'`;
+        regionOpacity = `(${regionOpacity})*max(0,${fade})`;
       }
+      // Keep the spotlight hole opaque; fade its inverted outside mask instead.
+      if (clip.annotationEffect?.type === "spotlight") alpha = "null";
       const visualEffects = visualFilters(
         animatedViewport ? { ...clip, crop: undefined } : clip,
         intrinsicWidth,
@@ -683,7 +678,9 @@ async function renderProject(
           ? `setpts=PTS-STARTPTS,tpad=start_mode=clone:start_duration=${range.before}:stop_mode=clone:stop_duration=${range.after},setpts=PTS+${range.start}/TB,`
           : "";
       const timing =
-        source === `${index}:v`
+        animatedDrawing
+          ? `fps=${fps},trim=duration=${clip.duration},setpts=PTS-STARTPTS+${clip.start}/TB,`
+          : source === `${index}:v`
           ? `trim=start=${sourceIn}:duration=${clip.duration * clip.speed},setpts=(PTS-STARTPTS)/${clip.speed}${padding ? "," + padding : `+${clip.start}/TB,`}`
           : padding;
       // An implicit RGBA -> YUVA converter can retain the first frame's size.
@@ -738,7 +735,11 @@ async function renderProject(
       // Composite text before chroma subsampling so rounded fills and glyphs
       // retain the same pixel position in video and frame captures.
       const matte = clip.visualEffects?.["media-matte"];
-      if (matte?.enabled) {
+      if (clip.annotationEffect) {
+        filters.push(...regionAnnotationFilters(clip, base, visual, output, width, height, fps, duration,
+          `${width}*((${pose("x")})+(${transitionOffsetExpression(project, clip)}))-overlay_w/2`,
+          `${height}*(${pose("y")})-overlay_h/2`, regionOpacity));
+      } else if (matte?.enabled) {
         const canvas = `matteCanvas${layer}`, full = `matteFull${layer}`, coverage = `matteMask${layer}`, backdrop = `matteBg${layer}`;
         filters.push(`color=c=black@0:s=${width}x${height}:r=${fps}:d=${duration},format=rgba[${canvas}]`);
         filters.push(`[${canvas}][${visual}]overlay=x='${width}*((${pose("x")})+(${transitionOffsetExpression(project, clip)}))-overlay_w/2':y='${height}*(${pose("y")})-overlay_h/2':enable='gte(t,${range.start})*lt(t,${range.end})':eof_action=pass:repeatlast=0:format=auto[${full}]`);

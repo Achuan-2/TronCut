@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Crop, MousePointer2, Settings2, Undo2, X } from "lucide-react";
+import { Crop, MousePointer2, Settings2, Undo2, X, PenTool } from "lucide-react";
 import type { Project } from "../shared/model";
 import type { Editor } from "./useEditor";
 import { transformAt } from "../shared/editor";
 import { visualClipAt } from "../shared/visual-state";
 
-export type CanvasMode = "select" | "crop";
+export type CanvasMode = "select" | "crop" | "draw";
 export type CanvasZoom = "fit" | number;
 const zoomPresets = [25, 50, 75, 100, 200, 300, 800, 1200, 1600, 2000];
 const presets = [
@@ -212,6 +212,15 @@ export default function CanvasToolbar({
             <Crop size={18} />
           </button>
         </div>
+        <button
+          aria-label="涂鸦笔模式"
+          title="在画布上绘制可编辑笔迹"
+          aria-pressed={mode === "draw"}
+          className={mode === "draw" ? "active" : ""}
+          onClick={() => changeMode(mode === "draw" ? "select" : "draw")}
+        >
+          <PenTool size={18} />
+        </button>
         <select
           aria-label="画布显示比例"
           title="画布缩放：Ctrl/⌘ + 加减号，或 Ctrl/⌘ + 滚轮"

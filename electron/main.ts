@@ -572,13 +572,18 @@ function installHandlers() {
   });
   handle("project:recent", async () => {
     const entries = await recentProjects.list();
-    if (entries.length) return entries;
+    if (entries.length || await recentProjects.hasHistory()) return entries;
     // Older versions only kept the last project's path in recovery. Import that
     // existing saved project into history without selecting or restoring it.
     try {
       const recovery = JSON.parse(await fs.readFile(path.join(app.getPath("userData"), "recovery.json"), "utf8"));
       if (typeof recovery.file === "string") await rememberProject(await openProject(recovery.file), recovery.file);
     } catch { /* No saved project to migrate. */ }
+    return recentProjects.list();
+  });
+  handle("project:recent:remove", async (input: unknown) => {
+    const file = z.string().min(1).max(32768).parse(input);
+    await recentProjects.remove(file);
     return recentProjects.list();
   });
   handle("project:recent:open", async (input: unknown) => {

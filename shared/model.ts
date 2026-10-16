@@ -7,6 +7,7 @@ import { transitionSchema } from "./transitions";
 import { exportSettingsSchema } from "./export-settings";
 import { visualEffectsSchema } from "./visual-effects";
 import { effectWindowSchema, effectOriginSchema } from "./effect-timing";
+import { annotationShapeSchema, shapeStyleSchema, drawingSchema, annotationEffectSchema } from "./annotation-style";
 
 const finite = z.number().finite();
 const identifier = z
@@ -183,7 +184,11 @@ export const projectSchema = z.object({
         lockAspectRatio: z.boolean().optional(),
         volume: finite.min(0).max(4),
         podcast: z.boolean(),
-        shape: z.enum(["rectangle", "ellipse", "arrow"]).optional(),
+        shape: annotationShapeSchema.optional(),
+        shapeStyle: shapeStyleSchema.optional(),
+        shapeSize: z.object({ width: finite.min(1).max(32768), height: finite.min(1).max(32768) }).optional(),
+        drawing: drawingSchema.optional(),
+        annotationEffect: annotationEffectSchema.optional(),
         fill: z
           .string()
           .regex(/^#[\da-f]{6}$/i)

@@ -86,6 +86,7 @@ export interface FrameCraftBridge {
   mediaUrl(assetId: string): Promise<string>;
   openProject(): Promise<{ project: Project; file: string } | null>;
   recentProjects(): Promise<RecentProject[]>;
+  removeRecentProject(file: string): Promise<RecentProject[]>;
   openRecentProject(file: string): Promise<{ project: Project; file: string }>;
   recoveryInfo(): Promise<RecoveryInfo | null>;
   initialProject(): Promise<{ project: Project; file: string } | null>;

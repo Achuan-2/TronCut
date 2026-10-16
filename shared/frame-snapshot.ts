@@ -8,6 +8,7 @@ import { isTrackActive } from "./tracks";
 import { freezeVisualEffects } from "./visual-effects";
 import { visualClipAt } from "./visual-state";
 import { effectActive } from "./effect-timing";
+import { drawingProgress } from "./annotation-style";
 
 /** Freeze visible layers at one timeline instant while retaining source timestamps. */
 export function frameSnapshot(
@@ -47,6 +48,9 @@ export function frameSnapshot(
         );
         return {
           ...clip,
+          drawing: clip.drawing
+            ? { ...clip.drawing, frozenProgress: drawingProgress(clip, local) }
+            : undefined,
           visualEffects: freezeVisualEffects(visualClipAt(clip, transform), local),
           mediaFrame: clip.mediaFrame
             ? {

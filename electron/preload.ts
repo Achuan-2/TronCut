@@ -49,6 +49,7 @@ const bridge: FrameCraftBridge = {
   mediaUrl: (id) => ipcRenderer.invoke("media:url", id),
   openProject: () => ipcRenderer.invoke("project:open"),
   recentProjects: () => ipcRenderer.invoke("project:recent"),
+  removeRecentProject: (file) => ipcRenderer.invoke("project:recent:remove", file),
   openRecentProject: (file) => ipcRenderer.invoke("project:recent:open", file),
   recoveryInfo: () => ipcRenderer.invoke("project:recovery:info"),
   initialProject: () => ipcRenderer.invoke("project:initial"),

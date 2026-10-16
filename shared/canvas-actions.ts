@@ -66,7 +66,7 @@ export function pasteClipProperties(
         ...appearanceKeys,
         ...(source.kind === "text" && clip.kind === "text" ? textKeys : []),
         ...(source.kind === "shape" && clip.kind === "shape"
-          ? ["fill" as const]
+          ? ["fill" as const, "shapeStyle" as const, "annotationEffect" as const]
           : []),
       ];
       const patch = Object.fromEntries(

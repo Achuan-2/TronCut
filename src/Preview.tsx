@@ -79,6 +79,9 @@ import EffectRegionOverlay from "./EffectRegionOverlay";
 import type { Region } from "../shared/visual-effects";
 import { effectActive } from "../shared/effect-timing";
 import BehaviorText from "./BehaviorText";
+import { annotationSvgBody, drawingProgress, shapeSize } from "../shared/annotation-style";
+import AnnotationEffectLayer from "./AnnotationEffectLayer";
+import CanvasDrawingOverlay from "./CanvasDrawingOverlay";
 import ClipContextMenu, {
   type ClipCommand,
   type ClipMenuPosition,
@@ -300,8 +303,8 @@ function PreviewLayer({
   let mediaWidth = 0,
     mediaHeight = 0;
   if (clip.kind === "shape") {
-    mediaWidth = 600 * scale;
-    mediaHeight = 300 * scale;
+    mediaWidth = shapeSize(clip).width * scale;
+    mediaHeight = shapeSize(clip).height * scale;
     style.width = mediaWidth;
     style.height = mediaHeight;
   }
@@ -317,6 +320,10 @@ function PreviewLayer({
       `blur(${effects.blur * scale}px)`,
     );
     style.transform += ` scale(${effects.flipX ? -1 : 1}, ${effects.flipY ? -1 : 1})`;
+    if (clip.annotationEffect) {
+      style.filter = undefined;
+      style.opacity = 1;
+    }
   }
   if (asset && clip.kind !== "audio") {
     const fit = Math.min(
@@ -338,7 +345,7 @@ function PreviewLayer({
   );
   if (effects.flipX) radii = [radii[1], radii[0], radii[3], radii[2]];
   if (effects.flipY) radii = [radii[3], radii[2], radii[1], radii[0]];
-  const selectable = interactive && !track?.locked && clip.kind !== "audio";
+  const selectable = interactive && !track?.locked && clip.kind !== "audio" && mode !== "draw";
   const [effectDrop, setEffectDrop] = useState(false);
   useEffect(() => {
     if (!effectDrop) return;
@@ -767,21 +774,16 @@ function PreviewLayer({
             clip.text || " "
           )}
         </div>
+      ) : clip.annotationEffect ? (
+        <AnnotationEffectLayer clip={clip} width={mediaWidth} height={mediaHeight} scale={scale / Math.max(0.05, displayed.scale)} opacity={displayed.opacity * fadeOpacity(clip, localTime)} canvas={project.canvas} pose={displayed} canvasScale={scale} />
       ) : (
         <svg
-          width={600 * scale}
-          height={300 * scale}
-          viewBox="0 0 600 300"
+          width={shapeSize(clip).width * scale}
+          height={shapeSize(clip).height * scale}
+          viewBox={`0 0 ${shapeSize(clip).width} ${shapeSize(clip).height}`}
           fill={clip.fill}
-        >
-          {clip.shape === "ellipse" ? (
-            <ellipse cx="300" cy="150" rx="296" ry="146" />
-          ) : clip.shape === "arrow" ? (
-            <path d="M0 110H420V20L600 150L420 280V190H0Z" />
-          ) : (
-            <rect x="4" y="4" width="592" height="292" rx="24" />
-          )}
-        </svg>
+          dangerouslySetInnerHTML={{ __html: annotationSvgBody(clip, drawingProgress(clip, localTime)) }}
+        />
       )}
       </div>
       {regionId && selectable && !editing && !editor.playing && mode === "select" && selectedObjectPart && <EffectRegionOverlay
@@ -1177,6 +1179,7 @@ export default function Preview({
             }}
           >
             <ScenePreview editor={editor} scale={scale} mode={mode} />
+            {mode === "draw" && !fullscreen && <CanvasDrawingOverlay editor={editor} />}
             {!project.clips.length && (
               <div className="canvas-empty">
                 <span className="empty-symbol">T</span>

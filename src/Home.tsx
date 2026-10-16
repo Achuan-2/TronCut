@@ -8,6 +8,8 @@ import {
   RotateCcw,
 } from "lucide-react";
 import type { RecentProject, RecoveryInfo } from "../shared/recent-projects";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 const durationLabel = (seconds: number) =>
   `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(Math.floor(seconds % 60)).padStart(2, "0")}`;
@@ -20,6 +22,7 @@ export default function Home({
   onRecord,
   onOpen,
   onRecent,
+  onRemoveRecent,
   onRecover,
   onContinue,
 }: {
@@ -31,9 +34,52 @@ export default function Home({
   onRecord: () => void;
   onOpen: () => void;
   onRecent: (file: string) => void;
+  onRemoveRecent: (file: string) => void;
   onRecover: () => void;
   onContinue?: () => void;
 }) {
+  const [menu, setMenu] = useState<{
+    file: string;
+    x: number;
+    y: number;
+  } | null>(null);
+  const menuRoot = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    if (!menu) return;
+    menuRoot.current?.querySelector("button")?.focus();
+  }, [menu]);
+  useEffect(() => {
+    if (!menu) return;
+    const outside = (event: PointerEvent) => {
+      if (!menuRoot.current?.contains(event.target as Node)) setMenu(null);
+    };
+    const close = () => setMenu(null);
+    const key = (event: KeyboardEvent) => {
+      if (event.key === "Escape") close();
+    };
+    window.addEventListener("pointerdown", outside);
+    window.addEventListener("keydown", key);
+    window.addEventListener("blur", close);
+    window.addEventListener("resize", close);
+    window.addEventListener("scroll", close, true);
+    return () => {
+      window.removeEventListener("pointerdown", outside);
+      window.removeEventListener("keydown", key);
+      window.removeEventListener("blur", close);
+      window.removeEventListener("resize", close);
+      window.removeEventListener("scroll", close, true);
+    };
+  }, [menu]);
+  useEffect(() => {
+    if (
+      disabled ||
+      (menu &&
+        !recent.some(
+          (project) => project.file === menu.file && project.missing,
+        ))
+    )
+      setMenu(null);
+  }, [disabled, recent, menu]);
   return (
     <div className="home-page">
       <aside className="home-sidebar">
@@ -61,21 +107,21 @@ export default function Home({
           )}
         </div>
         <div className="home-actions">
-        <button aria-label="新建录制" disabled={disabled} onClick={onRecord}>
+          <button aria-label="新建录制" disabled={disabled} onClick={onRecord}>
             <span className="home-action-icon record">
               <Circle size={39} fill="currentColor" />
             </span>
             <b>新建录制</b>
             <span>录制屏幕、摄像头和声音</span>
           </button>
-        <button aria-label="新建项目" disabled={disabled} onClick={onNew}>
+          <button aria-label="新建项目" disabled={disabled} onClick={onNew}>
             <span className="home-action-icon">
               <FolderPlus size={40} />
             </span>
             <b>新建项目</b>
             <span>从空白时间线开始创作</span>
           </button>
-        <button aria-label="打开项目" disabled={disabled} onClick={onOpen}>
+          <button aria-label="打开项目" disabled={disabled} onClick={onOpen}>
             <span className="home-action-icon">
               <FolderOpen size={40} />
             </span>
@@ -117,8 +163,26 @@ export default function Home({
                 <button
                   className={`recent-project ${project.missing ? "missing" : ""}`}
                   key={project.file}
-                  disabled={disabled || project.missing}
-                  onClick={() => onRecent(project.file)}
+                  disabled={disabled}
+                  aria-disabled={disabled || project.missing}
+                  onClick={() => {
+                    if (!project.missing) onRecent(project.file);
+                  }}
+                  onContextMenu={(event) => {
+                    if (!project.missing || disabled) return;
+                    event.preventDefault();
+                    setMenu({
+                      file: project.file,
+                      x: Math.max(
+                        8,
+                        Math.min(event.clientX, window.innerWidth - 220),
+                      ),
+                      y: Math.max(
+                        8,
+                        Math.min(event.clientY, window.innerHeight - 60),
+                      ),
+                    });
+                  }}
                   title={project.file}
                 >
                   <div className="recent-project-cover">
@@ -148,6 +212,28 @@ export default function Home({
           )}
         </section>
       </div>
+      {menu &&
+        createPortal(
+          <div
+            ref={menuRoot}
+            className="context-menu"
+            role="menu"
+            aria-label="最近项目操作"
+            style={{ left: menu.x, top: menu.y }}
+            onContextMenu={(event) => event.preventDefault()}
+          >
+            <button
+              role="menuitem"
+              onClick={() => {
+                onRemoveRecent(menu.file);
+                setMenu(null);
+              }}
+            >
+              从最近项目中移除
+            </button>
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }

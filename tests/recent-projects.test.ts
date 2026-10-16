@@ -29,6 +29,17 @@ it("最近项目按打开顺序持久化去重，并发保存不丢失，移走�
     expect(reloaded[0].thumbnail).toBe("data:image/png;base64,YQ==");
     await fs.unlink(a);
     expect((await store.list())[0].missing).toBe(true);
+    await Promise.all([
+      store.remove(a),
+      store.remember({ ...p, name: "保留项目" }, b),
+    ]);
+    expect(
+      (await new RecentProjects(file).list()).map((item) => item.file),
+    ).toEqual([b]);
+    expect(await fs.readFile(b, "utf8")).toBe("BB");
+    await store.remove(b);
+    expect(await new RecentProjects(file).list()).toEqual([]);
+    expect(await store.hasHistory()).toBe(true);
     await fs.writeFile(file, "broken json");
     expect(await store.list()).toEqual([]);
   } finally {

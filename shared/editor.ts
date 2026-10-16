@@ -404,6 +404,9 @@ export function changeSpeed(clip: Clip, speed: number): Clip {
     visualEffects: retimeVisualEffects(clip, ratio),
     mediaFrame: retimeMediaFrame(clip, ratio),
     speed,
+    drawing: clip.drawing
+      ? { ...clip.drawing, duration: clip.drawing.duration * ratio, delay: clip.drawing.delay * ratio }
+      : undefined,
     duration: clip.duration * ratio,
     animationOffset: (clip.animationOffset ?? 0) * ratio,
     keyframes: clip.keyframes.map((k) => ({ ...k, time: k.time * ratio })),
