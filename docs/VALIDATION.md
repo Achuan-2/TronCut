@@ -1,5 +1,15 @@
 # 验证记录（含历史与 TronCut 0.3）
 
+## v0.4.5 发布前检查（2026-10-16）
+
+本地 `pnpm test` 的 74 个文件、330 项测试全部通过，TypeScript、Vite、Electron 构建、2 项 Rust 测试及打包资源预检通过。录屏相关验证覆盖对象组合与取消组合、同步移动/裁剪/拆分、录后背景/圆角/鼠标编辑、轨道状态、可编辑运镜、真实 FFmpeg 导出与工程归档。
+
+`scripts/test-recording-object-ui.mjs`、`scripts/test-recordly-ui.mjs` 和 `scripts/test-recording-zoom-ui.mjs` 桌面专项已通过，覆盖背景下拉框、透视网格、静态/循环动态背景、鼠标样式、全屏倒计时、缩放端点、撤销重做与保存重开。此前真实 Windows WGC 录屏和录后样式编辑专项也通过。本版 `scripts/test-editing-ui.mjs` 完整开发程序回归通过，前端运行错误为零。
+
+针对 v0.4.4 云端末帧截取失败，新增尾部探测无结果时的完整探测回退，并在真实截帧测试中模拟该路径，验证源视频 10 fps、工程 30 fps 的末帧颜色。语音会话测试改为按实际异步准备顺序验证两个串行任务，避免将请求文件写入完成顺序误判为队列错误。
+
+Windows x64 安装包与免安装 ZIP、macOS arm64/x64 DMG 由发布工作流构建；Windows 打包版编辑回归与统一 SHA256 校验在云端执行，Mac 包未经真机安装、权限、录制和导出验收。
+
 ## v0.4.4 发布前检查（2026-10-16）
 
 本地 `pnpm test` 的 71 个文件、308 项测试全部通过，包含新增视觉效果、效果时间范围、遮罩关键帧、真实 FFmpeg 导出和截帧、字幕单条编辑、宽高独立缩放及预设库。`pnpm run test:rust` 的 2 项 Rust 单元测试通过；TypeScript、Vite、Electron 构建和 `scripts/check-packaging.mjs` 检查通过。

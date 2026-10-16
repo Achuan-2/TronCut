@@ -10,14 +10,14 @@
     <img src="https://img.shields.io/badge/status-release-71b896" alt="Release" />
   </p>
   <p><a href="README.md">简体中文</a> · <strong>English</strong></p>
-  <p><a href="https://github.com/Achuan-2/TronCut/releases/tag/v0.4.4">Download</a> · <a href="#highlights">Highlights</a> · <a href="docs/FEATURES.md">Roadmap</a> · <a href="https://github.com/Achuan-2/TronCut/issues">Report an issue</a></p>
+  <p><a href="https://github.com/Achuan-2/TronCut/releases/tag/v0.4.5">Download</a> · <a href="#highlights">Highlights</a> · <a href="docs/FEATURES.md">Roadmap</a> · <a href="https://github.com/Achuan-2/TronCut/issues">Report an issue</a></p>
 </div>
 
 ![TronCut Windows editor — Chinese UI](docs/images/editor.png)
 
 TronCut brings screen recording, editing, text, captions, and audio processing into one workspace. Its media library, canvas, inspector, and multitrack timeline use a familiar desktop editing layout, with particular attention to adding text, creating animations, positioning captions, and moving projects between machines.
 
-> **Current version: v0.4.4 release.** The Windows package has passed desktop checks. Unsigned Intel and Apple Silicon macOS packages are provided without real-device validation for users to test. Camtasia import remains limited. This release does not provide complete Camtasia feature parity; see [compatibility](#compatibility). The application UI is currently Chinese; this README is available in both languages.
+> **Current version: v0.4.5 release.** The Windows package has passed desktop checks. Unsigned Intel and Apple Silicon macOS packages are provided without real-device validation for users to test. Camtasia import remains limited. This release does not provide complete Camtasia feature parity; see [compatibility](#compatibility). The application UI is currently Chinese; this README is available in both languages.
 
 ## Highlights
 
@@ -37,14 +37,14 @@ TronCut also provides multitrack editing, multiple selection, grouping, synchron
 
 ## Download and get started
 
-Download from **[GitHub Releases](https://github.com/Achuan-2/TronCut/releases/tag/v0.4.4)**:
+Download from **[GitHub Releases](https://github.com/Achuan-2/TronCut/releases/tag/v0.4.5)**:
 
 | File                                  | Purpose                                                           |
 | ------------------------------------- | ----------------------------------------------------------------- |
-| `TronCut-Setup-0.4.4-windows-x64.exe` | Windows x64 installer with a configurable installation directory. |
-| `TronCut-0.4.4-windows-x64.zip`       | Portable build; extract the entire archive and run `TronCut.exe`. |
-| `TronCut-0.4.4-macos-arm64.dmg`       | Apple Silicon Mac package; not validated on a real device.        |
-| `TronCut-0.4.4-macos-x64.dmg`         | Intel Mac package; not validated on a real device.                |
+| `TronCut-Setup-0.4.5-windows-x64.exe` | Windows x64 installer with a configurable installation directory. |
+| `TronCut-0.4.5-windows-x64.zip`       | Portable build; extract the entire archive and run `TronCut.exe`. |
+| `TronCut-0.4.5-macos-arm64.dmg`       | Apple Silicon Mac package; not validated on a real device.        |
+| `TronCut-0.4.5-macos-x64.dmg`         | Intel Mac package; not validated on a real device.                |
 | `SHA256SUMS.txt`                      | SHA256 checksums for release files.                               |
 
 Packages include the matching media engine and speech environment manager; Windows also includes native recording helpers. End users do not need to install Node.js, FFmpeg, or uv. **The first speech-caption task needs internet access to download Python, dependencies, and models**; speech recognition then runs locally. Windows and macOS builds are unsigned, and the macOS packages are neither notarized nor validated on real hardware.
