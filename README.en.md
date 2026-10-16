@@ -10,21 +10,22 @@
     <img src="https://img.shields.io/badge/status-release-71b896" alt="Release" />
   </p>
   <p><a href="README.md">简体中文</a> · <strong>English</strong></p>
-  <p><a href="https://github.com/Achuan-2/TronCut/releases/tag/v0.4.5">Download</a> · <a href="#highlights">Highlights</a> · <a href="docs/FEATURES.md">Roadmap</a> · <a href="https://github.com/Achuan-2/TronCut/issues">Report an issue</a></p>
+  <p><a href="https://github.com/Achuan-2/TronCut/releases/tag/v0.4.7">Download</a> · <a href="#highlights">Highlights</a> · <a href="docs/FEATURES.md">Roadmap</a> · <a href="https://github.com/Achuan-2/TronCut/issues">Report an issue</a></p>
 </div>
 
 ![TronCut Windows editor — Chinese UI](docs/images/editor.png)
 
 TronCut brings screen recording, editing, text, captions, and audio processing into one workspace. Its media library, canvas, inspector, and multitrack timeline use a familiar desktop editing layout, with particular attention to adding text, creating animations, positioning captions, and moving projects between machines.
 
-> **Current version: v0.4.5 release.** The Windows package has passed desktop checks. Unsigned Intel and Apple Silicon macOS packages are provided without real-device validation for users to test. Camtasia import remains limited. This release does not provide complete Camtasia feature parity; see [compatibility](#compatibility). The application UI is currently Chinese; this README is available in both languages.
+> **Current version: v0.4.7 release.** The Windows package has passed desktop checks. Unsigned Intel and Apple Silicon macOS packages are provided without real-device validation for users to test. Camtasia import remains limited. This release does not provide complete Camtasia feature parity; see [compatibility](#compatibility). The application UI is currently Chinese; this README is available in both languages.
 
 ## Highlights
 
 | Capability                                   | What you can do                                                                                                                                                                               |
 | -------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Edit the cursor after recording**          | Windows native recording stores cursor data separately. Choose Recordly macOS, Tahoe, Windows 11, Figma and dot styles; preserve text and pointer shapes, resize or hide the cursor, and enable click highlights. |
-| **Automatic zoom and recording backgrounds** | Recordly click clustering, cursor follow and spring motion generate editable camera paths. Zoom the recording alone or its background too; choose a black perspective grid or four gradients and use a full-screen countdown before recording. |
+| **Automatic zoom and recording backgrounds** | Recordly click clustering, cursor follow and spring motion generate editable camera paths. Zoom the recording alone or its background too; choose animated backgrounds, gradients, or a custom image. |
+| **Custom recording regions** | Draw a region on the selected screen, resize it, or enter pixel coordinates. A small countdown keeps other apps usable, and the recording toolbar can be minimized and restored. |
 | **Recording objects** | Each recording becomes one timeline object. Change its background from a dropdown, edit padding, corners and cursor styles, or ungroup it to edit the original media separately. |
 | **Add text beside the timeline**             | Insert text in one click with white text with black outlines, black text with white outlines, and yellow text with black outlines. Center captions on the canvas to create text-based videos. |
 | **Animate without drag-only controls**       | Add fade, zoom, and slide animations from the context menu or presets. Auto animation records keyframes when you change position, scale, or opacity.                                          |
@@ -37,14 +38,14 @@ TronCut also provides multitrack editing, multiple selection, grouping, synchron
 
 ## Download and get started
 
-Download from **[GitHub Releases](https://github.com/Achuan-2/TronCut/releases/tag/v0.4.5)**:
+Download from **[GitHub Releases](https://github.com/Achuan-2/TronCut/releases/tag/v0.4.7)**:
 
 | File                                  | Purpose                                                           |
 | ------------------------------------- | ----------------------------------------------------------------- |
-| `TronCut-Setup-0.4.5-windows-x64.exe` | Windows x64 installer with a configurable installation directory. |
-| `TronCut-0.4.5-windows-x64.zip`       | Portable build; extract the entire archive and run `TronCut.exe`. |
-| `TronCut-0.4.5-macos-arm64.dmg`       | Apple Silicon Mac package; not validated on a real device.        |
-| `TronCut-0.4.5-macos-x64.dmg`         | Intel Mac package; not validated on a real device.                |
+| `TronCut-Setup-0.4.7-windows-x64.exe` | Windows x64 installer with a configurable installation directory. |
+| `TronCut-0.4.7-windows-x64.zip`       | Portable build; extract the entire archive and run `TronCut.exe`. |
+| `TronCut-0.4.7-macos-arm64.dmg`       | Apple Silicon Mac package; not validated on a real device.        |
+| `TronCut-0.4.7-macos-x64.dmg`         | Intel Mac package; not validated on a real device.                |
 | `SHA256SUMS.txt`                      | SHA256 checksums for release files.                               |
 
 Packages include the matching media engine and speech environment manager; Windows also includes native recording helpers. End users do not need to install Node.js, FFmpeg, or uv. **The first speech-caption task needs internet access to download Python, dependencies, and models**; speech recognition then runs locally. Windows and macOS builds are unsigned, and the macOS packages are neither notarized nor validated on real hardware.

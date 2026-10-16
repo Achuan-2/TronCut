@@ -10,21 +10,22 @@
     <img src="https://img.shields.io/badge/status-release-71b896" alt="Release" />
   </p>
   <p><strong>简体中文</strong> · <a href="README.en.md">English</a></p>
-  <p><a href="https://github.com/Achuan-2/TronCut/releases/tag/v0.4.6">下载安装</a> · <a href="#亮点">功能亮点</a> · <a href="docs/FEATURES.md">开发进度</a> · <a href="https://github.com/Achuan-2/TronCut/issues">反馈问题</a></p>
+  <p><a href="https://github.com/Achuan-2/TronCut/releases/tag/v0.4.7">下载安装</a> · <a href="#亮点">功能亮点</a> · <a href="docs/FEATURES.md">开发进度</a> · <a href="https://github.com/Achuan-2/TronCut/issues">反馈问题</a></p>
 </div>
 
 ![TronCut Windows 编辑器](docs/images/editor.png)
 
 TronCut 将录屏、剪辑、文字、字幕和声音处理放在同一个工作区。素材库、画布、属性面板和多轨时间线采用熟悉的桌面剪辑布局，重点改善教程制作中的文字添加、动画操作、字幕定位和工程迁移。
 
-> **当前版本：v0.4.6 正式版。** Windows 已提供经过桌面测试的安装包；macOS 提供未签名、未经真机验证的 Intel 与 Apple Silicon 安装包，由使用者自行验证。Camtasia 工程导入目前为有限转换。本版尚未实现完整 Camtasia 功能，详见[兼容范围](#兼容范围)。
+> **当前版本：v0.4.7 正式版。** Windows 已提供经过桌面测试的安装包；macOS 提供未签名、未经真机验证的 Intel 与 Apple Silicon 安装包，由使用者自行验证。Camtasia 工程导入目前为有限转换。本版尚未实现完整 Camtasia 功能，详见[兼容范围](#兼容范围)。
 
 ## 亮点
 
 | 能力                   | 你可以做什么                                                                                               |
 | ---------------------- | ---------------------------------------------------------------------------------------------------------- |
 | **录屏后继续编辑鼠标** | Windows 原生录制将鼠标与画面分开；支持 Recordly 的 macOS、Tahoe、Windows 11、Figma 等样式，保留文本与指针等形态变化，也可调整大小、隐藏光标或启用点击高亮。 |
-| **自动缩放与录屏背景** | 根据鼠标点击生成缩放，并在放大时平滑跟随鼠标；可选仅录屏缩放或背景一起缩放。内置黑色透视网格与四种渐变背景，录制前使用全屏倒计时。 |
+| **自动缩放与录屏背景** | 根据鼠标点击生成缩放，并在放大时平滑跟随鼠标；可选仅录屏缩放或背景一起缩放，支持动态背景、渐变和自定义图片。 |
+| **自定义录制范围** | 支持屏幕内框选、拖动缩放和像素坐标输入；倒计时小窗不阻挡操作，录制工具条可最小化并重新唤出。 |
 | **录屏对象** | 录制完成自动组合为一个对象；录后直接通过下拉框换背景，调整圆角、留白和鼠标，也可取消组合，分别编辑原始素材。 |
 | **录屏自动美化** | 录前选择背景、留白、圆角和鼠标，录后自动添加独立背景，并根据鼠标点击和停留生成可编辑的缩放动画。 |
 | **文字就在时间线旁**   | 一键添加文本，使用黑边白字、白边黑字、黑边黄字等模板；字幕可以放在画布中央，制作纯文字视频。               |
@@ -38,14 +39,14 @@ TronCut 将录屏、剪辑、文字、字幕和声音处理放在同一个工作
 
 ## 下载与开始使用
 
-前往 **[GitHub Releases](https://github.com/Achuan-2/TronCut/releases/tag/v0.4.6)** 下载：
+前往 **[GitHub Releases](https://github.com/Achuan-2/TronCut/releases/tag/v0.4.7)** 下载：
 
 | 文件                                  | 用途                                     |
 | ------------------------------------- | ---------------------------------------- |
-| `TronCut-Setup-0.4.6-windows-x64.exe` | Windows x64 安装包，支持选择安装目录。   |
-| `TronCut-0.4.6-windows-x64.zip`       | 免安装版；完整解压后运行 `TronCut.exe`。 |
-| `TronCut-0.4.6-macos-arm64.dmg`       | Apple Silicon Mac 安装包，未经真机验证。 |
-| `TronCut-0.4.6-macos-x64.dmg`         | Intel Mac 安装包，未经真机验证。         |
+| `TronCut-Setup-0.4.7-windows-x64.exe` | Windows x64 安装包，支持选择安装目录。   |
+| `TronCut-0.4.7-windows-x64.zip`       | 免安装版；完整解压后运行 `TronCut.exe`。 |
+| `TronCut-0.4.7-macos-arm64.dmg`       | Apple Silicon Mac 安装包，未经真机验证。 |
+| `TronCut-0.4.7-macos-x64.dmg`         | Intel Mac 安装包，未经真机验证。         |
 | `SHA256SUMS.txt`                      | 发布文件的 SHA256 校验值。               |
 
 安装包包含对应平台的媒体引擎和字幕环境管理器，Windows 版还包含原生录屏组件，使用者无需安装 Node.js、FFmpeg 或 uv。**首次生成语音字幕需要联网下载 Python、依赖和模型**，完成后语音识别在本地运行。当前 Windows 与 macOS 包均未配置代码签名，macOS 包也未公证或进行真机功能验收。
