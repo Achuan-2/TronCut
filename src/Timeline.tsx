@@ -6,6 +6,7 @@ import {
   useMemo,
   useRef,
   useState,
+  useCallback,
 } from "react";
 import { createPortal } from "react-dom";
 import {
@@ -100,6 +101,8 @@ import TrackResizeHandle from "./TrackResizeHandle";
 import TrackContextMenu, { type TrackMenuPosition } from "./TrackContextMenu";
 import ClipContextMenu, { type ClipCommand } from "./ClipContextMenu";
 import { useViewportZoom, type ZoomPoint } from "./useViewportZoom";
+import { useRAFThrottle } from "./hooks/useRAFThrottle";
+import { usePerformanceMonitor } from "./hooks/usePerformanceMonitor";
 import {
   animationMime, customAnimationId, animationDropTarget,
 } from "../shared/animation-drag";
@@ -143,6 +146,9 @@ export default function Timeline({
   onCommand: (command: ClipCommand) => void;
   dropDisabled?: boolean;
 }) {
+  // Performance monitoring in development
+  usePerformanceMonitor("Timeline");
+
   const { project, apply, playhead, seek, selected, selectedId, select } =
     editor;
   const timeline = useMemo(() => recordingTimeline(project), [project.clips, project.tracks]);
@@ -160,6 +166,9 @@ export default function Timeline({
       y: number;
       id: string;
     } | null>(null);
+
+  // RAF-throttled drag updates for smooth 60fps performance
+  const scheduleDragUpdate = useRAFThrottle<Drag | null>(setDrag);
   const panel = useRef<HTMLElement>(null);
   useEffect(
     () => setSnap(editor.preferences.program.snapping),
@@ -273,6 +282,9 @@ export default function Timeline({
   };
   const [marquee, setMarquee] = useState<Marquee | null>(null);
   const marqueeMoved = useRef(false);
+
+  // RAF-throttled marquee updates for smooth selection
+  const scheduleMarqueeUpdate = useRAFThrottle<Marquee | null>(setMarquee);
   const [transitionDrop, setTransitionDrop] = useState<TransitionTarget | null>(
     null,
   );
@@ -1035,7 +1047,7 @@ export default function Timeline({
                 marqueeMoved.current = true;
                 editor.selectMany(marqueeSelection(next));
               }
-              setMarquee(next);
+              scheduleMarqueeUpdate(next);
             }}
             onPointerUp={(event) => {
               if (!marquee || marquee.pointerId !== event.pointerId) return;
@@ -1471,7 +1483,7 @@ export default function Timeline({
                             const target = project.tracks.find(
                               (t) => t.id === hit?.dataset.track,
                             );
-                            setDrag({
+                            scheduleDragUpdate({
                               ...drag,
                               delta: (event.clientX - drag.x) / zoom,
                               trackId:

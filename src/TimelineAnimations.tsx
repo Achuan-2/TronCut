@@ -22,6 +22,7 @@ import {
 } from "../shared/animation-ranges";
 import { timeLabel } from "./Preview";
 import { animationCursor } from "./animationCursor";
+import { useRAFThrottle } from "./hooks/useRAFThrottle";
 
 export const TimelineAnimations = memo(function TimelineAnimations({
   clip,
@@ -63,6 +64,9 @@ export const TimelineAnimations = memo(function TimelineAnimations({
   };
   const [gesture, setGesture] = useState<Gesture | null>(null);
   const live = useRef<Gesture | null>(null);
+
+  // RAF-throttled gesture updates for smooth 60fps animation dragging
+  const scheduleGestureUpdate = useRAFThrottle<Gesture | null>(setGesture);
   const [context, setContext] = useState<{
     x: number;
     y: number;
@@ -130,10 +134,12 @@ export const TimelineAnimations = memo(function TimelineAnimations({
     editedEnd?.value.cropBottom,
   ]);
   useEffect(() => () => pulse.current?.animation.cancel(), []);
-  const setDrag = (next: Gesture | null) => {
+
+  const setDrag = useCallback((next: Gesture | null) => {
     live.current = next;
-    setGesture(next);
-  };
+    // Use RAF throttling for visual updates, but keep live.current immediate
+    scheduleGestureUpdate(next);
+  }, [scheduleGestureUpdate]);
   const begin = (
     event: PointerEvent<HTMLButtonElement>,
     range: AnimationRange,

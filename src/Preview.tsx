@@ -5,6 +5,7 @@ import {
   useMemo,
   useRef,
   useState,
+  useCallback,
   type CSSProperties,
   type ReactNode,
 } from "react";
@@ -87,6 +88,7 @@ import ClipContextMenu, {
   type ClipMenuPosition,
 } from "./ClipContextMenu";
 import { useViewportZoom, type ZoomPoint } from "./useViewportZoom";
+import { useRAFThrottle } from "./hooks/useRAFThrottle";
 import {
   animationMime, customAnimationId, animationDropTarget,
 } from "../shared/animation-drag";
@@ -270,12 +272,16 @@ function PreviewLayer({
     content?: ContentTransform;
   } | null>(null);
   const dragRef = useRef<typeof drag>(null);
-  const setGesture = (value: typeof drag) => {
+
+  // RAF-throttled gesture updates for smooth 60fps dragging
+  const scheduleDragUpdate = useRAFThrottle<typeof drag>(setDrag);
+
+  const setGesture = useCallback((value: typeof drag) => {
     // Pointer-up can arrive before React renders the latest pointer-move. Keep
     // the live gesture in a ref so a fast drag still commits its final position.
     dragRef.current = value;
-    setDrag(value);
-  };
+    scheduleDragUpdate(value);
+  }, [scheduleDragUpdate]);
   const displayed = editing
     ? (drag?.value ?? transform)
     : transitionTransform(
