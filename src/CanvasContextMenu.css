@@ -13,3 +13,7 @@
 .canvas-context-submenu {
   width: 180px;
 }
+.timeline-context-menu {
+  max-height: calc(100vh - 16px);
+  overflow-y: auto;
+}

@@ -152,7 +152,7 @@ try {
   await page.locator(".timeline-clip.image").click();
   await page.getByLabel("缩放 (%)", { exact: true }).fill("85");
   await page.locator(".timeline-clip.image").click({ button: "right" });
-  await page.getByRole("button", { name: "删除片段", exact: true }).click();
+  await page.getByRole("menuitem", { name: "删除", exact: true }).click();
   await expect(page.locator(".timeline-clip")).toHaveCount(1);
   await page.getByTitle("撤销 Ctrl+Z", { exact: true }).click();
   await expect(page.locator(".timeline-clip")).toHaveCount(2);

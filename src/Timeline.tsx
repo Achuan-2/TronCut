@@ -25,7 +25,6 @@ import {
   Undo2,
   Redo2,
   Trash2,
-  Copy,
   Flag,
   ChevronDown,
   Camera,
@@ -45,10 +44,9 @@ import {
   deleteClips,
   moveClips,
   splitSelection,
-  groupSelection,
-  pasteClips,
   selectionWithGroups,
   clipsInTimelineRange,
+  editableIds,
 } from "../shared/timeline";
 import { MediaThumbnail } from "./MediaThumbnail";
 import { TimelineAnimations } from "./TimelineAnimations";
@@ -85,7 +83,6 @@ import {
 import {
   captionTrackSelection,
   convertCaptionsToText,
-  ensureCaptionTrack,
   mergeWithPreviousCaption,
   previousCaption,
 } from "../shared/captions";
@@ -100,6 +97,7 @@ import {
 } from "../shared/tracks";
 import TrackResizeHandle from "./TrackResizeHandle";
 import TrackContextMenu, { type TrackMenuPosition } from "./TrackContextMenu";
+import ClipContextMenu, { type ClipCommand } from "./ClipContextMenu";
 import { useViewportZoom, type ZoomPoint } from "./useViewportZoom";
 import { projectIndex } from "../shared/project-index";
 import { recordingGroups, recordingTimeline, trimRecordingObject } from "../shared/recording-objects";
@@ -127,6 +125,7 @@ export default function Timeline({
   onCopyAnimation,
   onDropFiles,
   onCaptureFrame,
+  onCommand,
   dropDisabled = false,
 }: {
   editor: Editor;
@@ -137,6 +136,7 @@ export default function Timeline({
   ) => void;
   onDropFiles: (files: File[], time: number, trackId?: string) => void;
   onCaptureFrame: () => void;
+  onCommand: (command: ClipCommand) => void;
   dropDisabled?: boolean;
 }) {
   const { project, apply, playhead, seek, selected, selectedId, select } =
@@ -163,7 +163,6 @@ export default function Timeline({
   );
   const zoomAnchor = useRef<{ time: number; x: number } | null>(null);
   const scroll = useRef<HTMLDivElement>(null),
-    captionClipboard = useRef<Clip[]>([]),
     duration = useMemo(
       () => project.markers.reduce(
         (end, marker) => Math.max(end, markerEnd(marker) + 5),
@@ -475,70 +474,11 @@ export default function Timeline({
   }, [layoutKey, width]);
   const locked =
     selected && project.tracks.find((t) => t.id === selected.trackId)?.locked;
-  function remove(id: string) {
-    const clip = project.clips.find((c) => c.id === id);
-    if (!clip || project.tracks.find((t) => t.id === clip.trackId)?.locked)
-      return;
-    apply((p) =>
-      deleteClips(
-        p,
-        editor.selectedIds.includes(id) ? editor.selectedIds : [id],
-      ),
-    );
-    select(null);
-  }
-  function duplicate(id: string) {
-    const clip = project.clips.find((c) => c.id === id);
-    if (!clip || project.tracks.find((t) => t.id === clip.trackId)?.locked)
-      return;
-    const copied = project.clips.filter((c) =>
-      (editor.selectedIds.includes(id) ? editor.selectedIds : [id]).includes(
-        c.id,
-      ),
-    );
-    const result = pasteClips(
-      project,
-      copied,
-      Math.max(...copied.map((c) => c.start + c.duration)),
-    );
-    apply(result.project);
-    editor.selectMany(result.ids);
-  }
   function selectedCaptions(id: string) {
     const ids = editor.selectedIds.includes(id) ? editor.selectedIds : [id];
     return project.clips.filter(
       (clip) => clip.caption && ids.includes(clip.id),
     );
-  }
-  function copyCaptions(id: string, cut = false) {
-    const clips = selectedCaptions(id);
-    if (!clips.length) return;
-    captionClipboard.current = structuredClone(clips);
-    if (cut) {
-      apply((current) =>
-        deleteClips(
-          current,
-          clips.map((clip) => clip.id),
-        ),
-      );
-      select(null);
-    }
-  }
-  function pasteCaptions() {
-    if (!captionClipboard.current.length) return;
-    const ensured = ensureCaptionTrack(project);
-    if (
-      ensured.project.tracks.find((track) => track.id === ensured.trackId)
-        ?.locked
-    )
-      return;
-    const copied = captionClipboard.current.map((clip) => ({
-      ...clip,
-      trackId: ensured.trackId,
-    }));
-    const result = pasteClips(ensured.project, copied, playhead);
-    apply(result.project);
-    editor.selectMany(result.ids);
   }
   function convertCaptionSelection(id: string) {
     const result = convertCaptionsToText(
@@ -1268,6 +1208,7 @@ export default function Timeline({
                     return (
                       <Fragment key={c.id}>
                         <div
+                          data-clip-id={c.id}
                           className={`timeline-clip ${c.kind} ${isRecording ? "recording-object" : ""} ${c.caption ? "caption" : ""} ${animationRanges(c).length ? "has-animation" : ""} ${editor.selectedIds.includes(c.id) ? "selected" : ""} ${track.locked ? "locked" : ""} ${effectDrop === c.id ? "effect-drop-target" : ""} ${transitionHighlights.some((item) => item.clipId === c.id) ? "transition-drop-target" : ""}`}
                           style={{
                             left: c.start * zoom,
@@ -1522,17 +1463,19 @@ export default function Timeline({
                           }}
                           onContextMenu={(event) => {
                             event.preventDefault();
-                            if (!editor.selectedIds.includes(c.id))
-                              select(c.id);
+                            event.stopPropagation();
+                            editor.setPlaying(false);
+                            editor.clearKeyframeEdit();
+                            if (editor.editingTextId)
+                              editor.endTextEdit(editor.editingTextId);
+                            const previous = editor.selectedIds;
+                            select(c.id);
+                            if (previous.includes(c.id))
+                              editor.selectMany(previous);
+                            setTrackMenu(null);
                             setContext({
-                              x: Math.min(
-                                event.clientX,
-                                window.innerWidth - 210,
-                              ),
-                              y: Math.min(
-                                event.clientY,
-                                window.innerHeight - (c.caption ? 500 : 280),
-                              ),
+                              x: event.clientX,
+                              y: event.clientY,
                               id: c.id,
                             });
                           }}
@@ -1796,62 +1739,23 @@ export default function Timeline({
         (() => {
           const clip = project.clips.find((item) => item.id === context.id);
           if (!clip) return null;
+          const editable = editableIds(project, editor.selectedIds);
+          const selectionLocked = !editor.selectedIds.every((id) =>
+            editable.has(id),
+          );
           if (clip.caption) {
             const captionLocked = !!project.tracks.find(
               (track) => track.id === clip.trackId,
             )?.locked;
             return (
-              <div
-                className="context-menu caption-context-menu"
-                style={{ left: context.x, top: context.y }}
-                onClick={() => setContext(null)}
+              <ClipContextMenu
+                editor={editor}
+                menu={{ ...context, clipId: context.id }}
+                onClose={() => setContext(null)}
+                onCommand={onCommand}
+                portalTarget={panel.current}
+                surface="timeline"
               >
-                <button
-                  disabled={captionLocked}
-                  onClick={() => copyCaptions(context.id, true)}
-                >
-                  剪切<span className="menu-shortcut">Ctrl+X</span>
-                </button>
-                <button onClick={() => copyCaptions(context.id)}>
-                  复制<span className="menu-shortcut">Ctrl+C</span>
-                </button>
-                <button
-                  disabled={!captionClipboard.current.length || captionLocked}
-                  onClick={pasteCaptions}
-                >
-                  粘贴<span className="menu-shortcut">Ctrl+V</span>
-                </button>
-                <button
-                  disabled={captionLocked}
-                  onClick={() => duplicate(context.id)}
-                >
-                  复制片段<span className="menu-shortcut">Ctrl+D</span>
-                </button>
-                <hr />
-                <button
-                  disabled={captionLocked}
-                  onClick={() => remove(context.id)}
-                >
-                  <Trash2 size={14} />
-                  删除
-                  <span className="menu-shortcut">Delete</span>
-                </button>
-                <button
-                  disabled={captionLocked}
-                  onClick={() => {
-                    apply((current) =>
-                      deleteClips(
-                        current,
-                        selectedCaptions(context.id).map((item) => item.id),
-                        true,
-                      ),
-                    );
-                    select(null);
-                  }}
-                >
-                  <Trash2 size={14} />
-                  波纹删除
-                </button>
                 <hr />
                 <button
                   onClick={() =>
@@ -1908,35 +1812,19 @@ export default function Timeline({
                 >
                   转换为普通文本
                 </button>
-              </div>
+              </ClipContextMenu>
             );
           }
           return (
-            <div
-              className="context-menu"
-              style={{ left: context.x, top: context.y }}
-              onClick={() => setContext(null)}
+            <ClipContextMenu
+              editor={editor}
+              menu={{ ...context, clipId: context.id }}
+              onClose={() => setContext(null)}
+              onCommand={onCommand}
+              portalTarget={panel.current}
+              surface="timeline"
             >
-              <button
-                onClick={() => {
-                  apply((p) => deleteClips(p, editor.selectedIds, true));
-                  select(null);
-                }}
-              >
-                <Trash2 size={14} />
-                波纹删除选中片段
-              </button>
-              <button
-                onClick={() =>
-                  apply((p) => groupSelection(p, editor.selectedIds, true))
-                }
-              >
-                取消组合
-              </button>
-              <button onClick={() => duplicate(context.id)}>
-                <Copy size={14} />
-                复制片段
-              </button>
+              <hr />
               <button
                 disabled={
                   !editor.hasBehaviorClipboard() ||
@@ -1952,16 +1840,16 @@ export default function Timeline({
                 粘贴效果
               </button>
               <button
+                disabled={
+                  selectionLocked || playhead <= clip.start ||
+                  playhead >= clip.start + clip.duration
+                }
                 onClick={() => apply((p) => splitClip(p, context.id, playhead))}
               >
                 <Scissors size={14} />
                 在播放头拆分
               </button>
-              <button onClick={() => remove(context.id)}>
-                <Trash2 size={14} />
-                删除片段
-              </button>
-            </div>
+            </ClipContextMenu>
           );
         })()}
       <BehaviorContextMenu editor={editor} />

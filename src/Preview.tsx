@@ -79,10 +79,10 @@ import EffectRegionOverlay from "./EffectRegionOverlay";
 import type { Region } from "../shared/visual-effects";
 import { effectActive } from "../shared/effect-timing";
 import BehaviorText from "./BehaviorText";
-import CanvasContextMenu, {
-  type CanvasCommand,
-  type CanvasMenuPosition,
-} from "./CanvasContextMenu";
+import ClipContextMenu, {
+  type ClipCommand,
+  type ClipMenuPosition,
+} from "./ClipContextMenu";
 import { useViewportZoom, type ZoomPoint } from "./useViewportZoom";
 
 export function timeLabel(t: number): string {
@@ -912,14 +912,14 @@ export default function Preview({
   onCommand,
 }: {
   editor: Editor;
-  onCommand: (command: CanvasCommand) => void;
+  onCommand: (command: ClipCommand) => void;
 }) {
   const panel = useRef<HTMLElement>(null);
   const holder = useRef<HTMLDivElement>(null),
     [size, setSize] = useState({ width: 700, height: 400 });
   const { canvasMode: mode, setCanvasMode: setMode } = editor;
   const [zoom, setZoom] = useState<CanvasZoom>("fit");
-  const [contextMenu, setContextMenu] = useState<CanvasMenuPosition | null>(null);
+  const [contextMenu, setContextMenu] = useState<ClipMenuPosition | null>(null);
   useEffect(() => {
     const initial = editor.preferences.program.previewZoom;
     setZoom(initial === "fit" ? "fit" : Number(initial));
@@ -1133,7 +1133,7 @@ export default function Preview({
           </div>
         </div>
       </div>
-      <CanvasContextMenu
+      <ClipContextMenu
         editor={editor}
         menu={contextMenu}
         onClose={() => setContextMenu(null)}

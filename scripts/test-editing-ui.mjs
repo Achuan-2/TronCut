@@ -755,7 +755,7 @@ try {
   const openAnimationMenu = async (arrow) => {
     await arrow.locator(".animation-arrow").click({ button: "right" });
     await expect(page.getByRole("menu", { name: "动画菜单", exact: true })).toBeVisible();
-    await expect(page.getByRole("button", { name: "删除片段", exact: true })).toHaveCount(0);
+    await expect(page.getByRole("menuitem", { name: "删除", exact: true })).toHaveCount(0);
   };
   for (const label of ["指数缓入/缓出", "线性", "跳跃", "回弹", "自动"]) {
     await openAnimationMenu(imageArrow);

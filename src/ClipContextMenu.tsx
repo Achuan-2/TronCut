@@ -1,60 +1,82 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { createPortal } from "react-dom";
 import { ChevronRight } from "lucide-react";
-import type { Clip } from "../shared/model";
 import {
   arrangeClips,
   canArrangeClips,
-  editableCanvasIds,
-  fitFrameTransform,
-  pasteClipProperties,
   type ArrangeDirection,
 } from "../shared/canvas-actions";
 import { editableIds } from "../shared/timeline";
-import { setTransform, transformAt } from "../shared/editor";
-import { defaultCrop } from "../shared/effects";
-import { visualClipAt } from "../shared/visual-state";
-import { textBoxFor } from "./text";
 import type { Editor } from "./useEditor";
 import "./CanvasContextMenu.css";
 
-export type CanvasCommand = "cut" | "copy" | "paste" | "duplicate" | "delete";
-export interface CanvasMenuPosition {
+export type ClipCommand =
+  | "cut"
+  | "copy"
+  | "paste"
+  | "duplicate"
+  | "delete"
+  | "rippleDelete"
+  | "group"
+  | "ungroup";
+export interface ClipMenuPosition {
   x: number;
   y: number;
   clipId: string | null;
 }
 
-export default function CanvasContextMenu({
+export default function ClipContextMenu({
   editor,
   menu,
   onClose,
   onCommand,
   portalTarget,
+  surface = "canvas",
+  children,
 }: {
   editor: Editor;
-  menu: CanvasMenuPosition | null;
+  menu: ClipMenuPosition | null;
   onClose: () => void;
-  onCommand: (command: CanvasCommand) => void;
+  onCommand: (command: ClipCommand) => void;
   portalTarget: HTMLElement | null;
+  surface?: "canvas" | "timeline";
+  children?: ReactNode;
 }) {
   const root = useRef<HTMLDivElement>(null);
   const arrangeButton = useRef<HTMLButtonElement>(null);
   const submenuRoot = useRef<HTMLDivElement>(null);
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [submenu, setSubmenu] = useState<{ x: number; y: number } | null>(null);
-  const [properties, setProperties] = useState<Clip | null>(null);
   const { project } = editor;
+  const projectId = useRef(project.id);
   const source = menu?.clipId
     ? project.clips.find((clip) => clip.id === menu.clipId)
     : undefined;
   const ids = source ? editor.selectedIds : [];
   const editable = source ? editableIds(project, ids) : new Set<string>();
   const canEdit = ids.length > 0 && ids.every((id) => editable.has(id));
+  const selected = source
+    ? project.clips.filter((clip) => ids.includes(clip.id))
+    : [];
+  const canGroup =
+    canEdit &&
+    selected.length > 1 &&
+    (!selected[0].groupId ||
+      selected.some((clip) => clip.groupId !== selected[0].groupId));
+  const canUngroup = canEdit && selected.some((clip) => !!clip.groupId);
+  const canFit = canEdit && selected.some((clip) => clip.kind !== "audio");
   useEffect(() => {
-    setProperties(null);
-    onClose();
-  }, [project.id]);
+    if (projectId.current !== project.id) {
+      projectId.current = project.id;
+      onClose();
+    }
+  }, [project.id, onClose]);
   useLayoutEffect(() => {
     setSubmenu(null);
     if (!menu) return;
@@ -105,7 +127,7 @@ export default function CanvasContextMenu({
           ?.focus(),
       );
   };
-  const command = (name: CanvasCommand) => {
+  const command = (name: ClipCommand) => {
     onClose();
     onCommand(name);
   };
@@ -114,46 +136,13 @@ export default function CanvasContextMenu({
     onClose();
   };
   const fit = () => {
-    const targets = editableCanvasIds(project, ids);
-    // Apply as one undoable operation to every selected, editable object.
-    editor.apply((project) => ({
-      ...project,
-      clips: project.clips.map((clip) => {
-        if (!targets.has(clip.id) || clip.kind === "audio") return clip;
-        const value = transformAt(clip, editor.playhead - clip.start);
-        const sampled = visualClipAt(clip, value);
-        const asset = project.assets.find((asset) => asset.id === clip.assetId);
-        const ratio = asset
-          ? Math.min(
-              project.canvas.width / Math.max(1, asset.width),
-              project.canvas.height / Math.max(1, asset.height),
-            )
-          : 1;
-        const crop = sampled.crop ?? defaultCrop;
-        const size =
-          clip.kind === "text"
-            ? textBoxFor(clip)
-            : asset
-              ? {
-                  width: asset.width * ratio * (1 - crop.left - crop.right),
-                  height: asset.height * ratio * (1 - crop.top - crop.bottom),
-                }
-              : { width: 600, height: 300 };
-        return setTransform(
-          clip,
-          fitFrameTransform(value, size, project.canvas, clip.rotation),
-          editor.playhead - clip.start,
-          editor.autoAnimate,
-          editor.preferences.timing.animation,
-        );
-      }),
-    }));
+    editor.fitClipsToCanvas(ids);
     onClose();
   };
   if (!menu) return null;
   const item = (
     label: string,
-    name: CanvasCommand,
+    name: ClipCommand,
     shortcut: string,
     disabled = !canEdit,
   ) => (
@@ -172,8 +161,8 @@ export default function CanvasContextMenu({
     <div
       ref={root}
       role="menu"
-      aria-label="画布对象操作"
-      className="context-menu canvas-context-menu"
+      aria-label={surface === "canvas" ? "画布对象操作" : "时间轴对象操作"}
+      className={`context-menu canvas-context-menu ${surface === "timeline" ? "timeline-context-menu" : ""}`}
       style={{ left: position.x, top: position.y }}
       onContextMenu={(event) => event.preventDefault()}
       onClick={(event) => event.stopPropagation()}
@@ -206,9 +195,9 @@ export default function CanvasContextMenu({
           : root.current;
         const buttons = Array.from(
           container?.querySelectorAll<HTMLButtonElement>(
-            ":scope > button:not(:disabled)",
+            "button:not(:disabled)",
           ) ?? [],
-        );
+        ).filter((button) => button.closest('[role="menu"]') === container);
         const current = buttons.indexOf(
           document.activeElement as HTMLButtonElement,
         );
@@ -228,6 +217,8 @@ export default function CanvasContextMenu({
       {item("粘贴", "paste", "Ctrl+V", false)}
       {item("拷贝", "duplicate", "Ctrl+D")}
       {item("删除", "delete", "Delete")}
+      {surface === "timeline" &&
+        item("波纹删除", "rippleDelete", "Shift+Delete")}
       <hr />
       <button
         role="menuitem"
@@ -235,13 +226,7 @@ export default function CanvasContextMenu({
         onPointerEnter={() => setSubmenu(null)}
         onClick={() => {
           if (source) {
-            const value = transformAt(source, editor.playhead - source.start);
-            setProperties(
-              structuredClone({
-                ...visualClipAt(source, value),
-                transform: value,
-              }),
-            );
+            editor.copyClipProperties(source.id);
           }
           onClose();
         }}
@@ -250,13 +235,10 @@ export default function CanvasContextMenu({
       </button>
       <button
         role="menuitem"
-        disabled={!canEdit || !properties}
+        disabled={!canEdit || !editor.hasClipProperties}
         onPointerEnter={() => setSubmenu(null)}
         onClick={() => {
-          if (properties)
-            editor.apply((project) =>
-              pasteClipProperties(project, ids, properties),
-            );
+          editor.pasteClipProperties(ids);
           onClose();
         }}
       >
@@ -265,24 +247,38 @@ export default function CanvasContextMenu({
       <hr />
       <button
         role="menuitem"
-        disabled={!canEdit}
+        disabled={!canFit}
         onPointerEnter={() => setSubmenu(null)}
         onClick={fit}
       >
         自适应缩放
       </button>
-      <button
-        ref={arrangeButton}
-        role="menuitem"
-        aria-haspopup="menu"
-        aria-expanded={!!submenu}
-        disabled={!canEdit}
-        onPointerEnter={() => openSubmenu()}
-        onClick={() => openSubmenu(true)}
-      >
-        排列
-        <ChevronRight size={14} className="canvas-menu-arrow" />
-      </button>
+      {surface === "timeline" && (
+        <>
+          <hr />
+          {item("组合", "group", "", !canGroup)}
+          {item("取消组合", "ungroup", "", !canUngroup)}
+        </>
+      )}
+      {children && (
+        <div className="clip-context-extras" onClick={onClose}>
+          {children}
+        </div>
+      )}
+      {surface === "canvas" && (
+        <button
+          ref={arrangeButton}
+          role="menuitem"
+          aria-haspopup="menu"
+          aria-expanded={!!submenu}
+          disabled={!canEdit}
+          onPointerEnter={() => openSubmenu()}
+          onClick={() => openSubmenu(true)}
+        >
+          排列
+          <ChevronRight size={14} className="canvas-menu-arrow" />
+        </button>
+      )}
       {submenu && (
         <div
           ref={submenuRoot}

@@ -107,7 +107,7 @@ try {
     .click();
   await expect(page.locator(".caption-row")).toHaveCount(0);
   await page.locator(".timeline-clip.selected").click({ button: "right" });
-  await page.getByRole("button", { name: "删除片段", exact: true }).click();
+  await page.getByRole("menuitem", { name: "删除", exact: true }).click();
   await page.getByRole("button", { name: "媒体", exact: true }).click();
   await page.getByRole("button", { name: "添加文本", exact: true }).click();
   await page.getByLabel("文本内容").fill("TronCut：中文文本与动画");

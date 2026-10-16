@@ -52,7 +52,14 @@ import { setVideoZoomPan } from "../shared/video-zoom-pan";
 import { type ContentTransform } from "../shared/crop";
 import { animateContent, animateCrop } from "../shared/crop-animation";
 import type { Crop } from "../shared/crop";
-import { fitUpdatedText } from "./text";
+import { fitUpdatedText, textBoxFor } from "./text";
+import {
+  editableCanvasIds,
+  fitFrameTransform,
+  pasteClipProperties as applyClipProperties,
+} from "../shared/canvas-actions";
+import { defaultCrop } from "../shared/effects";
+import { visualClipAt } from "../shared/visual-state";
 import {
   addClipSpeed,
   removeClipSpeed,
@@ -128,6 +135,7 @@ export function useEditor(
   const [editingTextId, setEditingTextId] = useState<string | null>(null);
   const [zoomPanDraft, setZoomPanDraft] = useState<Transform | null>(null);
   const [canvasMode, setCanvasMode] = useState<"select" | "crop">("select");
+  const [clipProperties, setClipProperties] = useState<Clip | null>(null);
   type KeyframeSelection = {
     clipId: string;
     time: number;
@@ -268,6 +276,7 @@ export function useEditor(
     setProject(next);
     setEditingTextId(null);
     setZoomPanDraft(null);
+    setClipProperties(null);
     setCanvasMode(defaults.current.program.defaultTool);
     select(null);
     seek(0);
@@ -538,6 +547,73 @@ export function useEditor(
       });
     },
     [updateClip, updateTextAppearance, playhead, autoAnimate],
+  );
+  const copyClipProperties = useCallback(
+    (id: string) => {
+      const source = current.current.clips.find((clip) => clip.id === id);
+      if (!source) return;
+      const value = transformAt(source, playhead - source.start);
+      setClipProperties(
+        structuredClone({ ...visualClipAt(source, value), transform: value }),
+      );
+    },
+    [playhead],
+  );
+  const pasteClipProperties = useCallback(
+    (ids: readonly string[]) => {
+      if (clipProperties)
+        apply((project) => applyClipProperties(project, ids, clipProperties));
+    },
+    [apply, clipProperties],
+  );
+  const fitClipsToCanvas = useCallback(
+    (ids: readonly string[]) => {
+      apply((project) => {
+        const targets = editableCanvasIds(project, ids);
+        if (
+          !project.clips.some(
+            (clip) => targets.has(clip.id) && clip.kind !== "audio",
+          )
+        )
+          return project;
+        return {
+          ...project,
+          clips: project.clips.map((clip) => {
+            if (!targets.has(clip.id) || clip.kind === "audio") return clip;
+            const value = transformAt(clip, playhead - clip.start);
+            const sampled = visualClipAt(clip, value);
+            const asset = project.assets.find(
+              (asset) => asset.id === clip.assetId,
+            );
+            const ratio = asset
+              ? Math.min(
+                  project.canvas.width / Math.max(1, asset.width),
+                  project.canvas.height / Math.max(1, asset.height),
+                )
+              : 1;
+            const crop = sampled.crop ?? defaultCrop;
+            const size =
+              clip.kind === "text"
+                ? textBoxFor(clip)
+                : asset
+                  ? {
+                      width: asset.width * ratio * (1 - crop.left - crop.right),
+                      height:
+                        asset.height * ratio * (1 - crop.top - crop.bottom),
+                    }
+                  : { width: 600, height: 300 };
+            return setTransform(
+              clip,
+              fitFrameTransform(value, size, project.canvas, clip.rotation),
+              playhead - clip.start,
+              autoAnimate,
+              defaults.current.timing.animation,
+            );
+          }),
+        };
+      });
+    },
+    [apply, playhead, autoAnimate],
   );
   const addSelectedKeyframe = useCallback(() => {
     const project = current.current;
@@ -1084,6 +1160,10 @@ export function useEditor(
     canvasMode,
     setCanvasMode,
     updateTransform,
+    copyClipProperties,
+    pasteClipProperties,
+    hasClipProperties: !!clipProperties,
+    fitClipsToCanvas,
     addSelectedKeyframe,
     selectedKeyframe,
     selectedAnimation,

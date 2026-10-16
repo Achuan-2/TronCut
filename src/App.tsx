@@ -1103,6 +1103,7 @@ export default function App() {
           </div>
           <Timeline
             editor={editor}
+            onCommand={(command) => commands.current(command)}
             onCopyAnimation={copyAnimation}
             onDropFiles={dropFiles}
             onCaptureFrame={() => void captureFrame()}
