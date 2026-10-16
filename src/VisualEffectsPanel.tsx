@@ -1,17 +1,5 @@
 import { useState } from "react";
-import {
-  Gauge,
-  RectangleHorizontal,
-  Search,
-  X,
-  Blend,
-  Scan,
-  Layers,
-  Pipette,
-  PaintBucket,
-  ScanLine,
-  Square,
-} from "lucide-react";
+import { Search, X } from "lucide-react";
 import type { Editor } from "./useEditor";
 import { visualEffectPresets } from "../shared/preset-library";
 import {
@@ -20,6 +8,7 @@ import {
   supportsVisualEffect,
 } from "../shared/visual-effect-drag";
 import PresetTile from "./PresetTile";
+import VisualEffectPreview from "./VisualEffectPreview";
 
 export function VisualEffectCard({
   preset,
@@ -32,18 +21,7 @@ export function VisualEffectCard({
   selected?: boolean;
   onSelect?: () => void;
 }) {
-  const icons = {
-    "clip-speed": Gauge,
-    "rounded-corners": RectangleHorizontal,
-    "media-matte": Layers,
-    mask: Scan,
-    shadow: Blend,
-    "remove-color": Pipette,
-    tint: PaintBucket,
-    "blur-region": ScanLine,
-    border: Square,
-  };
-  const Icon = icons[preset.id];
+  const [previewing, setPreviewing] = useState(false);
   return (
     <PresetTile
       kind="effect"
@@ -55,9 +33,22 @@ export function VisualEffectCard({
         className={`visual-effect-card ${selected ? "selected" : ""}`}
         data-effect={preset.id}
         draggable
-        title="拖到画布对象或时间轴片段，或双击应用到所选片段"
+        title="悬停预览效果；拖到画布对象或时间轴片段，或双击应用到所选片段"
+        onPointerEnter={(event) => {
+          if (event.pointerType !== "touch") setPreviewing(true);
+        }}
+        onPointerLeave={(event) => {
+          if (!event.currentTarget.matches(":focus-visible"))
+            setPreviewing(false);
+        }}
+        onFocus={(event) => {
+          if (event.currentTarget.matches(":focus-visible"))
+            setPreviewing(true);
+        }}
+        onBlur={() => setPreviewing(false)}
         onClick={onSelect}
         onDragStart={(event) => {
+          setPreviewing(false);
           event.dataTransfer.setData(visualEffectMime, preset.id);
           event.dataTransfer.setData(
             visualEffectDragType(preset.id),
@@ -65,11 +56,10 @@ export function VisualEffectCard({
           );
           event.dataTransfer.effectAllowed = "copy";
         }}
+        onDragEnd={() => setPreviewing(false)}
         onDoubleClick={() => editor.addVisualEffect(preset.id)}
       >
-        <div className={`effect-card-preview ${preset.id}`}>
-          <Icon size={40} />
-        </div>
+        <VisualEffectPreview effect={preset.id} playing={previewing} />
         <b>{preset.name}</b>
       </button>
     </PresetTile>

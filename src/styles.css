@@ -2616,8 +2616,6 @@ fieldset:disabled {
 .visual-effects-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 14px 0; }
 .visual-effect-card.selected { border-color: var(--accent); }
 .visual-effect-card b { width: 100%; padding: 7px 3px; background: #151b1c; font-size: 11px; font-weight: 400; border-top: 2px solid #406b53; }
-.effect-card-preview { height: 75px; width: 100%; display: grid; place-items: center; color: #b9d9ce; background: linear-gradient(150deg, #465b69, #1c2f32 60%, #536958); }
-.effect-card-preview.rounded-corners svg { border-radius: 8px; padding: 5px; background: linear-gradient(135deg, #9fc1cf, #467e70 50%, #bf9a6d); box-shadow: 0 2px 6px #0008; }
 .effect-search { border-radius: 18px; }
 .visual-effect-properties { margin: 18px -18px 0; border-top: 1px solid #363e42; }
 .effect-section-heading { display: flex; align-items: center; gap: 8px; padding: 7px 10px; background: #151c1e; min-height: 36px; }
