@@ -120,3 +120,75 @@ it("真实导出和归档重开保留背景、圆角与自动缩放，放大画�
   expect(data[(90 * info.width + 160) * 3]).toBeGreaterThan(220);
   expect(data[(90 * info.width + 160) * 3 + 1]).toBeLessThan(40);
 }, 90000);
+
+it("透视网格按画布栅格化为黑底灰线，归档后可导出录屏及背景", async () => {
+  const root = path.resolve(`test-output/perspective-grid-${Date.now()}`);
+  const store = new RecordingStyleStore(root);
+  const settings = {
+    ...defaultRecordingSettings,
+    preset: "perspective-grid" as const,
+    autoZoom: false,
+  };
+  await store.save(settings);
+  expect((await store.read()).preset).toBe("perspective-grid");
+  const background = await store.background(320, 180, settings.preset);
+  expect(background).toMatchObject({ kind: "image", width: 320, height: 180 });
+  expect(path.extname(background.path)).toBe(".png");
+  const portrait = await store.background(180, 320, settings.preset);
+  expect(portrait).toMatchObject({ width: 180, height: 320 });
+  expect(portrait.path).not.toBe(background.path);
+  const { data, info } = await sharp(background.path)
+    .removeAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  expect(info.channels).toBe(3);
+  expect(data.includes(0)).toBe(true);
+  expect(data.some((value) => value > 25)).toBe(true);
+  expect(data.every((value) => value < 80)).toBe(true);
+  expect(
+    data.every((value, index) => value === data[index - (index % 3)]),
+  ).toBe(true);
+  const source = path.join(root, "screen.mp4");
+  await runProcess(findBinary("ffmpeg"), [
+    "-y",
+    "-f",
+    "lavfi",
+    "-i",
+    "color=white:s=320x180:r=10:d=0.4",
+    "-c:v",
+    "libx264",
+    "-pix_fmt",
+    "yuv420p",
+    source,
+  ]);
+  const project = createProject();
+  project.canvas = { width: 320, height: 180, fps: 10, background: "#000000" };
+  project.exportSettings = { encoder: "software" };
+  const styled = addRecordedAssets(
+    project,
+    [{ asset: await probeMedia(source), kind: "screen" }],
+    settings,
+    0,
+    background,
+  );
+  const archive = path.join(root, "grid.troncut");
+  await saveProject(styled, archive);
+  const reopened = await openProject(archive);
+  expect(reopened.clips[0].recording?.preset).toBe("perspective-grid");
+  const frame = path.join(root, "frame.png");
+  await exportFrame(
+    reopened,
+    0,
+    frame,
+    path.join(root, "render"),
+    AbortSignal.timeout(20000),
+  );
+  const border = await sharp(frame)
+    .extract({ left: 0, top: 0, width: 320, height: 10 })
+    .removeAlpha()
+    .raw()
+    .toBuffer();
+  expect(Math.min(...border)).toBe(0);
+  expect(Math.max(...border)).toBeGreaterThan(25);
+  expect(Math.max(...border)).toBeLessThan(80);
+});

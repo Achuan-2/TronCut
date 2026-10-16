@@ -131,7 +131,8 @@ try {
   );
   await background.selectOption("none");
   await expect(page.locator(".recording-background-swatch")).toHaveCount(0);
-  await background.selectOption("violet");
+  await background.selectOption("perspective-grid");
+  await expect(page.getByAltText("透视网格（黑）", { exact: true })).toBeVisible();
   await expect(
     page.getByRole("button", { name: "取消组合", exact: true }),
   ).toBeEnabled();
@@ -149,7 +150,7 @@ try {
   const archive = path.join(root, project.name, `${project.name}.troncut`);
   const disk = JSON.parse(await fs.readFile(archive, "utf8"));
   expect(disk.clips.find((clip) => clip.recording).recording.preset).toBe(
-    "violet",
+    "perspective-grid",
   );
   await page.getByRole("button", { name: "取消组合", exact: true }).click();
   await expect(page.locator(".timeline-clip")).toHaveCount(2);
@@ -166,7 +167,7 @@ try {
     .click();
   await expect(page.locator(".timeline-clip")).toHaveCount(1);
   await page.locator(".recording-object").click({ position: { x: 30, y: 10 } });
-  await expect(background).toHaveValue("violet");
+  await expect(background).toHaveValue("perspective-grid");
   await expect(page.getByLabel("圆角 (%)", { exact: true })).toHaveValue("30");
   await expect(
     page.getByLabel("录屏对象鼠标大小", { exact: true }),

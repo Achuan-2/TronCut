@@ -51,7 +51,7 @@ export class RecordingStyleStore {
   }
   async background(width: number, height: number, preset: RecordingBackground) {
     const entry = recordingBackgrounds[preset];
-    if ("file" in entry) {
+    if ("file" in entry && !entry.file.endsWith(".svg")) {
       // External FFprobe/FFmpeg cannot open media inside app.asar.
       const folder = path.join(this.root, "recording-backgrounds");
       await fs.mkdir(folder, { recursive: true });
@@ -69,11 +69,20 @@ export class RecordingStyleStore {
     try {
       await fs.access(file);
     } catch {
-      const [a, b] = entry.colors;
-      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop stop-color="${a}"/><stop offset="1" stop-color="${b}"/></linearGradient></defs><rect width="100%" height="100%" fill="url(#g)"/></svg>`;
+      // Rasterize vector backgrounds at the canvas size so archived projects and
+      // FFmpeg exports do not depend on an SVG decoder.
+      const svg =
+        "file" in entry
+          ? await fs.readFile(path.join(this.wallpaperRoot, entry.file))
+          : Buffer.from(
+              `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop stop-color="${entry.colors[0]}"/><stop offset="1" stop-color="${entry.colors[1]}"/></linearGradient></defs><rect width="100%" height="100%" fill="url(#g)"/></svg>`,
+            );
       const temporary = `${file}.${uid()}.tmp`;
       try {
-        await sharp(Buffer.from(svg)).png().toFile(temporary);
+        await sharp(svg)
+          .resize(width, height, { fit: "cover" })
+          .png()
+          .toFile(temporary);
         await fs.rename(temporary, file);
       } finally {
         await fs.rm(temporary, { force: true });

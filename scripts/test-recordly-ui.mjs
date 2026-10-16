@@ -20,7 +20,19 @@ try {
   await expect(page.getByLabel("背景图库")).toHaveCount(0);
   await expect(
     page.getByLabel("录屏背景", { exact: true }).locator("option"),
-  ).toHaveCount(44);
+  ).toHaveCount(45);
+  await page
+    .getByLabel("录屏背景", { exact: true })
+    .selectOption("perspective-grid");
+  const grid = page.locator("img.recording-wallpaper-preview");
+  await expect
+    .poll(() =>
+      grid.evaluate((image) => image.complete && image.naturalWidth > 0),
+    )
+    .toBe(true);
+  await page.screenshot({
+    path: path.join(root, "perspective-grid-settings.png"),
+  });
   await page.getByLabel("录屏背景", { exact: true }).selectOption("wispysky");
   const video = page.locator("video.recording-wallpaper-preview");
   await expect(video).toHaveAttribute("loop", "");

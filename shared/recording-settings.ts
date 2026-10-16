@@ -22,6 +22,11 @@ export const cursorStyleSchema = z.object({
 });
 
 export const recordingBackgrounds = {
+  "perspective-grid": {
+    name: "透视网格（黑）",
+    file: "perspective-grid.svg",
+    animated: false,
+  },
   mint: { name: "薄荷", colors: ["#143e42", "#7bdbc3"] },
   violet: { name: "紫雾", colors: ["#30295b", "#bd9ce4"] },
   sunset: { name: "日落", colors: ["#793c63", "#f6ae7d"] },
