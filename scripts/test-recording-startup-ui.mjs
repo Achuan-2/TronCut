@@ -102,9 +102,7 @@ try {
       await expect.poll(() => app.evaluate(() => !!globalThis.recordingStartupTiming.prepared)).toBe(true);
       expect(await app.evaluate(() => globalThis.recordingStartupTiming.engineReady)).toBeUndefined();
     }
-    await overlay
-      .getByRole("button", { name: "取消 · Esc", exact: true })
-      .click();
+    await page.evaluate(() => window.framecraft.cancelRecordingCountdown());
     await expect(
       page.getByRole("button", { name: "开始录制", exact: true }),
     ).toBeEnabled();

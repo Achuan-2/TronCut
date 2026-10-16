@@ -13,6 +13,7 @@ import type {
 import type { RecordingBackground, RecordingSettings } from "./recording";
 import type { RecordingControlsState } from "./recording-controls";
 import type { CustomRecordingBackground } from "./recording-settings";
+import type { CaptureRegion } from "./capture-region";
 import type { VideoExportRequest } from "./export-settings";
 import type { EditMenuState } from "./edit-menu";
 import type { z } from "zod";
@@ -39,7 +40,7 @@ export interface WindowState {
 export interface FrameCraftBridge {
   recordingCountdown(
     sourceId: string,
-    native?: { fps: number; systemAudio: boolean },
+    native?: { fps: number; systemAudio: boolean; region?: CaptureRegion },
   ): Promise<boolean>;
   cancelRecordingCountdown(): Promise<void>;
   updateRecordingControls(state: RecordingControlsState | null): Promise<void>;
@@ -136,13 +137,15 @@ export interface FrameCraftBridge {
     options?: SpeechOptions,
   ): Promise<CaptionProcessingResult>;
   captureSources(): Promise<CaptureSource[]>;
-  selectCapture(id: string, systemAudio: boolean): Promise<void>;
+  selectRecordingRegion(sourceId: string, initial?: CaptureRegion): Promise<{ sourceId: string; region: CaptureRegion } | null>;
+  selectCapture(id: string, systemAudio: boolean, region?: CaptureRegion): Promise<void>;
   nativeCaptureAvailable(): Promise<boolean>;
   restoreRecordingWindow(): Promise<void>;
   nativeRecordingStart(
     sourceId: string,
     fps: number,
     systemAudio: boolean,
+    region?: CaptureRegion,
   ): Promise<void>;
   nativeRecordingPause(paused: boolean): Promise<void>;
   nativeRecordingStop(): Promise<Asset>;

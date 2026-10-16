@@ -48,6 +48,7 @@ struct CaptureConfig {
     bool captureMic = false;
     bool captureCursor = false;
     bool waitForStart = false;
+    int cropX = 0, cropY = 0, cropWidth = 0, cropHeight = 0;
     bool webcamEnabled = false;
     bool preferSoftwareEncoder = false;
     bool hideDesktopIcons = false;
@@ -582,6 +583,10 @@ bool parseConfig(const std::string& json, CaptureConfig& config) {
     config.preferSoftwareEncoder = findBool(json, "preferSoftwareEncoder", false);
     config.hideDesktopIcons = findBool(json, "hideDesktopIcons", false);
     config.waitForStart = findBool(json, "waitForStart", false);
+    config.cropX = findInt(json, "cropX", 0);
+    config.cropY = findInt(json, "cropY", 0);
+    config.cropWidth = findInt(json, "cropWidth", 0);
+    config.cropHeight = findInt(json, "cropHeight", 0);
     config.microphoneDeviceId = findString(json, "microphoneDeviceId");
     config.microphoneDeviceName = findString(json, "microphoneDeviceName");
     config.microphoneGain = findDouble(json, "microphoneGain", 1.0);
@@ -758,6 +763,16 @@ int wmain(int argc, wchar_t* argv[]) {
     // matching resource dimensions.
     int width = session.captureWidth();
     int height = session.captureHeight();
+    const bool cropEnabled = config.cropWidth > 0 && config.cropHeight > 0;
+    if (cropEnabled) {
+        if (config.cropX < 0 || config.cropY < 0 || config.cropWidth < 16 || config.cropHeight < 16 ||
+            config.cropX + config.cropWidth > width || config.cropY + config.cropHeight > height) {
+            std::cerr << "ERROR: Capture region exceeds the display bounds" << std::endl;
+            return 1;
+        }
+        width = config.cropWidth;
+        height = config.cropHeight;
+    }
     width = (std::max(2, width) / 2) * 2;
     height = (std::max(2, height) / 2) * 2;
 
@@ -1028,6 +1043,30 @@ int wmain(int argc, wchar_t* argv[]) {
     uint64_t latestWebcamSequence = 0;
     bool hasVisibleWebcamFrame = false;
 
+    // Crop on the GPU before readback/encoding, in both WGC delivery modes.
+    // The output and editable cursor coordinates share these exact bounds.
+    auto copyCaptureTexture = [&](ID3D11Texture2D* texture) -> bool {
+        D3D11_TEXTURE2D_DESC desc{};
+        texture->GetDesc(&desc);
+        if (cropEnabled && (config.cropX + width > static_cast<int>(desc.Width) ||
+                            config.cropY + height > static_cast<int>(desc.Height))) return false;
+        if (!latestFrameTexture) {
+            if (cropEnabled) { desc.Width = width; desc.Height = height; }
+            desc.BindFlags = 0;
+            desc.CPUAccessFlags = 0;
+            desc.MiscFlags = 0;
+            if (FAILED(session.device()->CreateTexture2D(&desc, nullptr, &latestFrameTexture))) return false;
+        }
+        if (cropEnabled) {
+            const D3D11_BOX sourceBox{static_cast<UINT>(config.cropX), static_cast<UINT>(config.cropY), 0,
+                static_cast<UINT>(config.cropX + width), static_cast<UINT>(config.cropY + height), 1};
+            session.context()->CopySubresourceRegion(latestFrameTexture.Get(), 0, 0, 0, 0, texture, 0, &sourceBox);
+        } else {
+            session.context()->CopyResource(latestFrameTexture.Get(), texture);
+        }
+        return true;
+    };
+
     // Legacy-path-only state. frameMutex guards latestFrameTexture/
     // legacyLatestFrameTimestampHns between WGC's callback thread (writer)
     // and writeVideoFrames (reader); frameCv wakes the reader. Both are
@@ -1042,18 +1081,6 @@ int wmain(int argc, wchar_t* argv[]) {
                 return;
             }
             std::scoped_lock lock(frameMutex);
-            if (!latestFrameTexture) {
-                D3D11_TEXTURE2D_DESC desc{};
-                texture->GetDesc(&desc);
-                desc.BindFlags = 0;
-                desc.CPUAccessFlags = 0;
-                desc.MiscFlags = 0;
-                if (FAILED(session.device()->CreateTexture2D(&desc, nullptr, &latestFrameTexture))) {
-                    encodeFailed = true;
-                    control.requestStop();
-                    return;
-                }
-            }
 
             // Gated on an already-arrived first frame: main() blocks up to 10s
             // waiting for firstFrameWritten before it will even print
@@ -1067,7 +1094,11 @@ int wmain(int argc, wchar_t* argv[]) {
             if (testStallFrameCallbackMs > 0 && firstFrameWritten.load()) {
                 std::this_thread::sleep_for(std::chrono::milliseconds(testStallFrameCallbackMs));
             }
-            session.context()->CopyResource(latestFrameTexture.Get(), texture);
+            if (!copyCaptureTexture(texture)) {
+                encodeFailed = true;
+                control.requestStop();
+                return;
+            }
             legacyLatestFrameTimestampHns = timestampHns;
             if (!firstFrameWritten.exchange(true)) {
                 frameCv.notify_all();
@@ -1168,18 +1199,6 @@ int wmain(int argc, wchar_t* argv[]) {
                     const bool gotFrame = session.tryGetNextFrame(&wgcTexture, &wgcTimestampHns);
                     pictureChanged = gotFrame;
                     if (gotFrame) {
-                        if (!latestFrameTexture) {
-                            D3D11_TEXTURE2D_DESC desc{};
-                            wgcTexture->GetDesc(&desc);
-                            desc.BindFlags = 0;
-                            desc.CPUAccessFlags = 0;
-                            desc.MiscFlags = 0;
-                            if (FAILED(session.device()->CreateTexture2D(&desc, nullptr, &latestFrameTexture))) {
-                                encodeFailed = true;
-                                control.requestStop();
-                                break;
-                            }
-                        }
                         // The wedge risk this class exists to avoid: this call
                         // can block inside the display driver and never return
                         // (#252, still true of PR #305's DXGI path on some
@@ -1187,7 +1206,11 @@ int wmain(int argc, wchar_t* argv[]) {
                         // already owns deciding when to give up -- there is no
                         // separate WGC callback thread left for it to take a
                         // lock down with it.
-                        session.context()->CopyResource(latestFrameTexture.Get(), wgcTexture);
+                        if (!copyCaptureTexture(wgcTexture)) {
+                            encodeFailed = true;
+                            control.requestStop();
+                            break;
+                        }
                         latestFrameTimestampHns = wgcTimestampHns;
                         firstFrameWritten = true;
                     } else if (!latestFrameTexture) {

@@ -108,9 +108,7 @@ try {
   }
   await configure(true);
   const countdown = await begin();
-  await countdown
-    .getByRole("button", { name: "取消 · Esc", exact: true })
-    .click();
+  await page.evaluate(() => window.framecraft.cancelRecordingCountdown());
   await mainRestored();
   await expect(
     page.getByRole("button", { name: "开始录制", exact: true }),
@@ -240,7 +238,16 @@ try {
   );
   for (const native of [true, false]) {
     await configure(native, self);
+    const countdownOpened = app.waitForEvent("window");
     await page.getByRole("button", { name: "开始录制", exact: true }).click();
+    const countdown = await countdownOpened;
+    await expect(countdown.locator("strong")).toHaveText("3");
+    const countdownName = page.getByRole("textbox", { name: "工程名称", exact: true });
+    await expect(countdownName).toBeEnabled();
+    await countdownName.fill(`倒计时期间编辑 ${native}`);
+    await countdownName.blur();
+    await page.keyboard.press("Control+z");
+    await expect(countdownName).not.toHaveValue(`倒计时期间编辑 ${native}`);
     const controls = await recordingControls(app);
     expect(await minimized()).toBe(false);
     await expect(page.locator(".recorder-modal, .recording-bar")).toHaveCount(

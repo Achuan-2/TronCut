@@ -31,16 +31,16 @@ try {
     name: "录屏背景选项",
     exact: true,
   });
-  await expect(backgrounds.getByRole("option")).toHaveCount(6);
+  await expect(backgrounds.getByRole("option")).toHaveCount(10);
   await expect(
     backgrounds
       .getByRole("option", { name: "透视网格（黑）", exact: true })
-      .locator("img"),
+      .locator("video"),
   ).toBeVisible();
   await expect(
     backgrounds
       .getByRole("option", { name: "薄荷", exact: true })
-      .locator(".preview-select-thumbnail > span"),
+      .locator(".preview-select-thumbnail > div"),
   ).toHaveCSS("background-image", /linear-gradient/);
   await page.screenshot({ path: path.join(root, "background-options.png") });
   await backgroundSelect.press("Escape");
@@ -55,10 +55,10 @@ try {
     "data-value",
     "perspective-grid",
   );
-  const grid = page.locator("img.recording-wallpaper-preview");
+  const grid = page.locator("video.recording-wallpaper-preview");
   await expect
     .poll(() =>
-      grid.evaluate((image) => image.complete && image.naturalWidth > 0),
+      grid.evaluate((video) => video.readyState >= 2 && video.videoWidth > 0),
     )
     .toBe(true);
   await page.screenshot({
@@ -124,19 +124,19 @@ try {
       bounds,
       display: screen.getDisplayMatching(bounds).bounds,
       top: win.isAlwaysOnTop(),
+      focusable: win.isFocusable(),
+      fullscreen: win.isFullScreen(),
     };
   });
-  for (const key of ["x", "y", "width", "height"])
-    expect(
-      Math.abs(geometry.bounds[key] - geometry.display[key]),
-    ).toBeLessThanOrEqual(1);
+  expect(geometry.bounds.width).toBeLessThanOrEqual(250);
+  expect(geometry.bounds.height).toBeLessThanOrEqual(66);
+  expect(geometry.focusable).toBe(false);
+  expect(geometry.fullscreen).toBe(false);
   expect(geometry.top).toBe(true);
   await overlay.screenshot({
-    path: path.join(root, "fullscreen-countdown.png"),
+    path: path.join(root, "countdown.png"),
   });
-  await overlay
-    .getByRole("button", { name: "取消 · Esc", exact: true })
-    .click();
+  await page.evaluate(() => window.framecraft.cancelRecordingCountdown());
   await expect(
     page.getByRole("button", { name: "开始录制", exact: true }),
   ).toBeEnabled();
@@ -169,7 +169,7 @@ try {
   });
   expect(errors).toEqual([]);
   console.log(
-    `精简背景、全部鼠标样式、设置记忆、全屏倒计时与取消/完成通过：${root}`,
+    `精简背景、全部鼠标样式、设置记忆、小窗倒计时与取消/完成通过：${root}`,
   );
 } finally {
   await app.close();

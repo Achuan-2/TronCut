@@ -12,19 +12,17 @@ const overlayHtml = `<!doctype html><html lang="zh-CN"><meta charset="utf-8">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'">
 <style>
 html,body { margin:0; width:100%; height:100%; background:transparent; overflow:hidden; }
-body { display:grid; place-items:center; font-family:system-ui,sans-serif; color:white; background:#0003; }
-main { display:grid; place-items:center; gap:12px; width:176px; height:176px;
-background:#191b20ee; border:1px solid #ffffff30; border-radius:28px; box-shadow:0 8px 40px #0004; }
-strong { font-size:76px; font-weight:500; line-height:1; font-variant-numeric:tabular-nums; }
-button { background:transparent; color:#ddd; border:0; font-size:14px; cursor:pointer; padding:8px 16px; }
-</style><main aria-label="录制倒计时"><strong aria-live="assertive">3</strong><button>取消 · Esc</button></main>
+body { display:grid; place-items:center; font-family:system-ui,sans-serif; color:white; }
+main { display:flex; align-items:center; justify-content:center; gap:16px; width:236px; height:56px;
+background:#19211df2; border:1px solid #76e5b555; border-radius:12px; }
+strong { font-size:36px; font-weight:500; line-height:1; font-variant-numeric:tabular-nums; color:#76e5b5; }
+span { font-size:13px; color:#d7e8de; } small { display:block; margin-top:3px; color:#9cb5a6; font-size:11px; }
+</style><main aria-label="录制倒计时"><strong aria-live="assertive">3</strong><span>即将开始录制<small>可继续操作 · Esc 取消</small></span></main>
 <script>
 window.countdown.onTick(seconds => { document.querySelector('strong').textContent = seconds; });
-document.querySelector('button').onclick = () => window.countdown.cancel();
-document.addEventListener('keydown', event => { if(event.key === 'Escape') window.countdown.cancel(); });
 </script></html>`;
 
-/** Own a separate full-display window; its lifetime settles before capture starts. */
+/** Nonactivating, click-through indicator; never blocks interaction with the desktop. */
 export class RecordingCountdown {
   private overlay?: BrowserWindow;
   private busy = false;
@@ -54,7 +52,7 @@ export class RecordingCountdown {
       show: false,
       frame: false,
       transparent: true,
-      fullscreen: true,
+      focusable: false,
       resizable: false,
       movable: false,
       skipTaskbar: true,
@@ -68,9 +66,11 @@ export class RecordingCountdown {
       },
     });
     this.overlay = overlay;
+    overlay.setIgnoreMouseEvents(true);
+    overlay.setContentProtection(true);
     overlay.setAlwaysOnTop(true, "screen-saver");
     overlay.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
-    overlay.webContents.once("did-finish-load", () => overlay.show());
+    overlay.webContents.once("did-finish-load", () => overlay.showInactive());
     overlay.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
     void overlay
       .loadURL(
@@ -92,12 +92,14 @@ export class RecordingCountdown {
           : await findCaptureSource(sourceId);
       if (generation !== this.generation) return false;
       if (!source) throw new Error("录制来源已经关闭，请重新选择");
-      this.bounds = (
+      const display = (
         screen
           .getAllDisplays()
           .find((d) => String(d.id) === source.display_id) ??
         screen.getDisplayNearestPoint(screen.getCursorScreenPoint())
-      ).bounds;
+      );
+      const area = display.workArea;
+      this.bounds = { x: Math.round(area.x + (area.width - 248) / 2), y: area.y + 24, width: 248, height: 64 };
       escapeRegistered = globalShortcut.register("Escape", () => this.cancel());
       const result = await this.controller.start(3);
       if (result.error) throw new Error(result.error);

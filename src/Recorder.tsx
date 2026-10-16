@@ -6,9 +6,11 @@ import {
   Volume2,
   X,
   Circle,
+  Scan,
 } from "lucide-react";
 import type { Asset } from "../shared/model";
 import type { Capabilities, CaptureSource } from "../shared/bridge";
+import type { CaptureRegion } from "../shared/capture-region";
 import { timeLabel } from "./Preview";
 import {
   defaultRecordingSettings,
@@ -60,6 +62,18 @@ export default function Recorder({
     [fps, setFps] = useState(30);
   const nativeActive = useRef(false);
   const [countingDown, setCountingDown] = useState(false);
+  const [region, setRegion] = useState<CaptureRegion>();
+  const [selectingRegion, setSelectingRegion] = useState(false);
+  async function selectRegion() {
+    if (!window.framecraft || selectingRegion) return;
+    setSelectingRegion(true);
+    setError("");
+    try {
+      const result = await window.framecraft.selectRecordingRegion(sourceId, region);
+      if (result && mounted.current) { setSourceId(result.sourceId); setRegion(result.region); }
+    } catch (e) { if (mounted.current) setError(String(e)); }
+    finally { if (mounted.current) setSelectingRegion(false); }
+  }
   const pauseBusy = useRef(false);
   const [settings, setSettings] = useState(defaultRecordingSettings);
   const [settingsReady, setSettingsReady] = useState(false);
@@ -191,9 +205,10 @@ export default function Recorder({
   stopRef.current = stop;
   const pauseRef = useRef<() => Promise<void>>(async () => {});
   const captureActive = phase === "recording" || phase === "paused";
+  const editorAvailable = captureActive || (phase === "starting" && countingDown);
   useEffect(() => {
-    onCaptureActiveChange(captureActive);
-  }, [captureActive, onCaptureActiveChange]);
+    onCaptureActiveChange(editorAvailable);
+  }, [editorAvailable, onCaptureActiveChange]);
   useEffect(() => () => onCaptureActiveChange(false), [onCaptureActiveChange]);
   useEffect(() => {
     if (phase !== "recording" && phase !== "paused" && phase !== "saving") return;
@@ -229,7 +244,7 @@ export default function Recorder({
         recordingCapabilities.current ?? bridge.capabilities(),
         // Native capture validates the target when it actually starts. Only
         // getDisplayMedia needs a prior selection in the Electron handler.
-        ...(!native ? [bridge.selectCapture(sourceId, system)] : []),
+        ...(!native ? [bridge.selectCapture(sourceId, system, region)] : []),
       ]);
       recordingSettings.current = savedSettings;
       if (!info.ffmpeg)
@@ -295,7 +310,7 @@ export default function Recorder({
         toast("所选来源未提供系统音频，本次只录制画面与启用的麦克风");
       // Hide settings before the countdown, including when capturing our own window.
       setCountingDown(true);
-      if (!(await bridge.recordingCountdown(sourceId, native ? { fps, systemAudio: system } : undefined))) {
+      if (!(await bridge.recordingCountdown(sourceId, native ? { fps, systemAudio: system, region } : undefined))) {
         streams.forEach((s) => s.stream.getTracks().forEach((t) => t.stop()));
         if (mounted.current) setPhase("configure");
         return;
@@ -307,7 +322,7 @@ export default function Recorder({
       }
       timing.current = { started: performance.now(), paused: 0, pauseStart: 0 };
       if (native) {
-        await bridge.nativeRecordingStart(sourceId, fps, system);
+        await bridge.nativeRecordingStart(sourceId, fps, system, region);
         nativeActive.current = true;
         timing.current.started = performance.now();
       }
@@ -460,17 +475,27 @@ export default function Recorder({
         </div>
         <h3 className="section-title">
           <Monitor size={15} />
-          选择屏幕或窗口
+          选择录制范围
         </h3>
+        <div className="capture-mode">
+          <button aria-pressed={!region} disabled={phase === "starting" || selectingRegion || savingSettings}
+            onClick={() => setRegion(undefined)}><Monitor size={15} />屏幕或窗口</button>
+          <button aria-pressed={!!region} disabled={!sourceId || phase === "starting" || selectingRegion || savingSettings}
+            onClick={() => void selectRegion()}><Scan size={15} />{selectingRegion ? "正在框选…" : "自定义范围"}</button>
+        </div>
+        {region && <div className="capture-region-summary" role="status" aria-label="自定义录制范围">
+          <span>{region.width} × {region.height} 像素 · X {region.x} / Y {region.y}</span>
+          <button disabled={phase === "starting" || selectingRegion || savingSettings} onClick={() => void selectRegion()}>重新框选</button>
+        </div>}
         <div className="capture-sources">
           {sources.map((source) => (
             <button
               key={source.id}
               data-source-id={source.id}
-              aria-pressed={sourceId === source.id}
-              className={sourceId === source.id ? "selected" : ""}
-              onClick={() => setSourceId(source.id)}
-              disabled={phase === "starting" || savingSettings}
+              aria-pressed={!region && sourceId === source.id}
+              className={!region && sourceId === source.id ? "selected" : ""}
+              onClick={() => { setSourceId(source.id); setRegion(undefined); }}
+              disabled={phase === "starting" || selectingRegion || savingSettings}
             >
               <img src={source.thumbnail} alt="录制来源缩略图" />
               <span>{source.name}</span>
@@ -696,6 +721,7 @@ export default function Recorder({
             !settingsReady ||
             phase === "starting" ||
             savingSettings
+            || selectingRegion
           }
           onClick={() => void start()}
         >

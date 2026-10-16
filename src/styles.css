@@ -4014,6 +4014,11 @@ fieldset:disabled {
   color: #839b8a;
   padding: 2px;
 }
+.capture-mode { display:flex; gap:8px; margin:0 0 12px; }
+.capture-mode button { gap:7px; padding:8px 12px; border:1px solid #3c4c42; border-radius:6px; background:#19211d; }
+.capture-mode button[aria-pressed="true"] { border-color:var(--accent); background:#293d2f; color:var(--accent); }
+.capture-region-summary { display:flex; gap:12px; align-items:center; justify-content:space-between; padding:10px 12px; margin-bottom:12px; background:#293d2f; border:1px solid var(--accent); border-radius:7px; font-size:12px; }
+.capture-region-summary button { color:var(--accent); white-space:nowrap; }
 .capture-sources {
   display: grid;
   grid-template-columns: repeat(3, 1fr);

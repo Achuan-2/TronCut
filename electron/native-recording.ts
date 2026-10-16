@@ -167,7 +167,9 @@ export class NativeRecording {
             this.samples.length >= 500000
           )
             continue;
-          const bounds = event.bounds ?? displayBounds;
+          const bounds = config.cropWidth ? displayBounds : event.bounds ?? displayBounds;
+          const inside = event.x >= bounds.x && event.y >= bounds.y &&
+            event.x < bounds.x + bounds.width && event.y < bounds.y + bounds.height;
           const sample = {
             time: Math.max(
               0,
@@ -175,7 +177,7 @@ export class NativeRecording {
             ),
             x: (event.x - bounds.x) / bounds.width,
             y: (event.y - bounds.y) / bounds.height,
-            visible: !!event.visible,
+            visible: !!event.visible && inside,
             click: !!event.leftButtonPressed,
             cursorType: cursorType(event.cursorType),
           };

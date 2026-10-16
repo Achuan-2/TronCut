@@ -46,6 +46,8 @@ import { serveMediaFile } from "./media-protocol";
 import { NativeRecording } from "./native-recording";
 import { recordingName } from "./recording-name";
 import { RecordingBorder } from "./recording-border";
+import { CaptureRegionPicker, displayPixelBounds } from "./capture-region";
+import { captureRegionSchema, validateCaptureRegion, type CaptureRegion } from "../shared/capture-region";
 import { copyClipClipboard, importClipboardMedia } from "./clipboard-media";
 import { importMediaPaths } from "./import-media";
 import { RecentProjects } from "./recent-projects";
@@ -139,19 +141,21 @@ app.on("open-file", (event, file) => {
   if (window && !window.isDestroyed())
     window.webContents.send("shortcut", "openPending");
 });
-let captureSelection: { id: string; systemAudio: boolean } | null = null;
+let captureSelection: { id: string; systemAudio: boolean; region?: CaptureRegion; displaySize?: { width: number; height: number } } | null = null;
+const captureRegionPicker = new CaptureRegionPicker();
 let task: AbortController | null = null;
 let nativeRecording: NativeRecording | null = null;
 type NativePreparation = {
   sourceId: string;
   fps: number;
   systemAudio: boolean;
+  region?: CaptureRegion;
   recording: NativeRecording;
   ready: Promise<Electron.Rectangle>;
 };
 let nativePreparation: NativePreparation | null = null;
 const recordingBorder = new RecordingBorder();
-function prepareNativeRecording(sourceId: string, fps: number, systemAudio: boolean) {
+function prepareNativeRecording(sourceId: string, fps: number, systemAudio: boolean, region?: CaptureRegion) {
   if (process.platform !== "win32") throw new Error("该原生录制引擎仅支持 Windows");
   if (nativeRecording || nativePreparation || recordings.size)
     throw new Error("已有录制正在运行");
@@ -161,7 +165,10 @@ function prepareNativeRecording(sourceId: string, fps: number, systemAudio: bool
     if (!source) throw new Error("录制来源已经关闭，请重新选择");
     const display = screen.getAllDisplays().find((d) => String(d.id) === source.display_id)
       ?? screen.getPrimaryDisplay();
-    const bounds = screen.dipToScreenRect(null, display.bounds);
+    const bounds = displayPixelBounds(display);
+    if (region && !sourceId.startsWith("screen:")) throw new Error("自定义录制范围需要选择屏幕");
+    const crop = region ? validateCaptureRegion(region, bounds.width, bounds.height) : undefined;
+    const captureBounds = crop ? { x: bounds.x + crop.x, y: bounds.y + crop.y, width: crop.width, height: crop.height } : bounds;
     await recording.prepare({
       sourceId,
       sourceType: sourceId.startsWith("window:") ? "window" : "display",
@@ -169,15 +176,16 @@ function prepareNativeRecording(sourceId: string, fps: number, systemAudio: bool
       displayX: bounds.x, displayY: bounds.y,
       displayW: bounds.width, displayH: bounds.height,
       hasDisplayBounds: true, fps, captureSystemAudio: systemAudio,
-    }, path.join(app.getPath("userData"), "recordings"), process.resourcesPath, bounds, () => {
+      ...(crop ? { cropX: crop.x, cropY: crop.y, cropWidth: crop.width, cropHeight: crop.height } : {}),
+    }, path.join(app.getPath("userData"), "recordings"), process.resourcesPath, captureBounds, () => {
       void recordingBorder.stop();
       requestRecordingStop();
     });
-    return bounds;
+    return captureBounds;
   })();
   // Cancellation can win the countdown race before initialization rejects.
   void ready.catch(() => {});
-  nativePreparation = { sourceId, fps, systemAudio, recording, ready };
+  nativePreparation = { sourceId, fps, systemAudio, region, recording, ready };
   return nativePreparation;
 }
 async function discardNativePreparation(preparation = nativePreparation) {
@@ -201,7 +209,7 @@ const temporaryReferences = new Set<string>();
 const approvedPaths = new Set<string>();
 const recordings = new Map<
   string,
-  { file: string; handle: FileHandle; bytes: number; kind: string }
+  { file: string; handle: FileHandle; bytes: number; kind: string; crop?: CaptureRegion; displaySize?: { width: number; height: number } }
 >();
 const register = (asset: Asset) => {
   assets.set(asset.id, asset);
@@ -296,7 +304,7 @@ function installHandlers() {
   handle("recording:countdown", async (sourceId: unknown, nativeOptions: unknown) => {
     const id = z.string().parse(sourceId);
     const native = z.object({
-      fps: z.number().int().min(15).max(120), systemAudio: z.boolean(),
+      fps: z.number().int().min(15).max(120), systemAudio: z.boolean(), region: captureRegionSchema.optional(),
     }).optional().parse(nativeOptions);
     let preparation: NativePreparation | null = null;
     recordingControls.prepare(id, window.getBounds());
@@ -306,7 +314,7 @@ function installHandlers() {
       // waits for a separate start command before capturing any media.
       const countdown = recordingCountdown.start(id);
       recordingControls.preload();
-      if (native) preparation = prepareNativeRecording(id, native.fps, native.systemAudio);
+      if (native) preparation = prepareNativeRecording(id, native.fps, native.systemAudio, native.region);
       const success = await (preparation
         ? Promise.race([countdown, preparation.ready.then(() => countdown)])
         : countdown);
@@ -422,14 +430,15 @@ function installHandlers() {
   );
   handle(
     "capture:native:start",
-    async (sourceId: unknown, inputFps: unknown, audio: unknown) => {
+    async (sourceId: unknown, inputFps: unknown, audio: unknown, inputRegion: unknown) => {
       if (nativeRecording || recordings.size) throw new Error("已有录制正在运行");
       const id = z.string().parse(sourceId),
         fps = z.number().int().min(15).max(120).parse(inputFps),
-        systemAudio = z.boolean().parse(audio);
-      if (nativePreparation && (nativePreparation.sourceId !== id || nativePreparation.fps !== fps || nativePreparation.systemAudio !== systemAudio))
+        systemAudio = z.boolean().parse(audio),
+        region = captureRegionSchema.optional().parse(inputRegion);
+      if (nativePreparation && (nativePreparation.sourceId !== id || nativePreparation.fps !== fps || nativePreparation.systemAudio !== systemAudio || JSON.stringify(nativePreparation.region) !== JSON.stringify(region)))
         throw new Error("录制参数已改变，请重新开始倒计时");
-      const preparation = nativePreparation ?? prepareNativeRecording(id, fps, systemAudio);
+      const preparation = nativePreparation ?? prepareNativeRecording(id, fps, systemAudio, region);
       const { recording } = preparation;
       nativeRecording = recording;
       try {
@@ -1035,13 +1044,43 @@ function installHandlers() {
       thumbnail: s.thumbnail.toDataURL(),
     }));
   });
-  handle("capture:select", async (id: unknown, systemAudio: unknown) => {
+  handle("capture:region", async (sourceId: unknown, initial: unknown) => {
+    const id = z.string().parse(sourceId);
+    const previous = captureRegionSchema.optional().parse(initial);
+    if (nativeRecording || nativePreparation || recordings.size) throw new Error("请先结束当前录制");
+    const source = await findCaptureSource(id);
+    if (!source) throw new Error("录制来源已经关闭，请重新选择");
+    const display = screen.getAllDisplays().find((d) => String(d.id) === source.display_id)
+      ?? screen.getDisplayMatching(window.getBounds());
+    const sources = await desktopCapturer.getSources({ types: ["screen"], thumbnailSize: { width: 0, height: 0 } });
+    const monitor = sources.find((s) => s.display_id === String(display.id));
+    if (!monitor) throw new Error("无法找到所选屏幕");
+    // Register the monitor even if a window was selected in the source picker.
+    recordingCountdown.setSources(sources);
+    recordingControls.setSources(sources);
+    const wasVisible = window.isVisible() && !window.isMinimized();
+    if (wasVisible) window.hide();
+    try {
+      const region = await captureRegionPicker.select(display, previous);
+      return region ? { sourceId: monitor.id, region } : null;
+    } finally {
+      if (wasVisible && !window.isDestroyed()) { window.show(); window.focus(); }
+    }
+  });
+  handle("capture:select", async (id: unknown, systemAudio: unknown, inputRegion: unknown) => {
     const selected = z.string().parse(id);
-    if (!(await findCaptureSource(selected)))
+    const source = await findCaptureSource(selected);
+    if (!source)
       throw new Error("录屏目标已经关闭，请重新选择");
+    const region = captureRegionSchema.optional().parse(inputRegion);
+    const display = screen.getAllDisplays().find((d) => String(d.id) === source.display_id) ?? screen.getPrimaryDisplay();
+    const bounds = displayPixelBounds(display);
+    if (region && !selected.startsWith("screen:")) throw new Error("自定义录制范围需要选择屏幕");
     captureSelection = {
       id: selected,
       systemAudio: z.boolean().parse(systemAudio),
+      region: region ? validateCaptureRegion(region, bounds.width, bounds.height) : undefined,
+      displaySize: { width: bounds.width, height: bounds.height },
     };
   });
   handle("recording:start", async (kind: unknown) => {
@@ -1063,12 +1102,17 @@ function installHandlers() {
         if (!source) throw new Error("录屏目标已经关闭，请重新选择");
         const display = screen.getAllDisplays()
           .find((d) => String(d.id) === source.display_id) ?? screen.getPrimaryDisplay();
+        const bounds = screen.dipToScreenRect(null, display.bounds);
+        const crop = captureSelection.region;
+        const captureBounds = crop ? { x: bounds.x + crop.x, y: bounds.y + crop.y, width: crop.width, height: crop.height } : bounds;
         await recordingBorder.start(
-          source.id, screen.dipToScreenRect(null, display.bounds),
+          source.id, captureBounds,
           process.resourcesPath, requestRecordingStop,
         );
       }
-      recordings.set(id, { file, handle, bytes: 0, kind: label });
+      recordings.set(id, { file, handle, bytes: 0, kind: label,
+        ...(label === "screen" ? { crop: captureSelection?.region, displaySize: captureSelection?.displaySize } : {}),
+      });
     } catch (error) {
       await recordingBorder.stop();
       await handle.close();
@@ -1108,15 +1152,21 @@ function installHandlers() {
     await rec.handle.close();
     if (!rec.bytes) throw new Error("录屏没有产生数据");
     const output = rec.file.replace(".raw.webm", ".webm");
-    // Remux writes duration metadata without re-encoding and keeps the raw file on failure.
+    // The compatible engine may scale a display stream. Express the crop in
+    // source-relative coordinates so DPI/Chromium scaling cannot shift it.
+    const crop = rec.crop, size = rec.displaySize;
+    const videoOptions = crop && size ? [
+      "-vf", `crop=round(iw*${crop.width / size.width}/2)*2:round(ih*${crop.height / size.height}/2)*2:round(iw*${crop.x / size.width}/2)*2:round(ih*${crop.y / size.height}/2)*2,scale=${crop.width}:${crop.height}`,
+      "-c:v", "libvpx", "-deadline", "realtime", "-cpu-used", "8", "-b:v", "12M", "-c:a", "copy",
+    ] : ["-c", "copy"];
+    // Keep the raw file if either remuxing or region encoding fails.
     await runProcess(findBinary("ffmpeg", process.resourcesPath), [
       "-y",
       "-i",
       rec.file,
       "-t",
       String(duration),
-      "-c",
-      "copy",
+      ...videoOptions,
       output,
     ]);
     const asset = register(await probeMedia(output, process.resourcesPath));
@@ -1161,6 +1211,7 @@ async function createWindow() {
   window.on("leave-full-screen", notifyWindowState);
   window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
   window.webContents.on("render-process-gone", () => {
+    captureRegionPicker.cancel();
     recordingCountdown.cancel();
     recordingControls.close();
     void recordingBorder.stop();
@@ -1173,6 +1224,7 @@ async function createWindow() {
     if (url !== current) event.preventDefault();
   });
   window.on("close", (event) => {
+    captureRegionPicker.cancel();
     recordingCountdown.cancel();
     if (
       process.env.FRAMECRAFT_SMOKE ||
@@ -1356,6 +1408,7 @@ app.on("window-all-closed", () => {
 });
 let closingOnnx = false;
 app.on("will-quit", (event) => {
+  captureRegionPicker.cancel();
   recordingCountdown.cancel();
   void discardNativePreparation();
   recordingControls.close();
