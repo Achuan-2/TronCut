@@ -37,7 +37,10 @@ export interface WindowState {
   fullscreen: boolean;
 }
 export interface FrameCraftBridge {
-  recordingCountdown(sourceId: string): Promise<boolean>;
+  recordingCountdown(
+    sourceId: string,
+    native?: { fps: number; systemAudio: boolean },
+  ): Promise<boolean>;
   cancelRecordingCountdown(): Promise<void>;
   updateRecordingControls(state: RecordingControlsState | null): Promise<void>;
   showRecordingControls(): Promise<void>;

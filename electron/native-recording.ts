@@ -20,8 +20,11 @@ export class NativeRecording {
   private completion?: Promise<void>;
   private completed = false;
   private output = "";
+  private aborted = false;
+  private startReady?: Promise<void>;
+  private startSampling?: () => void;
 
-  async start(
+  async prepare(
     config: Record<string, unknown>,
     folder: string,
     resourcesPath: string | undefined,
@@ -29,6 +32,7 @@ export class NativeRecording {
     onUnexpectedStop: () => void,
   ) {
     await fs.mkdir(folder, { recursive: true });
+    if (this.aborted) throw new Error("录制准备已取消");
     this.output = path.join(folder, `${recordingName()}.mp4`);
     const capture = spawn(
       findBinary("wgc-capture", resourcesPath),
@@ -37,16 +41,24 @@ export class NativeRecording {
           ...config,
           screenPath: this.output,
           captureCursor: false,
+          waitForStart: true,
         }),
       ],
       { windowsHide: true, shell: false },
     );
     this.capture = capture;
-    let started!: () => void, failed!: (error: Error) => void;
+    capture.stdin.on("error", () => {}); // The source/helper may close before a command write.
+    let prepared!: () => void, failed!: (error: Error) => void;
     const ready = new Promise<void>((resolve, reject) => {
-      started = resolve;
+      prepared = resolve;
       failed = reject;
     });
+    let recordingStarted!: () => void, startFailed!: (error: Error) => void;
+    this.startReady = new Promise<void>((resolve, reject) => {
+      recordingStarted = resolve;
+      startFailed = reject;
+    });
+    void this.startReady.catch(() => {});
     let done!: () => void, failure!: (error: Error) => void;
     this.completion = new Promise<void>((resolve, reject) => {
       done = resolve;
@@ -65,9 +77,10 @@ export class NativeRecording {
         if (!line.startsWith("{")) continue;
         try {
           const event = JSON.parse(line);
+          if (event.event === "recording-prepared") prepared();
           if (event.event === "recording-started") {
             this.startedAt = Date.now();
-            started();
+            recordingStarted();
           }
           if (event.event === "recording-stopped") this.completed = true;
         } catch {
@@ -82,6 +95,7 @@ export class NativeRecording {
     capture.on("error", (e) => {
       clearTimeout(timeout);
       failed(e);
+      startFailed(e);
       failure(e);
     });
     capture.on("close", (code) => {
@@ -90,6 +104,7 @@ export class NativeRecording {
         `原生录制退出 (${code})：${this.error.slice(-2000)}`,
       );
       if (!this.startedAt) failed(error);
+      startFailed(error);
       if (this.completed) done();
       else failure(error);
       if (this.startedAt && !this.completed) onUnexpectedStop();
@@ -99,6 +114,32 @@ export class NativeRecording {
     } finally {
       clearTimeout(timeout);
     }
+    this.startSampling = () => this.sampleCursor(config, resourcesPath, displayBounds);
+  }
+
+  async start() {
+    if (this.aborted || !this.capture || !this.startReady)
+      throw new Error("原生录制尚未准备好");
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+    try {
+      this.capture.stdin.write("start\n");
+      await Promise.race([
+        this.startReady,
+        new Promise<never>((_, reject) => {
+          timeout = setTimeout(() => reject(new Error("原生录制启动超时")), 15000);
+        }),
+      ]);
+      this.startSampling?.();
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
+  private sampleCursor(
+    config: Record<string, unknown>,
+    resourcesPath: string | undefined,
+    displayBounds: { x: number; y: number; width: number; height: number },
+  ) {
     const handle =
       typeof config.sourceId === "string"
         ? config.sourceId.match(/^window:(\d+):/)?.[1]
@@ -212,8 +253,22 @@ export class NativeRecording {
     }
   }
 
-  abort() {
+  async abort() {
+    this.aborted = true;
     this.sampler?.kill();
-    this.capture?.stdin.end("stop\n");
+    const capture = this.capture;
+    if (this.startedAt) {
+      if (capture?.exitCode === null) capture.stdin.end("stop\n");
+      return;
+    }
+    if (capture && capture.exitCode === null && capture.signalCode === null) {
+      // A prepared helper may still be inside device initialization and not
+      // reading stdin yet. Terminate it so cancelling never waits for drivers.
+      const closed = new Promise<void>((resolve) => capture.once("close", () => resolve()));
+      capture.kill();
+      await closed;
+    }
+    if (!this.startedAt && this.output)
+      await fs.rm(this.output, { force: true }).catch(() => {});
   }
 }

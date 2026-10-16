@@ -47,6 +47,7 @@ struct CaptureConfig {
     bool captureSystemAudio = false;
     bool captureMic = false;
     bool captureCursor = false;
+    bool waitForStart = false;
     bool webcamEnabled = false;
     bool preferSoftwareEncoder = false;
     bool hideDesktopIcons = false;
@@ -580,6 +581,7 @@ bool parseConfig(const std::string& json, CaptureConfig& config) {
     config.webcamEnabled = findBool(json, "webcamEnabled", false);
     config.preferSoftwareEncoder = findBool(json, "preferSoftwareEncoder", false);
     config.hideDesktopIcons = findBool(json, "hideDesktopIcons", false);
+    config.waitForStart = findBool(json, "waitForStart", false);
     config.microphoneDeviceId = findString(json, "microphoneDeviceId");
     config.microphoneDeviceName = findString(json, "microphoneDeviceName");
     config.microphoneGain = findDouble(json, "microphoneGain", 1.0);
@@ -1466,6 +1468,25 @@ int wmain(int argc, wchar_t* argv[]) {
 
         return true;
     };
+
+    // Initialize devices and encoders during the parent's countdown, but do
+    // not start any capture or stream timeline until it releases this gate.
+    // Keeping this before the capture threads also makes cancellation safe:
+    // stop/EOF can exit without joining a thread blocked on input or frames.
+    if (config.waitForStart) {
+        std::cout << "{\"event\":\"recording-prepared\",\"schemaVersion\":2}" << std::endl;
+        std::string command;
+        bool startRequested = false;
+        while (std::getline(std::cin, command)) {
+            if (!command.empty() && command.back() == '\r') command.pop_back();
+            if (command == "start") {
+                startRequested = true;
+                break;
+            }
+            if (command == "stop" || command == "q" || command == "quit") break;
+        }
+        if (!startRequested) return 0;
+    }
 
     if (deviceWatchEnabled) {
         deviceWatchActive = deviceWatcher.start();

@@ -295,7 +295,7 @@ export default function Recorder({
         toast("所选来源未提供系统音频，本次只录制画面与启用的麦克风");
       // Hide settings before the countdown, including when capturing our own window.
       setCountingDown(true);
-      if (!(await bridge.recordingCountdown(sourceId))) {
+      if (!(await bridge.recordingCountdown(sourceId, native ? { fps, systemAudio: system } : undefined))) {
         streams.forEach((s) => s.stream.getTracks().forEach((t) => t.stop()));
         if (mounted.current) setPhase("configure");
         return;

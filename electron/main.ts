@@ -142,7 +142,49 @@ app.on("open-file", (event, file) => {
 let captureSelection: { id: string; systemAudio: boolean } | null = null;
 let task: AbortController | null = null;
 let nativeRecording: NativeRecording | null = null;
+type NativePreparation = {
+  sourceId: string;
+  fps: number;
+  systemAudio: boolean;
+  recording: NativeRecording;
+  ready: Promise<Electron.Rectangle>;
+};
+let nativePreparation: NativePreparation | null = null;
 const recordingBorder = new RecordingBorder();
+function prepareNativeRecording(sourceId: string, fps: number, systemAudio: boolean) {
+  if (process.platform !== "win32") throw new Error("该原生录制引擎仅支持 Windows");
+  if (nativeRecording || nativePreparation || recordings.size)
+    throw new Error("已有录制正在运行");
+  const recording = new NativeRecording();
+  const ready = (async () => {
+    const source = await findCaptureSource(sourceId);
+    if (!source) throw new Error("录制来源已经关闭，请重新选择");
+    const display = screen.getAllDisplays().find((d) => String(d.id) === source.display_id)
+      ?? screen.getPrimaryDisplay();
+    const bounds = screen.dipToScreenRect(null, display.bounds);
+    await recording.prepare({
+      sourceId,
+      sourceType: sourceId.startsWith("window:") ? "window" : "display",
+      displayId: display.id,
+      displayX: bounds.x, displayY: bounds.y,
+      displayW: bounds.width, displayH: bounds.height,
+      hasDisplayBounds: true, fps, captureSystemAudio: systemAudio,
+    }, path.join(app.getPath("userData"), "recordings"), process.resourcesPath, bounds, () => {
+      void recordingBorder.stop();
+      requestRecordingStop();
+    });
+    return bounds;
+  })();
+  // Cancellation can win the countdown race before initialization rejects.
+  void ready.catch(() => {});
+  nativePreparation = { sourceId, fps, systemAudio, recording, ready };
+  return nativePreparation;
+}
+async function discardNativePreparation(preparation = nativePreparation) {
+  if (!preparation) return;
+  if (nativePreparation === preparation) nativePreparation = null;
+  await preparation.recording.abort();
+}
 function requestRecordingStop() {
   if (window && !window.isDestroyed() && !window.webContents.isDestroyed())
     window.webContents.send("shortcut", "stopRecording");
@@ -251,30 +293,45 @@ function installHandlers() {
       register(settings.customBackground);
     return settings;
   });
-  handle("recording:countdown", async (sourceId: unknown) => {
+  handle("recording:countdown", async (sourceId: unknown, nativeOptions: unknown) => {
     const id = z.string().parse(sourceId);
+    const native = z.object({
+      fps: z.number().int().min(15).max(120), systemAudio: z.boolean(),
+    }).optional().parse(nativeOptions);
+    let preparation: NativePreparation | null = null;
     recordingControls.prepare(id, window.getBounds());
     minimizeForRecording(id);
     try {
-      // Create the overlay first so warming the controller cannot delay or
-      // steal focus from the countdown. Capture startup runs afterwards.
+      // Warm the encoder while the countdown is visible. The native helper
+      // waits for a separate start command before capturing any media.
       const countdown = recordingCountdown.start(id);
       recordingControls.preload();
-      const success = await countdown;
-      if (success) recordingControls.update({ phase: "starting", elapsed: 0, error: "" });
+      if (native) preparation = prepareNativeRecording(id, native.fps, native.systemAudio);
+      const success = await (preparation
+        ? Promise.race([countdown, preparation.ready.then(() => countdown)])
+        : countdown);
+      if (success) {
+        recordingControls.update({ phase: "starting", elapsed: 0, error: "" });
+        await preparation?.ready;
+      }
       else {
+        await discardNativePreparation(preparation);
         recordingControls.close();
         restoreRecordingWindow();
       }
       return success;
     } catch (error) {
       recordingCountdown.cancel();
+      await discardNativePreparation(preparation);
       recordingControls.close();
       restoreRecordingWindow();
       throw error;
     }
   });
-  handle("recording:countdown:cancel", () => recordingCountdown.cancel());
+  handle("recording:countdown:cancel", async () => {
+    recordingCountdown.cancel();
+    await discardNativePreparation();
+  });
   handle("recording:window:restore", () => restoreRecordingWindow());
   handle("recording:controls:update", (state: unknown) =>
     recordingControls.update(state === null ? null : recordingControlsStateSchema.parse(state)),
@@ -366,51 +423,27 @@ function installHandlers() {
   handle(
     "capture:native:start",
     async (sourceId: unknown, inputFps: unknown, audio: unknown) => {
-      if (process.platform !== "win32")
-        throw new Error("该原生录制引擎仅支持 Windows");
-      if (nativeRecording || recordings.size)
-        throw new Error("已有录制正在运行");
+      if (nativeRecording || recordings.size) throw new Error("已有录制正在运行");
       const id = z.string().parse(sourceId),
-        fps = z.number().int().min(15).max(120).parse(inputFps);
-      const source = await findCaptureSource(id);
-      if (!source) throw new Error("录制来源已经关闭，请重新选择");
-      const display =
-        screen
-          .getAllDisplays()
-          .find((d) => String(d.id) === source.display_id) ??
-        screen.getPrimaryDisplay();
-      const bounds = screen.dipToScreenRect(null, display.bounds);
-      const recording = new NativeRecording();
+        fps = z.number().int().min(15).max(120).parse(inputFps),
+        systemAudio = z.boolean().parse(audio);
+      if (nativePreparation && (nativePreparation.sourceId !== id || nativePreparation.fps !== fps || nativePreparation.systemAudio !== systemAudio))
+        throw new Error("录制参数已改变，请重新开始倒计时");
+      const preparation = nativePreparation ?? prepareNativeRecording(id, fps, systemAudio);
+      const { recording } = preparation;
       nativeRecording = recording;
       try {
+        const bounds = await preparation.ready;
+        if (nativePreparation !== preparation) throw new Error("录制准备已取消");
+        nativePreparation = null;
         await recordingBorder.start(
           id, bounds, process.resourcesPath, requestRecordingStop,
         );
-        await recording.start(
-          {
-            sourceId: id,
-            sourceType: id.startsWith("window:") ? "window" : "display",
-            displayId: display.id,
-            displayX: bounds.x,
-            displayY: bounds.y,
-            displayW: bounds.width,
-            displayH: bounds.height,
-            hasDisplayBounds: true,
-            fps,
-            captureSystemAudio: z.boolean().parse(audio),
-          },
-          path.join(app.getPath("userData"), "recordings"),
-          process.resourcesPath,
-          bounds,
-          () => {
-            void recordingBorder.stop();
-            requestRecordingStop();
-          },
-        );
+        await recording.start();
       } catch (error) {
         await recordingBorder.stop();
-        recording.abort();
-        nativeRecording = null;
+        await discardNativePreparation(preparation);
+        if (nativeRecording === recording) nativeRecording = null;
         throw error;
       }
     },
@@ -1132,6 +1165,7 @@ async function createWindow() {
     recordingControls.close();
     void recordingBorder.stop();
     nativeRecording?.abort();
+    void discardNativePreparation();
     restoreRecordingWindow();
   });
   window.webContents.on("will-navigate", (event, url) => {
@@ -1316,12 +1350,14 @@ app.on("window-all-closed", () => {
   void recordingBorder.stop();
   task?.abort();
   nativeRecording?.abort();
+  void discardNativePreparation();
   globalShortcut.unregisterAll();
   app.quit();
 });
 let closingOnnx = false;
 app.on("will-quit", (event) => {
   recordingCountdown.cancel();
+  void discardNativePreparation();
   recordingControls.close();
   void recordingBorder.stop();
   if (closingOnnx) return;

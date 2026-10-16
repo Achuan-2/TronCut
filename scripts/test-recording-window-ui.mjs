@@ -292,7 +292,8 @@ try {
   await app.evaluate(() => {
     process.env["FRAMECRAFT_WGC-CAPTURE"] = "Z:/troncut-test-missing.exe";
   });
-  await begin();
+  // Prewarming may report a missing engine before the countdown even paints.
+  await page.getByRole("button", { name: "开始录制", exact: true }).click();
   await expect(page.locator(".recorder-modal .error-box")).toBeVisible({
     timeout: 30000,
   });
