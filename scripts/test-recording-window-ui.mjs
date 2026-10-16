@@ -2,6 +2,7 @@ import { _electron as electron, expect } from "@playwright/test";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { selectPreview } from "./preview-select.mjs";
+import { recordingControls } from "./recording-controls.mjs";
 
 if (process.platform !== "win32")
   throw new Error("Windows recording window test");
@@ -68,10 +69,10 @@ try {
   await close.click();
   await expect(modal).toHaveCount(0);
 
-  async function configure(native) {
+  async function configure(native, source = target) {
     await page.getByRole("button", { name: "录制", exact: true }).click();
     await page
-      .locator(`.capture-sources > button[data-source-id="${target}"]`)
+      .locator(`.capture-sources > button[data-source-id="${source}"]`)
       .click();
     await page.getByLabel("麦克风", { exact: true }).uncheck();
     await page.getByLabel("录制帧率", { exact: true }).selectOption("15");
@@ -102,22 +103,102 @@ try {
   for (const native of [true, false]) {
     await configure(native);
     await begin();
-    await expect(page.getByText("正在录制", { exact: true })).toBeVisible({
-      timeout: 30000,
-    });
+    const controls = await recordingControls(app);
+    controls.on("pageerror", (error) => errors.push(error.message));
     expect(await minimized()).toBe(true);
-    await page.waitForTimeout(1200);
-    // Same renderer command delivered by the global stop shortcut, while minimized.
-    await app.evaluate(
-      ({ BrowserWindow }, id) =>
-        BrowserWindow.fromId(id).webContents.send("shortcut", "stopRecording"),
-      mainId,
+    await expect(page.locator(".recorder-modal, .recording-bar")).toHaveCount(
+      0,
     );
+    const properties = await app.evaluate(({ BrowserWindow }) => {
+      const controls = BrowserWindow.getAllWindows().find(
+        (w) => w.getTitle() === "TronCut 录制控制",
+      );
+      return {
+        top: controls.isAlwaysOnTop(),
+        parent: controls.getParentWindow()?.id,
+        sandbox: controls.webContents.getLastWebPreferences().sandbox,
+      };
+    });
+    expect(properties).toEqual({ top: true, parent: undefined, sandbox: true });
+    await controls
+      .getByRole("button", { name: "暂停录制", exact: true })
+      .click();
+    await expect(controls.getByRole("status")).toHaveText("已暂停");
+    await page.waitForTimeout(350);
+    const pausedTime = await controls.locator("time").textContent();
+    await page.waitForTimeout(1100);
+    await expect(controls.locator("time")).toHaveText(pausedTime);
+    await controls.screenshot({
+      path: path.join(root, `controls-paused-${native}.png`),
+    });
+    await controls
+      .getByRole("button", { name: "继续录制", exact: true })
+      .click();
+    await expect(controls.getByRole("status")).toHaveText("正在录制");
+    await controls
+      .getByRole("button", { name: "显示编辑器", exact: true })
+      .click();
+    await mainRestored();
+    await expect(
+      page.getByRole("button", { name: "录制", exact: true }),
+    ).toBeDisabled();
+    const projectName = page.getByRole("textbox", {
+      name: "工程名称",
+      exact: true,
+    });
+    await expect(projectName).toBeEnabled();
+    await projectName.fill(`录制中编辑 ${native}`);
+    await page.waitForTimeout(1200);
+    await controls
+      .getByRole("button", { name: "停止录制", exact: true })
+      .click();
     await expect(page.getByRole("status")).toContainText("录制完成", {
       timeout: 30000,
     });
     await mainRestored();
+    await expect.poll(() => controls.isClosed()).toBe(true);
     await expect(page.locator(".recording-bar")).toHaveCount(0);
+  }
+  const self = await app.evaluate(
+    ({ BrowserWindow }, id) => BrowserWindow.fromId(id).getMediaSourceId(),
+    mainId,
+  );
+  for (const native of [true, false]) {
+    await configure(native, self);
+    await page.getByRole("button", { name: "开始录制", exact: true }).click();
+    const controls = await recordingControls(app);
+    expect(await minimized()).toBe(false);
+    await expect(page.locator(".recorder-modal, .recording-bar")).toHaveCount(
+      0,
+    );
+    const name = page.getByRole("textbox", { name: "工程名称", exact: true });
+    await name.fill(`TronCut 自录 ${native}`);
+    await name.blur();
+    await page.keyboard.press("Control+z");
+    await expect(name).not.toHaveValue(`TronCut 自录 ${native}`);
+    await page.waitForTimeout(1200);
+    if (native) {
+      // Closing the controller saves, just like its Stop button.
+      await app.evaluate(({ BrowserWindow }) =>
+        BrowserWindow.getAllWindows()
+          .find((w) => w.getTitle() === "TronCut 录制控制")
+          .close(),
+      );
+    } else {
+      // Retain global stop command support.
+      await app.evaluate(
+        ({ BrowserWindow }, id) =>
+          BrowserWindow.fromId(id).webContents.send(
+            "shortcut",
+            "stopRecording",
+          ),
+        mainId,
+      );
+    }
+    await expect(page.getByRole("status")).toContainText("录制完成", {
+      timeout: 30000,
+    });
+    await expect.poll(() => controls.isClosed()).toBe(true);
   }
   await expect
     .poll(
@@ -125,7 +206,7 @@ try {
         (await page.evaluate(() => window.framecraft.readRecovery()))?.project
           .assets.length,
     )
-    .toBe(2);
+    .toBe(4);
   const project = (await page.evaluate(() => window.framecraft.readRecovery()))
     .project;
   for (const asset of project.assets)
@@ -154,7 +235,7 @@ try {
   await close.click();
   expect(errors).toEqual([]);
   console.log(
-    `固定关闭按钮、倒计时取消、原生/兼容录制最小化与快捷键停止恢复、来源失效和启动失败恢复通过：${root}`,
+    `独立录制控制窗、原生/兼容暂停继续、计时冻结、显示编辑器、自录与编辑快捷键、停止/关闭保存及异常恢复通过：${root}`,
   );
 } catch (error) {
   await app.evaluate(({ BrowserWindow }) => {

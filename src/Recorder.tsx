@@ -3,9 +3,6 @@ import {
   Camera,
   Mic,
   Monitor,
-  Pause,
-  Play,
-  Square,
   Volume2,
   X,
   Circle,
@@ -38,6 +35,7 @@ export default function Recorder({
   onClose,
   onRecorded,
   toast,
+  onCaptureActiveChange,
 }: {
   onClose: () => void;
   onRecorded: (
@@ -45,6 +43,7 @@ export default function Recorder({
     settings: RecordingSettings,
   ) => Promise<string | void>;
   toast: (text: string) => void;
+  onCaptureActiveChange: (active: boolean) => void;
 }) {
   const [sources, setSources] = useState<CaptureSource[]>([]),
     [sourceId, setSourceId] = useState(""),
@@ -60,6 +59,8 @@ export default function Recorder({
     [useNative, setUseNative] = useState(true),
     [fps, setFps] = useState(30);
   const nativeActive = useRef(false);
+  const [countingDown, setCountingDown] = useState(false);
+  const pauseBusy = useRef(false);
   const [settings, setSettings] = useState(defaultRecordingSettings);
   const [settingsReady, setSettingsReady] = useState(false);
   const [savingSettings, setSavingSettings] = useState(false);
@@ -122,11 +123,12 @@ export default function Recorder({
     return () => {
       mounted.current = false;
       void window.framecraft?.cancelRecordingCountdown();
+      void window.framecraft?.updateRecordingControls(null);
     };
   }, []);
   useEffect(() => {
     if (!["recording", "paused"].includes(phase)) return;
-    const timer = window.setInterval(() => setElapsed(currentDuration()), 100);
+    const timer = window.setInterval(() => setElapsed(currentDuration()), 250);
     return () => clearInterval(timer);
   }, [phase]);
   async function stop() {
@@ -134,6 +136,7 @@ export default function Recorder({
       return;
     stopping.current = true;
     const duration = Math.max(0.1, currentDuration());
+    if (!timing.current.pauseStart) timing.current.pauseStart = performance.now();
     setPhase("saving");
     try {
       const active = sessions.current;
@@ -181,14 +184,30 @@ export default function Recorder({
       nativeActive.current = false;
       stopping.current = false;
       await window.framecraft?.restoreRecordingWindow();
+      await window.framecraft?.updateRecordingControls(null);
     }
   }
   const stopRef = useRef(stop);
   stopRef.current = stop;
+  const pauseRef = useRef<() => Promise<void>>(async () => {});
+  const captureActive = phase === "recording" || phase === "paused";
+  useEffect(() => {
+    onCaptureActiveChange(captureActive);
+  }, [captureActive, onCaptureActiveChange]);
+  useEffect(() => () => onCaptureActiveChange(false), [onCaptureActiveChange]);
+  useEffect(() => {
+    if (phase !== "recording" && phase !== "paused" && phase !== "saving") return;
+    void window.framecraft?.updateRecordingControls({ phase, elapsed, error: error.slice(0, 4000) })
+      .catch((e) => {
+        setError(`录制控制窗口不可用：${String(e)}`);
+        void stopRef.current();
+      });
+  }, [phase, elapsed, error]);
   useEffect(
     () =>
       window.framecraft?.onShortcut((command) => {
         if (command === "stopRecording") void stopRef.current();
+        if (command === "pauseRecording") void pauseRef.current();
       }),
     [],
   );
@@ -199,6 +218,8 @@ export default function Recorder({
       return;
     }
     setError("");
+    setElapsed(0);
+    setCountingDown(false);
     setPhase("starting");
     const streams: { kind: Session["kind"]; stream: MediaStream }[] = [];
     try {
@@ -272,6 +293,8 @@ export default function Recorder({
       const screen = streams.find((stream) => stream.kind === "screen")?.stream;
       if (system && screen && !screen.getAudioTracks().length)
         toast("所选来源未提供系统音频，本次只录制画面与启用的麦克风");
+      // Hide settings before the countdown, including when capturing our own window.
+      setCountingDown(true);
       if (!(await bridge.recordingCountdown(sourceId))) {
         streams.forEach((s) => s.stream.getTracks().forEach((t) => t.stop()));
         if (mounted.current) setPhase("configure");
@@ -392,54 +415,32 @@ export default function Recorder({
       streams.forEach((s) => s.stream.getTracks().forEach((t) => t.stop()));
     }
   }
-  function pause() {
-    if (phase === "recording") {
-      sessions.current.forEach((s) => s.recorder.pause());
-      timing.current.pauseStart = performance.now();
-      setPhase("paused");
+  async function pause() {
+    if (!captureActive || stopping.current || pauseBusy.current) return;
+    pauseBusy.current = true;
+    const pausing = phase === "recording";
+    try {
       if (nativeActive.current)
-        void window.framecraft
-          ?.nativeRecordingPause(true)
-          .catch((e) => setError(String(e)));
-    } else {
-      timing.current.paused += performance.now() - timing.current.pauseStart;
-      timing.current.pauseStart = 0;
-      sessions.current.forEach((s) => s.recorder.resume());
-      setPhase("recording");
-      if (nativeActive.current)
-        void window.framecraft
-          ?.nativeRecordingPause(false)
-          .catch((e) => setError(String(e)));
+        await window.framecraft?.nativeRecordingPause(pausing);
+      if (stopping.current) return;
+      if (pausing) {
+        sessions.current.forEach((s) => s.recorder.pause());
+        timing.current.pauseStart = performance.now();
+      } else {
+        timing.current.paused += performance.now() - timing.current.pauseStart;
+        timing.current.pauseStart = 0;
+        sessions.current.forEach((s) => s.recorder.resume());
+      }
+      setPhase(pausing ? "paused" : "recording");
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      pauseBusy.current = false;
     }
   }
-  if (["recording", "paused", "saving"].includes(phase))
-    return (
-      <div className="recording-bar">
-        <span
-          className={`recording-dot ${phase === "paused" ? "paused" : ""}`}
-        />
-        <b>
-          {phase === "saving"
-            ? "正在保存录制…"
-            : phase === "paused"
-              ? "已暂停"
-              : "正在录制"}
-        </b>
-        <span className="timecode">{timeLabel(elapsed)}</span>
-        <small>Ctrl / ⌘ + Shift + F9 停止</small>
-        <button disabled={phase === "saving"} onClick={pause}>
-          {phase === "paused" ? <Play size={18} /> : <Pause size={18} />}
-        </button>
-        <button
-          className="stop-recording"
-          disabled={phase === "saving"}
-          onClick={() => void stop()}
-        >
-          <Square size={15} fill="currentColor" />
-          结束录制
-        </button>
-      </div>
-    );
+  pauseRef.current = pause;
+  if (captureActive || phase === "saving" || (phase === "starting" && countingDown))
+    return null;
   return (
     <div className="modal-backdrop">
       <div className="recorder-modal">

@@ -11,6 +11,7 @@ import type {
   AiProviderUpdate,
 } from "./preferences";
 import type { RecordingBackground, RecordingSettings } from "./recording";
+import type { RecordingControlsState } from "./recording-controls";
 import type { CustomRecordingBackground } from "./recording-settings";
 import type { VideoExportRequest } from "./export-settings";
 import type { EditMenuState } from "./edit-menu";
@@ -38,6 +39,7 @@ export interface WindowState {
 export interface FrameCraftBridge {
   recordingCountdown(sourceId: string): Promise<boolean>;
   cancelRecordingCountdown(): Promise<void>;
+  updateRecordingControls(state: RecordingControlsState | null): Promise<void>;
   recordingSettings(): Promise<RecordingSettings>;
   saveRecordingSettings(
     settings: RecordingSettings,

@@ -4,6 +4,7 @@ import path from "node:path";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import sharp from "sharp";
+import { recordingControls } from "./recording-controls.mjs";
 
 if (process.platform !== "win32")
   throw new Error("Windows recording border test");
@@ -83,9 +84,7 @@ try {
   await page.getByLabel("麦克风", { exact: true }).uncheck();
   await page.getByLabel("录制帧率", { exact: true }).selectOption("15");
   await page.getByRole("button", { name: "开始录制", exact: true }).click();
-  await expect(page.getByText("正在录制", { exact: true })).toBeVisible({
-    timeout: 30000,
-  });
+  const controls = await recordingControls(app);
   let border = await inspect();
   expect(border.visible).toBe(true);
   expect(border.bounds).toEqual(border.targetBounds);
@@ -120,12 +119,12 @@ try {
     source.id,
   );
   await expect.poll(async () => (await inspect()).visible).toBe(true);
-  const pause = page.locator(".recording-bar > button").first();
+  const pause = controls.locator("#pause");
   await pause.click();
-  await expect(page.getByText("已暂停", { exact: true })).toBeVisible();
+  await expect(controls.getByRole("status")).toHaveText("已暂停");
   expect((await inspect()).visible).toBe(true);
   await pause.click();
-  await page.getByRole("button", { name: "结束录制", exact: true }).click();
+  await controls.getByRole("button", { name: "停止录制", exact: true }).click();
   await expect(page.getByRole("status")).toContainText("录制完成", {
     timeout: 30000,
   });
@@ -181,6 +180,29 @@ try {
     await window.framecraft.selectCapture(id, false);
     await window.framecraft.nativeRecordingStart(id, 15, false);
   }, display.id);
+  // Place the real controller over the white fixture and inspect the saved
+  // pixels beneath it in both engines, rather than trusting the affinity flag.
+  await page.evaluate(() =>
+    window.framecraft.updateRecordingControls({
+      phase: "recording",
+      elapsed: 1,
+      error: "",
+    }),
+  );
+  const screenControls = await recordingControls(app);
+  const controlsBounds = await app.evaluate(({ BrowserWindow, screen }) => {
+    const controls = BrowserWindow.getAllWindows().find(
+      (w) => w.getTitle() === "TronCut 录制控制",
+    );
+    const display = screen.getDisplayMatching(controls.getBounds());
+    controls.setPosition(display.bounds.x + 40, display.bounds.y + 40);
+    controls.setAlwaysOnTop(true, "screen-saver");
+    controls.moveTop();
+    return screen.dipToScreenRect(controls, controls.getBounds());
+  });
+  await screenControls.screenshot({
+    path: path.join(root, "screen-controls.png"),
+  });
   let displayBorder = await inspect();
   expect(displayBorder.bounds).toEqual({
     left: display.bounds.x,
@@ -206,6 +228,21 @@ try {
       .toBuffer({ resolveWithObject: true });
     const green = greenBorderPixels(data, info);
     expect(green).toBe(0);
+    let white = 0,
+      samples = 0;
+    for (let y = 15; y < controlsBounds.height - 15; y += 8) {
+      for (let x = 15; x < controlsBounds.width - 15; x += 8) {
+        const i =
+          ((controlsBounds.y - display.bounds.y + y) * info.width +
+            controlsBounds.x -
+            display.bounds.x +
+            x) *
+          3;
+        if (Math.min(...data.subarray(i, i + 3)) > 235) white++;
+        samples++;
+      }
+    }
+    expect(white / samples).toBeGreaterThan(0.98);
     // Check every side: exclusion must reveal the fixture, not a black frame.
     for (const [x, y] of [
       [20, 0],
@@ -218,6 +255,17 @@ try {
     }
   };
   await verifyWhiteCapture(screenRecording.path, "native-screen.png");
+  await app.evaluate(({ BrowserWindow }, id) => {
+    const target = BrowserWindow.fromId(id);
+    target.restore();
+    target.showInactive();
+    target.setAlwaysOnTop(true, "screen-saver");
+    target.moveTop();
+    const controls = BrowserWindow.getAllWindows().find(
+      (w) => w.getTitle() === "TronCut 录制控制",
+    );
+    controls.moveTop();
+  }, source.id);
   await page.evaluate(async () => {
     const stream = await navigator.mediaDevices.getDisplayMedia({
       video: true,
@@ -260,6 +308,8 @@ try {
   );
   expect((await inspect()).exists).toBe(false);
   await verifyWhiteCapture(compatible.path, "compatible-screen.png");
+  await page.evaluate(() => window.framecraft.updateRecordingControls(null));
+  await expect.poll(() => screenControls.isClosed()).toBe(true);
   // A capture startup error must clear the already-visible border as well.
   await app.evaluate(() => {
     process.env["FRAMECRAFT_WGC-CAPTURE"] = "Z:/troncut-test-missing.exe";
@@ -295,7 +345,7 @@ try {
     source.id,
   );
   console.log(
-    `录制边框、窗口跟随、最小化、暂停、停止与失败清理、原生及兼容屏幕录制排除边框通过：${root}`,
+    `录制边框、窗口跟随、最小化、暂停、停止与失败清理、原生及兼容屏幕录制排除边框和控制窗通过：${root}`,
   );
 } finally {
   await app.close();

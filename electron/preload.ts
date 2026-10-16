@@ -4,6 +4,7 @@ import type { FrameCraftBridge } from "../shared/bridge";
 const bridge: FrameCraftBridge = {
   recordingCountdown: (sourceId) => ipcRenderer.invoke("recording:countdown", sourceId),
   cancelRecordingCountdown: () => ipcRenderer.invoke("recording:countdown:cancel"),
+  updateRecordingControls: (state) => ipcRenderer.invoke("recording:controls:update", state),
   recordingSettings: () => ipcRenderer.invoke("recording:settings"),
   saveRecordingSettings: (settings) =>
     ipcRenderer.invoke("recording:settings:save", settings),

@@ -1,4 +1,5 @@
 import { _electron as electron, expect } from "@playwright/test";
+import { recordingControls } from "./recording-controls.mjs";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { selectPreview } from "./preview-select.mjs";
@@ -78,16 +79,14 @@ try {
   await page.getByLabel("自动缩放倍数", { exact: true }).selectOption("2.5");
   await page.screenshot({ path: path.join(root, "configure.png") });
   await page.getByRole("button", { name: "开始录制", exact: true }).click();
-  await expect(page.getByText("正在录制", { exact: true })).toBeVisible({
-    timeout: 30000,
-  });
+  const controls = await recordingControls(app);
   expect(await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].isMinimized())).toBe(false);
   await page.waitForTimeout(2200);
-  const pause = page.locator(".recording-bar > button").first();
+  const pause = controls.locator("#pause");
   await pause.click();
-  await expect(page.getByText("已暂停", { exact: true })).toBeVisible();
+  await expect(controls.getByRole("status")).toHaveText("已暂停");
   await pause.click();
-  await page.getByRole("button", { name: "结束录制", exact: true }).click();
+  await controls.getByRole("button", { name: "停止录制", exact: true }).click();
   await expect(page.getByRole("status")).toContainText("录制完成", {
     timeout: 30000,
   });
@@ -108,7 +107,7 @@ try {
   const screen = recorded.clips.find((c) => c.kind === "video");
   expect(screen.transform.scale).toBe(0.76);
   expect(screen.cursorStyle).toMatchObject({ style: "circle", size: 56 });
-  expect(screen.mediaFrame).toEqual({ radius: 24 });
+  expect(screen.mediaFrame).toEqual({ radius: 24, unit: "percent" });
   const asset = recorded.assets.find((a) => a.id === screen.assetId);
   expect(asset.name).toMatch(
     /^录屏 \d{4}-\d{2}-\d{2} \d{2}-\d{2}-\d{2}-\d{3}\.mp4$/,

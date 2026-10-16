@@ -57,6 +57,7 @@ export default function App() {
     [homeLoading, setHomeLoading] = useState(true),
     [tab, setTab] = useState<Tab>("media"),
     [recording, setRecording] = useState(false),
+    [recordingActive, setRecordingActive] = useState(false),
     [caps, setCaps] = useState<Capabilities>(),
     [toastMessage, setToast] = useState(""),
     [busy, setBusy] = useState(false),
@@ -84,10 +85,11 @@ export default function App() {
     clipClipboardToken = useRef("");
   const initialized = useRef(false);
   const mediaImportLock = useRef(false);
+  const recordingModalOpen = recording && !recordingActive;
   const actionsBlocked =
     busy ||
     mediaImporting ||
-    recording ||
+    recordingModalOpen ||
     exportOpen ||
     !!editor.narrationRecording;
   const toast = useCallback((message: string) => {
@@ -111,7 +113,7 @@ export default function App() {
     [toast],
   );
   const importIntoTimeline = async (fn: () => Promise<void>) => {
-    if (mediaImportLock.current || busy || recording) return;
+    if (mediaImportLock.current || busy || recordingModalOpen) return;
     mediaImportLock.current = true;
     setMediaImporting(true);
     try {
@@ -170,7 +172,7 @@ export default function App() {
       blocked:
         busy ||
         mediaImporting ||
-        recording ||
+        recordingModalOpen ||
         exportOpen ||
         preferencesOpen ||
         !!editor.narrationRecording,
@@ -202,7 +204,7 @@ export default function App() {
     editor.canRedo,
     busy,
     mediaImporting,
-    recording,
+    recordingModalOpen,
     exportOpen,
     preferencesOpen,
     editingInput,
@@ -413,7 +415,7 @@ export default function App() {
       busy ||
       preferencesOpen ||
       exportOpen ||
-      recording ||
+      recordingModalOpen ||
       screen === "home"
     )
       return;
@@ -639,7 +641,7 @@ export default function App() {
       busy ||
       preferencesOpen ||
       exportOpen ||
-      recording ||
+      recordingModalOpen ||
       screen === "home"
     )
       return;
@@ -984,7 +986,7 @@ export default function App() {
         <div className="header-actions" hidden={screen === "home"}>
           <button
             className="record-button"
-            disabled={actionsBlocked}
+            disabled={actionsBlocked || recording}
             onClick={() => {
               editor.setPlaying(false);
               setRecording(true);
@@ -1091,7 +1093,7 @@ export default function App() {
             onCopyAnimation={copyAnimation}
             onDropFiles={dropFiles}
             onCaptureFrame={() => void captureFrame()}
-            dropDisabled={busy || recording || mediaImporting}
+            dropDisabled={busy || recordingModalOpen || mediaImporting}
           />
         </>
       )}
@@ -1149,6 +1151,7 @@ export default function App() {
           onClose={() => setRecording(false)}
           onRecorded={recorded}
           toast={toast}
+          onCaptureActiveChange={setRecordingActive}
         />
       )}
       {importReport && (

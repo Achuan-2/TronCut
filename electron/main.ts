@@ -57,6 +57,8 @@ import { processCaptionCues } from "./caption-processing";
 import { requestAi, listAiModels } from "./ai";
 import { RecordingStyleStore } from "./recording-style";
 import { RecordingCountdown } from "./recording-countdown";
+import { RecordingControls } from "./recording-controls";
+import { recordingControlsStateSchema } from "../shared/recording-controls";
 import { findCaptureSource } from "./capture-source";
 import { videoExportRequestSchema } from "../shared/export-settings";
 import { assertExportTarget, videoExportTarget } from "./video-export-target";
@@ -98,8 +100,8 @@ function minimizeForRecording(sourceId: string) {
   recordingMinimizedWindow = true;
   window.minimize();
 }
-function restoreRecordingWindow() {
-  if (!recordingMinimizedWindow) return;
+function restoreRecordingWindow(force = false) {
+  if (!recordingMinimizedWindow && !force) return;
   recordingMinimizedWindow = false;
   if (!window || window.isDestroyed()) return;
   if (window.isMinimized()) window.restore();
@@ -145,6 +147,11 @@ function requestRecordingStop() {
   if (window && !window.isDestroyed() && !window.webContents.isDestroyed())
     window.webContents.send("shortcut", "stopRecording");
 }
+const recordingControls = new RecordingControls((command) => {
+  if (command === "editor") restoreRecordingWindow(true);
+  else if (window && !window.isDestroyed())
+    window.webContents.send("shortcut", command === "pause" ? "pauseRecording" : "stopRecording");
+});
 const assets = new Map<string, Asset>();
 const speechVoicePreviews = new SpeechVoicePreviews();
 const clonedVoices = new ClonedVoices(app.getPath("userData"));
@@ -257,7 +264,10 @@ function installHandlers() {
     }
   });
   handle("recording:countdown:cancel", () => recordingCountdown.cancel());
-  handle("recording:window:restore", restoreRecordingWindow);
+  handle("recording:window:restore", () => restoreRecordingWindow());
+  handle("recording:controls:update", (state: unknown) =>
+    recordingControls.update(state === null ? null : recordingControlsStateSchema.parse(state)),
+  );
   handle("recording:settings:save", async (input: unknown) =>
     (await preferences.save({ recording: recordingSettingsSchema.parse(input) })).recording,
   );
@@ -1106,6 +1116,7 @@ async function createWindow() {
   window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
   window.webContents.on("render-process-gone", () => {
     recordingCountdown.cancel();
+    recordingControls.close();
     void recordingBorder.stop();
     nativeRecording?.abort();
     restoreRecordingWindow();
@@ -1134,6 +1145,7 @@ async function createWindow() {
     });
     if (choice === 0) event.preventDefault();
   });
+  window.on("closed", () => recordingControls.close());
   const shortcut = (command: string) =>
     window.webContents.send("shortcut", command);
   Menu.setApplicationMenu(
@@ -1297,6 +1309,7 @@ app.on("window-all-closed", () => {
 let closingOnnx = false;
 app.on("will-quit", (event) => {
   recordingCountdown.cancel();
+  recordingControls.close();
   void recordingBorder.stop();
   if (closingOnnx) return;
   event.preventDefault();

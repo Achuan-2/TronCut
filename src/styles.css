@@ -4218,48 +4218,6 @@ fieldset:disabled {
   line-height: 1.7;
   border-radius: 6px;
 }
-.recording-bar {
-  position: fixed;
-  top: 90px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 150;
-  display: flex;
-  align-items: center;
-  gap: 15px;
-  padding: 12px 17px;
-  background: #29382f;
-  border: 1px solid #607a68;
-  border-radius: 10px;
-  box-shadow: 0 8px 50px #0009;
-}
-.recording-bar b {
-  font-size: 12px;
-  font-weight: 500;
-}
-.recording-bar small {
-  font-size: 10px;
-  color: #8fa997;
-  margin-left: 10px;
-}
-.recording-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #ee9987;
-  box-shadow: 0 0 0 4px #ee99871c;
-  animation: demo-fade 1s infinite;
-}
-.recording-dot.paused {
-  animation: none;
-  background: #e4c171;
-}
-.recording-bar .stop-recording {
-  background: #543c33;
-  color: #f8c7b7;
-  border: 1px solid #88604e;
-  font-size: 11px;
-}
 .report-lines {
   max-height: 50vh;
   overflow: auto;
