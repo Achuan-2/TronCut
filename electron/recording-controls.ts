@@ -21,7 +21,7 @@ svg { width:15px; height:15px; fill:none; stroke:currentColor; stroke-width:1.7;
 .sr-only { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
 #dot { width:6px; height:6px; border-radius:50%; background:#f28c7d; flex-shrink:0; }
 body[data-phase=paused] #dot { background:#e4c171; }
-body[data-phase=saving] #dot { background:#9cb5a5; }
+body[data-phase=starting] #dot,body[data-phase=saving] #dot { background:#9cb5a5; }
 time { margin-right:auto; font-size:14px; font-variant-numeric:tabular-nums; white-space:nowrap; }
 #stop { color:#f3a799; }
 #stop:hover { background:#54362f; }
@@ -40,16 +40,16 @@ time { margin-right:auto; font-size:14px; font-variant-numeric:tabular-nums; whi
 const pause = document.querySelector('#pause'), stop = document.querySelector('#stop');
 window.recordingControls.onState(state => {
   document.body.dataset.phase = state.phase;
-  const status = state.phase === 'paused' ? '已暂停' : state.phase === 'saving' ? '正在保存…' : '正在录制';
+  const status = state.phase === 'starting' ? '正在启动录制…' : state.phase === 'paused' ? '已暂停' : state.phase === 'saving' ? '正在保存…' : '正在录制';
   document.querySelector('#status').textContent = status;
   document.querySelector('#dot').title = status;
   const seconds = Math.floor(state.elapsed), pad = n => String(n).padStart(2, '0');
-  document.querySelector('time').textContent = (seconds >= 3600 ? pad(Math.floor(seconds / 3600)) + ':' : '') + pad(Math.floor(seconds / 60) % 60) + ':' + pad(seconds % 60);
+  document.querySelector('time').textContent = state.phase === 'starting' ? '准备中…' : (seconds >= 3600 ? pad(Math.floor(seconds / 3600)) + ':' : '') + pad(Math.floor(seconds / 60) % 60) + ':' + pad(seconds % 60);
   document.querySelector('#pause-icon').toggleAttribute('hidden', state.phase === 'paused');
   document.querySelector('#play-icon').toggleAttribute('hidden', state.phase !== 'paused');
   pause.title = state.phase === 'paused' ? '继续录制' : '暂停录制';
   pause.setAttribute('aria-label', pause.title);
-  pause.disabled = stop.disabled = state.phase === 'saving';
+  pause.disabled = stop.disabled = state.phase === 'starting' || state.phase === 'saving';
   const error = document.querySelector('#error');
   error.hidden = !state.error;
   error.title = state.error;
@@ -65,6 +65,8 @@ document.querySelector('#minimize').onclick = () => window.recordingControls.com
 export class RecordingControls {
   private window?: BrowserWindow;
   private state?: RecordingControlsState;
+  private loaded = false;
+  private presentationRequested = false;
   private captureDisplayId?: number;
   private sourceDisplays = new Map<string, string>();
 
@@ -107,6 +109,8 @@ export class RecordingControls {
   show() {
     const controls = this.window;
     if (!controls || controls.isDestroyed() || !this.state) return;
+    this.presentationRequested = true;
+    if (!this.loaded) return;
     controls.setBounds(this.bounds());
     if (controls.isMinimized()) controls.restore();
     controls.show();
@@ -128,14 +132,21 @@ export class RecordingControls {
       }
       if (
         command === "editor" ||
-        (this.state?.phase !== "saving" &&
+        ((this.state?.phase === "recording" ||
+          this.state?.phase === "paused") &&
           (command === "pause" || command === "stop"))
       )
         this.command(command);
     });
   }
 
-  update(state: RecordingControlsState | null) {
+  /** Warm the renderer under the countdown without exposing it or stealing focus. */
+  preload() {
+    if (this.window && !this.window.isDestroyed()) return;
+    this.update({ phase: "starting", elapsed: 0, error: "" }, false);
+  }
+
+  update(state: RecordingControlsState | null, reveal = true) {
     if (!state) {
       this.close();
       return;
@@ -144,8 +155,11 @@ export class RecordingControls {
     if (this.window && !this.window.isDestroyed()) {
       if (!this.window.webContents.isLoadingMainFrame())
         this.window.webContents.send("recording:controls:state", state);
+      if (reveal && !this.presentationRequested) this.show();
       return;
     }
+    this.loaded = false;
+    this.presentationRequested = reveal;
     const controls = new BrowserWindow({
       ...this.bounds(),
       title: "TronCut 录制控制",
@@ -173,17 +187,17 @@ export class RecordingControls {
     controls.webContents.on("will-navigate", (event) => event.preventDefault());
     controls.webContents.once("did-finish-load", () => {
       if (this.window !== controls || !this.state) return;
+      this.loaded = true;
       controls.webContents.send("recording:controls:state", this.state);
       // Minimizing the editor can leave the Windows task switcher in front.
       // Activate once so the user can actually see and reach the controller.
-      controls.show();
-      controls.moveTop();
-      controls.focus();
+      if (this.presentationRequested) this.show();
     });
     // Alt+F4 must save the recording, rather than leave it without controls.
     controls.on("close", (event) => {
       event.preventDefault();
-      if (this.state?.phase !== "saving") this.command("stop");
+      if (this.state?.phase === "recording" || this.state?.phase === "paused")
+        this.command("stop");
     });
     controls.webContents.once("render-process-gone", () =>
       this.command("stop"),
@@ -204,6 +218,8 @@ export class RecordingControls {
     const controls = this.window;
     this.window = undefined;
     this.state = undefined;
+    this.loaded = false;
+    this.presentationRequested = false;
     if (controls && !controls.isDestroyed()) controls.destroy();
   }
 }

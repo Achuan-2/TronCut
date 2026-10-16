@@ -20,7 +20,9 @@ export async function recordingControls(app) {
       }),
     )
     .toBe(true);
-  await expect(controls.getByRole("status")).toHaveText("正在录制");
+  await expect(controls.getByRole("status")).toHaveText("正在录制", {
+    timeout: 30000,
+  });
   if (process.platform === "win32") {
     const handle = await app.evaluate(({ BrowserWindow }) =>
       BrowserWindow.getAllWindows()

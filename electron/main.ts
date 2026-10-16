@@ -256,10 +256,20 @@ function installHandlers() {
     recordingControls.prepare(id, window.getBounds());
     minimizeForRecording(id);
     try {
-      const success = await recordingCountdown.start(id);
-      if (!success) restoreRecordingWindow();
+      // Create the overlay first so warming the controller cannot delay or
+      // steal focus from the countdown. Capture startup runs afterwards.
+      const countdown = recordingCountdown.start(id);
+      recordingControls.preload();
+      const success = await countdown;
+      if (success) recordingControls.update({ phase: "starting", elapsed: 0, error: "" });
+      else {
+        recordingControls.close();
+        restoreRecordingWindow();
+      }
       return success;
     } catch (error) {
+      recordingCountdown.cancel();
+      recordingControls.close();
       restoreRecordingWindow();
       throw error;
     }

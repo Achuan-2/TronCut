@@ -117,7 +117,7 @@ try {
   await expect(overlay.locator("strong")).toHaveText("3");
   const geometry = await app.evaluate(({ BrowserWindow, screen }) => {
     const win = BrowserWindow.getAllWindows().find((w) =>
-      w.webContents.getURL().startsWith("data:text/html"),
+      w.webContents.getURL().includes(encodeURIComponent('aria-label="录制倒计时"')),
     );
     const bounds = win.getBounds();
     return {

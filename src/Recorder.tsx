@@ -398,6 +398,7 @@ export default function Recorder({
       setPhase("recording");
     } catch (e) {
       recordingCapabilities.current = null;
+      await bridge.updateRecordingControls(null);
       await bridge.restoreRecordingWindow();
       setError(String(e));
       setPhase("configure");
