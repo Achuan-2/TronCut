@@ -17,7 +17,10 @@ try {
   await page.getByRole("button", { name: "新建录制", exact: true }).click();
   await expect(page.getByLabel("录屏背景", { exact: true })).toBeEnabled();
   await page.getByLabel("麦克风", { exact: true }).uncheck();
-  await expect(page.getByLabel("背景图库").locator("button")).toHaveCount(43);
+  await expect(page.getByLabel("背景图库")).toHaveCount(0);
+  await expect(
+    page.getByLabel("录屏背景", { exact: true }).locator("option"),
+  ).toHaveCount(44);
   await page.getByLabel("录屏背景", { exact: true }).selectOption("wispysky");
   const video = page.locator("video.recording-wallpaper-preview");
   await expect(video).toHaveAttribute("loop", "");

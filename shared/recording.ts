@@ -1,6 +1,4 @@
-import { z } from "zod";
 import {
-  cursorStyleSchema,
   defaultTransform,
   newTrack,
   uid,
@@ -8,48 +6,22 @@ import {
   type Clip,
   type Project,
 } from "./model";
-import { defaultCursorStyle } from "./cursor";
-import { recordlyBackgrounds } from "./recording-backgrounds";
+import type { RecordingSettings } from "./recording-settings";
 import {
   recordingCameraFrames,
   sceneRecordingFrames,
 } from "./recording-camera";
 
-export const recordingBackgrounds = {
-  mint: { name: "薄荷", colors: ["#143e42", "#7bdbc3"] },
-  violet: { name: "紫雾", colors: ["#30295b", "#bd9ce4"] },
-  sunset: { name: "日落", colors: ["#793c63", "#f6ae7d"] },
-  dark: { name: "深灰", colors: ["#111827", "#475569"] },
-  ...recordlyBackgrounds,
-} as const;
-export const recordingBackgroundSchema = z.enum(
-  Object.keys(recordingBackgrounds) as [
-    keyof typeof recordingBackgrounds,
-    ...(keyof typeof recordingBackgrounds)[],
-  ],
-);
-export type RecordingBackground = z.infer<typeof recordingBackgroundSchema>;
-export const recordingSettingsSchema = z.object({
-  background: z.boolean(),
-  preset: recordingBackgroundSchema,
-  padding: z.number().finite().min(0).max(0.25),
-  radius: z.number().finite().min(0).max(200),
-  cursor: cursorStyleSchema,
-  autoZoom: z.boolean(),
-  zoom: z.number().finite().min(1.2).max(3),
-  zoomBackground: z.boolean().default(false),
-});
-export type RecordingSettings = z.infer<typeof recordingSettingsSchema>;
-export const defaultRecordingSettings: RecordingSettings = {
-  background: true,
-  preset: "tahoe-light",
-  padding: 0.08,
-  radius: 0,
-  cursor: { ...defaultCursorStyle, style: "tahoe", size: 40 },
-  autoZoom: true,
-  zoom: 1.8,
-  zoomBackground: false,
-};
+export {
+  recordingBackgrounds,
+  recordingBackgroundSchema,
+  recordingSettingsSchema,
+  defaultRecordingSettings,
+} from "./recording-settings";
+export type {
+  RecordingBackground,
+  RecordingSettings,
+} from "./recording-settings";
 export type RecordedAsset = {
   asset: Asset;
   kind: "screen" | "camera" | "microphone";
@@ -119,6 +91,9 @@ export function addRecordedAssets(
   const tracks: Project["tracks"] = [],
     clips: Clip[] = [],
     assets = results.map((r) => r.asset);
+  const groupId = results.some((result) => result.kind === "screen")
+    ? uid()
+    : undefined;
   for (const { asset, kind } of results) {
     const track = newTrack(tracks.length);
     if (kind === "camera") tracks.unshift(track);
@@ -126,6 +101,11 @@ export function addRecordedAssets(
     const framed = kind === "screen" && settings.background && !!background;
     const clip: Clip = {
       id: uid(),
+      groupId,
+      ...(groupId ? { recordingRole: kind } : {}),
+      ...(kind === "screen"
+        ? { recording: { ...structuredClone(settings), background: framed } }
+        : {}),
       trackId: track.id,
       assetId: asset.id,
       kind: asset.kind,
@@ -175,6 +155,8 @@ export function addRecordedAssets(
     clips.push({
       id: uid(),
       trackId: track.id,
+      groupId,
+      recordingRole: "background",
       assetId: background.id,
       kind: background.kind,
       name: "录屏背景",

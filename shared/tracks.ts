@@ -1,4 +1,19 @@
 import { type Project, newTrack, numberTracks } from "./model";
+import { recordingGroups } from "./recording-objects";
+
+function recordingTracks(project: Project, id: string) {
+  const groups = new Set(
+    [...recordingGroups(project).values()]
+      .filter((clip) => clip.trackId === id)
+      .map((clip) => clip.groupId),
+  );
+  return new Set([
+    id,
+    ...project.clips
+      .filter((clip) => clip.groupId && groups.has(clip.groupId))
+      .map((clip) => clip.trackId),
+  ]);
+}
 
 export type Track = Project["tracks"][number];
 
@@ -89,10 +104,28 @@ export function removeTrack(project: Project, id: string): Project {
     !project.tracks.some((track) => track.id === id && !track.locked)
   )
     return project;
+  const owned = recordingTracks(project, id);
+  if (project.tracks.some((track) => owned.has(track.id) && track.locked))
+    return project;
+  const groups = new Set(
+    [...recordingGroups(project).values()]
+      .filter((clip) => clip.trackId === id)
+      .map((clip) => clip.groupId),
+  );
+  const clips = project.clips.filter(
+    (clip) =>
+      clip.trackId !== id && (!clip.groupId || !groups.has(clip.groupId)),
+  );
+  const occupied = new Set(clips.map((clip) => clip.trackId));
   return {
     ...project,
-    tracks: numberTracks(project.tracks.filter((track) => track.id !== id)),
-    clips: project.clips.filter((clip) => clip.trackId !== id),
+    tracks: numberTracks(
+      project.tracks.filter(
+        (track) =>
+          track.id !== id && (!owned.has(track.id) || occupied.has(track.id)),
+      ),
+    ),
+    clips,
   };
 }
 
@@ -127,13 +160,15 @@ export function renameTrack(
 export function toggleTrack(
   project: Project,
   id: string,
-  key: "hidden" | "solo" | "locked",
+  key: "hidden" | "solo" | "locked" | "muted",
 ): Project {
   if (!project.tracks.some((track) => track.id === id)) return project;
+  const owned = recordingTracks(project, id);
+  const value = !project.tracks.find((track) => track.id === id)![key];
   return {
     ...project,
     tracks: project.tracks.map((track) =>
-      track.id === id ? { ...track, [key]: !track[key] } : track,
+      owned.has(track.id) ? { ...track, [key]: value } : track,
     ),
   };
 }

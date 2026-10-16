@@ -34,6 +34,7 @@ import {
   transformAt,
 } from "../shared/editor";
 import { selectionWithGroups } from "../shared/timeline";
+import { recordingMaster } from "../shared/recording-objects";
 import {
   captionTrackSelection,
   updateCaptionAppearance,
@@ -168,7 +169,9 @@ export function useEditor(
     () => selection.filter((id) => clipsById.has(id)),
     [selection, clipsById],
   );
-  const selectedId = selectedIds.at(-1) ?? null;
+  const lastSelectedId = selectedIds.at(-1);
+  const selectedId = lastSelectedId
+    ? recordingMaster(project, lastSelectedId)?.id ?? lastSelectedId : null;
   const setEditAllCaptions = useCallback(
     (all: boolean) => {
       setEditAllCaptionsState(all);

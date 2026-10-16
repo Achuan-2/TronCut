@@ -44,6 +44,8 @@ import TransitionsPanel from "./TransitionsPanel";
 import TransitionProperties from "./TransitionProperties";
 import CaptionsPanel from "./CaptionsPanel";
 import FavoritesPanel from "./FavoritesPanel";
+import RecordingObjectProperties from "./RecordingObjectProperties";
+import { recordingMaster } from "../shared/recording-objects";
 
 export type Tab =
   | "favorites"
@@ -362,7 +364,10 @@ function CursorProperties({
 
 export function Inspector({ editor }: { editor: Editor }) {
   const c = editor.selected,
-    locked = editor.project.tracks.find((t) => t.id === c?.trackId)?.locked;
+    locked = editor.project.tracks.find((t) => t.id === c?.trackId)?.locked ||
+      (!!c?.recording && editor.project.clips.some(clip => clip.groupId === c.groupId &&
+        editor.project.tracks.find(track => track.id === clip.trackId)?.locked));
+  const isRecording = !!c && recordingMaster(editor.project, c.id)?.id === c.id;
   const [tab, setTab] = useState({ clipId: "", name: "video" });
   const selectedAsset = useMemo(
     () =>
@@ -389,6 +394,7 @@ export function Inspector({ editor }: { editor: Editor }) {
   const hasCursor = c?.kind === "video" && !!selectedAsset?.cursor;
   const hasText = c?.kind === "text";
   const tabs = [
+    ...(isRecording ? [{ name: "recording", label: "录屏", icon: Film }] : []),
     ...(c?.kind !== "audio"
       ? [{ name: "video", label: hasCursor ? "视频" : "画面", icon: Film }]
       : []),
@@ -404,13 +410,14 @@ export function Inspector({ editor }: { editor: Editor }) {
       : []),
   ];
   const activeTab =
+    editor.selectedKeyframe?.clipId === c?.id ? "video" :
     editor.selectedBehavior?.clipId === c?.id
       ? "behaviors"
       : tab.clipId === c?.id &&
           tab.name !== "behaviors" &&
           tabs.some((item) => item.name === tab.name)
         ? tab.name
-        : hasText
+        : isRecording ? "recording" : hasText
           ? "text"
           : c?.kind === "audio"
             ? "audio"
@@ -546,6 +553,7 @@ export function Inspector({ editor }: { editor: Editor }) {
               aria-selected={activeTab === name}
               tabIndex={activeTab === name ? 0 : -1}
               onClick={() => {
+                if (name !== "video") editor.clearKeyframeEdit();
                 if (name !== "behaviors") editor.select(c.id);
                 else if (c.behaviors?.length)
                   editor.selectBehavior(c.id, c.behaviors[0].id);
@@ -582,7 +590,7 @@ export function Inspector({ editor }: { editor: Editor }) {
                 )}
               </span>
               <div>
-                <b title={c.name}>{c.name}</b>
+                <b title={c.name}>{isRecording ? "录屏对象" : c.name}</b>
                 <small>
                   {locked
                     ? "轨道已锁定"
@@ -594,7 +602,7 @@ export function Inspector({ editor }: { editor: Editor }) {
                         : "文本图层"
                       : c.kind === "shape"
                         ? "标注图层"
-                        : "媒体片段"}
+                        : isRecording ? c.name : "媒体片段"}
                 </small>
               </div>
             </div>
@@ -626,6 +634,10 @@ export function Inspector({ editor }: { editor: Editor }) {
                 </button>
               </div>
             )}
+            {isRecording && activeTab === "recording" && <div role="tabpanel" id="inspector-recording"
+              aria-labelledby="inspector-recording-tab" hidden={activeTab !== "recording"}>
+              <RecordingObjectProperties key={c.id} clip={c} editor={editor} />
+            </div>}
             {hasCursor && (
               <div
                 id="inspector-cursor"
@@ -809,7 +821,7 @@ export function Inspector({ editor }: { editor: Editor }) {
                   </div>
                 </>
               )}
-              {c.mediaFrame && (
+              {c.mediaFrame && (!isRecording || activeTab === "video") && (
                 <RoundedCornersProperties key={c.id} clip={c} editor={editor} size={size} />
               )}
               {hasClipSpeed(c) && <SpeedProperties key={c.id} clip={c} editor={editor} />}

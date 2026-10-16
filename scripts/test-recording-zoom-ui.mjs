@@ -75,14 +75,13 @@ try {
   const zoom = page.getByLabel("缩放 (%)", { exact: true });
   const pan = page.getByLabel("内容位置 X (%)", { exact: true });
   const cropMode = page.getByRole("button", { name: "裁剪模式", exact: true });
+  await expect(arrows).toHaveCount(2);
   const arrowCount = await arrows.count();
-  expect(arrowCount).toBe(2);
   await video.click();
   for (const name of ["编辑缩放与移动", "根据鼠标重新生成缩放", "移除自动缩放"])
     await expect(page.getByRole("button", { name, exact: true })).toHaveCount(
       0,
     );
-  await expect(page.getByText("自动缩放", { exact: true })).toHaveCount(0);
   await expect(
     page.getByText("选中时间线上的动画起点或终点", { exact: false }),
   ).toHaveCount(0);

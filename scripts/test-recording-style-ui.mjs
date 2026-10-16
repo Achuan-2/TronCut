@@ -78,6 +78,9 @@ try {
     timeout: 30000,
   });
   await expect(page.locator(".asset-card")).toHaveCount(2);
+  await expect(page.locator(".timeline-clip")).toHaveCount(1);
+  await page.locator(".recording-object").click({ position: { x: 30, y: 10 } });
+  await page.getByRole("button", { name: "取消组合", exact: true }).click();
   await expect(page.locator(".timeline-clip.image")).toContainText("录屏背景");
   await expect
     .poll(
@@ -108,7 +111,11 @@ try {
     page.getByRole("button", { name: "根据鼠标重新生成缩放", exact: true }),
   ).toHaveCount(0);
   await page.getByTitle("撤销 Ctrl+Z", { exact: true }).click();
+  await expect(page.locator(".recording-object")).toHaveCount(1);
+  await page.getByTitle("撤销 Ctrl+Z", { exact: true }).click();
   await expect(page.locator(".timeline-clip")).toHaveCount(0);
+  await page.getByTitle("重做 Ctrl+Shift+Z", { exact: true }).click();
+  await expect(page.locator(".recording-object")).toHaveCount(1);
   await page.getByTitle("重做 Ctrl+Shift+Z", { exact: true }).click();
   await expect(page.locator(".timeline-clip")).toHaveCount(2);
   await page.locator(".timeline-clip.video").click();

@@ -35,6 +35,7 @@ import {
 import { cursorAt, cursorSvg, cursorAnchor, cursorAspect, defaultCursorStyle } from "../shared/cursor";
 import { depthScale } from "../shared/rotation";
 import { mediaFrameRadii } from "../shared/media-frame";
+import { recordingMaster } from "../shared/recording-objects";
 import { cameraAt, resizeHandles, resizeTransform } from "../shared/canvas";
 import { setVideoZoomPan, unzoomVideoPreview } from "../shared/video-zoom-pan";
 import {
@@ -201,6 +202,8 @@ function PreviewLayer({
   const held =
     editor.playhead < clip.start ||
     editor.playhead >= clip.start + clip.duration;
+  const recording = useMemo(() => recordingMaster(project, clip.id), [project.clips, clip.id]);
+  const selectedObjectPart = interactive && editor.selectedIds.includes(clip.id) && (!recording || recording.id === clip.id);
   const sampleTransform = useMemo(() => createTransformSampler(clip), [clip]);
   const transform = sampleTransform(localTime),
     asset = useMemo(
@@ -378,7 +381,7 @@ function PreviewLayer({
   ) as "mask" | "blur-region" | undefined;
   return (
     <div
-      className={`preview-layer ${clip.kind} ${interactive && editor.selectedIds.includes(clip.id) ? "selected" : ""} ${editing ? "editing" : ""} ${cropping ? "cropping" : ""} ${effectDrop && selectable ? "effect-drop-target" : ""}`}
+      className={`preview-layer ${clip.kind} ${selectedObjectPart ? "selected" : ""} ${editing ? "editing" : ""} ${cropping ? "cropping" : ""} ${effectDrop && selectable ? "effect-drop-target" : ""}`}
       data-clip-id={clip.id}
       style={style}
       onDragOver={(event) => {
@@ -427,6 +430,11 @@ function PreviewLayer({
         editor.beginTextEdit(clip.id);
       }}
       onPointerDown={(event) => {
+        if (recording && recording.id !== clip.id && event.button === 0) {
+          event.stopPropagation();
+          editor.select(recording.id);
+          return;
+        }
         if (editing) {
           event.stopPropagation();
           return;
@@ -762,7 +770,7 @@ function PreviewLayer({
         </svg>
       )}
       </div>
-      {regionId && selectable && !editing && !editor.playing && mode === "select" && editor.selectedIds.includes(clip.id) && <EffectRegionOverlay
+      {regionId && selectable && !editing && !editor.playing && mode === "select" && selectedObjectPart && <EffectRegionOverlay
         key={`${clip.id}-${regionId}`} name={regionId === "mask" ? "遮罩" : "模糊区域"} region={clip.visualEffects![regionId]!}
         width={Number(style.width) || 1} height={Number(style.height) || 1} pose={displayed} cameraScale={cameraScale} canvasScale={scale}
         onDraft={(geometry) => setRegionDraft(geometry ? { id: regionId, geometry } : null)}
@@ -774,7 +782,7 @@ function PreviewLayer({
         !editing &&
         ((mode === "select" && ["text", "shape"].includes(clip.kind)) ||
           (asset && ["image", "video"].includes(clip.kind))) &&
-        editor.selectedIds.includes(clip.id) &&
+        selectedObjectPart &&
         resizeHandles.map((handle) => (
           <button
             key={handle.name}

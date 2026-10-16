@@ -21,6 +21,7 @@ import {
 } from "../shared/recording";
 import { cursorSvg, cursorStyles, cursorAspect } from "../shared/cursor";
 import { recordingWallpaperUrl } from "../shared/recording-backgrounds";
+import RecordingBackgroundSelect from "./RecordingBackgroundSelect";
 
 interface Session {
   id: string;
@@ -541,78 +542,8 @@ export default function Recorder({
                 )}
             </div>
           </div>
-          <label className="check-field">
-            <input
-              type="checkbox"
-              checked={settings.background}
-              onChange={(e) => changeSettings({ background: e.target.checked })}
-            />
-            自动添加背景
-          </label>
           <div className="recording-style-fields">
-            <div className="recording-wallpapers" aria-label="背景图库">
-              {Object.entries(recordingBackgrounds).map(([id, item]) => (
-                <button
-                  type="button"
-                  key={id}
-                  disabled={!settings.background}
-                  title={item.name}
-                  aria-label={`选择背景 ${item.name}`}
-                  aria-pressed={settings.preset === id}
-                  onClick={() =>
-                    changeSettings({
-                      preset: id as RecordingSettings["preset"],
-                    })
-                  }
-                >
-                  {"file" in item ? (
-                    item.animated ? (
-                      <>
-                        <video
-                          src={recordingWallpaperUrl(item.file)}
-                          muted
-                          preload="metadata"
-                        />
-                        <span>动态</span>
-                      </>
-                    ) : (
-                      <img
-                        src={recordingWallpaperUrl(item.file)}
-                        alt=""
-                        loading="lazy"
-                      />
-                    )
-                  ) : (
-                    <span
-                      className="gradient-wallpaper"
-                      style={{
-                        background: `linear-gradient(135deg,${item.colors.join(",")})`,
-                      }}
-                    />
-                  )}
-                </button>
-              ))}
-            </div>
-            <label className="field">
-              背景
-              <select
-                aria-label="录屏背景"
-                disabled={!settings.background}
-                value={settings.preset}
-                onChange={(e) =>
-                  changeSettings({
-                    preset: e.target.value as RecordingSettings["preset"],
-                  })
-                }
-              >
-                {Object.entries(recordingBackgrounds).map(([id, value]) => (
-                  <option key={id} value={id}>
-                    {value.name}
-                    {"animated" in value && value.animated ? " · 动态" : ""}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <RecordingBackgroundSelect settings={settings} onChange={changeSettings} />
             <label className="field">
               留白 (%)
               <input

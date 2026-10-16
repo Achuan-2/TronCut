@@ -95,11 +95,13 @@ import {
   minTrackHeight,
   maxTrackHeight,
   setTrackHeight,
+  toggleTrack,
 } from "../shared/tracks";
 import TrackResizeHandle from "./TrackResizeHandle";
 import TrackContextMenu, { type TrackMenuPosition } from "./TrackContextMenu";
 import { useViewportZoom, type ZoomPoint } from "./useViewportZoom";
 import { projectIndex } from "../shared/project-index";
+import { recordingTimeline, trimRecordingObject } from "../shared/recording-objects";
 
 interface Drag {
   id: string;
@@ -137,6 +139,8 @@ export default function Timeline({
 }) {
   const { project, apply, playhead, seek, selected, selectedId, select } =
     editor;
+  const timeline = useMemo(() => recordingTimeline(project), [project.clips, project.tracks]);
+  const timelineTracks = timeline.tracks;
   const assetsById = useMemo(
     () => new Map(project.assets.map((asset) => [asset.id, asset])),
     [project.assets],
@@ -276,7 +280,7 @@ export default function Timeline({
         rows.set(clip.trackId, Math.max(rows.get(clip.trackId) ?? 0, count));
       }
     }
-    return project.tracks.map((track) => {
+    return timelineTracks.map((track) => {
       // Keep animation arrows and expanded effect rows inside the resized lane.
       const minHeight = animated.has(track.id)
         ? defaultTrackHeight
@@ -298,6 +302,7 @@ export default function Timeline({
     project.id,
     project.clips,
     project.tracks,
+    timelineTracks,
     expandedEffects,
     trackHeightDraft,
   ]);
@@ -305,7 +310,7 @@ export default function Timeline({
   const changeTrackZoom = (factor: number) => {
     // Commit all lanes together so one zoom click is one undo step.
     apply((project) =>
-      project.tracks.reduce(
+      timelineTracks.reduce(
         (next, track, index) => setTrackHeight(
           next,
           track.id,
@@ -320,7 +325,7 @@ export default function Timeline({
   };
   const layoutKey = trackHeights.join(",");
   const trackTop = (id: string) => {
-    const index = project.tracks.findIndex((track) => track.id === id);
+    const index = timelineTracks.findIndex((track) => track.id === id);
     return trackHeights
       .slice(0, Math.max(0, index))
       .reduce((sum, height) => sum + height, 0);
@@ -330,13 +335,13 @@ export default function Timeline({
     const right = Math.max(next.startX, next.x);
     const top = Math.min(next.startY, next.y);
     const bottom = Math.max(next.startY, next.y);
-    const trackIds = project.tracks.flatMap((track, index) => {
+    const trackIds = timelineTracks.flatMap((track, index) => {
       const clipTop = 36 + trackTop(track.id) + 8;
       const clipBottom = 36 + trackTop(track.id) + trackHeights[index] - 9;
       return clipTop <= bottom && clipBottom >= top ? [track.id] : [];
     });
     const hits = clipsInTimelineRange(
-      project,
+      { ...project, clips: timeline.clips },
       left / zoom,
       right / zoom,
       trackIds,
@@ -423,7 +428,7 @@ export default function Timeline({
   useEffect(() => {
     if (trackHeightDraft?.projectId === project.id) return;
     const element = scroll.current;
-    const index = project.tracks.findIndex(
+    const index = timelineTracks.findIndex(
       (track) => track.id === selected?.trackId,
     );
     if (!element || index < 0) return;
@@ -437,17 +442,17 @@ export default function Timeline({
   const visibleClips = useMemo(() => {
     const index = projectIndex(project);
     return new Map(
-      project.tracks.map((track) => [
+      timelineTracks.map((track) => [
         track.id,
         index.visible(
           track.id,
           (viewport.left - 200) / zoom,
           (viewport.left + viewport.width + 200) / zoom,
           drag?.ids,
-        ),
+        ).filter(clip => !timeline.hidden.has(clip.id)),
       ]),
     );
-  }, [project.clips, project.tracks, viewport, zoom, drag?.ids]);
+  }, [project.clips, project.tracks, timeline, viewport, zoom, drag?.ids]);
   useLayoutEffect(() => {
     const element = scroll.current;
     const labels = headers.current;
@@ -788,8 +793,8 @@ export default function Timeline({
           }}
         >
           <div className="ruler-label track-header-toolbar">
-            <span title={`共 ${project.tracks.length} 条轨道`}>
-              {project.tracks.length} 轨
+            <span title={`共 ${timelineTracks.length} 条轨道`}>
+              {timelineTracks.length} 轨
             </span>
             <div
               className="track-header-tools"
@@ -830,7 +835,7 @@ export default function Timeline({
               </button>
             </div>
           </div>
-          {project.tracks.map((track, index) => (
+          {timelineTracks.map((track, index) => (
             <div
               className={`track-header ${track.locked ? "locked" : ""} ${track.captionTrack ? "caption-track" : ""} ${track.solo ? "solo-track" : ""} ${project.tracks.some((item) => item.solo) && !track.solo ? "inactive-solo-track" : ""}`}
               key={`${project.id}-${track.id}`}
@@ -856,9 +861,9 @@ export default function Timeline({
               <div>
                 <span
                   className="track-name"
-                  title={displayTrackName(project.tracks, track.id)}
+                  title={displayTrackName(timelineTracks, track.id)}
                 >
-                  {displayTrackName(project.tracks, track.id)}
+                  {displayTrackName(timelineTracks, track.id)}
                 </span>
                 {track.solo && (
                   <span className="track-solo-badge" title="独奏轨道">
@@ -879,12 +884,7 @@ export default function Timeline({
                     }
                     className={track[key] ? "active-tool" : ""}
                     onClick={() =>
-                      apply((p) => ({
-                        ...p,
-                        tracks: p.tracks.map((t) =>
-                          t.id === track.id ? { ...t, [key]: !t[key] } : t,
-                        ),
-                      }))
+                      apply((p) => toggleTrack(p, track.id, key))
                     }
                   >
                     {key === "hidden" ? (
@@ -908,7 +908,7 @@ export default function Timeline({
                 ))}
               </div>
               <TrackResizeHandle
-                name={displayTrackName(project.tracks, track.id)}
+                name={displayTrackName(timelineTracks, track.id)}
                 height={trackLayouts[index].baseHeight}
                 minHeight={trackLayouts[index].minHeight}
                 preview={(height) =>
@@ -1132,7 +1132,7 @@ export default function Timeline({
                 <span>{timeLabel(fileDrop.time)} · 添加素材</span>
               </div>
             )}
-            {project.tracks.map((track, trackIndex) => (
+            {timelineTracks.map((track, trackIndex) => (
               <div
                 key={track.id}
                 className={`track-lane ${!isTrackActive(project.tracks, track.id) ? "hidden-track" : ""} ${fileDrop?.trackId === track.id ? "external-drop-target" : ""}`}
@@ -1263,7 +1263,7 @@ export default function Timeline({
                     return (
                       <Fragment key={c.id}>
                         <div
-                          className={`timeline-clip ${c.kind} ${c.caption ? "caption" : ""} ${animationRanges(c).length ? "has-animation" : ""} ${editor.selectedIds.includes(c.id) ? "selected" : ""} ${track.locked ? "locked" : ""} ${effectDrop === c.id ? "effect-drop-target" : ""} ${transitionHighlights.some((item) => item.clipId === c.id) ? "transition-drop-target" : ""}`}
+                          className={`timeline-clip ${c.kind} ${c.recording && c.groupId ? "recording-object" : ""} ${c.caption ? "caption" : ""} ${animationRanges(c).length ? "has-animation" : ""} ${editor.selectedIds.includes(c.id) ? "selected" : ""} ${track.locked ? "locked" : ""} ${effectDrop === c.id ? "effect-drop-target" : ""} ${transitionHighlights.some((item) => item.clipId === c.id) ? "transition-drop-target" : ""}`}
                           style={{
                             left: c.start * zoom,
                             width: Math.max(4, c.duration * zoom),
@@ -1500,6 +1500,8 @@ export default function Timeline({
                                     next.start - drag.original.start,
                                   ),
                                 );
+                              else if (drag.original.recording && drag.original.groupId)
+                                apply(p => trimRecordingObject(p, drag.original, next));
                               else editor.updateClip(drag.id, next);
                             }
                             setDrag(null);
@@ -1760,7 +1762,7 @@ export default function Timeline({
           <span className="separator-dot">·</span>Shift+拖动标尺 区域标记
         </span>
         <span>
-          {project.clips.length} 个片段 · 已选 {editor.selectedIds.length} ·{" "}
+          {timeline.clips.length} 个片段 · 已选 {timeline.clips.filter(clip => editor.selectedIds.includes(clip.id)).length} ·{" "}
           {timeLabel(projectDuration(project))}
         </span>
       </div>
@@ -1920,7 +1922,7 @@ export default function Timeline({
                   apply((p) => groupSelection(p, editor.selectedIds, true))
                 }
               >
-                解除组合
+                取消组合
               </button>
               <button onClick={() => duplicate(context.id)}>
                 <Copy size={14} />

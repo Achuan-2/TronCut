@@ -851,9 +851,13 @@ export default function App() {
         warning = `背景生成失败，录屏已导入：${String(error)}`;
       }
     }
-    editor.apply((p) =>
-      addRecordedAssets(p, results, settings, start, background),
-    );
+    let master: string | undefined;
+    editor.apply((p) => {
+      const next = addRecordedAssets(p, results, settings, start, background);
+      master = next.clips.find(clip => !p.clips.some(before => before.id === clip.id) && clip.recording)?.id;
+      return next;
+    });
+    if (master) editor.select(master);
     return warning;
   };
   return (

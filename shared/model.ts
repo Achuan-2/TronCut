@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { cursorStyleSchema, recordingSettingsSchema } from "./recording-settings";
 import { ttsOptionsSchema } from "./tts";
 import { animationEasings } from "./easing";
 import { behaviorSchema } from "./behaviors";
@@ -25,13 +26,7 @@ export const cursorRecordingSchema = z.object({
     )
     .max(500000),
 });
-export const cursorStyleSchema = z.object({
-  style: z.enum(["arrow", "circle", "cross", "hidden", "macos", "tahoe", "tahoe-inverted", "windows11", "figma", "dot"]),
-  size: finite.min(8).max(160),
-  color: z.string().regex(/^#[\da-f]{6}$/i),
-  clicks: z.boolean(),
-  smooth: z.boolean(),
-});
+export { cursorStyleSchema } from "./recording-settings";
 export const transformSchema = z.object({
   maskX: finite.min(-1).max(2).optional(),
   maskY: finite.min(-1).max(2).optional(),
@@ -193,6 +188,8 @@ export const projectSchema = z.object({
           .regex(/^#[\da-f]{6}$/i)
           .optional(),
         groupId: identifier.optional(),
+        recording: recordingSettingsSchema.optional(),
+        recordingRole: z.enum(["screen", "background", "camera", "microphone"]).optional(),
         rotation: finite.min(-3600).max(3600).optional(),
         contentTransform: z
           .object({

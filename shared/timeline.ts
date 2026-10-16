@@ -1,6 +1,7 @@
 import { type Clip, type Project, uid } from "./model";
 import { splitClip } from "./editor";
 import { markerEnd } from "./markers";
+import { recordingGroups } from "./recording-objects";
 
 export function editableIds(
   project: Project,
@@ -9,9 +10,30 @@ export function editableIds(
   const locked = new Set(
     project.tracks.filter((t) => t.locked).map((t) => t.id),
   );
+  const objects = recordingGroups(project);
+  const blocked = new Set(
+    [...objects.keys()].filter((id) =>
+      project.clips.some(
+        (clip) => clip.groupId === id && locked.has(clip.trackId),
+      ),
+    ),
+  );
+  const recordingIds = new Set(
+    project.clips
+      .filter(
+        (clip) =>
+          ids.includes(clip.id) && clip.groupId && objects.has(clip.groupId),
+      )
+      .map((clip) => clip.groupId),
+  );
   return new Set(
     project.clips
-      .filter((c) => ids.includes(c.id) && !locked.has(c.trackId))
+      .filter(
+        (c) =>
+          (ids.includes(c.id) || (c.groupId && recordingIds.has(c.groupId))) &&
+          !locked.has(c.trackId) &&
+          (!c.groupId || !blocked.has(c.groupId)),
+      )
       .map((c) => c.id),
   );
 }
@@ -132,9 +154,11 @@ export function deleteClips(
     markers: project.markers.map((marker) => ({
       ...marker,
       time: shift(marker.time),
-      ...(marker.duration === undefined ? {} : {
-        duration: shift(markerEnd(marker)) - shift(marker.time),
-      }),
+      ...(marker.duration === undefined
+        ? {}
+        : {
+            duration: shift(markerEnd(marker)) - shift(marker.time),
+          }),
     })),
   };
 }
@@ -144,7 +168,27 @@ export function splitSelection(
   ids: readonly string[],
   time: number,
 ): Project {
-  return ids.reduce((p, id) => splitClip(p, id, time), project);
+  const selected = editableIds(project, ids);
+  const groups = new Set(
+    [...recordingGroups(project).values()]
+      .filter(
+        (clip) =>
+          selected.has(clip.id) &&
+          clip.start < time &&
+          clip.start + clip.duration > time,
+      )
+      .map((clip) => clip.groupId!),
+  );
+  const next = [...selected].reduce((p, id) => splitClip(p, id, time), project);
+  const rightGroups = new Map([...groups].map((id) => [id, uid()]));
+  return {
+    ...next,
+    clips: next.clips.map((clip) =>
+      clip.groupId && rightGroups.has(clip.groupId) && clip.start >= time
+        ? { ...clip, groupId: rightGroups.get(clip.groupId) }
+        : clip,
+    ),
+  };
 }
 
 export function groupSelection(
@@ -158,7 +202,15 @@ export function groupSelection(
   return {
     ...project,
     clips: project.clips.map((c) =>
-      selected.has(c.id) ? { ...c, groupId } : c,
+      selected.has(c.id)
+        ? {
+            ...c,
+            groupId,
+            ...(ungroup
+              ? { recording: undefined, recordingRole: undefined }
+              : {}),
+          }
+        : c,
     ),
   };
 }
