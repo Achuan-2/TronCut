@@ -592,19 +592,16 @@ export default function Recorder({
               </label>
               <label className="field">
                 鼠标大小 (px)
-                <input
+                <NumberInput
                   aria-label="录屏鼠标大小"
-                  type="number"
                   min={8}
                   max={160}
                   value={settings.cursor.size}
-                  onChange={(e) => {
-                    const n = e.target.valueAsNumber;
-                    if (n >= 8 && n <= 160)
-                      changeSettings({
-                        cursor: { ...settings.cursor, size: n },
-                      });
-                  }}
+                  onValueChange={(size) =>
+                    changeSettings({
+                      cursor: { ...settings.cursor, size },
+                    })
+                  }
                 />
               </label>
               <label className="field">

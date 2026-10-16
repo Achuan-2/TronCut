@@ -8,6 +8,7 @@ import {
 } from "../shared/video-zoom-pan";
 import type { Editor } from "./useEditor";
 import { ScenePreview } from "./Preview";
+import NumberInput from "./NumberInput";
 
 export default function ZoomPanPanel({ editor }: { editor: Editor }) {
   const overview = useRef<HTMLDivElement>(null);
@@ -196,19 +197,16 @@ export default function ZoomPanPanel({ editor }: { editor: Editor }) {
             })
           }
         />
-        <input
+        <NumberInput
           aria-label="画布缩放百分比"
           disabled={!available}
-          type="number"
           min={100}
           max={800}
           step={1}
           value={Number((camera.scale * 100).toFixed(1))}
-          onChange={(event) => {
-            const value = Number(event.target.value);
-            if (Number.isFinite(value) && value >= 100 && value <= 800)
-              editor.updateVideoZoomPan({ scale: value / 100 });
-          }}
+          onValueChange={(value) =>
+            editor.updateVideoZoomPan({ scale: value / 100 })
+          }
         />
         <span>%</span>
       </label>

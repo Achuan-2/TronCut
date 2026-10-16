@@ -149,6 +149,27 @@ try {
   }
   await page.getByRole("tab", { name: "画面", exact: true }).click();
   await expect(page.getByLabel("缩放 (%)", { exact: true })).toBeVisible();
+  for (const [label, value] of [
+    ["缩放 (%)", "75.5"],
+    ["不透明度 (%)", "65"],
+    ["旋转 Z (度)", "-12.5"],
+    ["位置 X (px)", "-123.5"],
+    ["宽度 (px)", "210.5"],
+  ]) {
+    const input = page.getByLabel(label, { exact: true });
+    const previous = await input.inputValue();
+    await input.fill("");
+    await expect(input).toHaveValue("");
+    await input.blur();
+    await expect(input).toHaveValue(previous);
+    await input.fill("");
+    await input.pressSequentially(value);
+    await expect(input).toHaveValue(value);
+    await input.blur();
+    await expect(input).toHaveValue(value);
+    await input.fill(previous);
+    await input.blur();
+  }
   await expect(page.getByLabel("录屏对象背景", { exact: true })).toHaveCount(0);
   await page.getByRole("tab", { name: "录屏", exact: true }).click();
   const background = page.getByLabel("录屏对象背景", { exact: true });
@@ -197,7 +218,26 @@ try {
     await expect(input).toHaveValue(value);
   }
   await selectPreview(page, "录屏对象鼠标样式", "windows11");
-  await page.getByLabel("录屏对象鼠标大小", { exact: true }).fill("56");
+  const cursorSize = page.getByLabel("录屏对象鼠标大小", { exact: true });
+  const previousSize = await cursorSize.inputValue();
+  await cursorSize.fill("");
+  await expect(cursorSize).toHaveValue("");
+  await cursorSize.blur();
+  await expect(cursorSize).toHaveValue(previousSize);
+  await cursorSize.fill("");
+  await cursorSize.pressSequentially("1");
+  await expect(cursorSize).toHaveValue("1"); // Incomplete prefix below the minimum of 8.
+  await cursorSize.pressSequentially("08");
+  await expect(cursorSize).toHaveValue("108");
+  await cursorSize.blur();
+  await expect(cursorSize).toHaveValue("108");
+  await cursorSize.fill("999");
+  await expect(cursorSize).toHaveValue("999");
+  await cursorSize.blur();
+  await expect(cursorSize).toHaveValue("108"); // Invalid drafts never reach settings.
+  await cursorSize.fill("");
+  await cursorSize.pressSequentially("56");
+  await cursorSize.blur();
   const recovery = async () =>
     (await page.evaluate(() => window.framecraft.readRecovery())).project;
   await expect

@@ -6,6 +6,7 @@ import {
   type VisualEffects,
 } from "../shared/visual-effects";
 import EffectSection from "./EffectSection";
+import NumberInput from "./NumberInput";
 import type { Editor } from "./useEditor";
 import { PropertySlider } from "./TransformControls";
 import {
@@ -277,9 +278,8 @@ export default function VisualEffectProperties({
                     onChange={(e) => update({ [field.key]: e.target.value })}
                   />
                 ) : (
-                  <input
+                  <NumberInput
                     aria-label={label}
-                    type="number"
                     min={field.min}
                     max={field.max}
                     step={field.step ?? 1}
@@ -287,16 +287,9 @@ export default function VisualEffectProperties({
                       Math.round(Number(value) * (field.scale ?? 1) * 1000) /
                       1000
                     }
-                    onChange={(e) => {
-                      if (!e.target.value.trim()) return;
-                      const next = Number(e.target.value);
-                      if (
-                        Number.isFinite(next) &&
-                        next >= (field.min ?? -Infinity) &&
-                        next <= (field.max ?? Infinity)
-                      )
-                        update({ [field.key]: next / (field.scale ?? 1) });
-                    }}
+                    onValueChange={(next) =>
+                      update({ [field.key]: next / (field.scale ?? 1) })
+                    }
                   />
                 )}
                 {field.type === "check" && field.label}

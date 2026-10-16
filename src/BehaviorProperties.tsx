@@ -18,6 +18,7 @@ import type { Editor } from "./useEditor";
 import BehaviorTypeMenu from "./BehaviorTypeMenu";
 import ShiftingProperties from "./ShiftingProperties";
 import NumberControl from "./BehaviorNumberControl";
+import NumberInput from "./NumberInput";
 
 export default function BehaviorProperties({
   clip,
@@ -287,15 +288,12 @@ export default function BehaviorProperties({
                                   change({ speed: Number(event.target.value) })
                                 }
                               />
-                              <input
+                              <NumberInput
                                 aria-label="行为速度（%）"
-                                type="number"
                                 min={1}
                                 max={100}
                                 value={phase.speed}
-                                onChange={(event) =>
-                                  change({ speed: Number(event.target.value) })
-                                }
+                                onValueChange={(speed) => change({ speed })}
                               />
                               <span>%</span>
                             </label>
@@ -314,17 +312,14 @@ export default function BehaviorProperties({
                               change({ offset: Number(event.target.value) })
                             }
                           />
-                          <input
+                          <NumberInput
                             aria-label="逐字偏移（秒）"
-                            type="number"
                             min={0}
                             max={2}
                             step={0.01}
                             disabled={phase.type === "whole"}
                             value={phase.offset}
-                            onChange={(event) =>
-                              change({ offset: Number(event.target.value) })
-                            }
+                            onValueChange={(offset) => change({ offset })}
                           />
                           <span>s</span>
                         </label>
@@ -366,16 +361,13 @@ export default function BehaviorProperties({
                               phase.style !== "pop" && (
                                 <label className="field">
                                   强度
-                                  <input
+                                  <NumberInput
                                     aria-label="行为强度（%）"
-                                    type="number"
                                     min={0}
                                     max={100}
                                     value={phase.intensity}
-                                    onChange={(event) =>
-                                      change({
-                                        intensity: Number(event.target.value),
-                                      })
+                                    onValueChange={(intensity) =>
+                                      change({ intensity })
                                     }
                                   />
                                 </label>
@@ -397,47 +389,38 @@ export default function BehaviorProperties({
                             )}
                             <label className="field">
                               循环时间
-                              <input
+                              <NumberInput
                                 aria-label="行为循环时间（秒）"
-                                type="number"
                                 min={0.05}
                                 max={60}
                                 step={0.05}
                                 value={phase.loopTime}
-                                onChange={(event) =>
-                                  change({
-                                    loopTime: Number(event.target.value),
-                                  })
+                                onValueChange={(loopTime) =>
+                                  change({ loopTime })
                                 }
                               />
                             </label>
                             <label className="field">
                               延迟
-                              <input
+                              <NumberInput
                                 aria-label="行为循环延迟（秒）"
-                                type="number"
                                 min={0}
                                 max={60}
                                 step={0.05}
                                 value={phase.delay}
-                                onChange={(event) =>
-                                  change({ delay: Number(event.target.value) })
-                                }
+                                onValueChange={(delay) => change({ delay })}
                               />
                             </label>
                             <label className="field">
                               循环次数
-                              <input
+                              <NumberInput
                                 aria-label="行为循环次数"
-                                type="number"
                                 min={1}
                                 max={1000}
                                 step={1}
                                 disabled={phase.loopForever}
                                 value={phase.loops}
-                                onChange={(event) =>
-                                  change({ loops: Number(event.target.value) })
-                                }
+                                onValueChange={(loops) => change({ loops })}
                               />
                             </label>
                             <label className="check-field">

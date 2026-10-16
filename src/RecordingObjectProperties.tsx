@@ -148,18 +148,15 @@ export default function RecordingObjectProperties({
         </label>
         <label className="field">
           鼠标大小 (px)
-          <input
+          <NumberInput
             aria-label="录屏对象鼠标大小"
             disabled={!hasCursor}
-            type="number"
             min={8}
             max={160}
             value={cursor.size}
-            onChange={(event) => {
-              const size = event.target.valueAsNumber;
-              if (size >= 8 && size <= 160)
-                void change({ cursor: { ...cursor, size } });
-            }}
+            onValueChange={(size) =>
+              void change({ cursor: { ...cursor, size } })
+            }
           />
         </label>
         <label className="field">

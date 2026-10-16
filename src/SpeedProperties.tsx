@@ -1,4 +1,5 @@
 import EffectSection from "./EffectSection";
+import NumberInput from "./NumberInput";
 import type { Clip } from "../shared/model";
 import { durationParts, speedLimits } from "../shared/clip-speed";
 import type { Editor } from "./useEditor";
@@ -17,16 +18,13 @@ export default function SpeedProperties({
       <label className="field">
         速度
         <div className="speed-number">
-          <input
+          <NumberInput
             aria-label="剪辑速度（倍）"
-            type="number"
             min={speedLimits.min}
             max={speedLimits.max}
             step="0.01"
             value={Number(clip.speed.toFixed(2))}
-            onChange={(event) =>
-              editor.changeClipSpeed(clip.id, Number(event.target.value))
-            }
+            onValueChange={(speed) => editor.changeClipSpeed(clip.id, speed)}
           />
           <span>×</span>
         </div>
@@ -37,8 +35,7 @@ export default function SpeedProperties({
           {(["minutes", "seconds", "frames"] as const).map((key, i) => (
             <label key={key}>
               {["分钟", "秒", "帧"][i]}
-              <input
-                type="number"
+              <NumberInput
                 aria-label={`剪辑持续时间（${["分钟", "秒", "帧"][i]}）`}
                 min={0}
                 max={
@@ -46,8 +43,7 @@ export default function SpeedProperties({
                 }
                 step={1}
                 value={parts[key]}
-                onChange={(event) => {
-                  const value = Number(event.target.value);
+                onValueChange={(value) => {
                   if (!Number.isInteger(value) || value < 0) return;
                   const next = { ...parts, [key]: value };
                   editor.changeSpeedDuration(

@@ -27,6 +27,7 @@ import { textBoxFor } from "./text";
 import MediaLibrary from "./MediaLibrary";
 import { defaultCursorStyle } from "../shared/cursor";
 import CursorStyleSelect from "./CursorStyleSelect";
+import NumberInput from "./NumberInput";
 import NarrationPanel from "./NarrationPanel";
 import AnimationsPanel from "./AnimationsPanel";
 import { defaultContentTransform } from "../shared/crop";
@@ -327,16 +328,11 @@ function CursorProperties({
       </label>
       <label className="field">
         鼠标大小
-        <input
-          type="number"
+        <NumberInput
           min={8}
           max={160}
           value={style.size}
-          onChange={(event) => {
-            const size = Number(event.target.value);
-            if (Number.isFinite(size) && size >= 8 && size <= 160)
-              change({ size });
-          }}
+          onValueChange={(size) => change({ size })}
         />
       </label>
       <label className="field">
@@ -489,22 +485,13 @@ export function Inspector({ editor }: { editor: Editor }) {
   ) => (
     <label className="field">
       {label}
-      <input
-        type="number"
+      <NumberInput
         value={Number(current.toFixed(3))}
         min={min}
         max={max}
         step={step}
         disabled={disabled}
-        onChange={(e) => {
-          const v = Number(e.target.value);
-          if (
-            Number.isFinite(v) &&
-            (min === undefined || v >= min) &&
-            (max === undefined || v <= max)
-          )
-            change(v);
-        }}
+        onValueChange={change}
       />
     </label>
   );

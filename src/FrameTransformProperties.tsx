@@ -1,6 +1,7 @@
 import { AlignCenter, LockKeyhole, Unlock } from "lucide-react";
 import type { Clip, Transform } from "../shared/model";
 import { framePosition } from "../shared/canvas";
+import NumberInput from "./NumberInput";
 import {
   ScaleControl,
   RotationControls,
@@ -135,17 +136,14 @@ export default function FrameTransformProperties({
             return (
               <label className="position-axis" key={axis}>
                 <span>{axis}</span>
-                <input
+                <NumberInput
                   aria-label={label}
-                  type="number"
                   step={0.1}
                   min={index === 2 ? -10000 : undefined}
                   max={index === 2 ? 1000 : undefined}
                   value={Number(position.toFixed(3))}
                   disabled={disabled}
-                  onChange={(event) => {
-                    const next = Number(event.target.value);
-                    if (!Number.isFinite(next)) return;
+                  onValueChange={(next) => {
                     if (index === 2) {
                       if (next >= -10000 && next <= 1000)
                         onTransform("z", next);
@@ -191,8 +189,7 @@ export default function FrameTransformProperties({
         {(["width", "height"] as const).map((axis, index) => (
           <label className="dimension-axis" key={axis}>
             <span>{index ? "高度" : "宽度"}</span>
-            <input
-              type="number"
+            <NumberInput
               aria-label={`${index ? "高度" : "宽度"} (px)`}
               min={1}
               max={262144}
@@ -205,11 +202,7 @@ export default function FrameTransformProperties({
                 ).toFixed(3),
               )}
               disabled={disabled || editingContent}
-              onChange={(event) => {
-                const pixels = Number(event.target.value);
-                if (Number.isFinite(pixels) && pixels >= 1 && pixels <= 262144)
-                  onResize(axis, pixels);
-              }}
+              onValueChange={(pixels) => onResize(axis, pixels)}
             />
           </label>
         ))}

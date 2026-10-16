@@ -1,6 +1,7 @@
 import { useRef } from "react";
 import { RotateCcw, RotateCw } from "lucide-react";
 import type { Transform } from "../shared/model";
+import NumberInput from "./NumberInput";
 
 export function PropertyResetButton({
   label,
@@ -58,19 +59,14 @@ export function ScaleControl({
         onChange={(event) => onChange(Number(event.target.value))}
       />
       <div className="transform-number">
-        <input
+        <NumberInput
           aria-label="缩放 (%)"
-          type="number"
           min={5}
           max={800}
           step={0.1}
           value={Number(value.toFixed(3))}
           disabled={disabled}
-          onChange={(event) => {
-            const next = Number(event.target.value);
-            if (Number.isFinite(next) && next >= 5 && next <= 800)
-              onChange(next);
-          }}
+          onValueChange={onChange}
         />
         <span>%</span>
       </div>
@@ -187,15 +183,14 @@ function RotationAxis({
       </button>
       <span className="rotation-axis-name">{axis}</span>
       <div className="transform-number">
-        <input
+        <NumberInput
           aria-label={`旋转 ${axis} (度)`}
-          type="number"
           min={-3600}
           max={3600}
           step={0.1}
           value={Number(value.toFixed(1))}
           disabled={disabled}
-          onChange={(event) => change(Number(event.target.value))}
+          onValueChange={change}
         />
         <span>°</span>
       </div>
@@ -253,15 +248,14 @@ export function PropertySlider({
         onChange={(event) => change(Number(event.target.value))}
       />
       <div className="transform-number">
-        <input
-          type="number"
+        <NumberInput
           aria-label={ariaLabel}
           min={min}
           max={max}
           step={step}
           value={Number(value.toFixed(3))}
           disabled={disabled}
-          onChange={(event) => change(Number(event.target.value))}
+          onValueChange={change}
         />
         {unit && <span>{unit}</span>}
       </div>

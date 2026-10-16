@@ -1,5 +1,6 @@
 import { type TextStyle, textFillDefaults } from "../shared/model";
 import { textFill } from "../shared/text";
+import NumberInput from "./NumberInput";
 
 export default function TextFillFields({
   style,
@@ -14,7 +15,7 @@ export default function TextFillFields({
   const opacity = Math.round(
     (style?.fillOpacity ?? textFillDefaults.fillOpacity) * 100,
   );
-  const setOpacity = (value: string) => {
+  const setOpacity = (value: string | number) => {
     const next = Number(value);
     if (Number.isFinite(next))
       onChange({ fillOpacity: Math.max(0, Math.min(100, next)) / 100 });
@@ -53,15 +54,14 @@ export default function TextFillFields({
             value={opacity}
             onChange={(event) => setOpacity(event.target.value)}
           />
-          <input
-            type="number"
+          <NumberInput
             disabled={!enabled}
             aria-label="填充不透明度 (%)"
             min="0"
             max="100"
             step="1"
             value={opacity}
-            onChange={(event) => setOpacity(event.target.value)}
+            onValueChange={setOpacity}
           />
           <span>%</span>
         </span>
@@ -75,18 +75,13 @@ export default function TextFillFields({
       ).map(([key, label]) => (
         <label className="field" key={key}>
           {label}
-          <input
-            type="number"
+          <NumberInput
             disabled={!enabled}
             min="0"
             max="200"
             step="1"
             value={style?.[key] ?? textFillDefaults[key]}
-            onChange={(event) => {
-              const value = Number(event.target.value);
-              if (Number.isFinite(value))
-                onChange({ [key]: Math.max(0, Math.min(200, value)) });
-            }}
+            onValueChange={(value) => onChange({ [key]: value })}
           />
         </label>
       ))}
