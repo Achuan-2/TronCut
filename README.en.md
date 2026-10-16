@@ -98,6 +98,7 @@ pnpm test:smoke     # Electron desktop regression; run build and test first
 - [Feature checklist and roadmap](docs/FEATURES.md) · [Architecture and project format](docs/ARCHITECTURE.md)
 - [Building and releases](docs/BUILDING.md) · [Validation record](docs/VALIDATION.md)
 - [Local speech captions](docs/SENSEVOICE.md) · [Real Camtasia project test](docs/CAMTASIA-REAL-PROJECT-TEST.md)
+- [Performance optimizations](docs/PERFORMANCE-IMPROVEMENTS.md) ⚡ **New**
 - [Contribution guide](CONTRIBUTING.md) · [Open an issue](https://github.com/Achuan-2/TronCut/issues/new/choose)
 
 Reproducible bugs, compatibility samples, test results, and code improvements are welcome. Remove private media and sensitive information before sharing projects or logs. Detailed engineering documents are currently primarily in Chinese.
