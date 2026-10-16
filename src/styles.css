@@ -2629,11 +2629,11 @@ fieldset:disabled {
 .visual-effect-card b { width: 100%; padding: 7px 3px; background: #151b1c; font-size: 11px; font-weight: 400; border-top: 2px solid #406b53; }
 .effect-search { border-radius: 18px; }
 .visual-effect-properties { margin: 18px -18px 0; border-top: 1px solid #363e42; }
-.effect-section-heading { display: flex; align-items: center; gap: 8px; padding: 7px 10px; background: #151c1e; min-height: 36px; }
+.effect-section-heading { display: flex; align-items: center; gap: 8px; padding: 7px 10px; min-height: 36px; }
 .effect-section-toggle { flex: 1; min-width: 0; justify-content: flex-start; padding: 2px 0; gap: 6px; }
 .effect-section-toggle h3 { font-size: 13px; font-weight: 500; }
 .effect-section-toggle[aria-expanded="false"] svg { transform: rotate(-90deg); }
-.effect-section-body { padding: 14px 18px; background: #242b30; }
+.effect-section-body { padding: 14px 18px; }
 .inspector .effect-section-body fieldset { padding: 0; }
 .effect-actions { position: relative; }
 .effect-actions summary { display: flex; cursor: pointer; padding: 3px; color: #b4bfc2; list-style: none; }
