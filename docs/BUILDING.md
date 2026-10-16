@@ -25,7 +25,7 @@ pnpm test:smoke
 pnpm dist:win
 ```
 
-The installer is written to `release/TronCut Setup 0.4.7.exe`; the unpacked app is under `release/win-unpacked/`. Test the packaged app before uploading. Release asset names use hyphens for stable direct-download URLs.
+The installer is written to `release/TronCut Setup 0.4.8.exe`; the unpacked app is under `release/win-unpacked/`. Test the packaged app before uploading. Release asset names use hyphens for stable direct-download URLs.
 
 ```powershell
 $env:FRAMECRAFT_PACKAGED_SMOKE='1'

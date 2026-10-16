@@ -975,9 +975,9 @@ try {
   await canvasSettings.getByLabel("高度（像素）", { exact: true }).fill("740");
   await canvasSettings.getByRole("button", { name: "应用", exact: true }).click();
   await app.evaluate(({ dialog }, root) => {
-    dialog.showOpenDialog = async () => ({
+    dialog.showSaveDialog = async () => ({
       canceled: false,
-      filePaths: [root],
+      filePath: `${root}/界面测试.troncut`,
     });
   }, root);
   await page.getByRole("button", { name: "保存", exact: true }).click();

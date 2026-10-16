@@ -195,14 +195,14 @@ try {
   ).toHaveCount(1, { timeout: 20000 });
   await page.getByRole("button", { name: "媒体", exact: true }).click();
   await app.evaluate(({ dialog }, folder) => {
-    dialog.showOpenDialog = async () => ({
+    dialog.showSaveDialog = async () => ({
       canceled: false,
-      filePaths: [folder],
+      filePath: `${folder}/我的第一个视频.troncut`,
     });
   }, root);
   await page.getByRole("button", { name: "保存", exact: true }).click();
   await expect(
-    page.getByText("工程已保存，所有素材已归档到工程文件夹", { exact: true }),
+    page.getByText("工程已保存，工程文件和素材已归档到工程文件夹", { exact: true }),
   ).toBeVisible({ timeout: 20000 });
   const folders = await fs.readdir(root);
   const projectFolder = folders.find((f) => f.startsWith("我的第一个视频"));
