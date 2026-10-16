@@ -4169,6 +4169,10 @@ fieldset:disabled {
   object-fit: cover;
 }
 .recording-style :disabled { opacity: 0.5; }
+.field.recording-zoom-scope { flex-wrap: wrap; }
+.field.recording-zoom-scope > select { width: max-content; min-width: 180px; max-width: 100%; flex-shrink: 0; }
+.inspector .field.recording-zoom-scope { flex-direction: column; align-items: stretch; }
+.inspector .field.recording-zoom-scope > select { width: 100%; }
 .preview-select { display: flex; align-items: center; gap: 8px; min-width: 0; width: 180px; padding: 5px 9px; border: 1px solid var(--line); border-radius: 6px; background: #151819; color: #d5dade; text-align: left; font: inherit; }
 .preview-select:disabled { opacity: 0.5; cursor: default; }
 .preview-select > svg { flex-shrink: 0; }

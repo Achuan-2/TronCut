@@ -222,7 +222,7 @@ export default function RecordingObjectProperties({
             ))}
           </select>
         </label>
-        <label className="field">
+        <label className="field recording-zoom-scope">
           自动缩放范围
           <select
             aria-label="录屏对象缩放范围"

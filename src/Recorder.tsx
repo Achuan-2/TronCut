@@ -629,7 +629,7 @@ export default function Recorder({
               />
               根据鼠标点击自动缩放并跟随移动
             </label>
-            <label className="field">
+            <label className="field recording-zoom-scope">
               自动缩放范围
               <select
                 aria-label="自动缩放范围"
