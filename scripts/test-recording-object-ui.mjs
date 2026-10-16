@@ -88,6 +88,31 @@ try {
   await expect(
     page.getByRole("tab", { name: "录屏", exact: true }),
   ).toHaveAttribute("aria-selected", "true");
+  for (const name of ["视频", "鼠标"]) {
+    await expect(page.getByRole("tab", { name, exact: true })).toHaveCount(0);
+  }
+  for (const title of ["录屏样式", "圆角倒角", "鼠标样式", "自动缩放"]) {
+    const collapse = page.getByRole("button", {
+      name: `收起${title}属性`,
+      exact: true,
+    });
+    await expect(collapse).toHaveAttribute("aria-expanded", "true");
+    await collapse.click();
+    const expand = page.getByRole("button", {
+      name: `展开${title}属性`,
+      exact: true,
+    });
+    await expect(expand).toHaveAttribute("aria-expanded", "false");
+    await expect(
+      page
+        .getByRole("region", { name: `${title}属性`, exact: true })
+        .locator(".effect-section-body"),
+    ).toHaveCount(0);
+    await expand.click();
+  }
+  await page.getByRole("button", { name: "展开画面属性", exact: true }).click();
+  await expect(page.getByLabel("缩放 (%)", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "收起画面属性", exact: true }).click();
   const background = page.getByLabel("录屏对象背景", { exact: true });
   await expect(background).toHaveValue("violet");
   await expect(page.getByLabel("背景图库")).toHaveCount(0);
@@ -154,6 +179,12 @@ try {
   await expect(
     page.getByRole("tab", { name: "录屏", exact: true }),
   ).toHaveCount(0);
+  await expect(
+    page.getByRole("tab", { name: "视频", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("tab", { name: "鼠标", exact: true }),
+  ).toBeVisible();
   await page.getByTitle("撤销 Ctrl+Z", { exact: true }).click();
   await expect(page.locator(".recording-object")).toHaveCount(1);
   await expect(page.locator(".timeline-clip")).toHaveCount(1);

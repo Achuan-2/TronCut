@@ -86,6 +86,15 @@ try {
     page.getByText("选中时间线上的动画起点或终点", { exact: false }),
   ).toHaveCount(0);
   await arrows.first().locator(".animation-point.end").click();
+  await expect(
+    page.getByRole("tab", { name: "录屏", exact: true }),
+  ).toHaveAttribute("aria-selected", "true");
+  await expect(
+    page.getByRole("tab", { name: "视频", exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "收起画面属性", exact: true }),
+  ).toHaveAttribute("aria-expanded", "true");
   await expect(cropMode).toHaveAttribute("aria-pressed", "true");
   const originalZoom = await zoom.inputValue();
   const originalPan = await pan.inputValue();

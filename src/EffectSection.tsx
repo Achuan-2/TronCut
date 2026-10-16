@@ -8,15 +8,17 @@ export default function EffectSection({
   onToggle,
   onReset,
   onRemove,
+  defaultExpanded = true,
 }: {
   title: string;
   children: ReactNode;
   enabled?: boolean;
   onToggle?: (enabled: boolean) => void;
-  onReset: () => void;
-  onRemove: () => void;
+  onReset?: () => void;
+  onRemove?: () => void;
+  defaultExpanded?: boolean;
 }) {
-  const [expanded, setExpanded] = useState(true);
+  const [expanded, setExpanded] = useState(defaultExpanded);
   return (
     <section className="visual-effect-properties" aria-label={`${title}属性`}>
       <header className="effect-section-heading">
@@ -29,35 +31,41 @@ export default function EffectSection({
           <ChevronDown size={16} />
           <h3>{title}</h3>
         </button>
-        <details className="effect-actions">
-          <summary aria-label={`${title}选项`} title={`${title}选项`}>
-            <MoreHorizontal size={18} />
-          </summary>
-          <div className="effect-actions-menu">
-            <button
-              aria-label={
-                title === "剪辑速度" ? "恢复正常速度" : `重置${title}`
-              }
-              onClick={(event) => {
-                event.currentTarget.closest("details")!.open = false;
-                onReset();
-              }}
-            >
-              <RotateCcw size={13} />
-              重置
-            </button>
-            <button
-              aria-label={`移除${title}`}
-              onClick={(event) => {
-                event.currentTarget.closest("details")!.open = false;
-                onRemove();
-              }}
-            >
-              <X size={13} />
-              移除
-            </button>
-          </div>
-        </details>
+        {(onReset || onRemove) && (
+          <details className="effect-actions">
+            <summary aria-label={`${title}选项`} title={`${title}选项`}>
+              <MoreHorizontal size={18} />
+            </summary>
+            <div className="effect-actions-menu">
+              {onReset && (
+                <button
+                  aria-label={
+                    title === "剪辑速度" ? "恢复正常速度" : `重置${title}`
+                  }
+                  onClick={(event) => {
+                    event.currentTarget.closest("details")!.open = false;
+                    onReset();
+                  }}
+                >
+                  <RotateCcw size={13} />
+                  重置
+                </button>
+              )}
+              {onRemove && (
+                <button
+                  aria-label={`移除${title}`}
+                  onClick={(event) => {
+                    event.currentTarget.closest("details")!.open = false;
+                    onRemove();
+                  }}
+                >
+                  <X size={13} />
+                  移除
+                </button>
+              )}
+            </div>
+          </details>
+        )}
         {onToggle && (
           <input
             type="checkbox"

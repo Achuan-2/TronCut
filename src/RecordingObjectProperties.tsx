@@ -10,6 +10,7 @@ import { updateRecordingObject } from "../shared/recording-objects";
 import { groupSelection } from "../shared/timeline";
 import RecordingBackgroundSelect from "./RecordingBackgroundSelect";
 import RoundedCornersProperties from "./RoundedCornersProperties";
+import EffectSection from "./EffectSection";
 import type { Editor } from "./useEditor";
 
 export default function RecordingObjectProperties({
@@ -69,54 +70,55 @@ export default function RecordingObjectProperties({
     : editor.project.canvas;
   return (
     <fieldset className="recording-object-properties" disabled={busy}>
-      <h3 className="section-title">录屏样式</h3>
-      <RecordingBackgroundSelect
-        settings={settings}
-        onChange={(patch) => void change(patch)}
-        label="录屏对象背景"
-      />
-      {settings.background && (
-        <div className="recording-background-swatch" aria-label="背景预览">
-          {"file" in background ? (
-            background.animated ? (
-              <video
-                src={recordingWallpaperUrl(background.file)}
-                autoPlay
-                loop
-                muted
-                playsInline
-              />
-            ) : (
-              <img
-                src={recordingWallpaperUrl(background.file)}
-                alt={background.name}
-              />
-            )
-          ) : (
-            <div
-              style={{
-                background: `linear-gradient(135deg,${background.colors.join(",")})`,
-              }}
-            />
-          )}
-        </div>
-      )}
-      <label className="field">
-        留白 (%)
-        <input
-          aria-label="录屏对象留白"
-          type="number"
-          min={0}
-          max={25}
-          disabled={!settings.background}
-          value={Number((settings.padding * 100).toFixed(2))}
-          onChange={(event) => {
-            const value = event.target.valueAsNumber;
-            if (value >= 0 && value <= 25)
-              void change({ padding: value / 100 });
-          }}
+      <EffectSection title="录屏样式">
+        <RecordingBackgroundSelect
+          settings={settings}
+          onChange={(patch) => void change(patch)}
+          label="录屏对象背景"
         />
-      </label>
+        {settings.background && (
+          <div className="recording-background-swatch" aria-label="背景预览">
+            {"file" in background ? (
+              background.animated ? (
+                <video
+                  src={recordingWallpaperUrl(background.file)}
+                  autoPlay
+                  loop
+                  muted
+                  playsInline
+                />
+              ) : (
+                <img
+                  src={recordingWallpaperUrl(background.file)}
+                  alt={background.name}
+                />
+              )
+            ) : (
+              <div
+                style={{
+                  background: `linear-gradient(135deg,${background.colors.join(",")})`,
+                }}
+              />
+            )}
+          </div>
+        )}
+        <label className="field">
+          留白 (%)
+          <input
+            aria-label="录屏对象留白"
+            type="number"
+            min={0}
+            max={25}
+            disabled={!settings.background}
+            value={Number((settings.padding * 100).toFixed(2))}
+            onChange={(event) => {
+              const value = event.target.valueAsNumber;
+              if (value >= 0 && value <= 25)
+                void change({ padding: value / 100 });
+            }}
+          />
+        </label>
+      </EffectSection>
       {clip.mediaFrame ? (
         <RoundedCornersProperties clip={clip} editor={editor} size={size} />
       ) : (
@@ -129,101 +131,119 @@ export default function RecordingObjectProperties({
           添加圆角
         </button>
       )}
-      <h3 className="section-title">鼠标</h3>
-      <label className="field">
-        鼠标样式
-        <select
-          aria-label="录屏对象鼠标样式"
-          disabled={!hasCursor}
-          value={cursor.style}
-          onChange={(event) =>
-            void change({
-              cursor: {
-                ...cursor,
-                style: event.target.value as typeof cursor.style,
-              },
-            })
-          }
-        >
-          {Object.entries(cursorStyles).map(([id, name]) => (
-            <option key={id} value={id}>
-              {name}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label className="field">
-        鼠标大小 (px)
-        <input
-          aria-label="录屏对象鼠标大小"
-          disabled={!hasCursor}
-          type="number"
-          min={8}
-          max={160}
-          value={cursor.size}
-          onChange={(event) => {
-            const size = event.target.valueAsNumber;
-            if (size >= 8 && size <= 160)
-              void change({ cursor: { ...cursor, size } });
-          }}
-        />
-      </label>
-      {(["smooth", "clicks"] as const).map((name, index) => (
-        <label className="check-field" key={name}>
+      <EffectSection title="鼠标样式">
+        <label className="field">
+          鼠标样式
+          <select
+            aria-label="录屏对象鼠标样式"
+            disabled={!hasCursor}
+            value={cursor.style}
+            onChange={(event) =>
+              void change({
+                cursor: {
+                  ...cursor,
+                  style: event.target.value as typeof cursor.style,
+                },
+              })
+            }
+          >
+            {Object.entries(cursorStyles).map(([id, name]) => (
+              <option key={id} value={id}>
+                {name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="field">
+          鼠标大小 (px)
+          <input
+            aria-label="录屏对象鼠标大小"
+            disabled={!hasCursor}
+            type="number"
+            min={8}
+            max={160}
+            value={cursor.size}
+            onChange={(event) => {
+              const size = event.target.valueAsNumber;
+              if (size >= 8 && size <= 160)
+                void change({ cursor: { ...cursor, size } });
+            }}
+          />
+        </label>
+        <label className="field">
+          鼠标颜色
+          <input
+            aria-label="录屏对象鼠标颜色"
+            type="color"
+            disabled={!hasCursor}
+            value={cursor.color}
+            onChange={(event) =>
+              void change({ cursor: { ...cursor, color: event.target.value } })
+            }
+          />
+        </label>
+        {(["smooth", "clicks"] as const).map((name, index) => (
+          <label className="check-field" key={name}>
+            <input
+              type="checkbox"
+              disabled={!hasCursor}
+              checked={cursor[name]}
+              onChange={(event) =>
+                void change({
+                  cursor: { ...cursor, [name]: event.target.checked },
+                })
+              }
+            />
+            {index ? "点击高亮" : "平滑移动"}
+          </label>
+        ))}
+        {!hasCursor && (
+          <p className="small-note">此录屏的鼠标已包含在画面中。</p>
+        )}
+      </EffectSection>
+      <EffectSection title="自动缩放">
+        <label className="check-field">
           <input
             type="checkbox"
             disabled={!hasCursor}
-            checked={cursor[name]}
+            checked={settings.autoZoom}
             onChange={(event) =>
-              void change({
-                cursor: { ...cursor, [name]: event.target.checked },
-              })
+              void change({ autoZoom: event.target.checked })
             }
           />
-          {index ? "点击高亮" : "平滑移动"}
+          自动缩放并跟随鼠标
         </label>
-      ))}
-      {!hasCursor && <p className="small-note">此录屏的鼠标已包含在画面中。</p>}
-      <h3 className="section-title">自动缩放</h3>
-      <label className="check-field">
-        <input
-          type="checkbox"
-          disabled={!hasCursor}
-          checked={settings.autoZoom}
-          onChange={(event) => void change({ autoZoom: event.target.checked })}
-        />
-        自动缩放并跟随鼠标
-      </label>
-      <label className="field">
-        放大倍数
-        <select
-          aria-label="录屏对象放大倍数"
-          disabled={!hasCursor || !settings.autoZoom}
-          value={settings.zoom}
-          onChange={(event) =>
-            void change({ zoom: Number(event.target.value) })
-          }
-        >
-          {[1.5, 1.8, 2, 2.5, 3].map((value) => (
-            <option key={value} value={value}>
-              {value}×
-            </option>
-          ))}
-        </select>
-      </label>
-      <label className="field">
-        自动缩放范围
-        <select
-          aria-label="录屏对象缩放范围"
-          value={settings.zoomBackground ? "scene" : "screen"}
-          onChange={(event) =>
-            void change({ zoomBackground: event.target.value === "scene" })
-          }
-        >
-          <option value="screen">仅录屏缩放，背景固定</option>
-          <option value="scene">录屏和背景一起缩放</option>
-        </select>
-      </label>
+        <label className="field">
+          放大倍数
+          <select
+            aria-label="录屏对象放大倍数"
+            disabled={!hasCursor || !settings.autoZoom}
+            value={settings.zoom}
+            onChange={(event) =>
+              void change({ zoom: Number(event.target.value) })
+            }
+          >
+            {[1.5, 1.8, 2, 2.5, 3].map((value) => (
+              <option key={value} value={value}>
+                {value}×
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="field">
+          自动缩放范围
+          <select
+            aria-label="录屏对象缩放范围"
+            value={settings.zoomBackground ? "scene" : "screen"}
+            onChange={(event) =>
+              void change({ zoomBackground: event.target.value === "scene" })
+            }
+          >
+            <option value="screen">仅录屏缩放，背景固定</option>
+            <option value="scene">录屏和背景一起缩放</option>
+          </select>
+        </label>
+      </EffectSection>
       {busy && (
         <p role="status" className="small-note">
           正在更新样式…

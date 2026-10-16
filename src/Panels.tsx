@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import {
   FolderOpen,
   Type,
@@ -45,6 +45,7 @@ import TransitionProperties from "./TransitionProperties";
 import CaptionsPanel from "./CaptionsPanel";
 import FavoritesPanel from "./FavoritesPanel";
 import RecordingObjectProperties from "./RecordingObjectProperties";
+import EffectSection from "./EffectSection";
 import { recordingMaster } from "../shared/recording-objects";
 
 export type Tab =
@@ -362,6 +363,18 @@ function CursorProperties({
   );
 }
 
+function RecordingFrameProperties({ recording, editing, children }: {
+  recording: boolean;
+  editing: boolean;
+  children: ReactNode;
+}) {
+  return recording ? (
+    <EffectSection key={String(editing)} title="画面" defaultExpanded={editing}>
+      {children}
+    </EffectSection>
+  ) : children;
+}
+
 export function Inspector({ editor }: { editor: Editor }) {
   const c = editor.selected,
     locked = editor.project.tracks.find((t) => t.id === c?.trackId)?.locked ||
@@ -395,10 +408,10 @@ export function Inspector({ editor }: { editor: Editor }) {
   const hasText = c?.kind === "text";
   const tabs = [
     ...(isRecording ? [{ name: "recording", label: "录屏", icon: Film }] : []),
-    ...(c?.kind !== "audio"
+    ...(!isRecording && c?.kind !== "audio"
       ? [{ name: "video", label: hasCursor ? "视频" : "画面", icon: Film }]
       : []),
-    ...(hasCursor
+    ...(hasCursor && !isRecording
       ? [{ name: "cursor", label: "鼠标", icon: MousePointer2 }]
       : []),
     ...(hasText ? [{ name: "text", label: "文本", icon: Type }] : []),
@@ -410,7 +423,7 @@ export function Inspector({ editor }: { editor: Editor }) {
       : []),
   ];
   const activeTab =
-    editor.selectedKeyframe?.clipId === c?.id ? "video" :
+    editor.selectedKeyframe?.clipId === c?.id ? (isRecording ? "recording" : "video") :
     editor.selectedBehavior?.clipId === c?.id
       ? "behaviors"
       : tab.clipId === c?.id &&
@@ -638,7 +651,7 @@ export function Inspector({ editor }: { editor: Editor }) {
               aria-labelledby="inspector-recording-tab" hidden={activeTab !== "recording"}>
               <RecordingObjectProperties key={c.id} clip={c} editor={editor} />
             </div>}
-            {hasCursor && (
+            {hasCursor && !isRecording && (
               <div
                 id="inspector-cursor"
                 role="tabpanel"
@@ -771,11 +784,12 @@ export function Inspector({ editor }: { editor: Editor }) {
               </div>
             )}
             <div
-              id="inspector-video"
-              role="tabpanel"
-              aria-labelledby="inspector-video-tab"
-              hidden={activeTab !== "video"}
+              id={isRecording ? "inspector-recording-frame" : "inspector-video"}
+              role={isRecording ? undefined : "tabpanel"}
+              aria-labelledby={isRecording ? "inspector-recording-tab" : "inspector-video-tab"}
+              hidden={activeTab !== (isRecording ? "recording" : "video")}
             >
+              <RecordingFrameProperties recording={isRecording} editing={!!editor.selectedKeyframe}>
               {c.kind === "shape" && (
                 <label className="field">
                   填充
@@ -821,11 +835,12 @@ export function Inspector({ editor }: { editor: Editor }) {
                   </div>
                 </>
               )}
-              {c.mediaFrame && (!isRecording || activeTab === "video") && (
+              {c.mediaFrame && !isRecording && (
                 <RoundedCornersProperties key={c.id} clip={c} editor={editor} size={size} />
               )}
               {hasClipSpeed(c) && <SpeedProperties key={c.id} clip={c} editor={editor} />}
               {c.visualEffects && <VisualEffectProperties clip={c} sampledClip={sampledVisual ?? c} editor={editor} />}
+              </RecordingFrameProperties>
             </div>
             <div
               id="inspector-audio"
