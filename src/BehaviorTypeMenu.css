@@ -1,0 +1,67 @@
+.behavior-type-menu {
+  position: relative;
+  min-width: 0;
+}
+.behavior-type-menu > button {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 8px;
+  background: #343e45;
+  text-align: left;
+  font-size: 12px;
+}
+.behavior-type-menu > button > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.behavior-type-menu > button > svg {
+  flex-shrink: 0;
+}
+.behavior-type-popup,
+.behavior-order-popup {
+  position: fixed;
+  z-index: 140;
+  padding: 3px 0;
+  max-width: calc(100vw - 16px);
+  max-height: calc(100vh - 16px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: #343e45;
+  border: 1px solid #59636b;
+  box-shadow: 0 3px 12px #0008;
+}
+.behavior-order-popup {
+  width: 240px;
+}
+.behavior-type-popup button,
+.behavior-order-popup button {
+  display: grid;
+  grid-template-columns: 14px minmax(0, 1fr) 14px;
+  gap: 7px;
+  width: 100%;
+  align-items: center;
+  text-align: left;
+  padding: 7px 10px;
+  min-height: 31px;
+  border-radius: 0;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.behavior-menu-check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+}
+.behavior-type-popup button:hover,
+.behavior-order-popup button:hover,
+.behavior-type-popup button:focus-visible,
+.behavior-order-popup button:focus-visible,
+.behavior-type-popup .behavior-submenu-open {
+  background: #4b5c65;
+}

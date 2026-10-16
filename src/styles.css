@@ -3117,54 +3117,6 @@ fieldset:disabled {
 .behavior-range > input[type="number"] {
   width: 58px;
 }
-.behavior-type-menu {
-  position: relative;
-  min-width: 0;
-}
-.behavior-type-menu > button {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 6px 8px;
-  background: #343e45;
-  text-align: left;
-  font-size: 12px;
-}
-.behavior-type-popup,
-.behavior-order-popup {
-  position: absolute;
-  z-index: 30;
-  background: #343e45;
-  border: 1px solid #59636b;
-  box-shadow: 0 3px 12px #0008;
-  min-width: 180px;
-}
-.behavior-type-popup {
-  left: 0;
-  right: 0;
-  top: 100%;
-}
-.behavior-type-popup button,
-.behavior-order-popup button {
-  display: flex;
-  width: 100%;
-  justify-content: space-between;
-  text-align: left;
-  padding: 8px 10px;
-  border-radius: 0;
-}
-.behavior-type-popup button:hover,
-.behavior-order-popup button:hover {
-  background: #4b5c65;
-}
-.behavior-text-submenu {
-  position: relative;
-}
-.behavior-order-popup {
-  right: 0;
-  top: 100%;
-}
 .delete-control {
   position: relative;
   display: flex;
