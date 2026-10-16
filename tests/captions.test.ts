@@ -44,6 +44,64 @@ describe("字幕轨道与批量编辑", () => {
     const selection = captionTrackSelection(second.project, first.ids[0]);
     expect(selection).toEqual([first.ids[1], first.ids[0]]);
     expect(selection).not.toContain(second.ids[0]);
+    expect(captionTrackSelection(second.project, first.ids[0], false)).toEqual([
+      first.ids[0],
+    ]);
+  });
+
+  it("取消整轨编辑后只更新当前字幕的样式、文本框和位置，保留其他字幕与动画", () => {
+    const first = appendCaptionCues(createProject(), [
+      { start: 0, end: 2, text: "第一句" },
+      { start: 2, end: 4, text: "第二句" },
+    ]);
+    const { project } = appendCaptionCues(
+      first.project,
+      [{ start: 0, end: 4, text: "另一轨字幕" }],
+      { newTrack: true },
+    );
+    const source = project.clips.find((clip) => clip.id === first.ids[1])!;
+    source.keyframes = [{ time: 0, value: { ...source.transform, x: 0.4 } }];
+    const ordinary = newText(source.trackId, 4, 0, "普通文本");
+    project.clips.push(ordinary);
+    const updated = updateCaptionAppearance(
+      project,
+      source.id,
+      {
+        style: { ...source.style!, fontSize: 54, color: "#ff0000" },
+        textBox: { width: 400, height: 100 },
+        autoResizeText: true,
+        transform: { x: 0.6, y: 0.8, opacity: 0.7 },
+      },
+      false,
+    );
+    const result = updated.clips.find((clip) => clip.id === source.id)!;
+    expect(result).toMatchObject({
+      text: source.text,
+      start: source.start,
+      duration: source.duration,
+      style: { fontSize: 54, color: "#ff0000" },
+      textBox: { width: 400, height: 100 },
+      autoResizeText: true,
+      transform: { x: 0.6, y: 0.8, opacity: 0.7 },
+    });
+    expect(result.keyframes[0].value.x).toBeCloseTo(0.5);
+    for (const clip of project.clips.filter((clip) => clip.id !== source.id))
+      expect(updated.clips.find((item) => item.id === clip.id)).toBe(clip);
+    const locked = {
+      ...project,
+      tracks: project.tracks.map((track) =>
+        track.id === source.trackId ? { ...track, locked: true } : track,
+      ),
+    };
+    expect(
+      updateCaptionAppearance(
+        locked,
+        source.id,
+        { transform: { y: 0.2 } },
+        false,
+      ),
+    ).toBe(locked);
+    validateProject(updated);
   });
 
   it("批量样式和位置保留逐句内容、时间与动画，不影响普通文本、其他轨道和锁定轨道", () => {

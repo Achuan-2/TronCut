@@ -591,7 +591,9 @@ export function Inspector({ editor }: { editor: Editor }) {
                     ? "轨道已锁定"
                     : c.kind === "text"
                       ? c.caption
-                        ? `字幕轨道 · ${captionCount} 条字幕（样式与位置统一设置）`
+                        ? editor.editAllCaptions
+                          ? `字幕轨道 · ${captionCount} 条字幕（样式与位置统一设置）`
+                          : "字幕 · 仅编辑当前字幕"
                         : "文本图层"
                       : c.kind === "shape"
                         ? "标注图层"
@@ -599,6 +601,21 @@ export function Inspector({ editor }: { editor: Editor }) {
                 </small>
               </div>
             </div>
+            {c.caption && (
+              <label
+                className="check-field"
+                title="勾选后同步修改同轨所有字幕的样式与位置；取消后仅修改当前字幕。"
+              >
+                <input
+                  type="checkbox"
+                  checked={editor.editAllCaptions}
+                  onChange={(event) =>
+                    editor.setEditAllCaptions(event.target.checked)
+                  }
+                />
+                编辑字幕所有文字
+              </label>
+            )}
             {editor.selectedKeyframe && (
               <div className="keyframe-edit-status" role="status">
                 <span>

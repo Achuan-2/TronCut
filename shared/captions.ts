@@ -15,13 +15,14 @@ export const captionDefaults = {
   fillEnabled: false,
 } as const;
 
-// Keep the clicked cue active while selecting the rest of its subtitle track.
+// Keep the clicked cue active; the editing scope controls the remaining cues.
 export function captionTrackSelection(
   project: Project,
   clipId: string,
+  allCaptions = true,
 ): string[] {
   const target = project.clips.find((clip) => clip.id === clipId);
-  if (!target?.caption) return [clipId];
+  if (!target?.caption || !allCaptions) return [clipId];
   return [
     ...captionClips(project)
       .filter((clip) => clip.trackId === target.trackId && clip.id !== clipId)
@@ -40,6 +41,7 @@ export function updateCaptionAppearance(
   project: Project,
   clipId: string,
   patch: CaptionAppearance,
+  allCaptions = true,
 ): Project {
   const target = project.clips.find((clip) => clip.id === clipId);
   if (
@@ -59,7 +61,12 @@ export function updateCaptionAppearance(
   return {
     ...project,
     clips: project.clips.map((clip) => {
-      if (!clip.caption || clip.trackId !== target.trackId) return clip;
+      if (
+        !clip.caption ||
+        clip.trackId !== target.trackId ||
+        (!allCaptions && clip.id !== clipId)
+      )
+        return clip;
       return {
         ...clip,
         ...appearance,

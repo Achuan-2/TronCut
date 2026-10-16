@@ -144,6 +144,7 @@ export function useEditor(
     setKeyframeSelection(null);
   }, []);
   const [selection, selectMany] = useState<string[]>([]);
+  const [editAllCaptions, setEditAllCaptionsState] = useState(true);
   const [transitionSelection, setTransitionSelection] =
     useState<TransitionSelection | null>(null);
   const [behaviorSelection, setBehaviorSelection] = useState<{
@@ -168,6 +169,20 @@ export function useEditor(
     [selection, clipsById],
   );
   const selectedId = selectedIds.at(-1) ?? null;
+  const setEditAllCaptions = useCallback(
+    (all: boolean) => {
+      setEditAllCaptionsState(all);
+      const project = current.current;
+      if (
+        selectedId &&
+        project.clips.find((clip) => clip.id === selectedId)?.caption
+      ) {
+        clearKeyframeEdit();
+        selectMany(captionTrackSelection(project, selectedId, all));
+      }
+    },
+    [selectedId, clearKeyframeEdit],
+  );
   const select = useCallback((id: string | null, additive = false) => {
     setBehaviorSelection(null);
     setTransitionSelection(null);
@@ -180,7 +195,7 @@ export function useEditor(
     const clip = current.current.clips.find((clip) => clip.id === id);
     const group =
       clip?.caption && !additive
-        ? captionTrackSelection(current.current, id)
+        ? captionTrackSelection(current.current, id, editAllCaptions)
         : selectionWithGroups(current.current, [id]);
     selectMany((previous) =>
       additive
@@ -189,7 +204,7 @@ export function useEditor(
           : [...new Set([...previous, ...group])]
         : group,
     );
-  }, []);
+  }, [clearKeyframeEdit, editAllCaptions]);
   const [playhead, setPlayhead] = useState(1.2);
   const seek = useCallback(
     (next: SetStateAction<number>) => {
@@ -315,7 +330,7 @@ export function useEditor(
         )
           return project;
         const next = target.caption
-          ? updateCaptionAppearance(project, id, patch)
+          ? updateCaptionAppearance(project, id, patch, editAllCaptions)
           : {
               ...project,
               clips: project.clips.map((clip) =>
@@ -345,7 +360,7 @@ export function useEditor(
         };
       });
     },
-    [apply],
+    [apply, editAllCaptions],
   );
   const selectCaptionTrack = useCallback(
     (trackId: string, time?: number) => {
@@ -1027,6 +1042,8 @@ export function useEditor(
     selected,
     selectedId,
     selectedIds,
+    editAllCaptions,
+    setEditAllCaptions,
     selectMany,
     select,
     selectCaptionTrack,
