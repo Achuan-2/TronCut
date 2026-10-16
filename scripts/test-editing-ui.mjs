@@ -329,6 +329,7 @@ try {
   await expect(page.getByLabel("鼠标大小")).toHaveValue("48");
   await page.getByRole("tab", { name: "视频", exact: true }).click();
   const canvasVideo = page.locator(".preview-panel .preview-layer.video");
+  const videoViewport = canvasVideo.locator(".preview-effect-content > div").first();
   await expect(page.getByLabel("效果预设", { exact: true })).toHaveCount(0);
   await expect(page.getByLabel("裁切左侧 (%)", { exact: true })).toHaveCount(0);
   await expect(page.getByLabel("淡入 (秒)", { exact: true })).toHaveCount(0);
@@ -345,7 +346,7 @@ try {
   await expect(page.getByLabel("高度 (px)", { exact: true })).toHaveValue("540");
   await page.getByLabel("水平翻转", { exact: true }).check();
   await page.getByLabel("垂直翻转", { exact: true }).check();
-  await expect(canvasVideo.locator(":scope > div").first()).toHaveCSS("transform", "matrix(-1, 0, 0, -1, 0, 0)");
+  await expect(videoViewport).toHaveCSS("transform", "matrix(-1, 0, 0, -1, 0, 0)");
   await page.getByLabel("水平翻转", { exact: true }).uncheck();
   await page.getByLabel("垂直翻转", { exact: true }).uncheck();
   await page.getByLabel("缩放 (%)", { exact: true }).fill("50");
@@ -406,7 +407,7 @@ try {
   await page.getByTitle("撤销 Ctrl+Z", { exact: true }).click();
   // In crop mode, scale/pan the source inside the unchanged visible rectangle.
   const fixedVideo = await canvasVideo.boundingBox();
-  const innerVideo = canvasVideo.locator(":scope > div > div").first();
+  const innerVideo = videoViewport.locator(":scope > div").first();
   const sourceWidth = Number(await innerVideo.evaluate((element) => element.style.width.slice(0, -2)));
   await page.getByLabel("缩放 (%)", { exact: true }).fill("200");
   await expect(page.getByRole("slider", { name: "缩放滑条", exact: true })).toHaveValue("200");
@@ -1018,8 +1019,14 @@ try {
   ).toBe(1);
   await page.evaluate(() => window.framecraft.markDirty(false));
   const exited = new Promise((resolve) => app.process().once("exit", resolve));
-  await page.getByRole("button", { name: "关闭窗口", exact: true }).click();
-  await Promise.race([
+  try {
+    await page.getByRole("button", { name: "关闭窗口", exact: true }).click();
+  } catch (error) {
+    // The app may exit before Playwright receives the click acknowledgement.
+    if (!page.isClosed() || !String(error).includes("Target page, context or browser has been closed"))
+      throw error;
+  }
+  const exitCode = await Promise.race([
     exited,
     new Promise((_, reject) => {
       const timeout = setTimeout(
@@ -1029,6 +1036,7 @@ try {
       timeout.unref();
     }),
   ]);
+  expect(exitCode).toBe(0);
   console.log(
     "紧凑标题栏、隐藏原生窗口栏、最大化/还原、最小化、自定义关闭及未保存退出确认通过",
   );
