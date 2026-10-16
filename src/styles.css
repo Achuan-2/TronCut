@@ -554,7 +554,7 @@ fieldset:disabled {
 }
 .editor-workspace {
   display: grid;
-  grid-template-columns: 335px minmax(420px, 1fr) 268px;
+  grid-template-columns: 395px minmax(420px, 1fr) 268px;
   flex: 1;
   min-height: 280px;
   overflow: hidden;
@@ -568,7 +568,7 @@ fieldset:disabled {
 .tool-rail {
   overflow-y: auto;
   overflow-x: hidden;
-  width: 65px;
+  width: 125px;
   flex-shrink: 0;
   background: #181b1d;
   border-right: 1px solid #292e31;
@@ -578,14 +578,21 @@ fieldset:disabled {
   gap: 5px;
 }
 .tool-rail button {
-  flex-direction: column;
-  gap: 6px;
+  flex-direction: row;
+  flex-shrink: 0;
+  justify-content: flex-start;
+  gap: 10px;
   border-radius: 7px;
   color: #839096;
-  font-size: 10px;
-  padding: 11px 0;
+  font-size: 12px;
+  padding: 10px 12px;
   position: relative;
-  min-height: 61px;
+  min-height: 48px;
+  white-space: nowrap;
+  text-align: left;
+}
+.tool-rail button > svg {
+  flex-shrink: 0;
 }
 .tool-rail button.selected {
   color: #93edc7;
@@ -597,7 +604,8 @@ fieldset:disabled {
   width: 3px;
   height: 23px;
   left: -6px;
-  top: 20px;
+  top: 50%;
+  transform: translateY(-50%);
   background: var(--accent);
   border-radius: 0 3px 3px 0;
 }
@@ -4125,7 +4133,7 @@ fieldset:disabled {
 }
 @media (max-width: 1250px) {
   .editor-workspace {
-    grid-template-columns: 305px minmax(380px, 1fr) 235px;
+    grid-template-columns: 365px minmax(380px, 1fr) 235px;
   }
   .library-content {
     padding: 16px 13px 65px;
@@ -4169,7 +4177,7 @@ fieldset:disabled {
     margin-bottom: 16px;
   }
   .tool-rail button {
-    min-height: 51px;
-    padding: 8px 0;
+    min-height: 42px;
+    padding: 8px 12px;
   }
 }
