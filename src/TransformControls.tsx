@@ -45,7 +45,7 @@ export function ScaleControl({
   disabled?: boolean;
 }) {
   return (
-    <div className="transform-scale field">
+    <div className="transform-scale property-slider-row">
       <span>缩放</span>
       <input
         aria-label="缩放滑条"

@@ -2349,9 +2349,6 @@ fieldset:disabled {
   gap: 18px;
   margin-top: 14px;
 }
-.transform-scale.field {
-  gap: 5px;
-}
 .transform-scale > span {
   width: 31px;
   flex-shrink: 0;
@@ -2653,7 +2650,6 @@ fieldset:disabled {
 .property-reset { padding: 1px; color: #aeb9bd; }
 .property-reset-spacer { width: 17px; }
 .frame-transform-properties { color: #d3dce0; padding-top: 10px; }
-.frame-transform-properties .transform-scale.field { display: grid; grid-template-columns: 45px minmax(20px, 1fr) 64px 17px; gap: 5px; }
 .frame-transform-properties .transform-scale > span { width: auto; }
 .frame-transform-properties .transform-scale input[type="range"] { width: 100%; min-width: 0; }
 .frame-transform-properties .transform-number { width: 64px; }
