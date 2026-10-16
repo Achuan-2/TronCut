@@ -31,6 +31,7 @@ import { defaultContentTransform } from "../shared/crop";
 import { visualClipAt } from "../shared/visual-state";
 import FrameTransformProperties from "./FrameTransformProperties";
 import RoundedCornersProperties from "./RoundedCornersProperties";
+import VisualEffectProperties from "./VisualEffectProperties";
 import AnnotationsPanel from "./AnnotationsPanel";
 import VisualEffectsPanel from "./VisualEffectsPanel";
 import SpeedProperties from "./SpeedProperties";
@@ -798,6 +799,7 @@ export function Inspector({ editor }: { editor: Editor }) {
                 <RoundedCornersProperties key={c.id} clip={c} editor={editor} size={size} />
               )}
               {hasClipSpeed(c) && <SpeedProperties key={c.id} clip={c} editor={editor} />}
+              {c.visualEffects && <VisualEffectProperties clip={c} editor={editor} />}
             </div>
             <div
               id="inspector-audio"

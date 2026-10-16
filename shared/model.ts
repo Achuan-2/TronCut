@@ -4,6 +4,7 @@ import { animationEasings } from "./easing";
 import { behaviorSchema } from "./behaviors";
 import { transitionSchema } from "./transitions";
 import { exportSettingsSchema } from "./export-settings";
+import { visualEffectsSchema } from "./visual-effects";
 
 const finite = z.number().finite();
 const identifier = z
@@ -139,6 +140,7 @@ export const projectSchema = z.object({
         sourceIn: finite.nonnegative(),
         speed: finite.min(0.25).max(8),
         speedEffect: z.boolean().optional(),
+        visualEffects: visualEffectsSchema.optional(),
         behaviors: z.array(behaviorSchema).max(32).optional(),
         transitions: z
           .object({

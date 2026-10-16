@@ -1914,6 +1914,34 @@ fieldset:disabled {
   position: absolute;
   inset: 0;
 }
+.matte-layer-group {
+  position: absolute;
+  inset: 0;
+}
+.effect-svg-definitions {
+  position: absolute;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+.shadow-directions {
+  display: grid;
+  grid-template-columns: repeat(3, 20px);
+  gap: 2px;
+  margin: 10px 0 12px auto;
+  width: max-content;
+}
+.shadow-directions button { width: 20px; height: 20px; padding: 0; border-radius: 2px; background: #354149; }
+.shadow-directions button[aria-pressed="true"] { background: var(--accent); }
+.effect-region-outline {
+  position: absolute;
+  z-index: 15;
+  border: 1px dashed #ffdf87;
+  touch-action: none;
+  cursor: move;
+}
+.effect-region-caption { position: absolute; left: 0; top: -20px; color: #ffdf87; font-size: 11px; white-space: nowrap; pointer-events: none; }
+.effect-region-resize { position: absolute; right: -4px; bottom: -4px; width: 8px; height: 8px; min-width: 0; padding: 0; background: #ffdf87; border: 1px solid #352b15; border-radius: 0; cursor: nwse-resize; }
 .resize-handle {
   position: absolute;
   width: 10px;

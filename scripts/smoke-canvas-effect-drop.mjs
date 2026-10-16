@@ -6,6 +6,16 @@ import path from "node:path";
 import sharp from "sharp";
 
 const root = path.resolve(`test-output/canvas-effect-drop-${Date.now()}`);
+const bundledFfmpeg = path.resolve(
+  "resources/bin",
+  process.platform === "win32" ? "ffmpeg.exe" : "ffmpeg",
+);
+const ffmpeg =
+  process.env.FRAMECRAFT_FFMPEG ??
+  (await fs.access(bundledFfmpeg).then(
+    () => bundledFfmpeg,
+    () => "ffmpeg",
+  ));
 await fs.mkdir(root, { recursive: true });
 await sharp({
   create: { width: 320, height: 180, channels: 3, background: "#528bb1" },
@@ -13,7 +23,7 @@ await sharp({
   .png()
   .toFile(path.join(root, "image.png"));
 execFileSync(
-  "ffmpeg",
+  ffmpeg,
   [
     "-y",
     "-hide_banner",
@@ -27,6 +37,8 @@ execFileSync(
     "5",
     "-r",
     "10",
+    "-c:v",
+    "libx264",
     "-pix_fmt",
     "yuv420p",
     path.join(root, "video.mp4"),

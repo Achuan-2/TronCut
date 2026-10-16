@@ -30,6 +30,8 @@ import { textFillRectangle } from "./text-fill";
 import { outlinedText } from "./text-outline";
 import { textFrameSize, textFillGeometry } from "../shared/text";
 import { isTrackActive } from "../shared/tracks";
+import { visualEffectFilters, effectAmountExpression } from "./visual-effects-export";
+import { visualEffectPadding } from "../shared/visual-effect-svg";
 import {
   exportDimensions,
   exportQualities,
@@ -544,7 +546,8 @@ async function renderProject(
       const pose = (key: keyof Transform, name = "t") =>
         expression(clip, key, clock(name));
       const scale = `(${pose("scale")})*2000/(2000-clip((${pose("z")}),-10000,1000))`;
-      const transform = `scale=w='max(2,trunc(${cropWidth * fit}*(${scale})*(${pose("scaleX")})/2)*2)':h='max(2,trunc(${cropHeight * fit}*(${scale})*(${pose("scaleY")})/2)*2)':eval=frame`;
+      const effectPadding = Math.ceil(visualEffectPadding(clip.visualEffects) / fit);
+      const transform = `scale=w='max(2,trunc(${(cropWidth + effectPadding * 2) * fit}*(${scale})*(${pose("scaleX")})/2)*2)':h='max(2,trunc(${(cropHeight + effectPadding * 2) * fit}*(${scale})*(${pose("scaleY")})/2)*2)':eval=frame`;
       // Per-glyph motion is already rasterized. Only run outer-frame filters
       // for channels that actually contain object motion.
       const objectMotion = objectBehaviorExpressions(clip, clock("t"));
@@ -641,12 +644,33 @@ async function renderProject(
         clip.keyframes.some((frame) => frame.value.scaleX !== undefined || frame.value.scaleY !== undefined);
       const outputFormat = independentScale
         ? ["scale=w=iw:h=ih:eval=frame", "format=yuva420p"] : [];
-      filters.push(
-        `[${source}]${timing}${animatedText ? `fps=${fps},` : ""}format=rgba,${[...(animatedViewport ? animatedViewportFilters((key) => pose(key, "T")) : contentFilters(clip)), ...visualEffects, ...frameFilters, transform, "setsar=1", ...rotate, alpha, ...outputFormat].join(",")}[${visual}]`,
-      );
+      const viewport = `viewport${layer}`;
+      filters.push(`[${source}]${timing}${animatedText ? `fps=${fps},` : ""}format=rgba,${[...(animatedViewport ? animatedViewportFilters((key) => pose(key, "T")) : contentFilters(clip)), ...visualEffects, ...frameFilters, "null"].join(",")}[${viewport}]`);
+      const attached = await visualEffectFilters({
+        clip, source: viewport, layer, width: cropWidth, height: cropHeight,
+        fit, fps, duration, workDir, input,
+      });
+      args.push(...attached.args);
+      input += attached.inputCount;
+      filters.push(...attached.filters);
+      filters.push(`[${attached.label}]${[transform, "setsar=1", ...rotate, alpha, ...outputFormat].join(",")}[${visual}]`);
       // Composite text before chroma subsampling so rounded fills and glyphs
       // retain the same pixel position in video and frame captures.
-      filters.push(
+      const matte = clip.visualEffects?.["media-matte"];
+      if (matte?.enabled) {
+        const canvas = `matteCanvas${layer}`, full = `matteFull${layer}`, coverage = `matteMask${layer}`, backdrop = `matteBg${layer}`;
+        filters.push(`color=c=black@0:s=${width}x${height}:r=${fps}:d=${duration},format=rgba[${canvas}]`);
+        filters.push(`[${canvas}][${visual}]overlay=x='${width}*((${pose("x")})+(${transitionOffsetExpression(project, clip)}))-overlay_w/2':y='${height}*(${pose("y")})-overlay_h/2':enable='gte(t,${range.start})*lt(t,${range.end})':eof_action=pass:repeatlast=0:format=auto[${full}]`);
+        const value = matte.mode.startsWith("luma")
+          ? "(0.2126*r(X,Y)+0.7152*g(X,Y)+0.0722*b(X,Y))*alpha(X,Y)/65025"
+          : "alpha(X,Y)/255";
+        const strength = `(${effectAmountExpression(matte, clip)}*${matte.strength})`;
+        const weight = matte.mode.endsWith("invert") ? `1-${strength}*(${value})` : `1-${strength}*(1-(${value}))`;
+        const active = `gte(T,${range.start})*lt(T,${range.end})`;
+        filters.push(`[${full}]format=gbrap,geq=r='255*if(${active},${weight},1)':g='255*if(${active},${weight},1)':b='255*if(${active},${weight},1)':a=255[${coverage}]`);
+        filters.push(`color=c=${background}:s=${width}x${height}:r=${fps}:d=${duration},format=gbrap[${backdrop}]`);
+        filters.push(`[${backdrop}][${base}][${coverage}]maskedmerge=planes=15[${output}]`);
+      } else filters.push(
         `[${base}][${visual}]overlay=x='${width}*((${pose("x")})+(${transitionOffsetExpression(project, clip)}))-overlay_w/2':y='${height}*(${pose("y")})-overlay_h/2':enable='gte(t,${range.start})*lt(t,${range.end})':eof_action=pass:repeatlast=0${still || clip.kind === "text" ? ":format=auto" : ""}[${output}]`,
       );
       base = output;

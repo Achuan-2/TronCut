@@ -2,6 +2,7 @@ import type { Clip } from "./model";
 import { supportsClipSpeed } from "./clip-speed";
 import { supportsMediaFrame } from "./media-frame";
 import { visualEffectPresets } from "./preset-library";
+import { isAdditionalVisualEffect } from "./visual-effects";
 
 export const visualEffectMime = "troncut-effect";
 export type VisualEffectId = (typeof visualEffectPresets)[number]["id"];
@@ -21,5 +22,6 @@ export function visualEffectFromDragTypes(types: readonly string[]) {
 export function supportsVisualEffect(clip: Clip, effect: string | undefined) {
   if (effect === "clip-speed") return supportsClipSpeed(clip);
   if (effect === "rounded-corners") return supportsMediaFrame(clip);
+  if (effect && isAdditionalVisualEffect(effect)) return clip.kind !== "audio";
   return false;
 }

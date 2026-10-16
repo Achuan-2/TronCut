@@ -1,10 +1,12 @@
 import {
   useEffect,
+  useId,
   useLayoutEffect,
   useMemo,
   useRef,
   useState,
   type CSSProperties,
+  type ReactNode,
 } from "react";
 import {
   Maximize2,
@@ -66,9 +68,14 @@ import {
   supportsVisualEffect,
   visualEffectFromDragTypes,
   visualEffectMime,
+  type VisualEffectId,
 } from "../shared/visual-effect-drag";
 import { transitionTransform } from "../shared/transitions";
 import { projectIndex } from "../shared/project-index";
+import { visualEffectSvg } from "../shared/visual-effect-svg";
+import MatteDefinition from "./MatteDefinition";
+import EffectRegionOverlay from "./EffectRegionOverlay";
+import type { Region } from "../shared/visual-effects";
 import BehaviorText from "./BehaviorText";
 import { useViewportZoom, type ZoomPoint } from "./useViewportZoom";
 
@@ -148,6 +155,7 @@ function MediaLayer({
   return (
     <video
       ref={ref}
+      crossOrigin="anonymous"
       src={url}
       onLoadedMetadata={syncLoaded}
       preload="auto"
@@ -164,6 +172,7 @@ function PreviewLayer({
   interactive = true,
   cameraScale = 1,
   mode = "select",
+  matteSource = false,
 }: {
   clip: Clip;
   project: Project;
@@ -173,11 +182,17 @@ function PreviewLayer({
   interactive?: boolean;
   cameraScale?: number;
   mode?: CanvasMode;
+  matteSource?: boolean;
 }) {
   const localTime = Math.max(
     0,
     Math.min(clip.duration, editor.playhead - clip.start),
   );
+  const filterId = `visual-effect-${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
+  const [regionDraft, setRegionDraft] = useState<{
+    id: "mask" | "blur-region";
+    geometry: Partial<Region>;
+  } | null>(null);
   const held =
     editor.playhead < clip.start ||
     editor.playhead >= clip.start + clip.duration;
@@ -329,6 +344,29 @@ function PreviewLayer({
     { width: mediaWidth, height: mediaHeight },
     contentView,
   );
+  const effectTime = Object.values(clip.visualEffects ?? {}).some(
+    (effect) => effect?.easeIn || effect?.easeOut,
+  ) ? localTime : 0;
+  const effectMarkup = useMemo(() => visualEffectSvg(
+    regionDraft ? {
+      ...clip,
+      visualEffects: {
+        ...clip.visualEffects,
+        [regionDraft.id]: {
+          ...clip.visualEffects?.[regionDraft.id],
+          ...regionDraft.geometry,
+        },
+      },
+    } : clip,
+    Number(style.width) || 1,
+    Number(style.height) || 1,
+    scale,
+    effectTime,
+    filterId,
+  ), [clip.visualEffects, clip.style, clip.duration, style.width, style.height, scale, effectTime, filterId, regionDraft]);
+  const regionId = Object.keys(clip.visualEffects ?? {}).reverse().find(
+    (id) => (id === "mask" || id === "blur-region") && clip.visualEffects?.[id]?.enabled,
+  ) as "mask" | "blur-region" | undefined;
   return (
     <div
       className={`preview-layer ${clip.kind} ${interactive && editor.selectedIds.includes(clip.id) ? "selected" : ""} ${editing ? "editing" : ""} ${cropping ? "cropping" : ""} ${effectDrop && selectable ? "effect-drop-target" : ""}`}
@@ -368,8 +406,7 @@ function PreviewLayer({
         if (behavior) {
           if (supportsBehaviors(clip)) editor.addBehavior(behavior, clip.id);
         } else if (supportsVisualEffect(clip, effect)) {
-          if (effect === "clip-speed") editor.addSpeedEffect(clip.id);
-          else editor.addRoundedCorners(clip.id);
+          editor.addVisualEffect(effect as VisualEffectId, clip.id);
         }
       }}
       onClick={(event) => event.stopPropagation()}
@@ -555,6 +592,13 @@ function PreviewLayer({
       onPointerCancel={() => setGesture(null)}
       onLostPointerCapture={() => setGesture(null)}
     >
+      {effectMarkup && <svg className="effect-svg-definitions" aria-hidden="true"><defs dangerouslySetInnerHTML={{ __html: effectMarkup }} /></svg>}
+      <div className="preview-effect-content" style={effectMarkup || matteSource ? {
+        width: "100%", height: "100%", position: "relative",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        filter: effectMarkup ? `url(#${filterId})` : undefined,
+        visibility: matteSource ? "hidden" : undefined,
+      } : { display: "contents" }}>
       {fill && (
         <div
           className="preview-text-fill"
@@ -711,6 +755,13 @@ function PreviewLayer({
           )}
         </svg>
       )}
+      </div>
+      {regionId && selectable && !editing && !editor.playing && mode === "select" && editor.selectedIds.includes(clip.id) && <EffectRegionOverlay
+        key={`${clip.id}-${regionId}`} name={regionId === "mask" ? "遮罩" : "模糊区域"} region={clip.visualEffects![regionId]!}
+        width={Number(style.width) || 1} height={Number(style.height) || 1} pose={displayed} cameraScale={cameraScale}
+        onDraft={(geometry) => setRegionDraft(geometry ? { id: regionId, geometry } : null)}
+        onCommit={(geometry) => editor.updateClip(clip.id, { visualEffects: { ...clip.visualEffects, [regionId]: { ...clip.visualEffects![regionId]!, ...geometry } } })}
+      />}
       {selectable &&
         !editing &&
         ((mode === "select" && ["text", "shape"].includes(clip.kind)) ||
@@ -788,6 +839,34 @@ export function ScenePreview({
     editor.selectedKeyframe?.clipId,
     project.clips,
   );
+  const sceneId = `scene-${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
+  const definitions: ReactNode[] = [];
+  let layers: ReactNode[] = [];
+  for (const track of [...project.tracks].reverse()) {
+    if (!isTrackActive(project.tracks, track.id)) continue;
+    for (const clip of active.filter((clip) => clip.trackId === track.id)) {
+      const matte = clip.visualEffects?.["media-matte"]?.enabled === true;
+      if (matte) {
+        const id = `${sceneId}-matte-${clip.id}`;
+        definitions.push(
+          <MatteDefinition key={id} id={id} clip={clip} project={project} time={playhead} scale={scale} />,
+        );
+        layers = [
+          <div className="matte-layer-group" key={id} style={{ mask: `url(#${id})` }}>
+            {layers}
+          </div>,
+        ];
+      }
+      layers.push(
+        <PreviewLayer
+          key={clip.id} clip={clip} project={project} editor={editor} scale={scale}
+          muted={!interactive || track.muted || !!editor.narrationRecording?.muted}
+          interactive={interactive} cameraScale={camera?.scale ?? 1}
+          mode={mode} matteSource={matte}
+        />,
+      );
+    }
+  }
   return (
     <div
       className="canvas-scene"
@@ -800,30 +879,8 @@ export function ScenePreview({
           : undefined
       }
     >
-      {[...project.tracks]
-        .reverse()
-        .filter((track) => isTrackActive(project.tracks, track.id))
-        .flatMap((track) =>
-          active
-            .filter((clip) => clip.trackId === track.id)
-            .map((clip) => (
-              <PreviewLayer
-                key={clip.id}
-                clip={clip}
-                project={project}
-                editor={editor}
-                scale={scale}
-                muted={
-                  !interactive ||
-                  track.muted ||
-                  !!editor.narrationRecording?.muted
-                }
-                interactive={interactive}
-                cameraScale={camera?.scale ?? 1}
-                mode={mode}
-              />
-            )),
-        )}
+      {definitions}
+      {layers}
     </div>
   );
 }

@@ -1,3 +1,4 @@
+import { shiftVisualEffects, retimeVisualEffects } from "./visual-effects";
 import {
   type Asset,
   type Clip,
@@ -345,6 +346,7 @@ export function splitClip(
   const cut = time - clip.start;
   const left: Clip = fitBehaviorDuration({
     ...clip,
+    visualEffects: shiftVisualEffects(clip, 0),
     duration: cut,
     transitions: clip.transitions
       ? { incoming: clip.transitions.incoming }
@@ -352,6 +354,7 @@ export function splitClip(
   });
   const right: Clip = fitBehaviorDuration({
     ...clip,
+    visualEffects: shiftVisualEffects(clip, cut),
     id: uid(),
     start: time,
     duration: clip.duration - cut,
@@ -373,6 +376,7 @@ export function changeSpeed(clip: Clip, speed: number): Clip {
   const ratio = clip.speed / speed;
   return fitBehaviorDuration({
     ...clip,
+    visualEffects: retimeVisualEffects(clip, ratio),
     speed,
     duration: clip.duration * ratio,
     animationOffset: (clip.animationOffset ?? 0) * ratio,

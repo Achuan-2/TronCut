@@ -48,6 +48,8 @@ export async function serveMediaFile(
     return new Response("素材不存在", { status: 404 });
   }
   const headers = new Headers({
+    // Anonymous video reads allow the editor to sample decoded frames for mattes.
+    "Access-Control-Allow-Origin": "*",
     "Accept-Ranges": "bytes",
     "Content-Type":
       mediaTypes[path.extname(file).toLowerCase()] ??

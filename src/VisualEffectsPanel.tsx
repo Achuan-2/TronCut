@@ -1,12 +1,23 @@
 import { useState } from "react";
-import { Gauge, RectangleHorizontal, Search, X } from "lucide-react";
-import { supportsClipSpeed } from "../shared/clip-speed";
-import { supportsMediaFrame } from "../shared/media-frame";
+import {
+  Gauge,
+  RectangleHorizontal,
+  Search,
+  X,
+  Blend,
+  Scan,
+  Layers,
+  Pipette,
+  PaintBucket,
+  ScanLine,
+  Square,
+} from "lucide-react";
 import type { Editor } from "./useEditor";
 import { visualEffectPresets } from "../shared/preset-library";
 import {
   visualEffectDragType,
   visualEffectMime,
+  supportsVisualEffect,
 } from "../shared/visual-effect-drag";
 import PresetTile from "./PresetTile";
 
@@ -21,7 +32,18 @@ export function VisualEffectCard({
   selected?: boolean;
   onSelect?: () => void;
 }) {
-  const Icon = preset.id === "clip-speed" ? Gauge : RectangleHorizontal;
+  const icons = {
+    "clip-speed": Gauge,
+    "rounded-corners": RectangleHorizontal,
+    "media-matte": Layers,
+    mask: Scan,
+    shadow: Blend,
+    "remove-color": Pipette,
+    tint: PaintBucket,
+    "blur-region": ScanLine,
+    border: Square,
+  };
+  const Icon = icons[preset.id];
   return (
     <PresetTile
       kind="effect"
@@ -37,14 +59,13 @@ export function VisualEffectCard({
         onClick={onSelect}
         onDragStart={(event) => {
           event.dataTransfer.setData(visualEffectMime, preset.id);
-          event.dataTransfer.setData(visualEffectDragType(preset.id), preset.id);
+          event.dataTransfer.setData(
+            visualEffectDragType(preset.id),
+            preset.id,
+          );
           event.dataTransfer.effectAllowed = "copy";
         }}
-        onDoubleClick={() =>
-          preset.id === "clip-speed"
-            ? editor.addSpeedEffect()
-            : editor.addRoundedCorners()
-        }
+        onDoubleClick={() => editor.addVisualEffect(preset.id)}
       >
         <div className={`effect-card-preview ${preset.id}`}>
           <Icon size={40} />
@@ -58,23 +79,12 @@ export function VisualEffectCard({
 export default function VisualEffectsPanel({ editor }: { editor: Editor }) {
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState("clip-speed");
-  const effects = [
-    {
-      ...visualEffectPresets[0],
-      supports: supportsMediaFrame,
-      apply: () => editor.addRoundedCorners(),
-    },
-    {
-      ...visualEffectPresets[1],
-      supports: supportsClipSpeed,
-      apply: () => editor.addSpeedEffect(),
-    },
-  ];
+  const effects = visualEffectPresets;
   const selectedEffect = effects.find((effect) => effect.id === selected)!;
   const canApply = editor.project.clips.some(
     (clip) =>
       editor.selectedIds.includes(clip.id) &&
-      selectedEffect.supports(clip) &&
+      supportsVisualEffect(clip, selectedEffect.id) &&
       !editor.project.tracks.find((track) => track.id === clip.trackId)?.locked,
   );
   return (
@@ -109,7 +119,7 @@ export default function VisualEffectsPanel({ editor }: { editor: Editor }) {
       <button
         className="wide-button"
         disabled={!canApply}
-        onClick={selectedEffect.apply}
+        onClick={() => editor.addVisualEffect(selectedEffect.id)}
       >
         应用到所选片段
       </button>

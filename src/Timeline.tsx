@@ -62,6 +62,7 @@ import { supportsMediaFrame } from "../shared/media-frame";
 import {
   supportsVisualEffect,
   visualEffectFromDragTypes,
+  type VisualEffectId,
 } from "../shared/visual-effect-drag";
 import TimelineSpeedEffect from "./TimelineSpeedEffect";
 import TimelineBehaviorEffect from "./TimelineBehaviorEffect";
@@ -1365,11 +1366,15 @@ export default function Timeline({
                               return;
                             }
                             const effect = event.dataTransfer.getData("troncut-effect");
-                            if (!["clip-speed", "rounded-corners"].includes(effect)) return;
+                            if (!effect) return;
                             event.preventDefault();
                             event.stopPropagation();
                             setEffectDrop(null);
                             if (track.locked) return;
+                            if (effect !== "clip-speed" && effect !== "rounded-corners") {
+                              if (supportsVisualEffect(c, effect)) editor.addVisualEffect(effect as VisualEffectId, c.id);
+                              return;
+                            }
                             if (effect === "rounded-corners") {
                               if (supportsMediaFrame(c)) editor.addRoundedCorners(c.id);
                               return;

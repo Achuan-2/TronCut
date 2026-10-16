@@ -24,6 +24,7 @@ describe("本地媒体字节分段响应", () => {
     expect(response.status).toBe(200);
     expect(response.headers.get("accept-ranges")).toBe("bytes");
     expect(response.headers.get("content-type")).toBe("video/mp4");
+    expect(response.headers.get("access-control-allow-origin")).toBe("*");
     expect(response.headers.get("content-length")).toBe("256");
     expect(Buffer.from(await response.arrayBuffer())).toEqual(contents);
     const head = await serveMediaFile(request("bytes=10-20", "HEAD"), file);

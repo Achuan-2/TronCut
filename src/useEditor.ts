@@ -1,5 +1,10 @@
 import { addMediaFrame as addFrameEffect, supportsMediaFrame } from "../shared/media-frame";
 import {
+  addVisualEffect as addVisualEffectToClip,
+  isAdditionalVisualEffect,
+} from "../shared/visual-effects";
+import type { VisualEffectId } from "../shared/visual-effect-drag";
+import {
   useCallback,
   useEffect,
   useMemo,
@@ -630,6 +635,28 @@ export function useEditor(
     },
     [apply, selectedIds, select, clearKeyframeEdit, setPlaying],
   );
+  const addVisualEffect = useCallback(
+    (effect: VisualEffectId, id?: string) => {
+      if (effect === "clip-speed") return addSpeedEffect(id);
+      if (effect === "rounded-corners") return addRoundedCorners(id);
+      if (!isAdditionalVisualEffect(effect)) return;
+      const p = current.current;
+      const ids = id ? [id] : selectedIds;
+      const clips = p.clips.map((clip) =>
+        ids.includes(clip.id) &&
+        !p.tracks.find((track) => track.id === clip.trackId)?.locked
+          ? addVisualEffectToClip(clip, effect)
+          : clip,
+      );
+      if (clips.some((clip, index) => clip !== p.clips[index]))
+        apply({ ...p, clips });
+      if (id && clips.some((clip) => clip.id === id && clip.kind !== "audio"))
+        select(id);
+      clearKeyframeEdit();
+      setPlaying(false);
+    },
+    [addSpeedEffect, addRoundedCorners, selectedIds, apply, select, clearKeyframeEdit, setPlaying],
+  );
   const selectTransition = useCallback(
     (selection: TransitionSelection) => {
       select(selection.clipId);
@@ -1024,6 +1051,7 @@ export function useEditor(
     addAnnotation,
     addSpeedEffect,
     addRoundedCorners,
+    addVisualEffect,
     addBehavior,
     addTransition,
     updateTransition,

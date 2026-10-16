@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { additionalVisualEffectPresets } from "./visual-effects";
 import {
   behaviorPhaseSchema,
   behaviorPresets,
@@ -14,6 +15,7 @@ export const animationPresets = [
 export const visualEffectPresets = [
   { id: "rounded-corners", name: "圆角倒角" },
   { id: "clip-speed", name: "剪辑速度" },
+  ...additionalVisualEffectPresets,
 ] as const;
 export type PresetKind = "behavior" | "animation" | "effect";
 const nameSchema = z.string().trim().min(1).max(100);
