@@ -666,27 +666,17 @@ function installHandlers() {
     const project = authorizedProject(input);
     let file = projectFile;
     if (!file || saveAs === true) {
-      const result = await dialog.showOpenDialog(window, {
-        title: "选择工程存放位置（将自动新建工程文件夹并收集素材）",
-        properties: ["openDirectory", "createDirectory"],
+      const fileName = project.name.replace(/[<>:"/\\|?*\x00-\x1f]/g, "_");
+      const result = await dialog.showSaveDialog(window, {
+        title: saveAs === true ? "工程另存为" : "保存工程",
+        defaultPath:
+          file || path.join(app.getPath("documents"), `${fileName}.troncut`),
+        filters: [{ name: "TronCut 工程", extensions: ["troncut"] }],
       });
-      if (result.canceled) return null;
-      const folderName = project.name.replace(/[<>:"/\\|?*\x00-\x1f]/g, "_");
-      let root = path.join(result.filePaths[0], folderName);
-      let suffix = 2;
-      while (
-        await fs.access(root).then(
-          () => true,
-          () => false,
-        )
-      )
-        root = path.join(result.filePaths[0], `${folderName}-${suffix++}`);
-      file = path.join(root, `${folderName}.troncut`);
+      if (result.canceled || !result.filePath) return null;
+      file = result.filePath;
     }
-    const icon = app.isPackaged
-      ? path.join(process.resourcesPath, "project.ico")
-      : path.resolve("resources/icon.ico");
-    const saved = registerProject(await saveProject(project, file, icon));
+    const saved = registerProject(await saveProject(project, file));
     projectFile = file;
     await rememberProject(saved, file);
     await fs.rm(path.join(app.getPath("userData"), "recovery.json"), {
