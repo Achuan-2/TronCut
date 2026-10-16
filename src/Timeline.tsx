@@ -700,12 +700,6 @@ export default function Timeline({
             截取当前帧
           </button>
           <button
-            title="添加标记"
-            onClick={() => addMarker(playhead)}
-          >
-            <Flag size={16} />
-          </button>
-          <button
             title="添加区域标记（Shift+拖动标尺）"
             onClick={() => {
               const clips = project.clips.filter((clip) =>

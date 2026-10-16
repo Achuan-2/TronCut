@@ -64,10 +64,11 @@ try {
   await expect
     .poll(() => color(page.locator('[data-marker-id="legacy"]')))
     .toBe("#e6c66f");
-  await page.getByTitle("添加标记", { exact: true }).click();
+  await expect(page.getByTitle("添加标记", { exact: true })).toHaveCount(0);
+  await page.getByTitle("添加区域标记（Shift+拖动标尺）", { exact: true }).click();
   await expect(
     dialog().getByRole("checkbox", { name: "区域标记", exact: true }),
-  ).not.toBeChecked();
+  ).toBeChecked();
   await dialog().getByLabel("标记名称", { exact: true }).fill("取消的标记");
   await page.keyboard.press("Escape");
   await expect(dialog()).toHaveCount(0);
@@ -179,7 +180,8 @@ try {
     });
   await save();
   await expect.poll(() => color(range)).toBe("#abc123");
-  await page.getByTitle("添加标记", { exact: true }).click();
+  await page.getByTitle("添加区域标记（Shift+拖动标尺）", { exact: true }).click();
+  await dialog().getByRole("checkbox", { name: "区域标记", exact: true }).uncheck();
   await dialog().getByLabel("标记名称", { exact: true }).fill("校对点");
   await dialog()
     .getByRole("button", { name: "标记颜色：橙色", exact: true })
