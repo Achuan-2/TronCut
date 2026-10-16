@@ -4,6 +4,10 @@ import { supportsClipSpeed } from "../shared/clip-speed";
 import { supportsMediaFrame } from "../shared/media-frame";
 import type { Editor } from "./useEditor";
 import { visualEffectPresets } from "../shared/preset-library";
+import {
+  visualEffectDragType,
+  visualEffectMime,
+} from "../shared/visual-effect-drag";
 import PresetTile from "./PresetTile";
 
 export function VisualEffectCard({
@@ -29,10 +33,11 @@ export function VisualEffectCard({
         className={`visual-effect-card ${selected ? "selected" : ""}`}
         data-effect={preset.id}
         draggable
-        title="拖到片段，或双击应用到所选片段"
+        title="拖到画布对象或时间轴片段，或双击应用到所选片段"
         onClick={onSelect}
         onDragStart={(event) => {
-          event.dataTransfer.setData("troncut-effect", preset.id);
+          event.dataTransfer.setData(visualEffectMime, preset.id);
+          event.dataTransfer.setData(visualEffectDragType(preset.id), preset.id);
           event.dataTransfer.effectAllowed = "copy";
         }}
         onDoubleClick={() =>

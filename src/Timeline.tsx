@@ -59,6 +59,10 @@ import type { Editor } from "./useEditor";
 import { timeLabel } from "./Preview";
 import { hasClipSpeed, supportsClipSpeed } from "../shared/clip-speed";
 import { supportsMediaFrame } from "../shared/media-frame";
+import {
+  supportsVisualEffect,
+  visualEffectFromDragTypes,
+} from "../shared/visual-effect-drag";
 import TimelineSpeedEffect from "./TimelineSpeedEffect";
 import TimelineBehaviorEffect from "./TimelineBehaviorEffect";
 import BehaviorContextMenu from "./BehaviorContextMenu";
@@ -1300,7 +1304,13 @@ export default function Timeline({
                             event.preventDefault();
                             event.stopPropagation();
                             const allowed =
-                              !track.locked && (supportsClipSpeed(c) || supportsMediaFrame(c));
+                              !track.locked &&
+                              supportsVisualEffect(
+                                c,
+                                visualEffectFromDragTypes(
+                                  event.dataTransfer.types,
+                                ),
+                              );
                             event.dataTransfer.dropEffect = allowed
                               ? "copy"
                               : "none";

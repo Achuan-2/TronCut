@@ -62,6 +62,11 @@ import type { Editor } from "./useEditor";
 import { visualClipAt } from "../shared/visual-state";
 import { annotationMime, parseAnnotation } from "../shared/annotations";
 import { behaviorTransform, supportsBehaviors } from "../shared/behaviors";
+import {
+  supportsVisualEffect,
+  visualEffectFromDragTypes,
+  visualEffectMime,
+} from "../shared/visual-effect-drag";
 import { transitionTransform } from "../shared/transitions";
 import { projectIndex } from "../shared/project-index";
 import BehaviorText from "./BehaviorText";
@@ -300,6 +305,19 @@ function PreviewLayer({
   if (effects.flipX) radii = [radii[1], radii[0], radii[3], radii[2]];
   if (effects.flipY) radii = [radii[3], radii[2], radii[1], radii[0]];
   const selectable = interactive && !track?.locked && clip.kind !== "audio";
+  const [effectDrop, setEffectDrop] = useState(false);
+  useEffect(() => {
+    if (!effectDrop) return;
+    const clear = () => setEffectDrop(false);
+    window.addEventListener("dragend", clear, true);
+    window.addEventListener("drop", clear, true);
+    window.addEventListener("blur", clear);
+    return () => {
+      window.removeEventListener("dragend", clear, true);
+      window.removeEventListener("drop", clear, true);
+      window.removeEventListener("blur", clear);
+    };
+  }, [effectDrop]);
   const cropping =
     mode === "crop" && asset && ["image", "video"].includes(clip.kind);
   const contentView =
@@ -313,26 +331,46 @@ function PreviewLayer({
   );
   return (
     <div
-      className={`preview-layer ${clip.kind} ${interactive && editor.selectedIds.includes(clip.id) ? "selected" : ""} ${editing ? "editing" : ""} ${cropping ? "cropping" : ""}`}
+      className={`preview-layer ${clip.kind} ${interactive && editor.selectedIds.includes(clip.id) ? "selected" : ""} ${editing ? "editing" : ""} ${cropping ? "cropping" : ""} ${effectDrop && selectable ? "effect-drop-target" : ""}`}
+      data-clip-id={clip.id}
       style={style}
       onDragOver={(event) => {
-        if (
-          !interactive ||
-          !event.dataTransfer.types.includes("troncut-behavior")
-        )
-          return;
+        if (!interactive) return;
+        const behavior = event.dataTransfer.types.includes("troncut-behavior");
+        const effect = event.dataTransfer.types.includes(visualEffectMime);
+        if (!behavior && !effect) return;
         event.preventDefault();
         event.stopPropagation();
-        event.dataTransfer.dropEffect =
-          selectable && supportsBehaviors(clip) ? "copy" : "none";
+        const allowed =
+          selectable &&
+          (behavior
+            ? supportsBehaviors(clip) && (clip.behaviors?.length ?? 0) < 32
+            : supportsVisualEffect(
+                clip,
+                visualEffectFromDragTypes(event.dataTransfer.types),
+              ));
+        event.dataTransfer.dropEffect = allowed ? "copy" : "none";
+        setEffectDrop(allowed);
+      }}
+      onDragLeave={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null))
+          setEffectDrop(false);
       }}
       onDrop={(event) => {
-        const preset = event.dataTransfer.getData("troncut-behavior");
-        if (!interactive || !preset) return;
+        if (!interactive) return;
+        const behavior = event.dataTransfer.getData("troncut-behavior");
+        const effect = event.dataTransfer.getData(visualEffectMime);
+        if (!behavior && !effect) return;
         event.preventDefault();
         event.stopPropagation();
-        if (selectable && supportsBehaviors(clip))
-          editor.addBehavior(preset, clip.id);
+        setEffectDrop(false);
+        if (!selectable) return;
+        if (behavior) {
+          if (supportsBehaviors(clip)) editor.addBehavior(behavior, clip.id);
+        } else if (supportsVisualEffect(clip, effect)) {
+          if (effect === "clip-speed") editor.addSpeedEffect(clip.id);
+          else editor.addRoundedCorners(clip.id);
+        }
       }}
       onClick={(event) => event.stopPropagation()}
       onDoubleClick={(event) => {

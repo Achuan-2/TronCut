@@ -1997,7 +1997,8 @@ fieldset:disabled {
   transform-origin: center center;
   max-width: none;
 }
-.preview-layer.selected:after {
+.preview-layer.selected:after,
+.preview-layer.effect-drop-target:after {
   content: "";
   position: absolute;
   /* Center the 1px border on the same bounds as the resize handles. */
@@ -2005,6 +2006,25 @@ fieldset:disabled {
   pointer-events: none;
   border: 1px solid var(--accent);
   outline: 2px solid #183d2940;
+}
+.preview-layer.effect-drop-target:after {
+  border-width: 2px;
+  outline: 2px solid #76e5b544;
+  animation: canvas-effect-target-pulse 0.9s ease-in-out infinite alternate;
+}
+@keyframes canvas-effect-target-pulse {
+  from {
+    box-shadow: 0 0 0 2px #76e5b533, inset 0 0 0 1px #76e5b544;
+  }
+  to {
+    box-shadow: 0 0 0 5px #76e5b566, inset 0 0 0 2px #76e5b588;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .preview-layer.effect-drop-target:after {
+    animation: none;
+    box-shadow: 0 0 0 3px #76e5b544;
+  }
 }
 .preview-layer.text.editing {
   cursor: text;
