@@ -1,4 +1,4 @@
-import { expect, it } from "vitest";
+import { expect, it, vi } from "vitest";
 import fs from "node:fs/promises";
 import path from "node:path";
 import sharp from "sharp";
@@ -12,6 +12,7 @@ import { frameSnapshot } from "../shared/frame-snapshot";
 import { exportFrame } from "../electron/export";
 import { probeMedia } from "../electron/media";
 import { findBinary, runProcess } from "../electron/process";
+import * as mediaProcess from "../electron/process";
 import { saveProject, openProject } from "../electron/project-store";
 
 it("截帧冻结当前动画、裁剪、淡入与运镜，按变速后的源时间取帧且不修改工程", () => {
@@ -187,6 +188,25 @@ it("真实截帧按源时间合成视频、文字、裁剪和背景为 PNG，支
   project.canvas.fps = 30; // Source video is 10 fps.
   const endpoint = await capture(6, clip.id);
   expect((await pixel(endpoint, 150, 60))[1]).toBeGreaterThan(230);
+  // Reproduce the CI demuxer returning an empty tail probe. The full scan must
+  // still resolve the real 10 fps endpoint while the canvas uses 30 fps.
+  const runProcessOriginal = mediaProcess.runProcess;
+  let emptyTail = false;
+  const processSpy = vi.spyOn(mediaProcess, "runProcess")
+    .mockImplementation((binary, args, options) => {
+      if (args.includes("-show_frames") && args.includes("-read_intervals")) {
+        emptyTail = true;
+        return Promise.resolve("");
+      }
+      return runProcessOriginal(binary, args, options);
+    });
+  try {
+    const recovered = await capture(6, clip.id);
+    expect(emptyTail).toBe(true);
+    expect((await pixel(recovered, 150, 60))[1]).toBeGreaterThan(230);
+  } finally {
+    processSpy.mockRestore();
+  }
   project.canvas.width = 201;
   const empty = path.join(root, "empty.png");
   await exportFrame(

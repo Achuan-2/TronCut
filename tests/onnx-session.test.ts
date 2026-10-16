@@ -65,7 +65,9 @@ it("连续任务共用 Python，串行排队，每个任务独立清理下载目
   const { root, run, events } = await setup();
   const [first, second] = await Promise.all([run({ delay: 30 }), run()]);
   expect(first.pid).toBe(second.pid);
-  expect([first.requests, second.requests]).toEqual([1, 2]);
+  // Request files are written asynchronously before enqueueing, so either
+  // preparation may finish first. Both tasks must still run once, in sequence.
+  expect([first.requests, second.requests].sort((a, b) => a - b)).toEqual([1, 2]);
   expect(first.messageTemp).not.toBe(second.messageTemp);
   await expect(fs.access(first.messageTemp)).rejects.toThrow();
   expect(await fs.readdir(path.join(root, "models"))).toEqual([]);

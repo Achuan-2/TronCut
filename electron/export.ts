@@ -470,30 +470,38 @@ async function renderProject(
     ) {
       // An edited endpoint can be exactly at EOF. Use the last decoded source
       // timestamp instead of assuming the video's frame rate equals the project.
-      const timestamps = await runProcess(
-        findBinary("ffprobe", resourcesPath),
-        [
-          "-v",
-          "error",
-          "-select_streams",
-          "v:0",
-          "-read_intervals",
-          `${Math.max(0, asset.duration - 1)}%`,
-          "-show_frames",
-          "-show_entries",
-          "frame=best_effort_timestamp_time",
-          "-of",
-          "csv=p=0",
-          asset.path,
-        ],
-        { signal, timeout: 30000 },
-      );
-      const last = timestamps
-        .trim()
-        .split(/\r?\n/)
-        .map((line) => Number.parseFloat(line))
-        .filter(Number.isFinite)
-        .at(-1);
+      const probeFrames = (tailOnly: boolean) =>
+        runProcess(
+          findBinary("ffprobe", resourcesPath),
+          [
+            "-v",
+            "error",
+            "-select_streams",
+            "v:0",
+            ...(tailOnly
+              ? ["-read_intervals", `${Math.max(0, asset.duration - 1)}%`]
+              : []),
+            "-show_frames",
+            "-show_entries",
+            "frame=best_effort_timestamp_time",
+            "-of",
+            "csv=p=0",
+            asset.path,
+          ],
+          { signal, timeout: 30000 },
+        );
+      const lastTimestamp = (timestamps: string) =>
+        timestamps
+          .trim()
+          .split(/\r?\n/)
+          .map((line) => Number.parseFloat(line))
+          .filter(Number.isFinite)
+          .at(-1);
+      // Some demuxers return no decoded frames when seeking near EOF. Retry
+      // from the beginning rather than guessing a frame duration from the canvas.
+      const last =
+        lastTimestamp(await probeFrames(true)) ??
+        lastTimestamp(await probeFrames(false));
       if (last === undefined)
         throw new Error(`无法读取视频末帧：${asset.name}`);
       sourceSeek = last;
