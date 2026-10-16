@@ -32,7 +32,13 @@ export function sameTransform(
           (a[key] ?? fallback[key] ?? 0) - (b[key] ?? fallback[key] ?? 0),
         ) < 1e-9,
     ) &&
-    maskKeys.every((key) => Math.abs((a[key] ?? fallback[key] ?? defaultMask[key]) - (b[key] ?? fallback[key] ?? defaultMask[key])) < 1e-9) &&
+    maskKeys.every(
+      (key) =>
+        Math.abs(
+          (a[key] ?? fallback[key] ?? defaultMask[key]) -
+            (b[key] ?? fallback[key] ?? defaultMask[key]),
+        ) < 1e-9,
+    ) &&
     visualKeys.every(
       (key) =>
         Math.abs(
@@ -102,6 +108,19 @@ export function visibleAnimationRanges(
 
 export type AnimationDragMode = "start" | "end" | "move";
 
+/** Destination samples with one ID form a single editable recording animation. */
+export function recordingSegments(frames: Clip["keyframes"]) {
+  const groups: { id: number; start: number; end: number }[] = [];
+  for (let i = 1; i < frames.length; i++) {
+    const id = frames[i].recordingSegment;
+    if (!id) continue;
+    const last = groups.at(-1);
+    if (last?.id === id && last.end === i - 1) last.end = i;
+    else groups.push({ id, start: i - 1, end: i });
+  }
+  return groups;
+}
+
 export function retimeAnimation(
   clip: Clip,
   range: AnimationRange,
@@ -115,6 +134,80 @@ export function retimeAnimation(
   const offset = clip.animationOffset ?? 0,
     minimum = 1 / fps;
   if (frames.length > 10000) return clip;
+  const groups = recordingSegments(frames);
+  const group = groups.find(
+    (group) =>
+      Math.max(0, frames[group.start].time - offset) === range.start &&
+      Math.min(clip.duration, frames[group.end].time - offset) === range.end,
+  );
+  if (group && group.end > group.start + 1) {
+    const a = frames[group.start].time,
+      b = frames[group.end].time;
+    const previousGroup = groups.find(
+      (candidate) => candidate.end === group.start,
+    );
+    const nextGroup = groups.find((candidate) => candidate.start === group.end);
+    const snap = (time: number) =>
+      Math.round((time - offset + clip.start) * fps) / fps +
+      offset -
+      clip.start;
+    const low = Math.max(
+      offset,
+      previousGroup
+        ? frames[previousGroup.start].time + minimum
+        : frames[group.start - 1]?.time + minimum || offset,
+    );
+    const high = Math.min(
+      offset + clip.duration,
+      nextGroup
+        ? frames[nextGroup.end].time - minimum
+        : frames[group.end + 1]?.time - minimum || offset + clip.duration,
+    );
+    if (high - low < minimum) return clip;
+    let start = a,
+      end = b;
+    if (mode === "move") {
+      if (high - b < low - a) return clip;
+      const shift = Math.max(
+        low - a,
+        Math.min(high - b, Math.round(delta * fps) / fps),
+      );
+      start += shift;
+      end += shift;
+    } else if (mode === "start" && range.hasStart)
+      start = Math.max(low, Math.min(b - minimum, snap(a + delta)));
+    else if (mode === "end" && range.hasEnd)
+      end = Math.max(a + minimum, Math.min(high, snap(b + delta)));
+    if (start === a && end === b) return clip;
+    return {
+      ...clip,
+      keyframes: frames.map((frame, index) =>
+        index >= group.start && index <= group.end
+          ? {
+              ...frame,
+              time: start + ((frame.time - a) / (b - a)) * (end - start),
+            }
+          : previousGroup && index >= previousGroup.start && index < group.start
+            ? {
+                ...frame,
+                time:
+                  frames[previousGroup.start].time +
+                  ((frame.time - frames[previousGroup.start].time) /
+                    (a - frames[previousGroup.start].time)) *
+                    (start - frames[previousGroup.start].time),
+              }
+            : nextGroup && index > group.end && index <= nextGroup.end
+              ? {
+                  ...frame,
+                  time:
+                    end +
+                    ((frame.time - b) / (frames[nextGroup.end].time - b)) *
+                      (frames[nextGroup.end].time - end),
+                }
+              : frame,
+      ),
+    };
+  }
   let index = frames.findIndex(
     (frame, i) =>
       i + 1 < frames.length &&
@@ -224,8 +317,18 @@ export function retimeAnimation(
       };
     }
   }
-  if (maskKeys.some((key) => clip.transform[key] !== undefined || frames.some((frame) => frame.value[key] !== undefined))) {
-    for (let i = 0; i < frames.length; i++) frames[i] = { ...frames[i], value: { ...frames[i].value, ...maskValues(clip, frames[i].value) } };
+  if (
+    maskKeys.some(
+      (key) =>
+        clip.transform[key] !== undefined ||
+        frames.some((frame) => frame.value[key] !== undefined),
+    )
+  ) {
+    for (let i = 0; i < frames.length; i++)
+      frames[i] = {
+        ...frames[i],
+        value: { ...frames[i].value, ...maskValues(clip, frames[i].value) },
+      };
   }
   const axes = optionalTransformKeys.filter(
     (key) =>
@@ -279,6 +382,19 @@ export function animationRanges(
       hasStart: start >= 0,
       hasEnd: end <= clip.duration,
     });
+    if (
+      b.recordingSegment &&
+      frames[i + 1]?.recordingSegment === b.recordingSegment
+    ) {
+      while (
+        i + 1 < frames.length &&
+        frames[i + 1].recordingSegment === b.recordingSegment
+      )
+        i++;
+      const last = ranges.at(-1)!;
+      last.end = Math.min(clip.duration, frames[i].time - offset);
+      last.hasEnd = frames[i].time - offset <= clip.duration;
+    }
   }
   return ranges;
 }

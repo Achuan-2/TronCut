@@ -24,7 +24,7 @@ import { timeLabel } from "./Preview";
 import { defaultCrop, defaultEffects } from "../shared/effects";
 import { textBoxFor } from "./text";
 import MediaLibrary from "./MediaLibrary";
-import { defaultCursorStyle } from "../shared/cursor";
+import { defaultCursorStyle, cursorStyles } from "../shared/cursor";
 import NarrationPanel from "./NarrationPanel";
 import AnimationsPanel from "./AnimationsPanel";
 import { defaultContentTransform } from "../shared/crop";
@@ -321,10 +321,7 @@ function CursorProperties({
             change({ style: event.target.value as typeof style.style })
           }
         >
-          <option value="arrow">箭头</option>
-          <option value="circle">圆形</option>
-          <option value="cross">十字</option>
-          <option value="hidden">隐藏鼠标</option>
+{Object.entries(cursorStyles).map(([id, name]) => <option key={id} value={id}>{name}</option>)}
         </select>
       </label>
       <label className="field">

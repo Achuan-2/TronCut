@@ -20,12 +20,13 @@ export const cursorRecordingSchema = z.object({
         y: finite,
         visible: z.boolean(),
         click: z.boolean(),
+        cursorType: z.enum(["arrow", "text", "pointer", "crosshair", "open-hand", "closed-hand", "resize-ew", "resize-ns", "not-allowed"]).optional(),
       }),
     )
     .max(500000),
 });
 export const cursorStyleSchema = z.object({
-  style: z.enum(["arrow", "circle", "cross", "hidden"]),
+  style: z.enum(["arrow", "circle", "cross", "hidden", "macos", "tahoe", "tahoe-inverted", "windows11", "figma", "dot"]),
   size: finite.min(8).max(160),
   color: z.string().regex(/^#[\da-f]{6}$/i),
   clicks: z.boolean(),
@@ -149,6 +150,7 @@ export const projectSchema = z.object({
         sourceIn: finite.nonnegative(),
         speed: finite.min(0.25).max(8),
         speedEffect: z.boolean().optional(),
+        loop: z.boolean().optional(),
         visualEffects: visualEffectsSchema.optional(),
         behaviors: z.array(behaviorSchema).max(32).optional(),
         transitions: z
@@ -167,6 +169,7 @@ export const projectSchema = z.object({
               easing: z.enum(animationEasings).optional(),
               animation: z.literal(true).optional(),
               recordingZoom: z.literal(true).optional(),
+              recordingSegment: z.number().int().positive().optional(),
               zoomPan: cameraTransformSchema.optional(),
             }),
           )

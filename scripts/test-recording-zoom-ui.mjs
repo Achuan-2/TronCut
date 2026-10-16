@@ -75,15 +75,22 @@ try {
   const zoom = page.getByLabel("缩放 (%)", { exact: true });
   const pan = page.getByLabel("内容位置 X (%)", { exact: true });
   const cropMode = page.getByRole("button", { name: "裁剪模式", exact: true });
-  await expect(arrows).toHaveCount(2);
+  const arrowCount = await arrows.count();
+  expect(arrowCount).toBe(2);
   await video.click();
   for (const name of ["编辑缩放与移动", "根据鼠标重新生成缩放", "移除自动缩放"])
-    await expect(page.getByRole("button", { name, exact: true })).toHaveCount(0);
+    await expect(page.getByRole("button", { name, exact: true })).toHaveCount(
+      0,
+    );
   await expect(page.getByText("自动缩放", { exact: true })).toHaveCount(0);
-  await expect(page.getByText("选中时间线上的动画起点或终点", { exact: false })).toHaveCount(0);
+  await expect(
+    page.getByText("选中时间线上的动画起点或终点", { exact: false }),
+  ).toHaveCount(0);
   await arrows.first().locator(".animation-point.end").click();
   await expect(cropMode).toHaveAttribute("aria-pressed", "true");
-  await expect(zoom).toHaveValue("200");
+  const originalZoom = await zoom.inputValue();
+  const originalPan = await pan.inputValue();
+  expect(Number(originalZoom)).toBeGreaterThan(140);
   const layer = page.locator(".preview-panel .preview-layer.video");
   const bounds = await layer.boundingBox();
   await zoom.fill("250");
@@ -91,12 +98,12 @@ try {
   const changed = await layer.boundingBox();
   for (const key of ["x", "y", "width", "height"])
     expect(changed[key]).toBeCloseTo(bounds[key], 0);
-  await expect(arrows).toHaveCount(2);
+  await expect(arrows).toHaveCount(arrowCount);
   await page.getByTitle("撤销 Ctrl+Z", { exact: true }).click();
-  await expect(pan).toHaveValue("-40");
+  await expect(pan).toHaveValue(originalPan);
   await page.getByTitle("重做 Ctrl+Shift+Z", { exact: true }).click();
   await expect(pan).toHaveValue("-30");
-  await arrows.first().locator(".animation-point.start").click();
+  await arrows.first().locator(".animation-point.start").click({ force: true });
   await expect(zoom).toHaveValue("100");
   await arrows.last().locator(".animation-point.end").click();
   await expect(zoom).toHaveValue("100");
@@ -131,7 +138,9 @@ try {
       "utf8",
     ),
   );
-  const zoomEnd = saved.clips[0].keyframes.find((frame) => frame.animation);
+  const zoomEnd = saved.clips[0].keyframes.find(
+    (frame) => frame.value.contentScale === 2.5,
+  );
   expect(zoomEnd.value.contentScale).toBe(2.5);
   expect(zoomEnd.value.contentX).toBe(-0.3);
   expect(

@@ -155,14 +155,22 @@ function baseExpression(
   )
     return String(frameValue(frames[0].value));
   const origin = clip.start - (clip.animationOffset ?? 0);
-  let result = String(frameValue(frames.at(-1)!.value));
-  for (let i = frames.length - 1; i > 0; i--) {
-    const a = frames[i - 1],
-      b = frames[i],
-      p = `clip((${clock}-${origin + a.time})/${Math.max(0.00001, b.time - a.time)},0,1)`;
-    const ease = easingExpression(p, b.easing);
-    result = `if(lt(${clock},${origin + b.time}),${frameValue(a.value)}+(${frameValue(b.value) - frameValue(a.value)})*${ease},${result})`;
-  }
+  // Balanced timestamp lookup keeps baked camera paths within FFmpeg's expression
+  // recursion limit and evaluates O(log N) branches per pixel instead of O(N).
+  const segment = (index: number): string => {
+    if (index >= frames.length - 1) return String(frameValue(frames.at(-1)!.value));
+    const a = frames[index], b = frames[index + 1];
+    const from = frameValue(a.value), delta = frameValue(b.value) - from;
+    if (delta === 0) return String(from);
+    const p = `clip((${clock}-${origin + a.time})/${Math.max(0.00001, b.time - a.time)},0,1)`;
+    return `${from}+(${delta})*${easingExpression(p, b.easing)}`;
+  };
+  const branch = (lo: number, hi: number): string => {
+    if (lo === hi) return segment(lo);
+    const mid = (lo + hi) >>> 1;
+    return `if(lt(${clock},${origin + frames[mid + 1].time}),${branch(lo, mid)},${branch(mid + 1, hi)})`;
+  };
+  const result = branch(0, frames.length - 1);
   const value = `if(lt(${clock},${origin + frames[0].time}),${frameValue(frames[0].value)},${result})`;
   return key === "opacity"
     ? `clip(${value},0,1)`
@@ -453,6 +461,7 @@ async function renderProject(
       );
     const sourceIn = still || animatedText ? 0 : clip.sourceIn;
     let sourceSeek = clip.sourceIn;
+    if (clip.loop && asset && asset.duration > 0) sourceSeek %= asset.duration;
     if (
       still &&
       clip.kind === "video" &&
@@ -518,6 +527,7 @@ async function renderProject(
       args.push(
         "-threads",
         "1",
+        ...(clip.loop ? ["-stream_loop", "-1"] : []),
         ...(still ? ["-ss", String(sourceSeek)] : []),
         "-i",
         asset!.path,
@@ -644,12 +654,29 @@ async function renderProject(
       // Negotiate that conversion on an explicit frame-evaluated scale filter
       // for axis-scaled layers, including later proportional animations.
       const independentScale =
+        clip.keyframes.some(frame => frame.value.scale !== clip.transform.scale) ||
         clip.transform.scaleX !== undefined || clip.transform.scaleY !== undefined ||
         clip.keyframes.some((frame) => frame.value.scaleX !== undefined || frame.value.scaleY !== undefined);
       const outputFormat = independentScale
         ? ["scale=w=iw:h=ih:eval=frame", "format=yuva420p"] : [];
       const viewport = `viewport${layer}`;
-      filters.push(`[${source}]${timing}${animatedText ? `fps=${fps},` : ""}format=rgba,${[...(animatedViewport ? animatedViewportFilters((key) => pose(key, "T")) : contentFilters(clip)), ...visualEffects, ...frameFilters, "null"].join(",")}[${viewport}]`);
+      const recordingViewport = !still && clip.kind === "video" &&
+        clip.keyframes.length > 0 && clip.keyframes.every(frame => frame.recordingZoom) &&
+        !Object.values(clip.crop ?? {}).some(Boolean) &&
+        !clip.keyframes.some(frame =>
+          [frame.value.cropLeft, frame.value.cropTop, frame.value.cropRight, frame.value.cropBottom].some(Boolean)) &&
+        !clip.keyframes.some(frame => (frame.value.contentScale ?? 1) < 1);
+      const viewportFilters = recordingViewport
+        ? [
+            // zoompan evaluates the camera once per output frame rather than per
+            // color channel and pixel. Round corners and alpha are applied afterwards.
+            `fps=${fps}`,
+            `zoompan=z='${pose("contentScale", "in_time")}':x='iw/2-iw/(2*zoom)-iw*(${pose("contentX", "in_time")})/zoom':y='ih/2-ih/(2*zoom)-ih*(${pose("contentY", "in_time")})/zoom':d=1:s=${intrinsicWidth}x${intrinsicHeight}:fps=${fps}`,
+            `setpts=PTS+${clip.start}/TB`,
+            "format=rgba",
+          ]
+        : animatedViewport ? animatedViewportFilters((key) => pose(key, "T")) : contentFilters(clip);
+      filters.push(`[${source}]${timing}${animatedText ? `fps=${fps},` : ""}format=rgba,${[...viewportFilters, ...visualEffects, ...frameFilters, "null"].join(",")}[${viewport}]`);
       const attached = await visualEffectFilters({
         clip, source: viewport, layer, width: cropWidth, height: cropHeight,
         fit, fps, duration, workDir, input, signal,

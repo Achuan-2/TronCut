@@ -17,7 +17,7 @@
 
 OpenScreen：`electron/ipc/recordingStream.ts` 展示写入流生命周期；`electron/native-bridge/cursor/recording/windowsNativeRecordingSession.ts` 展示光标采样器；`electron/native/wgc-capture/` 为采用的 Windows 原生组件。TronCut 的应用生命周期、工程、鼠标预览与导出自行实现，未复制 OpenScreen 整体应用。
 
-Recordly：`electron/native/windows-capture/src/` 中的 `wasapi_loopback.*`、`mf_encoder.*` 与 `main.cpp` 适合研究系统音频和原生编码；`electron/cursorHider.ts` 用于理解光标隐藏。没有作为 TronCut 依赖或编译进产品。
+Recordly：`electron/native/windows-capture/src/` 中的 `wasapi_loopback.*`、`mf_encoder.*` 与 `main.cpp` 适合研究系统音频和原生编码；`electron/cursorHider.ts` 用于理解光标隐藏。录屏自动缩放、安全区域跟随、弹簧缓动及倒计时代码已适配到 TronCut，静态和视频壁纸、鼠标图形已复制；采用范围、上游提交和许可见 [第三方声明](../THIRD_PARTY_NOTICES.md)。
 
 VideoCaptioner：`videocaptioner/cli/main.py` 定义 CLI 参数。该版本内部映射包括 Faster Whisper，但 `--asr` choices 没有该值。TronCut 为 Faster Whisper 单独实现工作进程，保留 Whisper.cpp 的外部 CLI 接口。
 

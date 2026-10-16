@@ -11,7 +11,7 @@ import {
   newTrack,
   numberTracks,
 } from "./model";
-import { sameTransform } from "./animation-ranges";
+import { sameTransform, recordingSegments } from "./animation-ranges";
 import { easeProgress } from "./easing";
 import {
   normalizeRotationAxes,
@@ -298,6 +298,23 @@ export function setKeyframeTransform<
     )
       held.add(ordered[i]);
     const initial = position === 0 || initialState;
+    const groups = recordingSegments(ordered).filter(group => group.start === position || group.end === position);
+    const adjusted = new Map(ordered.flatMap((frame, i) => {
+      if (held.has(frame)) return [];
+      const group = groups.find(group => i > group.start && i < group.end);
+      if (!group) return [];
+      const a = ordered[group.start].time, b = ordered[group.end].time;
+      const progress = (frame.time - a) / (b - a);
+      const weight = group.start === position ? 1 - progress : progress;
+      const value = { ...frame.value };
+      for (const [name, next] of Object.entries(patch)) {
+        const key = name as keyof Transform;
+        const fallback = ["scale", "scaleX", "scaleY", "contentScale", "opacity"].includes(name) ? 1 : 0;
+        value[key] = (frame.value[key] ?? clip.transform[key] ?? fallback) +
+          ((next ?? clip.transform[key] ?? fallback) - (target.value[key] ?? clip.transform[key] ?? fallback)) * weight;
+      }
+      return [[frame, value] as const];
+    }));
     if (initial)
       for (const frame of ordered.slice(0, position)) held.add(frame);
     return {
@@ -306,6 +323,7 @@ export function setKeyframeTransform<
       keyframes: clip.keyframes.map((frame) =>
         held.has(frame)
           ? { ...frame, value: { ...frame.value, ...patch } }
+          : adjusted.has(frame) ? { ...frame, value: adjusted.get(frame)! }
           : initial && axes.length
             ? {
                 ...frame,

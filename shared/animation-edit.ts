@@ -3,6 +3,7 @@ import type { AnimationEasing } from "./easing";
 import {
   animationRanges,
   sameTransform,
+  recordingSegments,
   type AnimationRange,
 } from "./animation-ranges";
 import { transformAt } from "./editor";
@@ -14,6 +15,7 @@ export interface CopiedAnimation {
   from: Transform;
   to: Transform;
   easing?: AnimationEasing;
+  samples?: { progress: number; value: Transform }[];
 }
 
 // An explicit animation can begin with identical states. Its end marker keeps
@@ -62,6 +64,19 @@ function rangeFrames(clip: Clip, range: AnimationRange) {
   const frames = [...clip.keyframes].sort((a, b) => a.time - b.time);
   if (frames[0]?.time > 0) frames.unshift({ time: 0, value: clip.transform });
   const offset = clip.animationOffset ?? 0;
+  const group = recordingSegments(frames).find(
+    (group) =>
+      Math.max(0, frames[group.start].time - offset) === range.start &&
+      Math.min(clip.duration, frames[group.end].time - offset) === range.end,
+  );
+  if (group)
+    return {
+      frames,
+      index: group.start,
+      endIndex: group.end,
+      a: frames[group.start],
+      b: frames[group.end],
+    };
   const index = frames.findIndex(
     (frame, i) =>
       i + 1 < frames.length &&
@@ -70,7 +85,13 @@ function rangeFrames(clip: Clip, range: AnimationRange) {
   );
   return index < 0
     ? null
-    : { frames, index, a: frames[index], b: frames[index + 1] };
+    : {
+        frames,
+        index,
+        endIndex: index + 1,
+        a: frames[index],
+        b: frames[index + 1],
+      };
 }
 
 export function snapshotAnimation(
@@ -84,6 +105,23 @@ export function snapshotAnimation(
         from: transformAt(clip, range.start),
         to: transformAt(clip, range.end),
         easing: pair.b.easing,
+        ...(pair.endIndex > pair.index + 1
+          ? {
+              samples: pair.frames
+                .slice(pair.index + 1, pair.endIndex)
+                .filter(
+                  (frame) =>
+                    frame.time > range.start + (clip.animationOffset ?? 0) &&
+                    frame.time < range.end + (clip.animationOffset ?? 0),
+                )
+                .map((frame) => ({
+                  progress:
+                    (frame.time - (clip.animationOffset ?? 0) - range.start) /
+                    (range.end - range.start),
+                  value: frame.value,
+                })),
+            }
+          : {}),
       }
     : null;
 }
@@ -106,9 +144,9 @@ export function setAnimationEasing(
 export function removeAnimation(clip: Clip, range: AnimationRange): Clip {
   const pair = rangeFrames(clip, range);
   if (!pair) return clip;
-  const held = new Set([pair.b]);
+  const held = new Set(pair.frames.slice(pair.index + 1, pair.endIndex + 1));
   for (
-    let i = pair.index + 2;
+    let i = pair.endIndex + 1;
     i < pair.frames.length &&
     !pair.frames[i].animation &&
     sameTransform(
@@ -131,6 +169,7 @@ export function removeAnimation(clip: Clip, range: AnimationRange): Clip {
             value: { ...pair.a.value },
             easing: undefined,
             animation: undefined,
+            recordingSegment: undefined,
             zoomPan: pair.a.zoomPan,
           }
         : frame,
@@ -163,7 +202,12 @@ export function pasteAnimation(
   )
     ? { ...sampled, ...visualValues(clip, sampled) }
     : sampled;
-  if (maskKeys.some((key) => copied.from[key] !== undefined || copied.to[key] !== undefined)) from = { ...from, ...maskValues(clip, sampled) };
+  if (
+    maskKeys.some(
+      (key) => copied.from[key] !== undefined || copied.to[key] !== undefined,
+    )
+  )
+    from = { ...from, ...maskValues(clip, sampled) };
   const to = { ...from };
   // Paste the same motion relative to the target's current state. This keeps
   // its preceding hold intact, instead of adding a transition to copied values.
@@ -204,7 +248,8 @@ export function pasteAnimation(
   }
   if (visualKeys.some((key) => to[key] !== undefined))
     Object.assign(to, visualValues(clip, to));
-  if (maskKeys.some((key) => to[key] !== undefined)) Object.assign(to, maskValues(clip, to));
+  if (maskKeys.some((key) => to[key] !== undefined))
+    Object.assign(to, maskValues(clip, to));
   let holding = true;
   const rotation = clip.transform.rotation ?? clip.rotation ?? 0;
   const frames = [...clip.keyframes]
@@ -222,5 +267,45 @@ export function pasteAnimation(
     { time: start, value: from },
     { time: end, value: to, easing: copied.easing, animation: true },
   );
+  if (copied.samples?.length) {
+    const group =
+      Math.max(0, ...frames.map((frame) => frame.recordingSegment ?? 0)) + 1;
+    const endpoint = frames.at(-1)!;
+    endpoint.recordingSegment = group;
+    endpoint.recordingZoom = true;
+    const keys = Object.keys(bounds) as (keyof Transform)[];
+    for (const sample of copied.samples) {
+      const value = { ...from };
+      for (const key of keys) {
+        if (sample.value[key] === undefined && copied.from[key] === undefined)
+          continue;
+        const fallback = [
+          "scale",
+          "contentScale",
+          "scaleX",
+          "scaleY",
+          "opacity",
+        ].includes(key)
+          ? 1
+          : 0;
+        value[key] = Math.max(
+          bounds[key][0],
+          Math.min(
+            bounds[key][1],
+            (from[key] ?? fallback) +
+              (sample.value[key] ?? fallback) -
+              (copied.from[key] ?? fallback),
+          ),
+        );
+      }
+      frames.push({
+        time: start + sample.progress * copied.duration,
+        value,
+        easing: "linear",
+        recordingZoom: true,
+        recordingSegment: group,
+      });
+    }
+  }
   return { ...clip, keyframes: frames.sort((a, b) => a.time - b.time) };
 }

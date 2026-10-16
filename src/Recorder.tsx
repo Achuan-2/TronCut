@@ -19,7 +19,8 @@ import {
   type RecordedAsset,
   type RecordingSettings,
 } from "../shared/recording";
-import { cursorSvg } from "../shared/cursor";
+import { cursorSvg, cursorStyles, cursorAspect } from "../shared/cursor";
+import { recordingWallpaperUrl } from "../shared/recording-backgrounds";
 
 interface Session {
   id: string;
@@ -52,7 +53,6 @@ export default function Recorder({
       "configure" | "starting" | "recording" | "paused" | "saving"
     >("configure"),
     [elapsed, setElapsed] = useState(0),
-    [countdown, setCountdown] = useState(0),
     [error, setError] = useState("");
   const [nativeAvailable, setNativeAvailable] = useState(false),
     [useNative, setUseNative] = useState(true),
@@ -64,6 +64,7 @@ export default function Recorder({
   const recordingSettings = useRef(settings);
   const changeSettings = (patch: Partial<RecordingSettings>) =>
     setSettings((s) => ({ ...s, ...patch }));
+  const background = recordingBackgrounds[settings.preset];
   async function closeSettings() {
     if (!settingsReady || !window.framecraft) {
       onClose();
@@ -115,6 +116,7 @@ export default function Recorder({
       .catch(() => {});
     return () => {
       mounted.current = false;
+      void window.framecraft?.cancelRecordingCountdown();
     };
   }, []);
   useEffect(() => {
@@ -233,9 +235,14 @@ export default function Recorder({
             audio: false,
           }),
         });
-      for (let i = 3; i > 0; i--) {
-        setCountdown(i);
-        await new Promise((resolve) => window.setTimeout(resolve, 1000));
+      if (!(await bridge.recordingCountdown(sourceId))) {
+        streams.forEach((s) => s.stream.getTracks().forEach((t) => t.stop()));
+        if (mounted.current) setPhase("configure");
+        return;
+      }
+      if (!mounted.current) {
+        streams.forEach((s) => s.stream.getTracks().forEach((t) => t.stop()));
+        return;
       }
       timing.current = { started: performance.now(), paused: 0, pauseStart: 0 };
       if (native) {
@@ -327,11 +334,9 @@ export default function Recorder({
       screen?.getVideoTracks()[0].addEventListener("ended", () => {
         void stopRef.current();
       });
-      setCountdown(0);
       setPhase("recording");
     } catch (e) {
       setError(String(e));
-      setCountdown(0);
       setPhase("configure");
       for (const session of sessions.current) {
         session.recorder.onstop = null;
@@ -487,13 +492,32 @@ export default function Recorder({
           <div
             className="recording-style-preview"
             style={{
-              background: settings.background
-                ? `linear-gradient(135deg, ${recordingBackgrounds[settings.preset].colors.join(",")})`
-                : "#111827",
+              background:
+                settings.background && "colors" in background
+                  ? `linear-gradient(135deg, ${background.colors.join(",")})`
+                  : "#111827",
               padding: settings.background ? settings.padding * 240 : 0,
             }}
             aria-label="录屏美化预览"
           >
+            {settings.background &&
+              "file" in background &&
+              (background.animated ? (
+                <video
+                  className="recording-wallpaper-preview"
+                  src={recordingWallpaperUrl(background.file)}
+                  autoPlay
+                  loop
+                  muted
+                  playsInline
+                />
+              ) : (
+                <img
+                  className="recording-wallpaper-preview"
+                  src={recordingWallpaperUrl(background.file)}
+                  alt=""
+                />
+              ))}
             <div
               style={{
                 borderRadius: settings.background ? settings.radius / 3 : 0,
@@ -507,7 +531,10 @@ export default function Recorder({
                     alt="鼠标预览"
                     src={`data:image/svg+xml,${encodeURIComponent(cursorSvg(settings.cursor))}`}
                     style={{
-                      width: settings.cursor.size / 2,
+                      width:
+                        (settings.cursor.size *
+                          cursorAspect(settings.cursor.style)) /
+                        2,
                       height: settings.cursor.size / 2,
                     }}
                   />
@@ -523,6 +550,49 @@ export default function Recorder({
             自动添加背景
           </label>
           <div className="recording-style-fields">
+            <div className="recording-wallpapers" aria-label="背景图库">
+              {Object.entries(recordingBackgrounds).map(([id, item]) => (
+                <button
+                  type="button"
+                  key={id}
+                  disabled={!settings.background}
+                  title={item.name}
+                  aria-label={`选择背景 ${item.name}`}
+                  aria-pressed={settings.preset === id}
+                  onClick={() =>
+                    changeSettings({
+                      preset: id as RecordingSettings["preset"],
+                    })
+                  }
+                >
+                  {"file" in item ? (
+                    item.animated ? (
+                      <>
+                        <video
+                          src={recordingWallpaperUrl(item.file)}
+                          muted
+                          preload="metadata"
+                        />
+                        <span>动态</span>
+                      </>
+                    ) : (
+                      <img
+                        src={recordingWallpaperUrl(item.file)}
+                        alt=""
+                        loading="lazy"
+                      />
+                    )
+                  ) : (
+                    <span
+                      className="gradient-wallpaper"
+                      style={{
+                        background: `linear-gradient(135deg,${item.colors.join(",")})`,
+                      }}
+                    />
+                  )}
+                </button>
+              ))}
+            </div>
             <label className="field">
               背景
               <select
@@ -538,6 +608,7 @@ export default function Recorder({
                 {Object.entries(recordingBackgrounds).map(([id, value]) => (
                   <option key={id} value={id}>
                     {value.name}
+                    {"animated" in value && value.animated ? " · 动态" : ""}
                   </option>
                 ))}
               </select>
@@ -590,10 +661,11 @@ export default function Recorder({
                     })
                   }
                 >
-                  <option value="arrow">箭头</option>
-                  <option value="circle">圆形</option>
-                  <option value="cross">十字</option>
-                  <option value="hidden">隐藏鼠标</option>
+                  {Object.entries(cursorStyles).map(([id, name]) => (
+                    <option key={id} value={id}>
+                      {name}
+                    </option>
+                  ))}
                 </select>
               </label>
               <label className="field">
@@ -636,9 +708,25 @@ export default function Recorder({
                 checked={settings.autoZoom}
                 onChange={(e) => changeSettings({ autoZoom: e.target.checked })}
               />
-              根据鼠标点击和停留生成缩放动画
+              根据鼠标点击自动缩放并跟随移动
+            </label>
+            <label className="field">
+              自动缩放范围
+              <select
+                aria-label="自动缩放范围"
+                value={settings.zoomBackground ? "scene" : "screen"}
+                onChange={(e) =>
+                  changeSettings({ zoomBackground: e.target.value === "scene" })
+                }
+              >
+                <option value="screen">仅录屏缩放，背景固定</option>
+                <option value="scene">录屏和背景一起缩放</option>
+              </select>
             </label>
           </fieldset>
+          <p className="small-note">
+            自动缩放、背景与鼠标样式参考 Recordly（AGPL-3.0）。
+          </p>
           <p className="small-note">
             背景作为独立轨道添加，缩放生成可编辑动画。
             {nativeAvailable && useNative
@@ -681,11 +769,7 @@ export default function Recorder({
           onClick={() => void start()}
         >
           <Circle size={15} fill="currentColor" />
-          {countdown
-            ? `${countdown} 秒后开始`
-            : phase === "starting"
-              ? "正在准备录制…"
-              : "开始录制"}
+          {phase === "starting" ? "正在准备录制…" : "开始录制"}
         </button>
       </div>
     </div>

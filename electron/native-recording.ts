@@ -6,6 +6,7 @@ import { cursorRecordingSchema } from "../shared/model";
 import { findBinary } from "./process";
 import { probeMedia } from "./media";
 import type { CursorSample } from "../shared/cursor";
+import { cursorType } from "../shared/cursor";
 
 export class NativeRecording {
   private capture?: ChildProcessWithoutNullStreams;
@@ -134,6 +135,7 @@ export class NativeRecording {
             y: (event.y - bounds.y) / bounds.height,
             visible: !!event.visible,
             click: !!event.leftButtonPressed,
+            cursorType: cursorType(event.cursorType),
           };
           if (
             !Number.isFinite(sample.time) ||
@@ -154,7 +156,9 @@ export class NativeRecording {
             before.x === last.x &&
             before.y === last.y &&
             last.visible === sample.visible &&
-            before.visible === last.visible
+            before.visible === last.visible &&
+            last.cursorType === sample.cursorType &&
+            before.cursorType === last.cursorType
           )
             this.samples[this.samples.length - 1] = sample;
           else this.samples.push(sample);

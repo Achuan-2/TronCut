@@ -32,7 +32,7 @@ import {
   fadeOpacity,
   previewFilter,
 } from "../shared/effects";
-import { cursorAt, cursorSvg, defaultCursorStyle } from "../shared/cursor";
+import { cursorAt, cursorSvg, cursorAnchor, cursorAspect, defaultCursorStyle } from "../shared/cursor";
 import { depthScale } from "../shared/rotation";
 import { mediaFrameRadii } from "../shared/media-frame";
 import { cameraAt, resizeHandles, resizeTransform } from "../shared/canvas";
@@ -122,7 +122,8 @@ function MediaLayer({
   useEffect(() => {
     const media = ref.current;
     if (!media) return;
-    const sourceTime = clip.sourceIn + localTime * clip.speed;
+    const absoluteTime = clip.sourceIn + localTime * clip.speed;
+    const sourceTime = clip.loop && asset.duration > 0 ? absoluteTime % asset.duration : absoluteTime;
     if (
       Number.isFinite(media.duration) &&
       Math.abs(media.currentTime - sourceTime) > (playing ? 0.22 : 0.025)
@@ -134,7 +135,7 @@ function MediaLayer({
     media.muted = muted;
     if (playing) void media.play().catch(() => {});
     else media.pause();
-  }, [localTime, playing, clip.speed, clip.sourceIn, clip.volume, muted, url]);
+  }, [localTime, playing, clip.speed, clip.sourceIn, clip.volume, clip.loop, asset.duration, muted, url]);
   if (!url || asset.missing)
     return (
       <div className="offline">
@@ -145,7 +146,9 @@ function MediaLayer({
     );
   const syncLoaded = () => {
     if (ref.current)
-      ref.current.currentTime = clip.sourceIn + localTime * clip.speed;
+      ref.current.currentTime = clip.loop && asset.duration > 0
+        ? (clip.sourceIn + localTime * clip.speed) % asset.duration
+        : clip.sourceIn + localTime * clip.speed;
   };
   if (clip.kind === "image")
     return <img draggable={false} src={url} alt={asset.name} />;
@@ -161,6 +164,7 @@ function MediaLayer({
       onLoadedMetadata={syncLoaded}
       preload="auto"
       playsInline
+      loop={clip.loop}
     />
   );
 }
@@ -677,17 +681,14 @@ function PreviewLayer({
                 )}
                 <img
                   className="cursor-overlay"
-                  src={`data:image/svg+xml,${encodeURIComponent(cursorSvg(cursorStyle))}`}
+                  src={`data:image/svg+xml,${encodeURIComponent(cursorSvg(cursorStyle, cursor.cursorType))}`}
                   alt="可编辑鼠标"
                   style={{
                     left: cursor.x * layout.width,
                     top: cursor.y * layout.height,
-                    width: cursorStyle.size * scale * contentView.scale,
+                    width: cursorStyle.size * cursorAspect(cursorStyle.style, cursor.cursorType) * scale * contentView.scale,
                     height: cursorStyle.size * scale * contentView.scale,
-                    transform:
-                      cursorStyle.style === "arrow"
-                        ? "translate(-9%, -6%)"
-                        : "translate(-50%, -50%)",
+                    transform: `translate(-${cursorAnchor(cursorStyle.style, cursor.cursorType).x * 100}%, -${cursorAnchor(cursorStyle.style, cursor.cursorType).y * 100}%)`,
                   }}
                 />
               </>

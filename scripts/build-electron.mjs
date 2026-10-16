@@ -10,8 +10,9 @@ await build({
   sourcemap: true,
 });
 await build({
-  entryPoints: ["electron/preload.ts"],
-  outfile: "dist-electron/preload.cjs",
+  entryPoints: ["electron/preload.ts", "electron/countdown-preload.ts"],
+  outdir: "dist-electron",
+  outExtension: { ".js": ".cjs" },
   bundle: true,
   platform: "node",
   format: "cjs",

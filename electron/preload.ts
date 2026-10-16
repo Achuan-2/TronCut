@@ -2,6 +2,8 @@ import { contextBridge, ipcRenderer, webUtils } from "electron";
 import type { FrameCraftBridge } from "../shared/bridge";
 
 const bridge: FrameCraftBridge = {
+  recordingCountdown: (sourceId) => ipcRenderer.invoke("recording:countdown", sourceId),
+  cancelRecordingCountdown: () => ipcRenderer.invoke("recording:countdown:cancel"),
   recordingSettings: () => ipcRenderer.invoke("recording:settings"),
   saveRecordingSettings: (settings) =>
     ipcRenderer.invoke("recording:settings:save", settings),

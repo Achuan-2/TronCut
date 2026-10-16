@@ -12,7 +12,12 @@ import {
 import { probeMedia } from "./media";
 
 export class RecordingStyleStore {
-  constructor(private readonly root: string) {}
+  constructor(
+    private readonly root: string,
+    private readonly wallpaperRoot = path.resolve(
+      "public/recording/wallpapers",
+    ),
+  ) {}
   async read(): Promise<RecordingSettings> {
     try {
       return recordingSettingsSchema.parse(
@@ -45,13 +50,26 @@ export class RecordingStyleStore {
     return settings;
   }
   async background(width: number, height: number, preset: RecordingBackground) {
+    const entry = recordingBackgrounds[preset];
+    if ("file" in entry) {
+      // External FFprobe/FFmpeg cannot open media inside app.asar.
+      const folder = path.join(this.root, "recording-backgrounds");
+      await fs.mkdir(folder, { recursive: true });
+      const file = path.join(folder, entry.file);
+      try {
+        await fs.access(file);
+      } catch {
+        await fs.copyFile(path.join(this.wallpaperRoot, entry.file), file);
+      }
+      return { ...(await probeMedia(file)), name: `录屏背景 · ${entry.name}` };
+    }
     const folder = path.join(this.root, "recording-backgrounds");
     const file = path.join(folder, `${preset}-${width}x${height}.png`);
     await fs.mkdir(folder, { recursive: true });
     try {
       await fs.access(file);
     } catch {
-      const [a, b] = recordingBackgrounds[preset].colors;
+      const [a, b] = entry.colors;
       const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop stop-color="${a}"/><stop offset="1" stop-color="${b}"/></linearGradient></defs><rect width="100%" height="100%" fill="url(#g)"/></svg>`;
       const temporary = `${file}.${uid()}.tmp`;
       try {

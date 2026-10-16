@@ -9,19 +9,25 @@ import {
   type Project,
 } from "./model";
 import { defaultCursorStyle } from "./cursor";
+import { recordlyBackgrounds } from "./recording-backgrounds";
+import {
+  recordingCameraFrames,
+  sceneRecordingFrames,
+} from "./recording-camera";
 
 export const recordingBackgrounds = {
   mint: { name: "薄荷", colors: ["#143e42", "#7bdbc3"] },
   violet: { name: "紫雾", colors: ["#30295b", "#bd9ce4"] },
   sunset: { name: "日落", colors: ["#793c63", "#f6ae7d"] },
   dark: { name: "深灰", colors: ["#111827", "#475569"] },
+  ...recordlyBackgrounds,
 } as const;
-export const recordingBackgroundSchema = z.enum([
-  "mint",
-  "violet",
-  "sunset",
-  "dark",
-]);
+export const recordingBackgroundSchema = z.enum(
+  Object.keys(recordingBackgrounds) as [
+    keyof typeof recordingBackgrounds,
+    ...(keyof typeof recordingBackgrounds)[],
+  ],
+);
 export type RecordingBackground = z.infer<typeof recordingBackgroundSchema>;
 export const recordingSettingsSchema = z.object({
   background: z.boolean(),
@@ -31,16 +37,18 @@ export const recordingSettingsSchema = z.object({
   cursor: cursorStyleSchema,
   autoZoom: z.boolean(),
   zoom: z.number().finite().min(1.2).max(3),
+  zoomBackground: z.boolean().default(false),
 });
 export type RecordingSettings = z.infer<typeof recordingSettingsSchema>;
 export const defaultRecordingSettings: RecordingSettings = {
   background: true,
-  preset: "mint",
+  preset: "tahoe-light",
   padding: 0.08,
   radius: 0,
-  cursor: { ...defaultCursorStyle, size: 40 },
+  cursor: { ...defaultCursorStyle, style: "tahoe", size: 40 },
   autoZoom: true,
   zoom: 1.8,
+  zoomBackground: false,
 };
 export type RecordedAsset = {
   asset: Asset;
@@ -92,60 +100,13 @@ export function recordingFocuses(asset: Asset, clip: Clip): Focus[] {
   return points.sort((a, b) => a.time - b.time);
 }
 
-/** Fixed viewport: zoom the source inside its frame so the background stays still. */
+/** Bake the Recordly camera into editable content transforms. */
 export function recordingZoomFrames(
   asset: Asset,
   clip: Clip,
   zoom: number,
 ): Clip["keyframes"] {
-  if (clip.duration < 1 || !asset.cursor) return [];
-  zoom = Math.max(1.2, Math.min(3, zoom));
-  const regions: { start: number; end: number; focus: Focus }[] = [];
-  for (const focus of recordingFocuses(asset, clip)) {
-    const start = Math.max(0, focus.time - 0.65),
-      end = Math.min(clip.duration, focus.time + 1.9);
-    const previous = regions.at(-1);
-    if (previous && start <= previous.end + 0.5) {
-      // Nearby actions share a shot; avoid chasing every tiny pointer movement.
-      if (
-        Math.hypot(focus.x - previous.focus.x, focus.y - previous.focus.y) <
-          0.16 &&
-        end - previous.start < 7
-      )
-        previous.end = end;
-      continue;
-    }
-    if (end - start >= 1) regions.push({ start, end, focus });
-    if (regions.length >= 1000) break;
-  }
-  return regions.flatMap(({ start, end, focus }) => {
-    const edge = Math.min(0.5, (end - start) / 3);
-    const x = Math.max(0.5 / zoom, Math.min(1 - 0.5 / zoom, focus.x));
-    const y = Math.max(0.5 / zoom, Math.min(1 - 0.5 / zoom, focus.y));
-    const base = {
-      ...clip.transform,
-      contentX: 0,
-      contentY: 0,
-      contentScale: 1,
-    };
-    const close = {
-      ...base,
-      contentX: (0.5 - x) * zoom,
-      contentY: (0.5 - y) * zoom,
-      contentScale: zoom,
-    };
-    return [
-      { time: start, value: base },
-      { time: start + edge, value: close },
-      { time: end - edge, value: close },
-      { time: end, value: base },
-    ].map((frame, i) => ({
-      ...frame,
-      easing: "auto" as const,
-      ...(i % 2 ? { animation: true as const } : {}),
-      recordingZoom: true as const,
-    }));
-  });
+  return recordingCameraFrames(asset, clip, zoom);
 }
 
 export function addRecordedAssets(
@@ -193,6 +154,16 @@ export function addRecordedAssets(
     clips.push(clip);
   }
   const screen = results.find((r) => r.kind === "screen");
+  const screenClip = clips.find((c) => c.assetId === screen?.asset.id);
+  const contentFrames = screenClip?.keyframes ?? [];
+  if (settings.zoomBackground && screenClip && screen)
+    screenClip.keyframes = sceneRecordingFrames(
+      contentFrames,
+      screenClip,
+      screen.asset,
+      project.canvas,
+      screenClip.transform,
+    );
   if (settings.background && background && screen) {
     const track = {
       ...newTrack(tracks.length),
@@ -205,17 +176,38 @@ export function addRecordedAssets(
       id: uid(),
       trackId: track.id,
       assetId: background.id,
-      kind: "image",
+      kind: background.kind,
       name: "录屏背景",
       start,
       duration: screen.asset.duration,
       sourceIn: 0,
       speed: 1,
-      volume: 1,
+      volume: 0,
       podcast: false,
-      transform: { ...defaultTransform },
+      loop: background.kind === "video",
+      transform: {
+        ...defaultTransform,
+        scale:
+          Math.max(
+            project.canvas.width / background.width,
+            project.canvas.height / background.height,
+          ) /
+          Math.min(
+            project.canvas.width / background.width,
+            project.canvas.height / background.height,
+          ),
+      },
       keyframes: [],
     });
+    const backdrop = clips.at(-1)!;
+    if (settings.zoomBackground && screenClip)
+      backdrop.keyframes = sceneRecordingFrames(
+        contentFrames,
+        screenClip,
+        screen.asset,
+        project.canvas,
+        backdrop.transform,
+      );
   }
   return {
     ...project,

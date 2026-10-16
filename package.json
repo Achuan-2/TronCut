@@ -68,6 +68,10 @@
     ],
     "extraResources": [
       {
+        "from": "resources/licenses",
+        "to": "licenses"
+      },
+      {
         "from": "LICENSE",
         "to": "TronCut-LICENSE.txt"
       },

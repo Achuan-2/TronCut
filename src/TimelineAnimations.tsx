@@ -235,6 +235,8 @@ export function TimelineAnimations({
           const start = clip.start + range.start,
             end = clip.start + range.end;
           const width = (range.end - range.start) * zoom;
+          const sharedStart = index > 0 && Math.abs(ranges[index - 1].end - range.start) < 1e-6;
+          const sharedEnd = index + 1 < ranges.length && Math.abs(ranges[index + 1].start - range.end) < 1e-6;
           const head = range.hasEnd ? Math.min(12, width * 0.4) : 0;
           const active = selected && Math.abs(playhead - end) <= 0.5 / fps;
           const startSelected =
@@ -284,7 +286,7 @@ export function TimelineAnimations({
               {range.hasStart && (
                 <button
                   type="button"
-                  className={`animation-point start ${startSelected ? "selected-frame" : ""}`}
+                  className={`animation-point start ${sharedStart ? "shared-boundary" : ""} ${startSelected ? "selected-frame" : ""}`}
                   aria-pressed={startSelected}
                   style={
                     locked ? undefined : { cursor: animationCursor("start") }
@@ -298,7 +300,7 @@ export function TimelineAnimations({
               {range.hasEnd && (
                 <button
                   type="button"
-                  className={`animation-point end ${active ? "active" : ""} ${endSelected ? "selected-frame" : ""}`}
+                  className={`animation-point end ${sharedEnd ? "shared-boundary" : ""} ${active ? "active" : ""} ${endSelected ? "selected-frame" : ""}`}
                   aria-pressed={endSelected}
                   style={
                     locked ? undefined : { cursor: animationCursor("end") }

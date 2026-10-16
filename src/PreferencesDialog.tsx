@@ -10,6 +10,7 @@ import {
   type EditorPreferences,
 } from "../shared/editor-preferences";
 import { editCommands } from "../shared/edit-menu";
+import { cursorStyles } from "../shared/cursor";
 import AiProvidersFields, {
   providerUpdate,
   type ProviderDraft,
@@ -456,6 +457,14 @@ export default function PreferencesDialog({
                   </p>
                   <h3>录屏默认设置</h3>
                   <label className="field">
+                    自动缩放范围
+                    <select aria-label="默认自动缩放范围" value={settings.recording.zoomBackground ? "scene" : "screen"}
+                      onChange={e => setSettings(s => ({ ...s, recording: { ...s.recording, zoomBackground: e.target.value === "scene" } }))}>
+                      <option value="screen">仅录屏缩放，背景固定</option>
+                      <option value="scene">录屏和背景一起缩放</option>
+                    </select>
+                  </label>
+                  <label className="field">
                     默认鼠标样式
                     <select
                       aria-label="默认鼠标样式"
@@ -474,10 +483,7 @@ export default function PreferencesDialog({
                         }))
                       }
                     >
-                      <option value="arrow">箭头</option>
-                      <option value="circle">圆形</option>
-                      <option value="cross">十字</option>
-                      <option value="hidden">隐藏鼠标</option>
+{Object.entries(cursorStyles).map(([id, name]) => <option key={id} value={id}>{name}</option>)}
                     </select>
                   </label>
                   <label className="field">

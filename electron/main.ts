@@ -54,6 +54,7 @@ import { captionProcessingSchema, cueSchema } from "../shared/caption-processing
 import { processCaptionCues } from "./caption-processing";
 import { requestAi, listAiModels } from "./ai";
 import { RecordingStyleStore } from "./recording-style";
+import { RecordingCountdown } from "./recording-countdown";
 import { videoExportRequestSchema } from "../shared/export-settings";
 import { assertExportTarget, videoExportTarget } from "./video-export-target";
 import { editCommands, editCommandEnabled, editMenuStateSchema, textEditSchema } from "../shared/edit-menu";
@@ -91,7 +92,10 @@ const windowState = () => ({
 let projectFile: string | null = null;
 const recentProjects = new RecentProjects(path.join(app.getPath("userData"), "recent-projects.json"));
 const preferences = new PreferencesStore(path.join(app.getPath("userData"), "preferences.json"), safeStorage);
-const recordingStyle = new RecordingStyleStore(app.getPath("userData"));
+const recordingStyle = new RecordingStyleStore(
+  app.getPath("userData"), path.join(app.getAppPath(), "dist/recording/wallpapers"),
+);
+const recordingCountdown = new RecordingCountdown();
 async function rememberProject(project: Project, file: string) {
   let thumbnail: string | null = null;
   const visible = new Set(project.tracks.filter((track) => !track.hidden).map((track) => track.id));
@@ -212,6 +216,8 @@ function installHandlers() {
   });
   handle("window:state", windowState);
   handle("recording:settings", async () => (await preferences.get()).recording);
+  handle("recording:countdown", (sourceId: unknown) => recordingCountdown.start(z.string().parse(sourceId)));
+  handle("recording:countdown:cancel", () => recordingCountdown.cancel());
   handle("recording:settings:save", async (input: unknown) =>
     (await preferences.save({ recording: recordingSettingsSchema.parse(input) })).recording,
   );
@@ -1049,6 +1055,7 @@ async function createWindow() {
   window.on("leave-full-screen", notifyWindowState);
   window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
   window.webContents.on("render-process-gone", () => {
+    recordingCountdown.cancel();
     void recordingBorder.stop();
     nativeRecording?.abort();
   });
@@ -1057,6 +1064,7 @@ async function createWindow() {
     if (url !== current) event.preventDefault();
   });
   window.on("close", (event) => {
+    recordingCountdown.cancel();
     if (
       process.env.FRAMECRAFT_SMOKE ||
       (!projectDirty && !recordings.size && !nativeRecording && !task)
@@ -1238,6 +1246,7 @@ app.on("window-all-closed", () => {
 });
 let closingOnnx = false;
 app.on("will-quit", (event) => {
+  recordingCountdown.cancel();
   void recordingBorder.stop();
   if (closingOnnx) return;
   event.preventDefault();
