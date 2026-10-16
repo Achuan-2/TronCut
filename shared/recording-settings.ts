@@ -81,7 +81,7 @@ export const recordingSettingsSchema = z.object({
   ),
   customBackground: customRecordingBackgroundSchema.optional(),
   padding: z.number().finite().min(0).max(0.25),
-  radius: z.number().finite().min(0).max(200),
+  radius: z.number().finite().min(0).max(100),
   cursor: cursorStyleSchema,
   autoZoom: z.boolean(),
   zoom: z.number().finite().min(1.2).max(3),

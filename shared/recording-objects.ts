@@ -234,7 +234,7 @@ export function updateRecordingObject(
           mediaFrame: {
             ...screen.mediaFrame,
             radius: patch.radius,
-            unit: "px" as const,
+            unit: "percent" as const,
           },
         }
       : {}),

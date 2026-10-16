@@ -189,7 +189,7 @@ it("更换静态及动态背景、圆角、鼠标不覆盖已编辑镜头，禁�
   const updated = changed.clips.find((clip) => clip.id === master.id)!;
   expect(updated.keyframes).toEqual(frames);
   expect(updated).toMatchObject({
-    mediaFrame: { radius: 24 },
+    mediaFrame: { radius: 24, unit: "percent" },
     cursorStyle: { style: "windows11", size: 56 },
   });
   expect(

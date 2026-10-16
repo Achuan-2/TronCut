@@ -203,14 +203,14 @@ it.each(["image", "video"] as const)(
   60000,
 );
 
-it("真实导出和归档重开保留背景、圆角与自动缩放，放大画面时背景像素不变", async () => {
-  const root = path.resolve(`test-output/recording-style-${Date.now()}`);
+it.each([0, 18])("真实导出和归档重开保留背景、圆角 %i 与自动缩放，放大画面时背景像素不变", async (radius) => {
+  const root = path.resolve(`test-output/recording-style-${radius}-${Date.now()}`);
   await fs.mkdir(root, { recursive: true });
   const store = new RecordingStyleStore(root);
   expect(await store.read()).toEqual(defaultRecordingSettings);
   const settings = {
     ...defaultRecordingSettings,
-    radius: 18,
+    radius,
     preset: "violet" as const,
     cursor: { ...defaultRecordingSettings.cursor, style: "hidden" as const },
   };
@@ -258,7 +258,7 @@ it("真实导出和归档重开保留背景、圆角与自动缩放，放大画�
   expect(reopened.clips.find((c) => c.kind === "video")!.keyframes).toEqual(
     styled.clips[0].keyframes,
   );
-  expect(reopened.clips[0].mediaFrame).toEqual({ radius: 18 });
+  expect(reopened.clips[0].mediaFrame).toEqual({ radius, unit: "percent" });
   const output = path.join(root, "recording.mp4"),
     signal = new AbortController().signal;
   await exportVideo(
@@ -296,7 +296,8 @@ it("真实导出和归档重开保留背景、圆角与自动缩放，放大画�
       expect(center[0]).toBeGreaterThan(220);
       expect(center[1]).toBeLessThan(40);
     }
-    expect(Math.max(...rgb(27, 16))).toBeLessThan(200); // Rounded corner reveals the gradient.
+    if (radius) expect(Math.max(...rgb(27, 16))).toBeLessThan(200); // Rounded corner reveals the gradient.
+    else expect(Math.min(...rgb(27, 16))).toBeGreaterThan(230);
   }
   expect(
     pixels[0].every((value, i) => Math.abs(value - pixels[1][i]) <= 6),

@@ -128,7 +128,7 @@ export function addRecordedAssets(
       ...(kind === "screen" && asset.cursor
         ? { cursorStyle: { ...settings.cursor } }
         : {}),
-      ...(framed ? { mediaFrame: { radius: settings.radius } } : {}),
+      ...(framed ? { mediaFrame: { radius: settings.radius, unit: "percent" as const } } : {}),
     };
     if (kind === "screen" && settings.autoZoom)
       clip.keyframes = recordingZoomFrames(asset, clip, settings.zoom);

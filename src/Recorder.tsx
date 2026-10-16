@@ -545,7 +545,7 @@ export default function Recorder({
             )}
             <div
               style={{
-                borderRadius: settings.background ? settings.radius / 3 : 0,
+                borderRadius: settings.background ? `${settings.radius}%` : 0,
               }}
             >
               <span>录屏画面</span>
@@ -580,12 +580,12 @@ export default function Recorder({
               />
             </label>
             <label className="field">
-              圆角 (px)
+              圆角 (%)
               <NumberInput
                 aria-label="录屏圆角"
                 disabled={!settings.background}
                 min={0}
-                max={200}
+                max={100}
                 value={settings.radius}
                 onValueChange={(radius) => changeSettings({ radius })}
               />
