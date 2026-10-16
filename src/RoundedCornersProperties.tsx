@@ -31,6 +31,8 @@ export default function RoundedCornersProperties({
           radius: 20,
           unit: "percent",
           enabled: true,
+          window: undefined,
+          timing: undefined,
           corners: { ...defaultFrameCorners },
         })
       }

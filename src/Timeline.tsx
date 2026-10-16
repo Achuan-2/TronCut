@@ -65,6 +65,11 @@ import {
   type VisualEffectId,
 } from "../shared/visual-effect-drag";
 import TimelineSpeedEffect from "./TimelineSpeedEffect";
+import TimelineVisualEffect from "./TimelineVisualEffect";
+import {
+  visualEffectEntries,
+  type RangedVisualEffectId,
+} from "../shared/visual-effect-range";
 import TimelineBehaviorEffect from "./TimelineBehaviorEffect";
 import BehaviorContextMenu from "./BehaviorContextMenu";
 import { hasBehaviors, supportsBehaviors } from "../shared/behaviors";
@@ -221,6 +226,11 @@ export default function Timeline({
     Record<string, boolean>
   >({});
   const [speedDraft, setSpeedDraft] = useState<Clip | null>(null);
+  const [visualDraft, setVisualDraft] = useState<Clip | null>(null);
+  const [activeVisual, setActiveVisual] = useState<{
+    clipId: string;
+    id: RangedVisualEffectId;
+  } | null>(null);
   const [activeSpeed, setActiveSpeed] = useState<string | null>(null);
   const [effectDrop, setEffectDrop] = useState<string | null>(null);
   const [marquee, setMarquee] = useState<Marquee | null>(null);
@@ -231,17 +241,21 @@ export default function Timeline({
   const transitionHighlights = transitionDrop
     ? transitionTargets(transitionDrop)
     : [];
-  const knownSpeedEffects = useRef(new Set<string>());
+  const knownEffects = useRef(new Set<string>());
   useEffect(() => {
-    const ids = project.clips
-      .filter((clip) => hasClipSpeed(clip) || hasBehaviors(clip))
-      .map((clip) => clip.id);
-    const added = ids.filter((id) => !knownSpeedEffects.current.has(id));
-    knownSpeedEffects.current = new Set(ids);
+    const entries = project.clips.flatMap((clip) =>
+      [
+        ...(hasClipSpeed(clip) ? ["speed"] : []),
+        ...(clip.behaviors ?? []).map((behavior) => `behavior:${behavior.id}`),
+        ...visualEffectEntries(clip).map(({ id }) => `visual:${id}`),
+      ].map((effect) => ({ key: `${clip.id}:${effect}`, clipId: clip.id })),
+    );
+    const added = entries.filter(({ key }) => !knownEffects.current.has(key));
+    knownEffects.current = new Set(entries.map(({ key }) => key));
     if (added.length)
       setExpandedEffects((previous) => ({
         ...previous,
-        ...Object.fromEntries(added.map((id) => [id, true])),
+        ...Object.fromEntries(added.map(({ clipId }) => [clipId, true])),
       }));
   }, [project.clips]);
   const [trackHeightDraft, setTrackHeightDraft] = useState<{
@@ -256,7 +270,9 @@ export default function Timeline({
       if (clip.keyframes.length > 1) animated.add(clip.trackId);
       if (expandedEffects[clip.id]) {
         const count =
-          Number(hasClipSpeed(clip)) + (clip.behaviors?.length ?? 0);
+          Number(hasClipSpeed(clip)) +
+          (clip.behaviors?.length ?? 0) +
+          visualEffectEntries(clip).length;
         rows.set(clip.trackId, Math.max(rows.get(clip.trackId) ?? 0, count));
       }
     }
@@ -333,6 +349,7 @@ export default function Timeline({
     editor.clearKeyframeEdit();
     editor.setPlaying(false);
     select(id);
+    setActiveVisual(null);
     setActiveSpeed(id);
   };
   useEffect(() => {
@@ -1240,7 +1257,9 @@ export default function Timeline({
                             }
                           : speedDraft?.id === original.id
                             ? speedDraft
-                            : original;
+                            : visualDraft?.id === original.id
+                              ? visualDraft
+                              : original;
                     return (
                       <Fragment key={c.id}>
                         <div
@@ -1254,7 +1273,8 @@ export default function Timeline({
                               (expandedEffects[c.id]
                                 ? 24 *
                                   (Number(hasClipSpeed(c)) +
-                                    (c.behaviors?.length ?? 0))
+                                    (c.behaviors?.length ?? 0) +
+                                    visualEffectEntries(c).length)
                                 : 0),
                             translate:
                               drag?.id === c.id
@@ -1604,7 +1624,8 @@ export default function Timeline({
                               data-trim="right"
                             />
                           </div>
-                          {(hasClipSpeed(c) || hasBehaviors(c)) && (
+                          {(hasClipSpeed(c) || hasBehaviors(c) ||
+                            visualEffectEntries(c).length > 0) && (
                             <button
                               className="clip-effects-toggle"
                               type="button"
@@ -1663,6 +1684,34 @@ export default function Timeline({
                                   behavior={behavior}
                                   locked={track.locked}
                                   editor={editor}
+                                />
+                              ))}
+                              {visualEffectEntries(c).map(({ id, name }) => (
+                                <TimelineVisualEffect
+                                  key={id}
+                                  clip={c}
+                                  id={id}
+                                  name={name}
+                                  zoom={zoom}
+                                  fps={project.canvas.fps}
+                                  locked={track.locked}
+                                  selected={
+                                    selectedId === c.id &&
+                                    activeVisual?.clipId === c.id &&
+                                    activeVisual.id === id &&
+                                    !editor.selectedBehavior &&
+                                    !editor.selectedTransition &&
+                                    !editor.selectedKeyframe
+                                  }
+                                  select={() => {
+                                    select(c.id);
+                                    editor.clearKeyframeEdit();
+                                    editor.setPlaying(false);
+                                    setActiveSpeed(null);
+                                    setActiveVisual({ clipId: c.id, id });
+                                  }}
+                                  preview={setVisualDraft}
+                                  commit={(next) => editor.updateClip(next.id, next)}
                                 />
                               ))}
                             </div>

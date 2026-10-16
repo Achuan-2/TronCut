@@ -141,17 +141,18 @@ export default function MatteDefinition({
     { width: sourceWidth, height: sourceHeight },
     clip.contentTransform ?? defaultContentTransform,
   );
-  let radii = mediaFrameRadii(clip, {
-    width: width / scale,
-    height: height / scale,
-  });
+  let radii = mediaFrameRadii(
+    clip,
+    { width: width / scale, height: height / scale },
+    local,
+  );
   if (clip.effects?.flipX) radii = [radii[1], radii[0], radii[3], radii[2]];
   if (clip.effects?.flipY) radii = [radii[3], radii[2], radii[1], radii[0]];
   const effectId = `${id}-effect`,
     modeId = `${id}-mode`,
     cropId = `${id}-crop`;
   const effectTime = Object.values(clip.visualEffects ?? {}).some(
-    (effect) => effect?.easeIn || effect?.easeOut,
+    (effect) => effect?.easeIn || effect?.easeOut || effect?.window,
   )
     ? local
     : 0;

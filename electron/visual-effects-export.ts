@@ -7,6 +7,7 @@ import { loopImageInput } from "./loop-image";
 import { hasMaskAnimation, maskClipAt } from "../shared/mask-state";
 import { transformAt } from "../shared/editor";
 import { rasterizeMaskAnimation } from "./mask-export";
+import { effectActiveExpression, originalEffectWindow } from "../shared/effect-timing";
 
 export function effectAmountExpression(
   effect: EffectTiming,
@@ -14,15 +15,16 @@ export function effectAmountExpression(
   clock = "T",
 ) {
   if (!effect.enabled) return "0";
-  const duration = effect.timing?.duration ?? clip.duration;
-  const origin = clip.start - (effect.timing?.offset ?? 0);
+  const window = originalEffectWindow(effect, clip.duration);
+  const duration = window.end - window.start;
+  const origin = clip.start + window.start - (effect.timing?.offset ?? 0);
   const ratio = Math.min(
     1,
     duration / Math.max(duration, effect.easeIn + effect.easeOut),
   );
   const incoming = effect.easeIn * ratio,
     outgoing = effect.easeOut * ratio;
-  return `${effect.intensity}*max(0,min(1,min(${incoming ? `(${clock}-${origin})/${incoming}` : "1"},${outgoing ? `(${origin + duration}-${clock})/${outgoing}` : "1"})))`;
+  return `(${effectActiveExpression(effect, clip, clock)})*${effect.intensity}*max(0,min(1,min(${incoming ? `(${clock}-${origin})/${incoming}` : "1"},${outgoing ? `(${origin + duration}-${clock})/${outgoing}` : "1"})))`;
 }
 
 /** Filters run after the content viewport and before frame scale/rotation. */

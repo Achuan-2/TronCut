@@ -33,6 +33,7 @@ import { isTrackActive } from "../shared/tracks";
 import { visualEffectFilters, effectAmountExpression } from "./visual-effects-export";
 import { visualEffectPadding } from "../shared/visual-effect-svg";
 import { maskKeys, maskDefaults, type MaskKey } from "../shared/mask-state";
+import { effectActiveExpression } from "../shared/effect-timing";
 import {
   exportDimensions,
   exportQualities,
@@ -670,9 +671,26 @@ async function renderProject(
         const strength = `(${effectAmountExpression(matte, clip)}*${matte.strength})`;
         const weight = matte.mode.endsWith("invert") ? `1-${strength}*(${value})` : `1-${strength}*(1-(${value}))`;
         const active = `gte(T,${range.start})*lt(T,${range.end})`;
-        filters.push(`[${full}]format=gbrap,geq=r='255*if(${active},${weight},1)':g='255*if(${active},${weight},1)':b='255*if(${active},${weight},1)':a=255[${coverage}]`);
+        let maskSource = full;
+        let maskedBase = base;
+        let normal: string | undefined;
+        if (matte.window) {
+          // Outside its effect window, the matte source is an ordinary layer.
+          // Retain both composites so switching does not lose the lower tracks.
+          maskSource = `matteMaskSource${layer}`;
+          maskedBase = `matteUnder${layer}`;
+          normal = `matteNormal${layer}`;
+          const normalSource = `matteNormalSource${layer}`;
+          const normalBase = `matteNormalBase${layer}`;
+          filters.push(`[${full}]split=2[${maskSource}][${normalSource}]`);
+          filters.push(`[${base}]split=2[${maskedBase}][${normalBase}]`);
+          filters.push(`[${normalBase}][${normalSource}]overlay=0:0:format=auto[${normal}]`);
+        }
+        filters.push(`[${maskSource}]format=gbrap,geq=r='255*if(${active},${weight},1)':g='255*if(${active},${weight},1)':b='255*if(${active},${weight},1)':a=255[${coverage}]`);
         filters.push(`color=c=${background}:s=${width}x${height}:r=${fps}:d=${duration},format=gbrap[${backdrop}]`);
-        filters.push(`[${backdrop}][${base}][${coverage}]maskedmerge=planes=15[${output}]`);
+        const maskedOutput = normal ? `matteResult${layer}` : output;
+        filters.push(`[${backdrop}][${maskedBase}][${coverage}]maskedmerge=planes=15[${maskedOutput}]`);
+        if (normal) filters.push(`[${maskedOutput}][${normal}]overlay=0:0:format=auto:enable='not(${effectActiveExpression(matte, clip, "t")})'[${output}]`);
       } else filters.push(
         `[${base}][${visual}]overlay=x='${width}*((${pose("x")})+(${transitionOffsetExpression(project, clip)}))-overlay_w/2':y='${height}*(${pose("y")})-overlay_h/2':enable='gte(t,${range.start})*lt(t,${range.end})':eof_action=pass:repeatlast=0${still || clip.kind === "text" ? ":format=auto" : ""}[${output}]`,
       );

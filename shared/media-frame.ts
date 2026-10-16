@@ -1,4 +1,5 @@
 import type { Clip } from "./model";
+import { effectActive } from "./effect-timing";
 
 export const frameCorners = [
   "topLeft",
@@ -43,17 +44,42 @@ export function mediaFrameRadiusPercent(clip: Clip, size: FrameSize) {
   return maximum > 0 ? Math.min(100, (frame.radius / maximum) * 100) : 0;
 }
 
-export function mediaFrameRadii(clip: Clip, size: FrameSize) {
+export function mediaFrameRadii(clip: Clip, size: FrameSize, time = 0) {
   const frame = clip.mediaFrame;
   const radius =
     frame?.unit === "percent"
       ? (Math.min(size.width, size.height) * frame.radius) / 200
       : (frame?.radius ?? 0);
   return frameCorners.map((corner) =>
-    frame?.enabled === false || !frame
+    !frame || !effectActive(frame, time, clip.duration)
       ? 0
       : (frame.corners ?? defaultFrameCorners)[corner]
         ? radius
         : 0,
   );
+}
+export function shiftMediaFrame(clip: Clip, offset: number) {
+  const frame = clip.mediaFrame;
+  if (!frame?.window) return frame;
+  return {
+    ...frame,
+    timing: {
+      offset: (frame.timing?.offset ?? 0) + offset,
+      duration: frame.timing?.duration ?? clip.duration,
+    },
+  };
+}
+export function retimeMediaFrame(clip: Clip, ratio: number) {
+  const frame = clip.mediaFrame;
+  if (!frame?.window) return frame;
+  return {
+    ...frame,
+    window: { start: frame.window.start * ratio, end: frame.window.end * ratio },
+    timing: frame.timing
+      ? {
+          offset: frame.timing.offset * ratio,
+          duration: frame.timing.duration * ratio,
+        }
+      : undefined,
+  };
 }

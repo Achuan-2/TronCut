@@ -76,6 +76,7 @@ import { visualEffectSvg } from "../shared/visual-effect-svg";
 import MatteDefinition from "./MatteDefinition";
 import EffectRegionOverlay from "./EffectRegionOverlay";
 import type { Region } from "../shared/visual-effects";
+import { effectActive } from "../shared/effect-timing";
 import BehaviorText from "./BehaviorText";
 import { useViewportZoom, type ZoomPoint } from "./useViewportZoom";
 
@@ -313,10 +314,14 @@ function PreviewLayer({
     style.width = mediaWidth * (1 - crop.left - crop.right);
     style.height = mediaHeight * (1 - crop.top - crop.bottom);
   }
-  let radii = mediaFrameRadii(clip, {
-    width: (mediaWidth * (1 - crop.left - crop.right)) / scale,
-    height: (mediaHeight * (1 - crop.top - crop.bottom)) / scale,
-  });
+  let radii = mediaFrameRadii(
+    clip,
+    {
+      width: (mediaWidth * (1 - crop.left - crop.right)) / scale,
+      height: (mediaHeight * (1 - crop.top - crop.bottom)) / scale,
+    },
+    localTime,
+  );
   if (effects.flipX) radii = [radii[1], radii[0], radii[3], radii[2]];
   if (effects.flipY) radii = [radii[3], radii[2], radii[1], radii[0]];
   const selectable = interactive && !track?.locked && clip.kind !== "audio";
@@ -345,7 +350,7 @@ function PreviewLayer({
     contentView,
   );
   const effectTime = Object.values(clip.visualEffects ?? {}).some(
-    (effect) => effect?.easeIn || effect?.easeOut,
+    (effect) => effect?.easeIn || effect?.easeOut || effect?.window,
   ) ? localTime : 0;
   const effectMarkup = useMemo(() => visualEffectSvg(
     regionDraft ? {
@@ -847,7 +852,10 @@ export function ScenePreview({
   for (const track of [...project.tracks].reverse()) {
     if (!isTrackActive(project.tracks, track.id)) continue;
     for (const clip of active.filter((clip) => clip.trackId === track.id)) {
-      const matte = clip.visualEffects?.["media-matte"]?.enabled === true;
+      const matteEffect = clip.visualEffects?.["media-matte"];
+      const matte = !!matteEffect && effectActive(
+        matteEffect, playhead - clip.start, clip.duration,
+      );
       if (matte) {
         const id = `${sceneId}-matte-${clip.id}`;
         definitions.push(

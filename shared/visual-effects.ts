@@ -1,5 +1,11 @@
 import { z } from "zod";
 import type { Clip } from "./model";
+import {
+  effectWindowSchema,
+  effectOriginSchema,
+  originalEffectWindow,
+  effectActive,
+} from "./effect-timing";
 
 const number = z.number().finite();
 const color = z.string().regex(/^#[\da-f]{6}$/i);
@@ -8,9 +14,8 @@ const common = z.object({
   easeIn: number.min(0).max(86400).default(0),
   easeOut: number.min(0).max(86400).default(0),
   intensity: number.min(0).max(1).default(1),
-  timing: z
-    .object({ offset: number, duration: number.positive().max(86400) })
-    .optional(),
+  timing: effectOriginSchema.optional(),
+  window: effectWindowSchema.optional(),
 });
 const region = {
   shape: z.enum(["rectangle", "ellipse"]).default("ellipse"),
@@ -114,9 +119,11 @@ export function effectAmount(
   time: number,
   duration: number,
 ) {
-  if (!effect.enabled) return 0;
+  if (!effectActive(effect, time, duration)) return 0;
+  const window = originalEffectWindow(effect, duration);
   time += effect.timing?.offset ?? 0;
-  duration = effect.timing?.duration ?? duration;
+  time -= window.start;
+  duration = window.end - window.start;
   const ratio = Math.min(
     1,
     duration / Math.max(duration, effect.easeIn + effect.easeOut),
@@ -147,10 +154,12 @@ export function freezeVisualEffects(
         id,
         {
           ...effect,
+          enabled: effectActive(effect, time, clip.duration),
           intensity: effectAmount(effect, time, clip.duration),
           easeIn: 0,
           easeOut: 0,
           timing: undefined,
+          window: undefined,
         },
       ]),
   );
@@ -189,6 +198,12 @@ export function retimeVisualEffects(
           ...effect,
           easeIn: effect.easeIn * ratio,
           easeOut: effect.easeOut * ratio,
+          window: effect.window
+            ? {
+                start: effect.window.start * ratio,
+                end: effect.window.end * ratio,
+              }
+            : undefined,
           timing: effect.timing
             ? {
                 offset: effect.timing.offset * ratio,

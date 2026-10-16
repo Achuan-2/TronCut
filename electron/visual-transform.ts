@@ -2,6 +2,7 @@ import type { Clip } from "../shared/model";
 import { contentOrigin, defaultContentTransform } from "../shared/crop";
 import type { VisualKey } from "../shared/visual-state";
 import { defaultFrameCorners, frameCorners } from "../shared/media-frame";
+import { effectActiveExpression } from "../shared/effect-timing";
 
 export function mediaFrameFilters(
   clip: Clip,
@@ -30,7 +31,7 @@ export function mediaFrameFilters(
   const mask =
     "lte(pow(max(abs(X+0.5-W/2)-ld(0)+ld(2),0),2)+pow(max(abs(Y+0.5-H/2)-ld(1)+ld(2),0),2),ld(2)*ld(2))";
   return [
-    `geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='${prefix}alpha(X,Y)*(${mask})'`,
+    `geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='${prefix}alpha(X,Y)*if(${effectActiveExpression(frame, clip)},${mask},1)'`,
   ];
 }
 

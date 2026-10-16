@@ -5,6 +5,7 @@ import { behaviorSchema } from "./behaviors";
 import { transitionSchema } from "./transitions";
 import { exportSettingsSchema } from "./export-settings";
 import { visualEffectsSchema } from "./visual-effects";
+import { effectWindowSchema, effectOriginSchema } from "./effect-timing";
 
 const finite = z.number().finite();
 const identifier = z
@@ -224,6 +225,8 @@ export const projectSchema = z.object({
         fadeOut: finite.min(0).max(86400).optional(),
         cursorStyle: cursorStyleSchema.optional(),
         mediaFrame: z.object({
+          window: effectWindowSchema.optional(),
+          timing: effectOriginSchema.optional(),
           radius: finite.min(0).max(200),
           unit: z.enum(["px", "percent"]).optional(),
           enabled: z.boolean().optional(),
