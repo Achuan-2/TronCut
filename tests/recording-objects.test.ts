@@ -144,7 +144,7 @@ it("更换静态及动态背景、圆角、鼠标不覆盖已编辑镜头，禁�
       project,
       master.id,
       {
-        preset: "wispysky",
+        preset: "mint",
         cursor: {
           ...defaultRecordingSettings.cursor,
           style: "windows11",

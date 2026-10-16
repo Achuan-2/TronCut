@@ -196,7 +196,7 @@ it("动态壁纸循环导出到录屏末尾，暂停导出帧也按同一源时�
   const root = path.resolve(`test-output/recordly-wallpaper-${Date.now()}`);
   const bundled = path.join(root, "bundled");
   await fs.mkdir(bundled, { recursive: true });
-  const wallpaper = path.join(bundled, "wispysky.mp4");
+  const wallpaper = path.join(bundled, "loop.mp4");
   await runProcess(findBinary("ffmpeg"), [
     "-y",
     "-f",
@@ -228,11 +228,8 @@ it("动态壁纸循环导出到录屏末尾，暂停导出帧也按同一源时�
     "yuv420p",
     screenFile,
   ]);
-  const store = new RecordingStyleStore(root, bundled);
-  const background = await store.background(160, 90, "wispysky");
-  expect(await fs.readFile(background.path)).toEqual(
-    await fs.readFile(wallpaper),
-  );
+  // Existing projects may still contain a collected video background.
+  const background = await probeMedia(wallpaper);
   const project = createProject();
   project.canvas = { width: 160, height: 90, fps: 10, background: "#000000" };
   project.exportSettings = { encoder: "software" };
@@ -242,7 +239,7 @@ it("动态壁纸循环导出到录屏末尾，暂停导出帧也按同一源时�
     [{ asset: screen, kind: "screen" }],
     {
       ...defaultRecordingSettings,
-      preset: "wispysky",
+      preset: "mint",
       autoZoom: false,
       padding: 0.2,
     },

@@ -91,19 +91,14 @@ try {
   const background = page.getByLabel("录屏对象背景", { exact: true });
   await expect(background).toHaveValue("violet");
   await expect(page.getByLabel("背景图库")).toHaveCount(0);
-  await background.selectOption("tahoe-light");
-  await expect(page.getByAltText("Tahoe Light", { exact: true })).toBeVisible();
-  await background.selectOption("wispysky");
+  await background.selectOption("perspective-grid");
   await expect(
-    page.locator(".recording-background-swatch video"),
-  ).toHaveAttribute("loop", "");
-  await expect
-    .poll(() =>
-      page
-        .locator(".recording-background-swatch video")
-        .evaluate((video) => video.currentTime),
-    )
-    .toBeGreaterThan(0.1);
+    page.getByAltText("透视网格（黑）", { exact: true }),
+  ).toBeVisible();
+  await background.selectOption("mint");
+  await expect(
+    page.locator(".recording-background-swatch > div"),
+  ).toBeVisible();
   await page.getByLabel("录屏对象留白", { exact: true }).fill("12");
   await page.getByLabel("圆角 (%)", { exact: true }).fill("30");
   await page
@@ -132,7 +127,9 @@ try {
   await background.selectOption("none");
   await expect(page.locator(".recording-background-swatch")).toHaveCount(0);
   await background.selectOption("perspective-grid");
-  await expect(page.getByAltText("透视网格（黑）", { exact: true })).toBeVisible();
+  await expect(
+    page.getByAltText("透视网格（黑）", { exact: true }),
+  ).toBeVisible();
   await expect(
     page.getByRole("button", { name: "取消组合", exact: true }),
   ).toBeEnabled();

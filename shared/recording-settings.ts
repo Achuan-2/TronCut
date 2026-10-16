@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { defaultCursorStyle } from "./cursor";
-import { recordlyBackgrounds } from "./recording-backgrounds";
+import { retiredRecordingBackgrounds } from "./recording-backgrounds";
 const finite = z.number().finite();
 export const cursorStyleSchema = z.object({
   style: z.enum([
@@ -31,7 +31,6 @@ export const recordingBackgrounds = {
   violet: { name: "紫雾", colors: ["#30295b", "#bd9ce4"] },
   sunset: { name: "日落", colors: ["#793c63", "#f6ae7d"] },
   dark: { name: "深灰", colors: ["#111827", "#475569"] },
-  ...recordlyBackgrounds,
 } as const;
 export const recordingBackgroundSchema = z.enum(
   Object.keys(recordingBackgrounds) as [
@@ -42,7 +41,13 @@ export const recordingBackgroundSchema = z.enum(
 export type RecordingBackground = z.infer<typeof recordingBackgroundSchema>;
 export const recordingSettingsSchema = z.object({
   background: z.boolean(),
-  preset: recordingBackgroundSchema,
+  preset: z.preprocess(
+    (value) =>
+      typeof value === "string" && retiredRecordingBackgrounds.has(value)
+        ? "perspective-grid"
+        : value,
+    recordingBackgroundSchema,
+  ),
   padding: z.number().finite().min(0).max(0.25),
   radius: z.number().finite().min(0).max(200),
   cursor: cursorStyleSchema,
@@ -53,7 +58,7 @@ export const recordingSettingsSchema = z.object({
 export type RecordingSettings = z.infer<typeof recordingSettingsSchema>;
 export const defaultRecordingSettings: RecordingSettings = {
   background: true,
-  preset: "tahoe-light",
+  preset: "perspective-grid",
   padding: 0.08,
   radius: 0,
   cursor: { ...defaultCursorStyle, style: "tahoe", size: 40 },

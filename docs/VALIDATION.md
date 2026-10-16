@@ -2,9 +2,9 @@
 
 ## v0.4.5 发布前检查（2026-10-16）
 
-本地 `pnpm test` 的 74 个文件、330 项测试全部通过，TypeScript、Vite、Electron 构建、2 项 Rust 测试及打包资源预检通过。录屏相关验证覆盖对象组合与取消组合、同步移动/裁剪/拆分、录后背景/圆角/鼠标编辑、轨道状态、可编辑运镜、真实 FFmpeg 导出与工程归档。
+本地 `pnpm test` 的 74 个文件、331 项测试全部通过，TypeScript、Vite、Electron 构建、2 项 Rust 测试及打包资源预检通过。录屏相关验证覆盖对象组合与取消组合、同步移动/裁剪/拆分、录后背景/圆角/鼠标编辑、轨道状态、可编辑运镜、真实 FFmpeg 导出与工程归档。
 
-`scripts/test-recording-object-ui.mjs`、`scripts/test-recordly-ui.mjs` 和 `scripts/test-recording-zoom-ui.mjs` 桌面专项已通过，覆盖背景下拉框、透视网格、静态/循环动态背景、鼠标样式、全屏倒计时、缩放端点、撤销重做与保存重开。此前真实 Windows WGC 录屏和录后样式编辑专项也通过。本版 `scripts/test-editing-ui.mjs` 完整开发程序回归通过，前端运行错误为零。
+`scripts/test-recording-object-ui.mjs`、`scripts/test-recordly-ui.mjs` 和 `scripts/test-recording-zoom-ui.mjs` 桌面专项已通过，覆盖背景下拉框、透视网格、渐变背景、鼠标样式、全屏倒计时、缩放端点、撤销重做与保存重开。移除 39 个 Recordly 壁纸后重新验证精简背景和录屏对象流程；旧壁纸设置迁移测试覆盖所有已移除选项，已有工程的视频背景循环导出仍保留测试。此前真实 Windows WGC 录屏和录后样式编辑专项也通过。本版 `scripts/test-editing-ui.mjs` 完整开发程序回归通过，前端运行错误为零。
 
 针对 v0.4.4 云端末帧截取失败，新增尾部探测无结果时的完整探测回退，并在真实截帧测试中模拟该路径，验证源视频 10 fps、工程 30 fps 的末帧颜色。语音会话测试改为按实际异步准备顺序验证两个串行任务，避免将请求文件写入完成顺序误判为队列错误。
 

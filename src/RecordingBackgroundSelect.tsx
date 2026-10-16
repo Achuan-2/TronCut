@@ -52,15 +52,17 @@ export default function RecordingBackgroundSelect({
         }
       >
         <option value="none">无背景</option>
-        {groups.map(({ name, items }) => (
-          <optgroup key={name} label={name}>
-            {items.map(([id, entry]) => (
-              <option key={id} value={id}>
-                {entry.name}
-              </option>
-            ))}
-          </optgroup>
-        ))}
+        {groups
+          .filter(({ items }) => items.length > 0)
+          .map(({ name, items }) => (
+            <optgroup key={name} label={name}>
+              {items.map(([id, entry]) => (
+                <option key={id} value={id}>
+                  {entry.name}
+                </option>
+              ))}
+            </optgroup>
+          ))}
       </select>
     </label>
   );

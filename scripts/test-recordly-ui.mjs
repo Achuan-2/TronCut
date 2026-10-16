@@ -20,7 +20,12 @@ try {
   await expect(page.getByLabel("背景图库")).toHaveCount(0);
   await expect(
     page.getByLabel("录屏背景", { exact: true }).locator("option"),
-  ).toHaveCount(45);
+  ).toHaveCount(6);
+  await expect(
+    page
+      .getByLabel("录屏背景", { exact: true })
+      .locator("optgroup[label='动态背景']"),
+  ).toHaveCount(0);
   await page
     .getByLabel("录屏背景", { exact: true })
     .selectOption("perspective-grid");
@@ -33,12 +38,6 @@ try {
   await page.screenshot({
     path: path.join(root, "perspective-grid-settings.png"),
   });
-  await page.getByLabel("录屏背景", { exact: true }).selectOption("wispysky");
-  const video = page.locator("video.recording-wallpaper-preview");
-  await expect(video).toHaveAttribute("loop", "");
-  await expect
-    .poll(() => video.evaluate((el) => el.currentTime))
-    .toBeGreaterThan(0.1);
   await page.getByLabel("自动缩放范围", { exact: true }).selectOption("scene");
   for (const style of [
     "macos",
@@ -112,13 +111,13 @@ try {
     window.framecraft.recordingSettings(),
   );
   expect(saved).toMatchObject({
-    preset: "wispysky",
+    preset: "perspective-grid",
     zoomBackground: true,
     cursor: { style: "windows11" },
   });
   expect(errors).toEqual([]);
   console.log(
-    `Recordly 静态/动态图库、全部鼠标样式、设置记忆、全屏倒计时与取消/完成通过：${root}`,
+    `精简背景、全部鼠标样式、设置记忆、全屏倒计时与取消/完成通过：${root}`,
   );
 } finally {
   await app.close();

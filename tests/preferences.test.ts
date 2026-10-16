@@ -8,6 +8,8 @@ import {
   preferencesUpdateSchema,
 } from "../shared/preferences";
 import { defaultRecordingSettings } from "../shared/recording";
+import { retiredRecordingBackgrounds } from "../shared/recording-backgrounds";
+import { recordingSettingsSchema } from "../shared/recording-settings";
 const secrets = {
   isEncryptionAvailable: () => true,
   encryptString: (value: string) =>
@@ -15,6 +17,25 @@ const secrets = {
   decryptString: (value: Buffer) =>
     value.toString().split("").reverse().join(""),
 };
+
+it("已移除壁纸的旧设置迁移为透视网格，保留其他录屏样式", () => {
+  for (const preset of retiredRecordingBackgrounds) {
+    expect(
+      recordingSettingsSchema.parse({
+        ...defaultRecordingSettings,
+        preset,
+        padding: 0.12,
+        radius: 24,
+      }),
+    ).toMatchObject({ preset: "perspective-grid", padding: 0.12, radius: 24 });
+  }
+  expect(
+    recordingSettingsSchema.safeParse({
+      ...defaultRecordingSettings,
+      preset: "invalid",
+    }).success,
+  ).toBe(false);
+});
 
 it("首选项持久化且不向界面或工程暴露密钥，更换服务不会复用原密钥", async () => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "troncut-preferences-"));
