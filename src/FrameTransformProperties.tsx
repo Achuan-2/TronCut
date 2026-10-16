@@ -1,10 +1,11 @@
-import { AlignCenter, LockKeyhole, Unlock, RotateCcw } from "lucide-react";
+import { AlignCenter, LockKeyhole, Unlock } from "lucide-react";
 import type { Clip, Transform } from "../shared/model";
 import { framePosition } from "../shared/canvas";
 import {
   ScaleControl,
   RotationControls,
   PropertySlider,
+  PropertyResetButton,
 } from "./TransformControls";
 
 const positionPresets = [
@@ -72,6 +73,8 @@ export default function FrameTransformProperties({
         step={1}
         unit="%"
         onChange={(opacity) => onTransform("opacity", opacity / 100)}
+        defaultValue={100}
+        onReset={() => onTransform("opacity", 1)}
         disabled={disabled}
       />
       {!editingContent && (
@@ -157,20 +160,17 @@ export default function FrameTransformProperties({
                     }
                   }}
                 />
-                <button
-                  className="property-reset"
-                  type="button"
-                  aria-label={`重置${editingContent ? "内容位置" : "位置"} ${axis}`}
-                  title={`重置位置 ${axis}`}
+                <PropertyResetButton
+                  label={`重置${editingContent ? "内容位置" : "位置"} ${axis}`}
+                  value={position}
+                  defaultValue={0}
                   disabled={disabled}
-                  onClick={() =>
+                  onReset={() =>
                     index === 2
                       ? onTransform("z", 0)
                       : onContentOrFrame(index === 0 ? "x" : "y", origin)
                   }
-                >
-                  <RotateCcw size={14} />
-                </button>
+                />
               </label>
             );
           })}
@@ -245,6 +245,7 @@ export default function FrameTransformProperties({
           step={0.1}
           onChange={(skew) => onTransform("skew", skew)}
           onReset={() => onTransform("skew", 0)}
+          defaultValue={0}
           disabled={disabled}
         />
       )}

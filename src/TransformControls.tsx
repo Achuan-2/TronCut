@@ -2,6 +2,39 @@ import { useRef } from "react";
 import { RotateCcw, RotateCw } from "lucide-react";
 import type { Transform } from "../shared/model";
 
+export function PropertyResetButton({
+  label,
+  value,
+  defaultValue,
+  precision = 3,
+  onReset,
+  disabled,
+}: {
+  label: string;
+  value: number;
+  defaultValue: number;
+  precision?: number;
+  onReset: () => void;
+  disabled?: boolean;
+}) {
+  const isDefault = Number(value.toFixed(precision)) === defaultValue;
+  return (
+    <button
+      type="button"
+      className="property-reset"
+      title={label}
+      aria-label={label}
+      aria-hidden={isDefault || undefined}
+      tabIndex={isDefault ? -1 : undefined}
+      style={{ visibility: isDefault ? "hidden" : undefined }}
+      disabled={disabled || isDefault}
+      onClick={onReset}
+    >
+      <RotateCcw size={14} />
+    </button>
+  );
+}
+
 export function ScaleControl({
   value,
   onChange,
@@ -41,14 +74,13 @@ export function ScaleControl({
         />
         <span>%</span>
       </div>
-      <button
-        title="重置缩放"
-        aria-label="重置缩放"
+      <PropertyResetButton
+        label="重置缩放"
+        value={value}
+        defaultValue={100}
         disabled={disabled}
-        onClick={() => onChange(100)}
-      >
-        <RotateCcw size={14} />
-      </button>
+        onReset={() => onChange(100)}
+      />
     </div>
   );
 }
@@ -167,15 +199,14 @@ function RotationAxis({
         />
         <span>°</span>
       </div>
-      <button
-        className="property-reset"
-        aria-label={`重置旋转 ${axis}`}
-        title={`重置旋转 ${axis}`}
+      <PropertyResetButton
+        label={`重置旋转 ${axis}`}
+        value={value}
+        defaultValue={0}
+        precision={1}
         disabled={disabled}
-        onClick={() => change(0)}
-      >
-        <RotateCcw size={14} />
-      </button>
+        onReset={() => change(0)}
+      />
     </div>
   );
 }
@@ -190,6 +221,7 @@ export function PropertySlider({
   unit,
   onChange,
   onReset,
+  defaultValue = 0,
   disabled,
 }: {
   label: string;
@@ -201,6 +233,7 @@ export function PropertySlider({
   unit?: string;
   onChange: (value: number) => void;
   onReset?: () => void;
+  defaultValue?: number;
   disabled?: boolean;
 }) {
   const change = (value: number) => {
@@ -233,15 +266,13 @@ export function PropertySlider({
         {unit && <span>{unit}</span>}
       </div>
       {onReset ? (
-        <button
-          className="property-reset"
-          aria-label={`重置${label}`}
-          title={`重置${label}`}
+        <PropertyResetButton
+          label={`重置${label}`}
+          value={value}
+          defaultValue={defaultValue}
           disabled={disabled}
-          onClick={onReset}
-        >
-          <RotateCcw size={14} />
-        </button>
+          onReset={onReset}
+        />
       ) : (
         <span className="property-reset-spacer" />
       )}
