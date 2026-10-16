@@ -2607,18 +2607,19 @@ fieldset:disabled {
 .frame-transform-properties .rotation-dial { width: 23px; height: 23px; }
 .frame-transform-properties .rotation-dial > span { width: 17px; height: 17px; }
 .property-group { margin: 14px 0; font-size: 11px; }
-.position-controls { display: flex; justify-content: space-between; position: relative; }
-.position-presets-column { display: flex; flex-direction: column; gap: 8px; padding-top: 5px; }
-.position-presets { display: grid; grid-template-columns: repeat(3, 25px); gap: 3px; }
+.position-controls { --position-row-height: 25px; --position-row-gap: 3px; display: grid; grid-template-columns: 1fr auto; gap: 8px 12px; align-items: start; position: relative; }
+.position-presets-column { display: contents; }
+.position-presets-column > span { grid-column: 1 / -1; }
+.position-presets { grid-column: 1; grid-row: 2; display: grid; grid-template-columns: repeat(3, 25px); grid-auto-rows: var(--position-row-height); gap: var(--position-row-gap); }
 .position-presets button { width: 25px; height: 25px; padding: 0; border: 1px solid var(--line); border-radius: 4px; color: #aeb9bd; background: #171d20; }
 .position-presets button:hover:not(:disabled), .position-presets button[aria-pressed="true"] { color: var(--accent); border-color: var(--accent); background: #263a32; }
 .position-preset-icon { display: block; position: relative; width: 12px; height: 12px; border: 1px solid currentColor; border-radius: 1px; }
 .position-preset-icon > i { position: absolute; width: 5px; height: 5px; background: currentColor; transform: translate(-50%, -50%); border-radius: 1px; }
-.position-axes { display: flex; flex-direction: column; gap: 6px; }
+.position-axes { grid-column: 2; grid-row: 2; display: grid; grid-auto-rows: var(--position-row-height); gap: var(--position-row-gap); }
 .position-axis { display: flex; align-items: center; gap: 6px; }
 .position-axis > input { width: 64px; padding: 4px; text-align: right; }
 .position-axis > span { width: 10px; }
-.position-axes > .center-layer { position: absolute; left: 27px; top: 0; color: #91a19a; }
+.position-axes > .center-layer { position: absolute; right: 0; top: 0; color: #91a19a; }
 .dimension-controls { position: relative; padding: 6px 22px 3px 0; }
 .dimension-axis { display: flex; justify-content: space-between; align-items: center; margin: 7px 0; }
 .dimension-axis > input { width: 64px; text-align: right; padding: 4px; }
