@@ -253,6 +253,7 @@ function installHandlers() {
   });
   handle("recording:countdown", async (sourceId: unknown) => {
     const id = z.string().parse(sourceId);
+    recordingControls.prepare(id, window.getBounds());
     minimizeForRecording(id);
     try {
       const success = await recordingCountdown.start(id);
@@ -268,6 +269,7 @@ function installHandlers() {
   handle("recording:controls:update", (state: unknown) =>
     recordingControls.update(state === null ? null : recordingControlsStateSchema.parse(state)),
   );
+  handle("recording:controls:show", () => recordingControls.show());
   handle("recording:settings:save", async (input: unknown) =>
     (await preferences.save({ recording: recordingSettingsSchema.parse(input) })).recording,
   );
@@ -983,6 +985,7 @@ function installHandlers() {
       thumbnailSize: { width: 300, height: 180 },
     });
     recordingCountdown.setSources(sources);
+    recordingControls.setSources(sources);
     return sources.map((s) => ({
       id: s.id,
       name: s.name,

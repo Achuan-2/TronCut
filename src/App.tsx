@@ -986,14 +986,19 @@ export default function App() {
         <div className="header-actions" hidden={screen === "home"}>
           <button
             className="record-button"
-            disabled={actionsBlocked || recording}
+            disabled={recording ? !recordingActive : actionsBlocked}
+            title={recordingActive ? "显示独立录制控制窗口" : "开始录制"}
             onClick={() => {
+              if (recordingActive) {
+                void bridge().showRecordingControls().catch(error => toast(String(error)));
+                return;
+              }
               editor.setPlaying(false);
               setRecording(true);
             }}
           >
             <Circle size={11} fill="currentColor" />
-            录制
+            {recordingActive ? "录制控制" : "录制"}
           </button>
           <button
             className="save-button"

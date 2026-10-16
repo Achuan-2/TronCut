@@ -54,6 +54,54 @@ document.querySelector('#editor').onclick = () => window.recordingControls.comma
 export class RecordingControls {
   private window?: BrowserWindow;
   private state?: RecordingControlsState;
+  private captureDisplayId?: number;
+  private sourceDisplays = new Map<string, string>();
+
+  setSources(
+    sources: Pick<Electron.DesktopCapturerSource, "id" | "display_id">[],
+  ) {
+    this.sourceDisplays = new Map(
+      sources.map((source) => [source.id, source.display_id]),
+    );
+  }
+
+  prepare(sourceId: string, editorBounds: Electron.Rectangle) {
+    const displayId = this.sourceDisplays.get(sourceId);
+    this.captureDisplayId = (
+      screen
+        .getAllDisplays()
+        .find((display) => String(display.id) === displayId) ??
+      screen.getDisplayMatching(editorBounds)
+    ).id;
+  }
+
+  private bounds() {
+    const display =
+      screen
+        .getAllDisplays()
+        .find((display) => display.id === this.captureDisplayId) ??
+      screen.getPrimaryDisplay();
+    const { workArea } = display;
+    const width = Math.min(448, workArea.width),
+      height = Math.min(120, workArea.height);
+    return {
+      x: Math.round(workArea.x + (workArea.width - width) / 2),
+      y: workArea.y + Math.max(0, workArea.height - height - 24),
+      width,
+      height,
+    };
+  }
+
+  /** Explicit recovery from the editor/taskbar also brings off-screen controls back. */
+  show() {
+    const controls = this.window;
+    if (!controls || controls.isDestroyed() || !this.state) return;
+    controls.setBounds(this.bounds());
+    if (controls.isMinimized()) controls.restore();
+    controls.show();
+    controls.moveTop();
+    controls.focus();
+  }
 
   constructor(private command: (command: RecordingControlCommand) => void) {
     ipcMain.on("recording:controls:command", (event, command: unknown) => {
@@ -83,16 +131,8 @@ export class RecordingControls {
         this.window.webContents.send("recording:controls:state", state);
       return;
     }
-    const { workArea } = screen.getDisplayNearestPoint(
-      screen.getCursorScreenPoint(),
-    );
-    const width = 448,
-      height = 120;
     const controls = new BrowserWindow({
-      x: workArea.x + Math.max(0, workArea.width - width - 24),
-      y: workArea.y + Math.max(0, workArea.height - height - 24),
-      width,
-      height,
+      ...this.bounds(),
       title: "TronCut 录制控制",
       show: false,
       frame: false,
@@ -100,7 +140,7 @@ export class RecordingControls {
       maximizable: false,
       minimizable: false,
       alwaysOnTop: true,
-      skipTaskbar: true,
+      skipTaskbar: false,
       backgroundColor: "#18231c",
       webPreferences: {
         preload: path.join(__dirname, "recording-controls-preload.cjs"),
@@ -111,7 +151,7 @@ export class RecordingControls {
     });
     this.window = controls;
     controls.setContentProtection(true);
-    controls.setAlwaysOnTop(true, "floating");
+    controls.setAlwaysOnTop(true, "screen-saver");
     controls.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
     controls.setMenu(null);
     controls.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
@@ -119,7 +159,11 @@ export class RecordingControls {
     controls.webContents.once("did-finish-load", () => {
       if (this.window !== controls || !this.state) return;
       controls.webContents.send("recording:controls:state", this.state);
-      controls.showInactive();
+      // Minimizing the editor can leave the Windows task switcher in front.
+      // Activate once so the user can actually see and reach the controller.
+      controls.show();
+      controls.moveTop();
+      controls.focus();
     });
     // Alt+F4 must save the recording, rather than leave it without controls.
     controls.on("close", (event) => {

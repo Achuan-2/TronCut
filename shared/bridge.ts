@@ -40,6 +40,7 @@ export interface FrameCraftBridge {
   recordingCountdown(sourceId: string): Promise<boolean>;
   cancelRecordingCountdown(): Promise<void>;
   updateRecordingControls(state: RecordingControlsState | null): Promise<void>;
+  showRecordingControls(): Promise<void>;
   recordingSettings(): Promise<RecordingSettings>;
   saveRecordingSettings(
     settings: RecordingSettings,

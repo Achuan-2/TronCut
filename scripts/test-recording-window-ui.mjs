@@ -17,7 +17,19 @@ const env = {
   FRAMECRAFT_USER_DATA: path.join(root, "profile"),
 };
 delete env.ELECTRON_RUN_AS_NODE;
-const app = await electron.launch({ args: ["."], env });
+const packaged = process.env.FRAMECRAFT_PACKAGED_SMOKE === "1";
+const app = await electron.launch({
+  ...(packaged
+    ? {
+        executablePath: path.resolve(
+          process.env.FRAMECRAFT_PACKAGED_APP ??
+            "release/win-unpacked/TronCut.exe",
+        ),
+      }
+    : {}),
+  args: packaged ? [] : ["."],
+  env,
+});
 try {
   const page = await app.firstWindow();
   const errors = [];
@@ -72,7 +84,12 @@ try {
   async function configure(native, source = target) {
     await page.getByRole("button", { name: "录制", exact: true }).click();
     await page
-      .locator(`.capture-sources > button[data-source-id="${source}"]`)
+      .locator(
+        source === "screen"
+          ? '.capture-sources > button[data-source-id^="screen:"]'
+          : `.capture-sources > button[data-source-id="${source}"]`,
+      )
+      .first()
       .click();
     await page.getByLabel("麦克风", { exact: true }).uncheck();
     await page.getByLabel("录制帧率", { exact: true }).selectOption("15");
@@ -101,7 +118,7 @@ try {
   await close.click();
 
   for (const native of [true, false]) {
-    await configure(native);
+    await configure(native, native ? "screen" : target);
     await begin();
     const controls = await recordingControls(app);
     controls.on("pageerror", (error) => errors.push(error.message));
@@ -139,9 +156,32 @@ try {
       .getByRole("button", { name: "显示编辑器", exact: true })
       .click();
     await mainRestored();
-    await expect(
-      page.getByRole("button", { name: "录制", exact: true }),
-    ).toBeDisabled();
+    const recall = page.getByRole("button", { name: "录制控制", exact: true });
+    await expect(recall).toBeEnabled();
+    await app.evaluate(({ BrowserWindow }) => {
+      const controls = BrowserWindow.getAllWindows().find(
+        (w) => w.getTitle() === "TronCut 录制控制",
+      );
+      controls.setPosition(-30000, -30000);
+      controls.hide();
+    });
+    await recall.click();
+    await recordingControls(app);
+    const placement = await app.evaluate(({ BrowserWindow, screen }) => {
+      const controls = BrowserWindow.getAllWindows().find(
+        (w) => w.getTitle() === "TronCut 录制控制",
+      );
+      const bounds = controls.getBounds();
+      const area = screen.getDisplayMatching(bounds).workArea;
+      return {
+        centered:
+          Math.abs(bounds.x + bounds.width / 2 - area.x - area.width / 2) <= 1,
+        inside:
+          bounds.y >= area.y &&
+          bounds.y + bounds.height <= area.y + area.height,
+      };
+    });
+    expect(placement).toEqual({ centered: true, inside: true });
     const projectName = page.getByRole("textbox", {
       name: "工程名称",
       exact: true,
