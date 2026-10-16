@@ -3962,6 +3962,15 @@ fieldset:disabled {
   align-items: flex-start;
   margin-bottom: 21px;
 }
+.recorder-modal > .modal-heading {
+  position: sticky;
+  top: -25px;
+  z-index: 3;
+  margin: -25px -28px 21px;
+  padding: 25px 28px 16px;
+  background: #202724;
+  border-bottom: 1px solid #46534b;
+}
 .modal-heading h2 {
   font-size: 19px;
   color: #e0ece4;

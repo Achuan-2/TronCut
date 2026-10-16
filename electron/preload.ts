@@ -111,6 +111,7 @@ const bridge: FrameCraftBridge = {
   captureSources: () => ipcRenderer.invoke("capture:sources"),
   selectCapture: (id, audio) => ipcRenderer.invoke("capture:select", id, audio),
   nativeCaptureAvailable: () => ipcRenderer.invoke("capture:native:available"),
+  restoreRecordingWindow: () => ipcRenderer.invoke("recording:window:restore"),
   nativeRecordingStart: (id, fps, audio) =>
     ipcRenderer.invoke("capture:native:start", id, fps, audio),
   nativeRecordingPause: (paused) =>

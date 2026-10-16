@@ -157,6 +157,7 @@ try {
   await expect(next.locator("strong")).toHaveText("2");
   await expect(next.locator("strong")).toHaveText("1");
   expect(await completed).toBe(true);
+  await page.evaluate(() => window.framecraft.restoreRecordingWindow());
   await page.getByRole("button", { name: "关闭录制设置", exact: true }).click();
   const saved = await page.evaluate(() =>
     window.framecraft.recordingSettings(),

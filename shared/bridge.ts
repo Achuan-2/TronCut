@@ -129,6 +129,7 @@ export interface FrameCraftBridge {
   captureSources(): Promise<CaptureSource[]>;
   selectCapture(id: string, systemAudio: boolean): Promise<void>;
   nativeCaptureAvailable(): Promise<boolean>;
+  restoreRecordingWindow(): Promise<void>;
   nativeRecordingStart(
     sourceId: string,
     fps: number,

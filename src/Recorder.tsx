@@ -178,6 +178,7 @@ export default function Recorder({
       sessions.current = [];
       nativeActive.current = false;
       stopping.current = false;
+      await window.framecraft?.restoreRecordingWindow();
     }
   }
   const stopRef = useRef(stop);
@@ -245,6 +246,7 @@ export default function Recorder({
       }
       if (!mounted.current) {
         streams.forEach((s) => s.stream.getTracks().forEach((t) => t.stop()));
+        await bridge.restoreRecordingWindow();
         return;
       }
       timing.current = { started: performance.now(), paused: 0, pauseStart: 0 };
@@ -339,6 +341,7 @@ export default function Recorder({
       });
       setPhase("recording");
     } catch (e) {
+      await bridge.restoreRecordingWindow();
       setError(String(e));
       setPhase("configure");
       for (const session of sessions.current) {

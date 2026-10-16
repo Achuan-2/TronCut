@@ -89,6 +89,22 @@ if (!app.isPackaged || process.env.FRAMECRAFT_SMOKE)
     path.resolve(process.env.FRAMECRAFT_USER_DATA || ".framecraft-dev"),
   );
 let window: BrowserWindow;
+let recordingMinimizedWindow = false;
+function minimizeForRecording(sourceId: string) {
+  if (!window || window.isDestroyed() || window.isMinimized()) return;
+  // Minimizing the capture target itself would stop producing useful frames.
+  if (sourceId === window.getMediaSourceId()) return;
+  recordingMinimizedWindow = true;
+  window.minimize();
+}
+function restoreRecordingWindow() {
+  if (!recordingMinimizedWindow) return;
+  recordingMinimizedWindow = false;
+  if (!window || window.isDestroyed()) return;
+  if (window.isMinimized()) window.restore();
+  window.show();
+  window.focus();
+}
 const windowState = () => ({
   maximized: window.isMaximized(),
   fullscreen: window.isFullScreen(),
@@ -220,8 +236,20 @@ function installHandlers() {
   });
   handle("window:state", windowState);
   handle("recording:settings", async () => (await preferences.get()).recording);
-  handle("recording:countdown", (sourceId: unknown) => recordingCountdown.start(z.string().parse(sourceId)));
+  handle("recording:countdown", async (sourceId: unknown) => {
+    const id = z.string().parse(sourceId);
+    minimizeForRecording(id);
+    try {
+      const success = await recordingCountdown.start(id);
+      if (!success) restoreRecordingWindow();
+      return success;
+    } catch (error) {
+      restoreRecordingWindow();
+      throw error;
+    }
+  });
   handle("recording:countdown:cancel", () => recordingCountdown.cancel());
+  handle("recording:window:restore", restoreRecordingWindow);
   handle("recording:settings:save", async (input: unknown) =>
     (await preferences.save({ recording: recordingSettingsSchema.parse(input) })).recording,
   );
@@ -1063,6 +1091,7 @@ async function createWindow() {
     recordingCountdown.cancel();
     void recordingBorder.stop();
     nativeRecording?.abort();
+    restoreRecordingWindow();
   });
   window.webContents.on("will-navigate", (event, url) => {
     const current = window.webContents.getURL();

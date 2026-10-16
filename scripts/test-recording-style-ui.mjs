@@ -81,6 +81,7 @@ try {
   await expect(page.getByText("正在录制", { exact: true })).toBeVisible({
     timeout: 30000,
   });
+  expect(await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].isMinimized())).toBe(false);
   await page.waitForTimeout(2200);
   const pause = page.locator(".recording-bar > button").first();
   await pause.click();
