@@ -5,7 +5,7 @@ import {
   behaviorStyles,
   behaviorStyleLabels,
   behaviorSchema,
-  createBehavior,
+  behaviorFromPreset,
   type Behavior,
   type BehaviorPhase,
   type BehaviorPhaseKey,
@@ -80,7 +80,14 @@ export default function BehaviorProperties({
             key={behavior.id}
             className={`behavior-property ${selected ? "selected" : ""}`}
           >
-            <div className="speed-heading">
+            <div
+              className="speed-heading"
+              onContextMenu={(event) => {
+                event.preventDefault();
+                editor.selectBehavior(clip.id, behavior.id);
+                setMenuId(behavior.id);
+              }}
+            >
               <button
                 className="behavior-name"
                 type="button"
@@ -117,8 +124,21 @@ export default function BehaviorProperties({
                   <div
                     className="behavior-actions-popup"
                     role="menu"
+                    onKeyDown={(event) => {
+                      event.stopPropagation();
+                      if (event.key === "Escape") setMenuId(null);
+                    }}
                     onClick={() => setMenuId(null)}
                   >
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={() =>
+                        editor.presetLibrary.saveBehavior(behavior)
+                      }
+                    >
+                      添加预设
+                    </button>
                     <button
                       type="button"
                       role="menuitem"
@@ -129,12 +149,20 @@ export default function BehaviorProperties({
                     <button
                       type="button"
                       role="menuitem"
+                      disabled={
+                        !editor.presetLibrary.findBehavior(behavior.preset)
+                      }
                       onClick={() => {
-                        const reset = createBehavior(
+                        const preset = editor.presetLibrary.findBehavior(
                           behavior.preset,
-                          behavior.duration,
-                          clip.kind,
                         );
+                        const reset =
+                          preset &&
+                          behaviorFromPreset(
+                            preset,
+                            behavior.duration,
+                            clip.kind,
+                          );
                         if (reset)
                           update({
                             incoming: reset.incoming,

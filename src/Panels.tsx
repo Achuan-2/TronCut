@@ -13,6 +13,7 @@ import {
   MousePointer2,
   Paintbrush,
   ArrowRightLeft,
+  Star,
 } from "lucide-react";
 import { type Asset, type Clip, textPresets, defaultTransform } from "../shared/model";
 import { createTransformSampler } from "../shared/editor";
@@ -41,8 +42,10 @@ import TextFillFields from "./TextFillFields";
 import TransitionsPanel from "./TransitionsPanel";
 import TransitionProperties from "./TransitionProperties";
 import CaptionsPanel from "./CaptionsPanel";
+import FavoritesPanel from "./FavoritesPanel";
 
 export type Tab =
+  | "favorites"
   | "media"
   | "annotations"
   | "captions"
@@ -53,6 +56,7 @@ export type Tab =
   | "transitions"
   | "settings";
 const tabs = [
+  { id: "favorites", name: "收藏夹", icon: Star },
   { id: "media", name: "媒体", icon: FolderOpen },
   { id: "annotations", name: "标注", icon: Type },
   { id: "captions", name: "字幕", icon: Captions },
@@ -92,6 +96,10 @@ export default function Panels(props: Props) {
             key={t.id}
             className={tab === t.id ? "selected" : ""}
             onClick={() => setTab(t.id)}
+            onContextMenu={t.id === "behaviors" ? (event) => {
+              event.preventDefault();
+              editor.presetLibrary.showMenu({ kind: "behavior", x: event.clientX, y: event.clientY });
+            } : undefined}
           >
             <t.icon size={21} />
             <span>{t.name}</span>
@@ -100,6 +108,10 @@ export default function Panels(props: Props) {
       </nav>
       <div
         className={`library-content ${tab === "media" ? "media-library" : tab === "captions" ? "captions-library" : tab === "narration" ? "narration-library" : tab === "animations" ? "animations-library" : ""}`}
+        onContextMenu={tab === "behaviors" ? (event) => {
+          event.preventDefault();
+          editor.presetLibrary.showMenu({ kind: "behavior", x: event.clientX, y: event.clientY });
+        } : undefined}
       >
         {tab !== "captions" && tab !== "animations" && tab !== "narration" && (
           <div className="library-heading">
@@ -111,6 +123,8 @@ export default function Panels(props: Props) {
             {tab === "media" && <span>{project.assets.length} 个素材</span>}
           </div>
         )}
+        {editor.presetLibrary.error && <p className="preset-library-error" role="alert">{editor.presetLibrary.error}</p>}
+        {tab === "favorites" && <FavoritesPanel editor={editor} toast={toast} />}
         {tab === "media" && (
           <MediaLibrary
             assets={project.assets}

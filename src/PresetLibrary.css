@@ -1,0 +1,135 @@
+.preset-tile {
+  position: relative;
+  min-width: 0;
+}
+.preset-tile > .behavior-card,
+.preset-tile > .animation-card,
+.preset-tile > .visual-effect-card {
+  width: 100%;
+  height: 100%;
+}
+.preset-tile .preset-favorite {
+  position: absolute;
+  right: 4px;
+  top: 4px;
+  display: grid;
+  place-items: center;
+  width: 27px;
+  height: 27px;
+  padding: 3px;
+  border: 0;
+  border-radius: 4px;
+  color: #d3d9da;
+  background: #141b20b3;
+  opacity: 0;
+}
+.preset-tile:hover .preset-favorite,
+.preset-tile:focus-within .preset-favorite,
+.preset-tile.is-favorite .preset-favorite {
+  opacity: 1;
+}
+.preset-tile.is-favorite .preset-favorite {
+  color: #ffd25e;
+}
+.preset-tile.is-favorite > :first-child {
+  border-color: #ffd25e;
+}
+.preset-user-badge {
+  position: absolute;
+  left: 7px;
+  top: 64px;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #263238;
+  border: 1px solid #68777b;
+  color: #e4ebed;
+  pointer-events: none;
+}
+.preset-context-menu {
+  min-width: 205px;
+  z-index: 140;
+}
+.preset-menu-separator {
+  height: 1px;
+  background: #4b565d;
+  margin: 4px 0;
+}
+.preset-name-dialog {
+  width: min(420px, calc(100vw - 32px));
+  padding: 20px;
+  background: #222b30;
+  color: var(--text);
+  border: 1px solid #59656c;
+  border-radius: 8px;
+  box-shadow: 0 12px 50px #0009;
+}
+.preset-name-dialog::backdrop {
+  background: #0007;
+}
+.preset-name-dialog .modal-heading {
+  margin-bottom: 22px;
+}
+.preset-name-dialog h3 {
+  margin: 0;
+  font-size: 16px;
+}
+.preset-name-dialog .field {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+.preset-name-dialog input {
+  flex: 1;
+  min-width: 0;
+}
+.preset-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 24px;
+}
+.preset-dialog-actions button {
+  min-width: 80px;
+}
+.preset-library-error {
+  color: #ffb4ab;
+  font-size: 12px;
+}
+.favorites-filter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+.favorites-filter select {
+  flex: 1;
+  min-width: 0;
+}
+.favorites-group {
+  margin-bottom: 22px;
+}
+.favorites-group h3 {
+  font-size: 13px;
+  font-weight: 500;
+  border-bottom: 1px solid #3b464d;
+  padding-bottom: 8px;
+}
+.favorites-group .animation-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 9px;
+  padding: 14px 7px;
+  background: #242c26;
+  border: 1px solid #38403a;
+}
+.favorites-group .animation-card > span {
+  font-size: 11px;
+}
+.favorites-group .animation-card small {
+  font-size: 9px;
+  color: #7e9485;
+}

@@ -1554,7 +1554,7 @@ fieldset:disabled {
   grid-template-columns: 1fr 1fr;
   gap: 12px;
 }
-.animation-presets button {
+.animation-presets .animation-card {
   display: flex;
   flex-direction: column;
   gap: 9px;
@@ -1562,7 +1562,7 @@ fieldset:disabled {
   background: #242c26;
   padding: 13px 7px;
 }
-.animation-presets button > span {
+.animation-presets .animation-card > span {
   font-size: 11px;
 }
 .animation-presets small {

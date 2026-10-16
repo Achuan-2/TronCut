@@ -71,7 +71,7 @@ import {
   type EditorPreferences,
 } from "../shared/editor-preferences";
 import {
-  createBehavior,
+  behaviorFromPreset,
   supportsBehaviors,
   fitBehaviorDuration,
   type Behavior,
@@ -81,6 +81,7 @@ import {
   mediaBoundaryTime,
   type PlaybackDirection,
 } from "../shared/playback";
+import { usePresetLibrary } from "./usePresetLibrary";
 
 export function demoProject(): Project {
   const project = createProject("我的第一个视频");
@@ -112,6 +113,7 @@ export function demoProject(): Project {
 export function useEditor(
   preferences: EditorPreferences = defaultEditorPreferences,
 ) {
+  const presetLibrary = usePresetLibrary();
   const defaults = useRef(preferences);
   defaults.current = preferences;
   const [project, setProject] = useState<Project>(() => createProject());
@@ -672,6 +674,8 @@ export function useEditor(
   );
   const addBehavior = useCallback(
     (presetId: string, clipId?: string) => {
+      const preset = presetLibrary.findBehavior(presetId);
+      if (!preset) return;
       const p = current.current;
       const ids = clipId ? [clipId] : selectedIds;
       let added: { clipId: string; behaviorId: string } | null = null;
@@ -683,8 +687,7 @@ export function useEditor(
           p.tracks.find((track) => track.id === clip.trackId)?.locked
         )
           return clip;
-        const behavior = createBehavior(presetId, clip.duration, clip.kind);
-        if (!behavior) return clip;
+        const behavior = { ...behaviorFromPreset(preset, clip.duration, clip.kind), name: preset.name };
         added = { clipId: clip.id, behaviorId: behavior.id };
         return { ...clip, behaviors: [...(clip.behaviors ?? []), behavior] };
       });
@@ -694,7 +697,7 @@ export function useEditor(
         selectBehavior(target.clipId, target.behaviorId);
       }
     },
-    [apply, selectedIds, selectBehavior],
+    [apply, selectedIds, selectBehavior, presetLibrary.findBehavior],
   );
   const updateBehavior = useCallback(
     (clipId: string, behaviorId: string, patch: Partial<Behavior>) => {
@@ -975,6 +978,7 @@ export function useEditor(
   }, [keyframeSelection, selectedKeyframe, clearKeyframeEdit]);
   return {
     project,
+    presetLibrary,
     preferences,
     apply,
     replace,

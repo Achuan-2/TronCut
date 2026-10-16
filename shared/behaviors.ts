@@ -69,6 +69,8 @@ export const behaviorPhaseSchema = z.object({
 export const behaviorSchema = z.object({
   id: z.string().regex(/^[a-zA-Z0-9_-]{1,128}$/),
   preset: z.string().max(100),
+  // Keep applied custom presets readable even if their library entry is removed.
+  name: z.string().trim().min(1).max(100).optional(),
   enabled: z.boolean(),
   // Normal clips start at zero. A frame snapshot shifts the clock backwards
   // while retaining the original duration so it captures the current phase.
@@ -220,25 +222,33 @@ export function createBehavior(
   kind: Clip["kind"] = "text",
 ): Behavior | null {
   const preset = behaviorPresets.find((item) => item.id === presetId);
-  const value = preset
-    ? {
-        id: crypto.randomUUID(),
-        preset: preset.id,
-        enabled: true,
-        start: 0,
-        duration,
-        incoming: { ...preset.incoming },
-        during: { ...preset.during },
-        outgoing: { ...preset.outgoing },
-      }
-    : null;
-  if (value && kind !== "text")
+  return preset ? behaviorFromPreset(preset, duration, kind) : null;
+}
+
+export function behaviorFromPreset(
+  preset: BehaviorPreset,
+  duration: number,
+  kind: Clip["kind"] = "text",
+): Behavior {
+  const value: Behavior = {
+    id: crypto.randomUUID(),
+    preset: preset.id,
+    enabled: true,
+    start: 0,
+    duration,
+    incoming: { ...preset.incoming },
+    during: { ...preset.during },
+    outgoing: { ...preset.outgoing },
+  };
+  if (kind !== "text")
     for (const key of ["incoming", "during", "outgoing"] as const)
       value[key] = { ...value[key], type: "whole", offset: 0 };
   return value;
 }
 export const behaviorName = (behavior: Behavior) =>
-  behaviorPresets.find((item) => item.id === behavior.preset)?.name ?? "行为";
+  behavior.name ??
+  behaviorPresets.find((item) => item.id === behavior.preset)?.name ??
+  "行为";
 export const supportsBehaviors = (clip: Pick<Clip, "kind">) =>
   clip.kind !== "audio";
 export const hasBehaviors = (clip: Clip) =>

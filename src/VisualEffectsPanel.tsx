@@ -3,22 +3,64 @@ import { Gauge, RectangleHorizontal, Search, X } from "lucide-react";
 import { supportsClipSpeed } from "../shared/clip-speed";
 import { supportsMediaFrame } from "../shared/media-frame";
 import type { Editor } from "./useEditor";
+import { visualEffectPresets } from "../shared/preset-library";
+import PresetTile from "./PresetTile";
+
+export function VisualEffectCard({
+  preset,
+  editor,
+  selected,
+  onSelect,
+}: {
+  preset: (typeof visualEffectPresets)[number];
+  editor: Editor;
+  selected?: boolean;
+  onSelect?: () => void;
+}) {
+  const Icon = preset.id === "clip-speed" ? Gauge : RectangleHorizontal;
+  return (
+    <PresetTile
+      kind="effect"
+      id={preset.id}
+      name={preset.name}
+      library={editor.presetLibrary}
+    >
+      <button
+        className={`visual-effect-card ${selected ? "selected" : ""}`}
+        data-effect={preset.id}
+        draggable
+        title="拖到片段，或双击应用到所选片段"
+        onClick={onSelect}
+        onDragStart={(event) => {
+          event.dataTransfer.setData("troncut-effect", preset.id);
+          event.dataTransfer.effectAllowed = "copy";
+        }}
+        onDoubleClick={() =>
+          preset.id === "clip-speed"
+            ? editor.addSpeedEffect()
+            : editor.addRoundedCorners()
+        }
+      >
+        <div className={`effect-card-preview ${preset.id}`}>
+          <Icon size={40} />
+        </div>
+        <b>{preset.name}</b>
+      </button>
+    </PresetTile>
+  );
+}
 
 export default function VisualEffectsPanel({ editor }: { editor: Editor }) {
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState("clip-speed");
   const effects = [
     {
-      id: "rounded-corners",
-      name: "圆角倒角",
-      icon: RectangleHorizontal,
+      ...visualEffectPresets[0],
       supports: supportsMediaFrame,
       apply: () => editor.addRoundedCorners(),
     },
     {
-      id: "clip-speed",
-      name: "剪辑速度",
-      icon: Gauge,
+      ...visualEffectPresets[1],
       supports: supportsClipSpeed,
       apply: () => editor.addSpeedEffect(),
     },
@@ -50,24 +92,13 @@ export default function VisualEffectsPanel({ editor }: { editor: Editor }) {
         {effects
           .filter((effect) => effect.name.includes(query.trim()))
           .map((effect) => (
-            <button
+            <VisualEffectCard
               key={effect.id}
-              className={`visual-effect-card ${selected === effect.id ? "selected" : ""}`}
-              data-effect={effect.id}
-              draggable
-              title="拖到片段，或双击应用到所选片段"
-              onClick={() => setSelected(effect.id)}
-              onDragStart={(event) => {
-                event.dataTransfer.setData("troncut-effect", effect.id);
-                event.dataTransfer.effectAllowed = "copy";
-              }}
-              onDoubleClick={effect.apply}
-            >
-              <div className={`effect-card-preview ${effect.id}`}>
-                <effect.icon size={40} />
-              </div>
-              <b>{effect.name}</b>
-            </button>
+              preset={effect}
+              editor={editor}
+              selected={selected === effect.id}
+              onSelect={() => setSelected(effect.id)}
+            />
           ))}
       </div>
       <button

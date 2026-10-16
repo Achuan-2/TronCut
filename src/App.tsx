@@ -43,6 +43,7 @@ import {
   type EditorPreferences,
 } from "../shared/editor-preferences";
 import { textEditSchema } from "../shared/edit-menu";
+import PresetLibraryOverlays from "./PresetLibraryOverlays";
 
 export default function App() {
   const [editorPreferences, setEditorPreferences] = useState<EditorPreferences>(
@@ -1101,6 +1102,7 @@ export default function App() {
           busy={busy}
         />
       )}
+      <PresetLibraryOverlays library={editor.presetLibrary} />
       {toastMessage && (
         <div className="toast" role="status">
           <Check size={17} />

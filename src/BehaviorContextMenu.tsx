@@ -32,10 +32,21 @@ export default function BehaviorContextMenu({ editor }: { editor: Editor }) {
       role="menu"
       style={{
         left: Math.min(menu.x, window.innerWidth - 200),
-        top: Math.min(menu.y, window.innerHeight - 140),
+        top: Math.min(menu.y, window.innerHeight - 180),
       }}
       onClick={() => editor.showBehaviorMenu(null)}
     >
+      <button
+        role="menuitem"
+        onClick={() => {
+          const behavior = editor.project.clips
+            .find((clip) => clip.id === menu.clipId)
+            ?.behaviors?.find((behavior) => behavior.id === menu.behaviorId);
+          if (behavior) editor.presetLibrary.saveBehavior(behavior);
+        }}
+      >
+        添加预设
+      </button>
       <button
         role="menuitem"
         onClick={() => editor.copyBehavior(menu.clipId, menu.behaviorId)}

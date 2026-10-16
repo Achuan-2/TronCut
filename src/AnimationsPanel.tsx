@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { Check, Diamond } from "lucide-react";
-import { animation } from "../shared/editor";
+import { animationPresets } from "../shared/preset-library";
 import type { Editor } from "./useEditor";
 import ZoomPanPanel from "./ZoomPanPanel";
+import AnimationPresetCard from "./AnimationPresetCard";
 
 const categories = [
   { id: "zoompan", name: "缩放与平移" },
@@ -76,30 +77,13 @@ export default function AnimationsPanel({
               也可以在时间线上右键添加动画。
             </p>
             <div className="animation-presets">
-              {(["fade", "zoom", "slide"] as const).map((type, i) => (
-                <button
-                  key={type}
-                  onClick={() => {
-                    if (!editor.selected) {
-                      toast("请先选中片段");
-                      return;
-                    }
-                    editor.updateClip(editor.selected.id, (clip) =>
-                      animation(
-                        clip,
-                        type,
-                        editor.playhead - clip.start,
-                        editor.preferences.timing.animation,
-                      ),
-                    );
-                  }}
-                >
-                  <div className={`animation-demo ${type}`}>
-                    <span />
-                  </div>
-                  <span>{["轻柔淡入", "平滑缩放", "侧边滑入"][i]}</span>
-                  <small>0.6 秒 · 平滑曲线</small>
-                </button>
+              {animationPresets.map((preset) => (
+                <AnimationPresetCard
+                  key={preset.id}
+                  preset={preset}
+                  editor={editor}
+                  toast={toast}
+                />
               ))}
             </div>
             <div className="tip-card">
