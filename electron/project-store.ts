@@ -103,21 +103,37 @@ export async function saveProject(
   );
   await fs.rename(temporary, file);
   if (process.platform === "win32" && iconPath) {
-    await fs.copyFile(iconPath, path.join(root, "project.ico")).catch(() => {});
-    // Windows refuses CREATE_ALWAYS on a hidden/system file. Create it once;
-    // repeated saves must neither fail nor overwrite an existing folder customization.
     const desktopIni = path.join(root, "desktop.ini");
-    if (
-      !(await fs.access(desktopIni).then(
-        () => true,
-        () => false,
-      ))
-    )
-      await fs.writeFile(
-        desktopIni,
-        "\uFEFF[.ShellClassInfo]\r\nIconResource=project.ico,0\r\n",
-        "utf16le",
-      );
+    const previous = await fs.readFile(desktopIni, "utf16le").catch((error) => {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
+      throw error;
+    });
+    const legacy = "\uFEFF[.ShellClassInfo]\r\nIconResource=project.ico,0\r\n";
+    const content = `\uFEFF[.ShellClassInfo]\r\nIconResource=${path.resolve(iconPath)},0\r\n`;
+    // Preserve custom folder settings. Only migrate the exact old generated file.
+    if (previous === null || previous === legacy) {
+      // OPEN_EXISTING avoids CREATE_ALWAYS failing on hidden/system desktop.ini.
+      const handle = await fs.open(desktopIni, previous === null ? "wx" : "r+");
+      try {
+        await handle.writeFile(content, "utf16le");
+        await handle.truncate(Buffer.byteLength(content, "utf16le"));
+      } finally {
+        await handle.close();
+      }
+      if (previous === legacy) {
+        // Remove only an unchanged copy of the app icon, never a custom icon.
+        const legacyIcon = path.join(root, "project.ico");
+        const stat = await fs.lstat(legacyIcon).catch(() => null);
+        if (stat?.isFile()) {
+          const icons = await Promise.all([
+            fs.readFile(legacyIcon),
+            fs.readFile(iconPath),
+          ]).catch(() => null);
+          if (icons && icons[0].equals(icons[1]))
+            await fs.unlink(legacyIcon).catch(() => {});
+        }
+      }
+    }
     const { runProcess } = await import("./process");
     await runProcess("attrib", ["+r", root]).catch(() => {});
     await runProcess("attrib", [

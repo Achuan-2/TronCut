@@ -30,6 +30,31 @@ describe("真实视频与工程往返", () => {
     await saveProject(p, file, icon);
     await saveProject({ ...p, name: "第二次保存" }, file, icon);
     expect((await openProject(file)).name).toBe("第二次保存");
+    if (icon) {
+      const desktopIni = path.join(root, "desktop.ini");
+      const expected = `\uFEFF[.ShellClassInfo]\r\nIconResource=${icon},0\r\n`;
+      expect(await fs.readFile(desktopIni, "utf16le")).toBe(expected);
+      expect(await fs.readdir(root)).not.toContain("project.ico");
+
+      await runProcess("attrib", ["-s", "-h", desktopIni]);
+      await fs.writeFile(
+        desktopIni,
+        "\uFEFF[.ShellClassInfo]\r\nIconResource=project.ico,0\r\n",
+        "utf16le",
+      );
+      await fs.copyFile(icon, path.join(root, "project.ico"));
+      await runProcess("attrib", ["+s", "+h", desktopIni]);
+      await saveProject(p, file, icon);
+      expect(await fs.readFile(desktopIni, "utf16le")).toBe(expected);
+      expect(await fs.readdir(root)).not.toContain("project.ico");
+
+      await runProcess("attrib", ["-s", "-h", desktopIni]);
+      const custom = "\uFEFF[.ShellClassInfo]\r\nIconResource=custom.ico,0\r\n";
+      await fs.writeFile(desktopIni, custom, "utf16le");
+      await runProcess("attrib", ["+s", "+h", desktopIni]);
+      await saveProject(p, file, icon);
+      expect(await fs.readFile(desktopIni, "utf16le")).toBe(custom);
+    }
   });
   it("随附纯文字示例可以打开并保持字幕位于中央", async () => {
     const p = await openProject(path.resolve("examples/文字视频.framecraft"));
