@@ -20,6 +20,7 @@
     "test:rust": "node scripts/test-rust.mjs",
     "bench:engine": "node scripts/bench-engine.mjs",
     "bench:hotpaths": "node scripts/bench-hotpaths.mjs",
+    "bench:export": "node scripts/bench-export.mjs",
     "bench:editor": "pnpm build && node scripts/bench-editor.mjs",
     "bench:ui-compare": "pnpm build && node scripts/bench-ui-compare.mjs",
     "start": "node scripts/start.mjs",

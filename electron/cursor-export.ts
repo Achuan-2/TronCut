@@ -22,6 +22,7 @@ export async function cursorFilters(
   input: number,
   signal: AbortSignal,
   still = false,
+  format: "auto" | "yuv444" = "auto",
 ) {
   const style = clip.cursorStyle ?? defaultCursorStyle;
   if (!asset.cursor?.samples.length || style.style === "hidden") return null;
@@ -157,8 +158,8 @@ export async function cursorFilters(
             `[${input}:v]crop@cursorArt${layer}=w=${cell}:h=${cell}:x=${Math.max(0, shapes.indexOf(firstShape)) * cell}:y=0[cursorart${layer}]`,
           ]
         : []),
-      `[cursorclock${layer}][${input + 1}:v]overlay@click${layer}=x=${ringX}:y=${ringY}:format=auto[clickvideo${layer}]`,
-      `[clickvideo${layer}][${atlas ? `cursorart${layer}` : `${input}:v`}]overlay@cursor${layer}=x=${firstX}:y=${firstY}:format=auto${still ? "" : `,sendcmd=f=${filename}`}[cursorvideo${layer}]`,
+      `[cursorclock${layer}][${input + 1}:v]overlay@click${layer}=x=${ringX}:y=${ringY}:format=${format}[clickvideo${layer}]`,
+      `[clickvideo${layer}][${atlas ? `cursorart${layer}` : `${input}:v`}]overlay@cursor${layer}=x=${firstX}:y=${firstY}:format=${format}${still ? "" : `,sendcmd=f=${filename}`}[cursorvideo${layer}]`,
     ],
     label: `cursorvideo${layer}`,
   };

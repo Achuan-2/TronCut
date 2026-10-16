@@ -10,6 +10,7 @@ import {
 import { findBinary, runProcess } from "./process";
 import { defaultCrop, fadeDurations, visualFilters } from "../shared/effects";
 import { cursorFilters } from "./cursor-export";
+import { staticFrameMaskFilters } from "./static-frame-mask";
 import { loopImageInput } from "./loop-image";
 import { easingExpression } from "../shared/easing";
 import {
@@ -234,6 +235,12 @@ async function chooseEncoder(
             [
               "-c:v",
               "h264_amf",
+              "-usage",
+              "lowlatency",
+              "-bf",
+              "0",
+              "-preanalysis",
+              "0",
               "-quality",
               "balanced",
               "-qp_i",
@@ -459,7 +466,11 @@ async function renderProject(
             (phase) => phase.type !== "whole" && phase.style !== "none",
           ),
       );
-    const sourceIn = still || animatedText ? 0 : clip.sourceIn;
+    // Input seeking skips discarded media before decoding, and resets both audio
+    // and video timestamps. Cursor telemetry still uses the original sourceIn.
+    const seekInput =
+      !clip.loop && (clip.kind === "video" || clip.kind === "audio");
+    const sourceIn = still || animatedText || seekInput ? 0 : clip.sourceIn;
     let sourceSeek = clip.sourceIn;
     if (clip.loop && asset && asset.duration > 0) sourceSeek %= asset.duration;
     if (
@@ -536,7 +547,9 @@ async function renderProject(
         "-threads",
         "1",
         ...(clip.loop ? ["-stream_loop", "-1"] : []),
-        ...(still ? ["-ss", String(sourceSeek)] : []),
+        ...(still || (seekInput && sourceSeek > 0)
+          ? ["-ss", String(sourceSeek)]
+          : []),
         "-i",
         asset!.path,
       );
@@ -623,6 +636,25 @@ async function renderProject(
                 `rotate=${(rotation * Math.PI) / 180}:ow=rotw(${(rotation * Math.PI) / 180}):oh=roth(${(rotation * Math.PI) / 180}):c=none`,
               ]
             : [];
+      const recordingViewport = !still && clip.kind === "video" &&
+        clip.keyframes.length > 0 && clip.keyframes.every(frame => frame.recordingZoom) &&
+        !Object.values(clip.crop ?? {}).some(Boolean) &&
+        !clip.keyframes.some(frame =>
+          [frame.value.cropLeft, frame.value.cropTop, frame.value.cropRight, frame.value.cropBottom].some(Boolean)) &&
+        !clip.keyframes.some(frame => (frame.value.contentScale ?? 1) < 1);
+      // Captured screen frames are opaque. Keep cursor compositing and camera
+      // sampling in 4:4:4 YUV, preserving cursor color detail until final output.
+      const content = contentFilters(clip);
+      const hasAttachedEffects = Object.values(clip.visualEffects ?? {}).some(
+        effect => effect?.enabled,
+      );
+      const planarRecording =
+        !still && clip.recordingRole === "screen" && clip.kind === "video" &&
+        (recordingViewport || !animatedViewport) &&
+        !content.length && !visualEffects.length && !rotate.length &&
+        !clip.mediaFrame?.window && !alphaAnimated &&
+        clip.transform.opacity === 1 && !incoming && !outgoing &&
+        !hasAttachedEffects;
       let source = `${index}:v`;
       if (asset?.cursor) {
         const cursor = await cursorFilters(
@@ -634,12 +666,13 @@ async function renderProject(
           input,
           signal,
           still,
+          planarRecording ? "yuv444" : "auto",
         );
         if (cursor) {
           args.push(...cursor.args);
           input += 2;
           filters.push(
-            `[${source}]trim=start=${sourceIn}:duration=${clip.duration * clip.speed},setpts=(PTS-STARTPTS)/${clip.speed}+${clip.start}/TB,format=rgba,${cursor.filters[0]}`,
+            `[${source}]trim=start=${sourceIn}:duration=${clip.duration * clip.speed},setpts=(PTS-STARTPTS)/${clip.speed}+${clip.start}/TB,format=${planarRecording ? "yuv444p" : "rgba"},${cursor.filters[0]}`,
           );
           filters.push(...cursor.filters.slice(1));
           source = cursor.label;
@@ -653,11 +686,6 @@ async function renderProject(
         source === `${index}:v`
           ? `trim=start=${sourceIn}:duration=${clip.duration * clip.speed},setpts=(PTS-STARTPTS)/${clip.speed}${padding ? "," + padding : `+${clip.start}/TB,`}`
           : padding;
-      const frameFilters = mediaFrameFilters(
-        clip,
-        fit,
-        animatedViewport ? (key) => pose(key, "T") : undefined,
-      );
       // An implicit RGBA -> YUVA converter can retain the first frame's size.
       // Negotiate that conversion on an explicit frame-evaluated scale filter
       // for axis-scaled layers, including later proportional animations.
@@ -668,12 +696,6 @@ async function renderProject(
       const outputFormat = independentScale
         ? ["scale=w=iw:h=ih:eval=frame", "format=yuva420p"] : [];
       const viewport = `viewport${layer}`;
-      const recordingViewport = !still && clip.kind === "video" &&
-        clip.keyframes.length > 0 && clip.keyframes.every(frame => frame.recordingZoom) &&
-        !Object.values(clip.crop ?? {}).some(Boolean) &&
-        !clip.keyframes.some(frame =>
-          [frame.value.cropLeft, frame.value.cropTop, frame.value.cropRight, frame.value.cropBottom].some(Boolean)) &&
-        !clip.keyframes.some(frame => (frame.value.contentScale ?? 1) < 1);
       const viewportFilters = recordingViewport
         ? [
             // zoompan evaluates the camera once per output frame rather than per
@@ -681,18 +703,38 @@ async function renderProject(
             `fps=${fps}`,
             `zoompan=z='${pose("contentScale", "in_time")}':x='iw/2-iw/(2*zoom)-iw*(${pose("contentX", "in_time")})/zoom':y='ih/2-ih/(2*zoom)-ih*(${pose("contentY", "in_time")})/zoom':d=1:s=${intrinsicWidth}x${intrinsicHeight}:fps=${fps}`,
             `setpts=PTS+${clip.start}/TB`,
-            "format=rgba",
+            ...(planarRecording ? [] : ["format=rgba"]),
           ]
-        : animatedViewport ? animatedViewportFilters((key) => pose(key, "T")) : contentFilters(clip);
-      filters.push(`[${source}]${timing}${animatedText ? `fps=${fps},` : ""}format=rgba,${[...viewportFilters, ...visualEffects, ...frameFilters, "null"].join(",")}[${viewport}]`);
+        : animatedViewport ? animatedViewportFilters((key) => pose(key, "T")) : content;
+      const staticFrame = await staticFrameMaskFilters({
+        clip, width: cropWidth, height: cropHeight, fit,
+        file: path.join(workDir, `frame-mask-${layer}.pgm`),
+        source: viewport, layer, input,
+      });
+      const frameFilters = staticFrame ? [] : mediaFrameFilters(
+        clip, fit, animatedViewport ? (key) => pose(key, "T") : undefined,
+      );
+      // Unprocessed video retains its native format and alpha. Avoid two
+      // full-frame RGB conversions and an identity alpha pass.
+      const directVideo = planarRecording || (clip.kind === "video" && source === `${index}:v` &&
+        !viewportFilters.length && !visualEffects.length && !frameFilters.length &&
+        !staticFrame && !rotate.length && !alphaAnimated &&
+        clip.transform.opacity === 1 && !incoming && !outgoing &&
+        !hasAttachedEffects);
+      filters.push(`[${source}]${timing}${animatedText ? `fps=${fps},` : ""}${planarRecording ? "format=yuv444p," : directVideo ? "" : "format=rgba,"}${[...viewportFilters, ...visualEffects, ...frameFilters, "null"].join(",")}[${viewport}]`);
+      if (staticFrame) {
+        args.push(...staticFrame.args);
+        input++;
+        filters.push(...staticFrame.filters);
+      }
       const attached = await visualEffectFilters({
-        clip, source: viewport, layer, width: cropWidth, height: cropHeight,
+        clip, source: staticFrame?.label ?? viewport, layer, width: cropWidth, height: cropHeight,
         fit, fps, duration, workDir, input, signal,
       });
       args.push(...attached.args);
       input += attached.inputCount;
       filters.push(...attached.filters);
-      filters.push(`[${attached.label}]${[transform, "setsar=1", ...rotate, alpha, ...outputFormat].join(",")}[${visual}]`);
+      filters.push(`[${attached.label}]${[transform, "setsar=1", ...rotate, ...(directVideo ? [] : [alpha]), ...outputFormat].join(",")}[${visual}]`);
       // Composite text before chroma subsampling so rounded fills and glyphs
       // retain the same pixel position in video and frame captures.
       const matte = clip.visualEffects?.["media-matte"];
@@ -740,7 +782,7 @@ async function renderProject(
     ) {
       const label = `a${layer}`;
       filters.push(
-        `[${index}:a]atrim=start=${clip.sourceIn}:duration=${clip.duration * clip.speed},asetpts=PTS-STARTPTS,${audioFilters(clip, rubberband).join(",")},adelay=${Math.round(clip.start * 1000)}:all=1[${label}]`,
+        `[${index}:a]atrim=start=${sourceIn}:duration=${clip.duration * clip.speed},asetpts=PTS-STARTPTS,${audioFilters(clip, rubberband).join(",")},adelay=${Math.round(clip.start * 1000)}:all=1[${label}]`,
       );
       audioLabels.push(`[${label}]`);
     }
