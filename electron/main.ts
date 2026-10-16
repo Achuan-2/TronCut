@@ -675,13 +675,35 @@ function installHandlers() {
       const result = await dialog.showSaveDialog(window, {
         title: saveAs === true ? "工程另存为" : "保存工程",
         defaultPath:
-          file || path.join(app.getPath("documents"), `${fileName}.troncut`),
+          file
+            ? path.join(path.dirname(path.dirname(file)), path.basename(file))
+            : path.join(app.getPath("documents"), `${fileName}.troncut`),
         filters: [{ name: "TronCut 工程", extensions: ["troncut"] }],
       });
       if (result.canceled || !result.filePath) return null;
-      file = result.filePath;
+      const selected = result.filePath;
+      if (file && path.resolve(selected) === path.resolve(file)) {
+        file = selected;
+      } else {
+        const folderName = path.basename(selected, path.extname(selected));
+        const parent = path.dirname(selected);
+        let root = path.join(parent, folderName);
+        let suffix = 2;
+        // Keep existing project folders intact when the chosen name is reused.
+        while (
+          await fs.access(root).then(
+            () => true,
+            () => false,
+          )
+        )
+          root = path.join(parent, `${folderName}-${suffix++}`);
+        file = path.join(root, `${folderName}.troncut`);
+      }
     }
-    const saved = registerProject(await saveProject(project, file));
+    const icon = app.isPackaged
+      ? path.join(process.resourcesPath, "project.ico")
+      : path.resolve("resources/icon.ico");
+    const saved = registerProject(await saveProject(project, file, icon));
     projectFile = file;
     await rememberProject(saved, file);
     await fs.rm(path.join(app.getPath("userData"), "recovery.json"), {

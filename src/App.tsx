@@ -279,7 +279,7 @@ export default function App() {
         editor.markSaved(result.project);
         setFile(result.file);
         void refreshHome().catch(() => {});
-        toast("工程文件已保存，素材已归档到同目录的 media 文件夹");
+        toast("工程已保存，工程文件和素材已归档到工程文件夹");
       }
     });
   const open = () =>
