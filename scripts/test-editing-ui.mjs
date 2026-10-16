@@ -311,7 +311,7 @@ try {
   }
   await expect(page.getByRole("slider", { name: "播放进度", exact: true })).toBeDisabled();
   await expect(page.getByRole("menu", { name: "删除菜单", exact: true })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "添加关键帧", exact: true })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "添加动画", exact: true })).toBeDisabled();
   await page.getByTitle("撤销 Ctrl+Z", { exact: true }).click();
   await expect(page.locator(".timeline-clip.video")).toHaveCount(1);
   await page.locator(".timeline-clip.video").click();
@@ -634,7 +634,7 @@ try {
     beforeResize.width / beforeResize.height,
     2,
   );
-  const addKeyframe = page.getByRole("button", { name: "添加关键帧", exact: true });
+  const addKeyframe = page.getByRole("button", { name: "添加动画", exact: true });
   const beforeKeyframeX = await page.getByLabel("位置 X (px)", { exact: true }).inputValue();
   expect(await addKeyframe.evaluate((button) => button.previousElementSibling.textContent)).toContain("添加文本");
   await seek(8);

@@ -40,6 +40,7 @@ import {
 import TimelineMarkers from "./TimelineMarkers";
 import MarkerDialog from "./MarkerDialog";
 import { snapTime, splitClip, transformAt } from "../shared/editor";
+import { editableCanvasIds } from "../shared/canvas-actions";
 import {
   deleteClips,
   moveClips,
@@ -99,6 +100,9 @@ import TrackResizeHandle from "./TrackResizeHandle";
 import TrackContextMenu, { type TrackMenuPosition } from "./TrackContextMenu";
 import ClipContextMenu, { type ClipCommand } from "./ClipContextMenu";
 import { useViewportZoom, type ZoomPoint } from "./useViewportZoom";
+import {
+  animationMime, customAnimationId, animationDropTarget,
+} from "../shared/animation-drag";
 import { projectIndex } from "../shared/project-index";
 import { recordingGroups, recordingTimeline, trimRecordingObject } from "../shared/recording-objects";
 import { timelineZoomMin, timelineZoomMax, timelineRulerStep, timelineRulerLabel } from "../shared/timeline-scale";
@@ -239,6 +243,34 @@ export default function Timeline({
   } | null>(null);
   const [activeSpeed, setActiveSpeed] = useState<string | null>(null);
   const [effectDrop, setEffectDrop] = useState<string | null>(null);
+  const [animationDrop, setAnimationDrop] = useState<{
+    clipId: string;
+    start: number;
+    end: number;
+  } | null>(null);
+  useEffect(() => {
+    if (!animationDrop && !effectDrop) return;
+    const clear = () => {
+      setAnimationDrop(null);
+      setEffectDrop(null);
+    };
+    window.addEventListener("dragend", clear, true);
+    window.addEventListener("drop", clear, true);
+    window.addEventListener("blur", clear);
+    return () => {
+      window.removeEventListener("dragend", clear, true);
+      window.removeEventListener("drop", clear, true);
+      window.removeEventListener("blur", clear);
+    };
+  }, [animationDrop?.clipId, effectDrop]);
+  const animationAtPointer = (clip: Clip, event: React.DragEvent<HTMLDivElement>) => {
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const localTime = Math.max(0, Math.min(clip.duration,
+      (event.clientX - bounds.left) / zoom));
+    return dropDisabled ? null : animationDropTarget(
+      project, clip.id, clip.start + localTime, editor.preferences.timing.animation,
+    );
+  };
   const [marquee, setMarquee] = useState<Marquee | null>(null);
   const marqueeMoved = useRef(false);
   const [transitionDrop, setTransitionDrop] = useState<TransitionTarget | null>(
@@ -402,8 +434,13 @@ export default function Timeline({
       (clip) => ids.has(clip.id) && !lockedTracks.has(clip.trackId),
     );
   }, [project.clips, project.tracks, editor.selectedIds]);
-  const canAddKeyframe = editableSelection.some(
+  const animationIds = useMemo(
+    () => editableCanvasIds(project, editor.selectedIds),
+    [project.clips, project.tracks, editor.selectedIds],
+  );
+  const canAddAnimation = editableSelection.some(
     (clip) =>
+      animationIds.has(clip.id) &&
       clip.kind !== "audio" &&
       !project.tracks.find((track) => track.id === clip.trackId)?.hidden &&
       playhead >= clip.start &&
@@ -655,12 +692,12 @@ export default function Timeline({
           </button>
           <button
             className="keyframe-add"
-            title="为选中的对象添加默认1秒动画关键帧"
-            disabled={!canAddKeyframe}
-            onClick={editor.addSelectedKeyframe}
+            title={`为选中的对象添加默认 ${editor.preferences.timing.animation} 秒动画`}
+            disabled={!canAddAnimation}
+            onClick={() => editor.addSelectedAnimation()}
           >
             <Diamond size={15} />
-            添加关键帧
+            添加动画
           </button>
           <button
             title="将当前画面截为图片并插入新轨道"
@@ -1116,6 +1153,7 @@ export default function Timeline({
                   if (
                     e.dataTransfer.types.includes("troncut-effect") ||
                     e.dataTransfer.types.includes("troncut-behavior") ||
+                    e.dataTransfer.types.includes(animationMime) ||
                     e.dataTransfer.types.includes(transitionMime)
                   )
                     e.dataTransfer.dropEffect = "none";
@@ -1230,6 +1268,17 @@ export default function Timeline({
                                 : undefined,
                           }}
                           onDragOver={(event) => {
+                            if (event.dataTransfer.types.includes(animationMime)) {
+                              event.preventDefault();
+                              event.stopPropagation();
+                              const target = animationAtPointer(c, event);
+                              event.dataTransfer.dropEffect = target ? "copy" : "none";
+                              setAnimationDrop(target ? {
+                                clipId: c.id, start: target.start, end: target.end,
+                              } : null);
+                              setEffectDrop(target ? c.id : null);
+                              return;
+                            }
                             if (
                               event.dataTransfer.types.includes(transitionMime)
                             ) {
@@ -1293,9 +1342,20 @@ export default function Timeline({
                             ) {
                               setEffectDrop(null);
                               setTransitionDrop(null);
+                              setAnimationDrop(null);
                             }
                           }}
                           onDrop={(event) => {
+                            if (event.dataTransfer.types.includes(animationMime)) {
+                              event.preventDefault();
+                              event.stopPropagation();
+                              setAnimationDrop(null);
+                              setEffectDrop(null);
+                              if (event.dataTransfer.getData(animationMime) !== customAnimationId) return;
+                              const target = animationAtPointer(c, event);
+                              if (target) editor.addCustomAnimation(target.clipId, target.end);
+                              return;
+                            }
                             if (
                               event.dataTransfer.types.includes(transitionMime)
                             ) {
@@ -1480,6 +1540,19 @@ export default function Timeline({
                             });
                           }}
                         >
+                          {animationDrop?.clipId === c.id && (
+                            <div
+                              className="animation-drop-preview"
+                              data-start={animationDrop.start}
+                              data-end={animationDrop.end}
+                              style={{
+                                left: (animationDrop.start - c.start) * zoom,
+                                width: Math.max(2, (animationDrop.end - animationDrop.start) * zoom),
+                              }}
+                            >
+                              <span>动画终点 {timeLabel(animationDrop.end)}</span>
+                            </div>
+                          )}
                           <div
                             className="clip-content"
                             style={{ height: trackLayouts[trackIndex].contentHeight }}

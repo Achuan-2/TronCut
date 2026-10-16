@@ -1,4 +1,4 @@
-import { animation } from "../shared/editor";
+import { animationMime, customAnimationId } from "../shared/animation-drag";
 import { animationPresets } from "../shared/preset-library";
 import type { Editor } from "./useEditor";
 import PresetTile from "./PresetTile";
@@ -21,26 +21,28 @@ export default function AnimationPresetCard({
     >
       <button
         className="animation-card"
+        aria-label={preset.name}
+        draggable
+        data-animation={preset.id}
+        title="点击应用到所选片段，或拖到时间轴片段的指定位置、画布对象"
+        onDragStart={(event) => {
+          event.dataTransfer.setData(animationMime, customAnimationId);
+          event.dataTransfer.effectAllowed = "copy";
+        }}
         onClick={() => {
-          if (!editor.selected) {
-            toast("请先选中片段");
+          if (!editor.addSelectedAnimation()) {
+            toast("请选中可编辑的画面对象，并将播放头放在片段内");
             return;
           }
-          editor.updateClip(editor.selected.id, (clip) =>
-            animation(
-              clip,
-              preset.id,
-              editor.playhead - clip.start,
-              editor.preferences.timing.animation,
-            ),
-          );
         }}
       >
         <div className={`animation-demo ${preset.id}`}>
           <span />
         </div>
         <span>{preset.name}</span>
-        <small>{editor.preferences.timing.animation} 秒 · 平滑曲线</small>
+        <small>
+          {editor.preferences.timing.animation} 秒 · 编辑动画终点属性
+        </small>
       </button>
     </PresetTile>
   );

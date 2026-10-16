@@ -8,9 +8,7 @@ import {
 } from "./behaviors";
 
 export const animationPresets = [
-  { id: "fade", name: "轻柔淡入" },
-  { id: "zoom", name: "平滑缩放" },
-  { id: "slide", name: "侧边滑入" },
+  { id: "custom", name: "自定义动画" },
 ] as const;
 export const visualEffectPresets = [
   { id: "rounded-corners", name: "圆角倒角" },

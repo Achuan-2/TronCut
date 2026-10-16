@@ -8,7 +8,7 @@ import {
   defaultTransform,
   type Clip,
 } from "../shared/model";
-import { animation } from "../shared/editor";
+import { setTransform } from "../shared/editor";
 import { probeMedia, capabilities } from "../electron/media";
 import { runProcess, findBinary } from "../electron/process";
 import { exportVideo } from "../electron/export";
@@ -119,7 +119,8 @@ describe("真实视频与工程往返", () => {
     text.duration = 1;
     text.style!.fontSize = 22;
     text.style!.outlineWidth = 2;
-    p.clips = [clip, animation(text, "fade", 0)];
+    text.transform.opacity = 0;
+    p.clips = [clip, setTransform(text, { opacity: 1 }, 0.6, true)];
     const target = path.join(root, "export.mp4");
     await exportVideo(
       p,

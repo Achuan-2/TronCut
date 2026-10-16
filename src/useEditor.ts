@@ -97,6 +97,7 @@ import {
   type PlaybackDirection,
 } from "../shared/playback";
 import { usePresetLibrary } from "./usePresetLibrary";
+import { animationDropTarget } from "../shared/animation-drag";
 
 export function demoProject(): Project {
   const project = createProject("我的第一个视频");
@@ -615,13 +616,41 @@ export function useEditor(
     },
     [apply, playhead, autoAnimate],
   );
-  const addSelectedKeyframe = useCallback(() => {
+  const addCustomAnimation = useCallback(
+    (clipId: string, time = playhead) => {
+      const project = current.current;
+      const target = animationDropTarget(
+        project,
+        clipId,
+        time,
+        defaults.current.timing.animation,
+      );
+      if (!target) return false;
+      if (
+        target.result.clip !==
+        project.clips.find((clip) => clip.id === target.clipId)
+      ) {
+        apply({
+          ...project,
+          clips: project.clips.map((clip) =>
+            clip.id === target.clipId ? target.result.clip : clip,
+          ),
+        });
+      }
+      select(target.clipId);
+      editKeyframe(target.clipId, target.result.time, "end", true);
+      return true;
+    },
+    [playhead, apply, select, editKeyframe],
+  );
+  const addSelectedAnimation = useCallback(() => {
     const project = current.current;
+    const targets = editableCanvasIds(project, selectedIds);
     const frame = keyframeRef.current;
     const results = project.clips
       .filter(
         (clip) =>
-          selectedIds.includes(clip.id) &&
+          targets.has(clip.id) &&
           !project.tracks.find((track) => track.id === clip.trackId)?.locked &&
           !project.tracks.find((track) => track.id === clip.trackId)?.hidden,
       )
@@ -636,7 +665,7 @@ export function useEditor(
         ),
       )
       .filter((result) => result !== null);
-    if (!results.length) return;
+    if (!results.length) return false;
     const changes = new Map(
       results.map((result) => [result.clip.id, result.clip]),
     );
@@ -656,10 +685,12 @@ export function useEditor(
     if (
       frame?.clipId !== focused.clip.id ||
       frame.side !== "end" ||
-      Math.abs(frame.time - (focused.clip.animationOffset ?? 0) - focused.time) >=
-        1e-6
+      Math.abs(
+        frame.time - (focused.clip.animationOffset ?? 0) - focused.time,
+      ) >= 1e-6
     )
       editKeyframe(focused.clip.id, focused.time, "end", true);
+    return true;
   }, [selectedIds, selectedId, playhead, apply, editKeyframe]);
   const addText = useCallback(
     (preset = 0, text?: string) => {
@@ -1164,7 +1195,8 @@ export function useEditor(
     pasteClipProperties,
     hasClipProperties: !!clipProperties,
     fitClipsToCanvas,
-    addSelectedKeyframe,
+    addCustomAnimation,
+    addSelectedAnimation,
     selectedKeyframe,
     selectedAnimation,
     copyAnimation,

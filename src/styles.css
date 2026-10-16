@@ -1601,43 +1601,51 @@ fieldset:disabled {
   border-radius: 5px;
   background: #659d7f33;
 }
-.animation-demo.fade span {
-  animation: demo-fade 2s infinite;
+.animation-demo.custom span {
+  width: 64px;
+  height: 3px;
+  border: 0;
+  border-radius: 0;
+  background: #87d5ac;
+  position: relative;
 }
-.animation-demo.zoom span {
-  animation: demo-zoom 2s infinite;
+.animation-demo.custom span:before,
+.animation-demo.custom span:after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  width: 11px;
+  height: 11px;
+  background: #87d5ac;
+  transform: translateY(-50%) rotate(45deg);
 }
-.animation-demo.slide span {
-  animation: demo-slide 2s infinite;
+.animation-demo.custom span:before { left: 0; }
+.animation-demo.custom span:after { right: 0; }
+.animation-card[draggable="true"] { cursor: grab; }
+.animation-card[draggable="true"]:active { cursor: grabbing; }
+.canvas.animation-drop-target {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
 }
-@keyframes demo-fade {
-  0%,
-  100% {
-    opacity: 0.2;
-  }
-  50% {
-    opacity: 1;
-  }
+.animation-drop-preview {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 8;
+  pointer-events: none;
+  background: #76e5b533;
+  border: 2px solid var(--accent);
+  border-left-style: dashed;
 }
-@keyframes demo-zoom {
-  0%,
-  100% {
-    transform: scale(0.65);
-  }
-  50% {
-    transform: scale(1.15);
-  }
-}
-@keyframes demo-slide {
-  0%,
-  100% {
-    transform: translateX(-25px);
-    opacity: 0.3;
-  }
-  50% {
-    transform: translateX(5px);
-    opacity: 1;
-  }
+.animation-drop-preview > span {
+  position: absolute;
+  right: 2px;
+  top: 2px;
+  padding: 3px 6px;
+  background: #204c3c;
+  color: #e1fff0;
+  font-size: 10px;
+  white-space: nowrap;
 }
 .tip-card {
   margin-top: 20px;

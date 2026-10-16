@@ -72,9 +72,7 @@ export default function AnimationsPanel({
         ) : (
           <>
             <p className="panel-intro">
-              选中片段，点击即添加。
-              <br />
-              也可以在时间线上右键添加动画。
+              点击为所选片段添加动画，或拖到时间轴片段的指定位置、画布对象。
             </p>
             <div className="animation-presets">
               {animationPresets.map((preset) => (

@@ -160,7 +160,7 @@ try {
     "aria-pressed", "true",
   );
   await expect(zoom).toHaveValue("300");
-  await page.getByRole("button", { name: "添加关键帧", exact: true }).click();
+  await page.getByRole("button", { name: "添加动画", exact: true }).click();
   await expect(arrows).toHaveCount(2);
   await expect(playhead).toHaveCSS("left", "260px");
   await zoom.fill("350");

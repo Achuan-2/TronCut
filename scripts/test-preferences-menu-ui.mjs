@@ -99,7 +99,7 @@ try {
     height: 720,
     fps: 60,
   });
-  await page.getByRole("button", { name: "添加关键帧", exact: true }).click();
+  await page.getByRole("button", { name: "添加动画", exact: true }).click();
   await expect
     .poll(
       async () =>

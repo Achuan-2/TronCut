@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createProject, newText, validateProject } from "../shared/model";
 import {
-  animation,
   changeSpeed,
   setTransform,
   snapTime,
@@ -76,7 +75,7 @@ describe("编辑操作保留素材和动画时间", () => {
   });
   it("拆分关键帧时保持拆分点与后续插值一致", () => {
     const p = createProject(),
-      c = animation(newText("titles", 0), "slide", 0);
+      c = setTransform(newText("titles", 0), { x: 0.8 }, 0.6, true);
     p.clips = [c];
     const at = transformAt(c, 0.3),
       split = splitClip(p, c.id, 0.3);
@@ -105,7 +104,7 @@ describe("编辑操作保留素材和动画时间", () => {
     expect(expression(movedAgain, "x")).toContain("clip(");
   });
   it("变速不改变消耗的源素材长度，并同步关键帧", () => {
-    const c = animation(newText("titles", 0), "zoom", 0),
+    const c = setTransform(newText("titles", 0), { scale: 1.25 }, 0.6, true),
       fast = changeSpeed(c, 2);
     expect(fast.duration * fast.speed).toBe(c.duration * c.speed);
     expect(fast.keyframes[1].time).toBe(0.3);

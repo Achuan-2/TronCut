@@ -199,7 +199,7 @@ try {
   await rail.getByRole("button", { name: "动画", exact: true }).click();
   await page.getByRole("tab", { name: "动画", exact: true }).click();
   await page
-    .getByRole("button", { name: "收藏：平滑缩放", exact: true })
+    .getByRole("button", { name: "收藏：自定义动画", exact: true })
     .click();
   await rail.getByRole("button", { name: "视觉效果", exact: true }).click();
   await page
@@ -291,7 +291,7 @@ try {
     .click();
   await expect(page.locator(".favorites-group")).toHaveCount(2);
   await page
-    .getByRole("button", { name: "取消收藏：平滑缩放", exact: true })
+    .getByRole("button", { name: "取消收藏：自定义动画", exact: true })
     .click();
   await expect(page.locator(".favorites-group")).toHaveCount(1);
   expect(errors).toEqual([]);

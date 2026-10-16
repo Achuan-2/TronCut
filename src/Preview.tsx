@@ -84,6 +84,9 @@ import ClipContextMenu, {
   type ClipMenuPosition,
 } from "./ClipContextMenu";
 import { useViewportZoom, type ZoomPoint } from "./useViewportZoom";
+import {
+  animationMime, customAnimationId, animationDropTarget,
+} from "../shared/animation-drag";
 
 export function timeLabel(t: number): string {
   const seconds = Math.max(0, t);
@@ -392,12 +395,15 @@ function PreviewLayer({
         if (!interactive) return;
         const behavior = event.dataTransfer.types.includes("troncut-behavior");
         const effect = event.dataTransfer.types.includes(visualEffectMime);
-        if (!behavior && !effect) return;
+        const animation = event.dataTransfer.types.includes(animationMime);
+        if (!behavior && !effect && !animation) return;
         event.preventDefault();
         event.stopPropagation();
         const allowed =
           selectable &&
-          (behavior
+          (animation ? !!animationDropTarget(
+            project, clip.id, editor.playhead, editor.preferences.timing.animation,
+          ) : behavior
             ? supportsBehaviors(clip) && (clip.behaviors?.length ?? 0) < 32
             : supportsVisualEffect(
                 clip,
@@ -414,12 +420,16 @@ function PreviewLayer({
         if (!interactive) return;
         const behavior = event.dataTransfer.getData("troncut-behavior");
         const effect = event.dataTransfer.getData(visualEffectMime);
-        if (!behavior && !effect) return;
+        const animation = event.dataTransfer.types.includes(animationMime);
+        if (!behavior && !effect && !animation) return;
         event.preventDefault();
         event.stopPropagation();
         setEffectDrop(false);
         if (!selectable) return;
-        if (behavior) {
+        if (animation) {
+          if (event.dataTransfer.getData(animationMime) === customAnimationId)
+            editor.addCustomAnimation(clip.id);
+        } else if (behavior) {
           if (supportsBehaviors(clip)) editor.addBehavior(behavior, clip.id);
         } else if (supportsVisualEffect(clip, effect)) {
           editor.addVisualEffect(effect as VisualEffectId, clip.id);
@@ -920,6 +930,19 @@ export default function Preview({
   const { canvasMode: mode, setCanvasMode: setMode } = editor;
   const [zoom, setZoom] = useState<CanvasZoom>("fit");
   const [contextMenu, setContextMenu] = useState<ClipMenuPosition | null>(null);
+  const [animationHover, setAnimationHover] = useState(false);
+  useEffect(() => {
+    if (!animationHover) return;
+    const clear = () => setAnimationHover(false);
+    window.addEventListener("dragend", clear, true);
+    window.addEventListener("drop", clear, true);
+    window.addEventListener("blur", clear);
+    return () => {
+      window.removeEventListener("dragend", clear, true);
+      window.removeEventListener("drop", clear, true);
+      window.removeEventListener("blur", clear);
+    };
+  }, [animationHover]);
   useEffect(() => {
     const initial = editor.preferences.program.previewZoom;
     setZoom(initial === "fit" ? "fit" : Number(initial));
@@ -1031,6 +1054,13 @@ export default function Preview({
     const clip = editor.selected;
     if (clip) editor.updateCrop(clip.id, defaultCrop, true);
   };
+  const canvasAnimationTarget = (target: EventTarget) => {
+    const hit = (target as HTMLElement).closest<HTMLElement>(".preview-layer[data-clip-id]");
+    const id = hit?.dataset.clipId ?? editor.selectedId;
+    return !fullscreen && id ? animationDropTarget(
+      project, id, editor.playhead, editor.preferences.timing.animation,
+    ) : null;
+  };
   return (
     <section
       className="preview-panel"
@@ -1090,13 +1120,33 @@ export default function Preview({
           }}
         >
           <div
-            className="canvas"
+            className={`canvas ${animationHover ? "animation-drop-target" : ""}`}
+            onDragOverCapture={(event) => {
+              if (event.dataTransfer.types.includes(animationMime))
+                setAnimationHover(!!canvasAnimationTarget(event.target));
+            }}
             onDragOver={(event) => {
+              if (event.dataTransfer.types.includes(animationMime)) {
+                event.preventDefault();
+                const target = canvasAnimationTarget(event.target);
+                event.dataTransfer.dropEffect = target ? "copy" : "none";
+                setAnimationHover(!!target);
+                return;
+              }
               if (!event.dataTransfer.types.includes(annotationMime)) return;
               event.preventDefault();
               event.dataTransfer.dropEffect = "copy";
             }}
             onDrop={(event) => {
+              if (event.dataTransfer.types.includes(animationMime)) {
+                event.preventDefault();
+                event.stopPropagation();
+                setAnimationHover(false);
+                if (!fullscreen && editor.selectedId &&
+                  event.dataTransfer.getData(animationMime) === customAnimationId)
+                  editor.addCustomAnimation(editor.selectedId);
+                return;
+              }
               const template = parseAnnotation(
                 event.dataTransfer.getData(annotationMime),
               );
@@ -1115,6 +1165,10 @@ export default function Preview({
                   ((event.clientY - bounds.top) / bounds.height - 0.5) /
                     camera.scale,
               });
+            }}
+            onDragLeave={(event) => {
+              if (!event.currentTarget.contains(event.relatedTarget as Node | null))
+                setAnimationHover(false);
             }}
             style={{
               width: project.canvas.width * scale,

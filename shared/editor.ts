@@ -409,37 +409,6 @@ export function changeSpeed(clip: Clip, speed: number): Clip {
     keyframes: clip.keyframes.map((k) => ({ ...k, time: k.time * ratio })),
   });
 }
-export function animation(
-  clip: Clip,
-  type: "fade" | "zoom" | "slide",
-  localTime: number,
-  animationDuration = 0.6,
-): Clip {
-  const localStart = Math.max(0, Math.min(localTime, clip.duration - 0.1));
-  const start = Math.max(0, localStart + (clip.animationOffset ?? 0));
-  const end = Math.max(
-    start + 0.01,
-    Math.min(clip.duration, localStart + animationDuration) +
-      (clip.animationOffset ?? 0),
-  );
-  const target = transformAt(clip, localStart);
-  const from = {
-    ...target,
-    ...(type === "fade"
-      ? { opacity: 0 }
-      : type === "zoom"
-        ? { scale: target.scale * 0.75 }
-        : { x: target.x - 0.18 }),
-  };
-  return {
-    ...clip,
-    keyframes: [
-      ...clip.keyframes.filter((k) => k.time < start || k.time > end),
-      { time: start, value: from },
-      { time: end, value: target },
-    ].sort((a, b) => a.time - b.time),
-  };
-}
 export function snapTime(
   time: number,
   project: Project,
