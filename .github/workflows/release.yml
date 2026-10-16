@@ -124,6 +124,7 @@ jobs:
           FRAMECRAFT_PACKAGED_APP: release/win-unpacked/TronCut.exe
         run: |
           Copy-Item -LiteralPath ../ci/scripts/test-editing-ui.mjs -Destination .cache/test-editing-ui.mjs
+          Copy-Item -LiteralPath ../ci/scripts/preview-select.mjs -Destination .cache/preview-select.mjs
           node .cache/test-editing-ui.mjs
           if ($LASTEXITCODE -ne 0) { throw 'Packaged editing regression failed' }
       - name: Prepare portable ZIP and checksums
