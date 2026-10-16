@@ -57,6 +57,7 @@ import { processCaptionCues } from "./caption-processing";
 import { requestAi, listAiModels } from "./ai";
 import { RecordingStyleStore } from "./recording-style";
 import { RecordingCountdown } from "./recording-countdown";
+import { findCaptureSource } from "./capture-source";
 import { videoExportRequestSchema } from "../shared/export-settings";
 import { assertExportTarget, videoExportTarget } from "./video-export-target";
 import { editCommands, editCommandEnabled, editMenuStateSchema, textEditSchema } from "../shared/edit-menu";
@@ -349,10 +350,7 @@ function installHandlers() {
         throw new Error("已有录制正在运行");
       const id = z.string().parse(sourceId),
         fps = z.number().int().min(15).max(120).parse(inputFps);
-      const sources = await desktopCapturer.getSources({
-        types: ["screen", "window"],
-      });
-      const source = sources.find((s) => s.id === id);
+      const source = await findCaptureSource(id);
       if (!source) throw new Error("录制来源已经关闭，请重新选择");
       const display =
         screen
@@ -969,24 +967,21 @@ function installHandlers() {
       }
     },
   );
-  handle("capture:sources", async () =>
-    (
-      await desktopCapturer.getSources({
-        types: ["screen", "window"],
-        thumbnailSize: { width: 300, height: 180 },
-      })
-    ).map((s) => ({
+  handle("capture:sources", async () => {
+    const sources = await desktopCapturer.getSources({
+      types: ["screen", "window"],
+      thumbnailSize: { width: 300, height: 180 },
+    });
+    recordingCountdown.setSources(sources);
+    return sources.map((s) => ({
       id: s.id,
       name: s.name,
       thumbnail: s.thumbnail.toDataURL(),
-    })),
-  );
+    }));
+  });
   handle("capture:select", async (id: unknown, systemAudio: unknown) => {
-    const sources = await desktopCapturer.getSources({
-      types: ["screen", "window"],
-    });
     const selected = z.string().parse(id);
-    if (!sources.some((s) => s.id === selected))
+    if (!(await findCaptureSource(selected)))
       throw new Error("录屏目标已经关闭，请重新选择");
     captureSelection = {
       id: selected,
@@ -1259,10 +1254,9 @@ app
     session.defaultSession.setDisplayMediaRequestHandler(
       async (_request, callback) => {
         try {
-          const sources = await desktopCapturer.getSources({
-            types: ["screen", "window"],
-          });
-          const source = sources.find((s) => s.id === captureSelection?.id);
+          const source = captureSelection
+            ? await findCaptureSource(captureSelection.id)
+            : undefined;
           if (!source) {
             callback({});
             return;

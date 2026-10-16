@@ -1,12 +1,12 @@
 import {
   BrowserWindow,
-  desktopCapturer,
   globalShortcut,
   ipcMain,
   screen,
 } from "electron";
 import path from "node:path";
 import { createCountdownController } from "./countdown-controller";
+import { findCaptureSource } from "./capture-source";
 
 const overlayHtml = `<!doctype html><html lang="zh-CN"><meta charset="utf-8">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'">
@@ -34,6 +34,14 @@ export class RecordingCountdown {
     () => {},
   );
   private bounds?: Electron.Rectangle;
+  private sourceDisplays = new Map<string, string>();
+
+  /** Reuse picker metadata only for placement; capture still validates live sources. */
+  setSources(sources: Pick<Electron.DesktopCapturerSource, "id" | "display_id">[]) {
+    this.sourceDisplays = new Map(
+      sources.map((source) => [source.id, source.display_id]),
+    );
+  }
 
   constructor() {
     ipcMain.on("recording:countdown:cancel", (event) => {
@@ -77,11 +85,12 @@ export class RecordingCountdown {
     const generation = this.generation;
     let escapeRegistered = false;
     try {
-      const sources = await desktopCapturer.getSources({
-        types: ["screen", "window"],
-      });
+      const displayId = this.sourceDisplays.get(sourceId);
+      const source =
+        displayId !== undefined
+          ? { display_id: displayId }
+          : await findCaptureSource(sourceId);
       if (generation !== this.generation) return false;
-      const source = sources.find((s) => s.id === sourceId);
       if (!source) throw new Error("录制来源已经关闭，请重新选择");
       this.bounds = (
         screen

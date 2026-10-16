@@ -11,7 +11,7 @@ import {
   Circle,
 } from "lucide-react";
 import type { Asset } from "../shared/model";
-import type { CaptureSource } from "../shared/bridge";
+import type { Capabilities, CaptureSource } from "../shared/bridge";
 import { timeLabel } from "./Preview";
 import {
   defaultRecordingSettings,
@@ -64,6 +64,7 @@ export default function Recorder({
   const [settingsReady, setSettingsReady] = useState(false);
   const [savingSettings, setSavingSettings] = useState(false);
   const recordingSettings = useRef(settings);
+  const recordingCapabilities = useRef<Promise<Capabilities> | null>(null);
   const changeSettings = (patch: Partial<RecordingSettings>) =>
     setSettings((s) => ({ ...s, ...patch }));
   async function closeSettings() {
@@ -95,6 +96,9 @@ export default function Recorder({
     1000;
   useEffect(() => {
     mounted.current = true;
+    // Start the engine check while the user configures the recording.
+    recordingCapabilities.current = window.framecraft?.capabilities() ?? null;
+    void recordingCapabilities.current?.catch(() => {});
     window.framecraft
       ?.recordingSettings()
       .then((value) => {
@@ -198,45 +202,76 @@ export default function Recorder({
     setPhase("starting");
     const streams: { kind: Session["kind"]; stream: MediaStream }[] = [];
     try {
-      recordingSettings.current = await bridge.saveRecordingSettings(settings);
-      const info = await bridge.capabilities();
+      const native = nativeAvailable && useNative;
+      const [savedSettings, info] = await Promise.all([
+        bridge.saveRecordingSettings(settings),
+        recordingCapabilities.current ?? bridge.capabilities(),
+        // Native capture validates the target when it actually starts. Only
+        // getDisplayMedia needs a prior selection in the Electron handler.
+        ...(!native ? [bridge.selectCapture(sourceId, system)] : []),
+      ]);
+      recordingSettings.current = savedSettings;
       if (!info.ffmpeg)
         throw new Error("录制保存需要 FFmpeg / FFprobe，请先在设置中配置引擎");
-      await bridge.selectCapture(sourceId, system);
-      const native = nativeAvailable && useNative;
-      const screen = native
-        ? null
-        : await navigator.mediaDevices.getDisplayMedia({
-            video: { frameRate: { ideal: fps, max: fps } },
-            audio: system,
-          });
-      if (screen) streams.push({ kind: "screen", stream: screen });
+      const acquire = async (
+        kind: Session["kind"],
+        request: Promise<MediaStream>,
+      ) => {
+        streams.push({ kind, stream: await request });
+      };
+      const requests: Promise<void>[] = [];
+      if (!native)
+        requests.push(
+          acquire(
+            "screen",
+            navigator.mediaDevices.getDisplayMedia({
+              video: { frameRate: { ideal: fps, max: fps } },
+              audio: system,
+            }),
+          ),
+        );
+      if (mic)
+        requests.push(
+          acquire(
+            "microphone",
+            navigator.mediaDevices.getUserMedia({
+              audio: {
+                echoCancellation: true,
+                noiseSuppression: true,
+                autoGainControl: false,
+              },
+              video: false,
+            }),
+          ),
+        );
+      if (camera)
+        requests.push(
+          acquire(
+            "camera",
+            navigator.mediaDevices.getUserMedia({
+              video: {
+                width: { ideal: 1920 },
+                height: { ideal: 1080 },
+                frameRate: 30,
+              },
+              audio: false,
+            }),
+          ),
+        );
+      // Wait for every request before cleanup, including devices that finish
+      // opening after another device has failed.
+      const devices = await Promise.allSettled(requests);
+      const failedDevice = devices.find(
+        (result) => result.status === "rejected",
+      );
+      if (failedDevice?.status === "rejected") throw failedDevice.reason;
+      if (!mounted.current) {
+        streams.forEach((s) => s.stream.getTracks().forEach((t) => t.stop()));
+        return;
+      }
+      const screen = streams.find((stream) => stream.kind === "screen")?.stream;
       if (system && screen && !screen.getAudioTracks().length)
         toast("所选来源未提供系统音频，本次只录制画面与启用的麦克风");
-      if (mic)
-        streams.push({
-          kind: "microphone",
-          stream: await navigator.mediaDevices.getUserMedia({
-            audio: {
-              echoCancellation: true,
-              noiseSuppression: true,
-              autoGainControl: false,
-            },
-            video: false,
-          }),
-        });
-      if (camera)
-        streams.push({
-          kind: "camera",
-          stream: await navigator.mediaDevices.getUserMedia({
-            video: {
-              width: { ideal: 1920 },
-              height: { ideal: 1080 },
-              frameRate: 30,
-            },
-            audio: false,
-          }),
-        });
       if (!(await bridge.recordingCountdown(sourceId))) {
         streams.forEach((s) => s.stream.getTracks().forEach((t) => t.stop()));
         if (mounted.current) setPhase("configure");
@@ -339,6 +374,7 @@ export default function Recorder({
       });
       setPhase("recording");
     } catch (e) {
+      recordingCapabilities.current = null;
       await bridge.restoreRecordingWindow();
       setError(String(e));
       setPhase("configure");
