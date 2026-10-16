@@ -82,6 +82,7 @@ try {
   await picker.screenshot({ path: path.join(root, "region-picker.png") });
   await picker.getByRole("button", { name: "使用此范围", exact: true }).click();
   await expect(page.getByLabel("自定义录制范围", { exact: true })).toContainText("640 × 360");
+  await expect(page.locator(".capture-sources")).toHaveCount(0);
   await page.screenshot({ path: path.join(root, "region-settings.png") });
   // Existing selection is restored when reopening the selector.
   const reopened = app.waitForEvent("window");
@@ -95,6 +96,8 @@ try {
   for (const native of [true, false]) {
     if (!native) {
       await page.getByRole("button", { name: "录制", exact: true }).click();
+      await expect(page.getByLabel("麦克风", { exact: true })).not.toBeChecked();
+      await expect(page.locator(".capture-sources")).toBeVisible();
       const reopened = app.waitForEvent("window");
       await page.getByRole("button", { name: "自定义范围", exact: true }).click();
       picker = await reopened;
@@ -103,6 +106,7 @@ try {
         await picker.locator(`#${key}`).press("Tab");
       }
       await picker.getByRole("button", { name: "使用此范围", exact: true }).click();
+      await expect(page.locator(".capture-sources")).toHaveCount(0);
     }
     await page.getByLabel("原生录制与可编辑鼠标", { exact: true }).setChecked(native);
     await app.evaluate(() => {

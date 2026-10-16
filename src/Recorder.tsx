@@ -49,7 +49,6 @@ export default function Recorder({
 }) {
   const [sources, setSources] = useState<CaptureSource[]>([]),
     [sourceId, setSourceId] = useState(""),
-    [mic, setMic] = useState(true),
     [camera, setCamera] = useState(false),
     [system, setSystem] = useState(false);
   const [phase, setPhase] = useState<
@@ -76,6 +75,7 @@ export default function Recorder({
   }
   const pauseBusy = useRef(false);
   const [settings, setSettings] = useState(defaultRecordingSettings);
+  const mic = settings.microphone;
   const [settingsReady, setSettingsReady] = useState(false);
   const [savingSettings, setSavingSettings] = useState(false);
   const recordingSettings = useRef(settings);
@@ -487,24 +487,31 @@ export default function Recorder({
           <span>{region.width} × {region.height} 像素 · X {region.x} / Y {region.y}</span>
           <button disabled={phase === "starting" || selectingRegion || savingSettings} onClick={() => void selectRegion()}>重新框选</button>
         </div>}
-        <div className="capture-sources">
-          {sources.map((source) => (
-            <button
-              key={source.id}
-              data-source-id={source.id}
-              aria-pressed={!region && sourceId === source.id}
-              className={!region && sourceId === source.id ? "selected" : ""}
-              onClick={() => { setSourceId(source.id); setRegion(undefined); }}
-              disabled={phase === "starting" || selectingRegion || savingSettings}
-            >
-              <img src={source.thumbnail} alt="录制来源缩略图" />
-              <span>{source.name}</span>
-            </button>
-          ))}
-        </div>
+        {!region && (
+          <div className="capture-sources">
+            {sources.map((source) => (
+              <button
+                key={source.id}
+                data-source-id={source.id}
+                aria-pressed={sourceId === source.id}
+                className={sourceId === source.id ? "selected" : ""}
+                onClick={() => setSourceId(source.id)}
+                disabled={phase === "starting" || selectingRegion || savingSettings}
+              >
+                <img src={source.thumbnail} alt="录制来源缩略图" />
+                <span>{source.name}</span>
+              </button>
+            ))}
+          </div>
+        )}
         <div className="record-options">
           {[
-            { label: "麦克风", icon: Mic, value: mic, change: setMic },
+            {
+              label: "麦克风",
+              icon: Mic,
+              value: mic,
+              change: (microphone: boolean) => changeSettings({ microphone }),
+            },
             {
               label: "系统声音",
               icon: Volume2,
@@ -517,7 +524,7 @@ export default function Recorder({
               <option.icon size={22} />
               <span>{option.label}</span>
               <input
-                disabled={phase === "starting" || savingSettings}
+                disabled={phase === "starting" || savingSettings || !settingsReady}
                 type="checkbox"
                 checked={option.value}
                 onChange={(e) => option.change(e.target.checked)}
@@ -667,31 +674,33 @@ export default function Recorder({
                 </select>
               </label>
             </div>
-            <label className="check-field">
-              <input
-                type="checkbox"
-                checked={settings.autoZoom}
-                onChange={(e) => changeSettings({ autoZoom: e.target.checked })}
-              />
-              根据鼠标点击自动缩放并跟随移动
-            </label>
-            <label className="field recording-zoom-scope">
-              自动缩放范围
-              <select
-                aria-label="自动缩放范围"
-                value={settings.zoomBackground ? "scene" : "screen"}
-                onChange={(e) =>
-                  changeSettings({ zoomBackground: e.target.value === "scene" })
-                }
-              >
-                <option value="screen">仅录屏缩放，背景固定</option>
-                <option value="scene">录屏和背景一起缩放</option>
-              </select>
-            </label>
+            <div className="recording-style-fields recording-zoom-options">
+              <label className="check-field">
+                <input
+                  type="checkbox"
+                  checked={settings.autoZoom}
+                  onChange={(e) => changeSettings({ autoZoom: e.target.checked })}
+                />
+                根据鼠标点击自动缩放并跟随移动
+              </label>
+              <label className="field recording-zoom-scope">
+                自动缩放范围
+                <select
+                  aria-label="自动缩放范围"
+                  value={settings.zoomBackground ? "scene" : "screen"}
+                  onChange={(e) =>
+                    changeSettings({ zoomBackground: e.target.value === "scene" })
+                  }
+                >
+                  <option value="screen">仅录屏缩放，背景固定</option>
+                  <option value="scene">录屏和背景一起缩放</option>
+                </select>
+              </label>
+            </div>
           </fieldset>
         </fieldset>
         <p className="small-note">
-          开始录制或关闭窗口时会记住美化设置，下次录制继续使用。录制后仍可在时间线和属性中调整。
+          开始录制或关闭窗口时会记住麦克风与美化设置，下次录制继续使用。录制后仍可在时间线和属性中调整。
         </p>
         <p className="small-note">
           麦克风与摄像头保存为独立素材。Windows

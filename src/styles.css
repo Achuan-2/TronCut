@@ -4161,7 +4161,7 @@ fieldset:disabled {
 .recording-style fieldset {
   border: 0;
   padding: 0;
-  margin: 0;
+  margin: 16px 0 0;
   min-width: 0;
 }
 .recording-style-fields {
@@ -4175,11 +4175,30 @@ fieldset:disabled {
   flex-direction: column;
   align-items: stretch;
   gap: 7px;
+  margin: 0;
+  min-width: 0;
 }
-.recording-style-fields input,
-.recording-style-fields select {
+.recording-style-fields .field input[type="number"],
+.recording-style .recording-style-fields .field select,
+.recording-style-fields .preview-select {
   width: 100%;
   min-width: 0;
+  height: 40px;
+}
+.recording-style .recording-background-upload {
+  justify-content: flex-start;
+  width: fit-content;
+  margin: 6px 0 0;
+  padding: 4px 0;
+}
+.recording-zoom-options {
+  align-items: end;
+  margin-top: 16px;
+}
+.recording-zoom-options .check-field {
+  grid-column: span 2;
+  min-height: 40px;
+  margin: 0;
 }
 .recording-style-preview {
   position: relative;

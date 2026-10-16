@@ -71,6 +71,7 @@ export type CustomRecordingBackground = z.infer<
   typeof customRecordingBackgroundSchema
 >;
 export const recordingSettingsSchema = z.object({
+  microphone: z.boolean().default(true),
   background: z.boolean(),
   preset: z.preprocess(
     (value) =>
@@ -89,6 +90,7 @@ export const recordingSettingsSchema = z.object({
 });
 export type RecordingSettings = z.infer<typeof recordingSettingsSchema>;
 export const defaultRecordingSettings: RecordingSettings = {
+  microphone: true,
   background: true,
   preset: "perspective-grid",
   padding: 0.08,

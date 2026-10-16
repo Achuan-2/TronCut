@@ -334,3 +334,20 @@ it("迁移旧录屏默认值后与首选项统一保存，后续不被旧文件�
     await fs.rm(root, { recursive: true, force: true });
   }
 });
+
+it("旧录屏设置默认启用麦克风，关闭后跨重启记住且不被其他首选项覆盖", async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "troncut-microphone-preferences-"));
+  const file = path.join(root, "preferences.json");
+  try {
+    const { microphone: _, ...legacy } = defaultRecordingSettings;
+    await fs.writeFile(file, JSON.stringify({ recording: legacy }));
+    const store = new PreferencesStore(file, secrets);
+    const settings = (await store.get()).recording;
+    expect(settings.microphone).toBe(true);
+    await store.save({ recording: { ...settings, microphone: false } });
+    await store.save({ timing: { image: 8 } });
+    expect((await new PreferencesStore(file, secrets).get()).recording.microphone).toBe(false);
+  } finally {
+    await fs.rm(root, { recursive: true, force: true });
+  }
+});

@@ -24,6 +24,8 @@ try {
   await page.getByRole("button", { name: "新建录制", exact: true }).click();
   await expect(page.getByLabel("录屏背景", { exact: true })).toBeEnabled();
   await expect(page.getByLabel("录屏圆角", { exact: true })).toHaveValue("0");
+  await expect(page.getByLabel("麦克风", { exact: true })).toBeChecked();
+  await page.getByLabel("麦克风", { exact: true }).uncheck();
   await selectPreview(page, "录屏背景", "violet");
   for (const [label, value] of [
     ["录屏留白", "10"],
@@ -55,6 +57,7 @@ try {
   );
   await expect(page.getByLabel("录屏留白", { exact: true })).toHaveValue("10");
   await expect(page.getByLabel("录屏圆角", { exact: true })).toHaveValue("7");
+  await expect(page.getByLabel("麦克风", { exact: true })).not.toBeChecked();
   const ownWindow = page.locator(
     `.capture-sources > button[data-source-id="${ownId}"]`,
   );
