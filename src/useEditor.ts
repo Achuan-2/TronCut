@@ -1469,10 +1469,18 @@ export function useEditor(
 }
 export type Editor = ReturnType<typeof useEditor>;
 
-export function useEditorPlayhead(editor: Pick<Editor, "playback">): number {
+export function useEditorPlayhead(
+  editor: Pick<Editor, "playback">,
+  enabled = true,
+): number {
   const { playback } = editor;
+  const subscribe = useCallback(
+    (listener: () => void) =>
+      enabled ? playback.subscribe(listener) : () => {},
+    [enabled, playback],
+  );
   return useSyncExternalStore(
-    playback.subscribe,
+    subscribe,
     playback.getSnapshot,
     playback.getServerSnapshot,
   );

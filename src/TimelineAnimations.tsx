@@ -24,11 +24,12 @@ import {
 import { timeLabel } from "./Preview";
 import { animationCursor } from "./animationCursor";
 import { useRAFThrottle } from "./hooks/useRAFThrottle";
+import { useEditorPlayhead, type Editor } from "./useEditor";
 
 export const TimelineAnimations = memo(function TimelineAnimations({
   clip,
   zoom,
-  playhead,
+  editor,
   fps,
   selected,
   locate,
@@ -43,7 +44,7 @@ export const TimelineAnimations = memo(function TimelineAnimations({
 }: {
   clip: Clip;
   zoom: number;
-  playhead: number;
+  editor: Editor;
   fps: number;
   selected: boolean;
   locate: (time: number, side: "start" | "end", kind?: "drawing") => void;
@@ -56,6 +57,7 @@ export const TimelineAnimations = memo(function TimelineAnimations({
   viewportEnd: number;
   channel?: "transform" | "drawing";
 }) {
+  const playhead = useEditorPlayhead(editor, selected);
   type Gesture = {
     x: number;
     original: Clip;
@@ -370,7 +372,6 @@ export const TimelineAnimations = memo(function TimelineAnimations({
   if (prev.selected || next.selected) {
     if (prev.selected !== next.selected) return false;
     if (prev.selectedFrame !== next.selectedFrame) return false;
-    if (prev.playhead !== next.playhead) return false;
   }
   return (
     prev.clip === next.clip &&

@@ -35,6 +35,7 @@ import {
 import {
   type Clip,
   type Marker,
+  type Project,
   projectDuration,
   uid,
   newTrack,
@@ -147,6 +148,61 @@ interface Marquee {
   y: number;
   baseIds: string[];
 }
+
+function TimelinePlayheadCursor({
+  editor,
+  zoom,
+  placement,
+}: {
+  editor: Editor;
+  zoom: number;
+  placement: "ruler" | "body";
+}) {
+  const playhead = useEditorPlayhead(editor);
+  return placement === "ruler" ? (
+    <div className="ruler-playhead" style={{ left: playhead * zoom }}>
+      <span />
+    </div>
+  ) : (
+    <div className="playhead" style={{ left: playhead * zoom }}>
+      <i />
+    </div>
+  );
+}
+
+function TimelineAddAnimationButton({
+  editor,
+  project,
+  editableSelection,
+  animationIds,
+}: {
+  editor: Editor;
+  project: Project;
+  editableSelection: Clip[];
+  animationIds: Set<string>;
+}) {
+  const playhead = useEditorPlayhead(editor);
+  const enabled = editableSelection.some(
+    (clip) =>
+      animationIds.has(clip.id) &&
+      clip.kind !== "audio" &&
+      !project.tracks.find((track) => track.id === clip.trackId)?.hidden &&
+      playhead >= clip.start &&
+      playhead <= clip.start + clip.duration,
+  );
+  return (
+    <button
+      className="keyframe-add"
+      title={`为选中的对象添加默认 ${editor.preferences.timing.animation} 秒动画`}
+      disabled={!enabled}
+      onClick={() => editor.addSelectedAnimation()}
+    >
+      <Diamond size={15} />
+      添加动画
+    </button>
+  );
+}
+
 export default function Timeline({
   editor,
   onCopyAnimation,
@@ -166,7 +222,6 @@ export default function Timeline({
   onCommand: (command: ClipCommand) => void;
   dropDisabled?: boolean;
 }) {
-  const playhead = useEditorPlayhead(editor);
   // Performance monitoring in development
   usePerformanceMonitor("Timeline");
 
@@ -490,14 +545,6 @@ export default function Timeline({
     () => editableCanvasIds(project, editor.selectedIds),
     [project.clips, project.tracks, editor.selectedIds],
   );
-  const canAddAnimation = editableSelection.some(
-    (clip) =>
-      animationIds.has(clip.id) &&
-      clip.kind !== "audio" &&
-      !project.tracks.find((track) => track.id === clip.trackId)?.hidden &&
-      playhead >= clip.start &&
-      playhead <= clip.start + clip.duration,
-  );
   const deleteSelection = (ripple = false) => {
     if (editor.selectedTransition) {
       editor.updateTransition(editor.selectedTransition, null);
@@ -688,7 +735,9 @@ export default function Timeline({
             disabled={!selected || !!locked}
             onClick={() =>
               selected &&
-              apply((p) => splitSelection(p, editor.selectedIds, playhead))
+              apply((p) =>
+                splitSelection(p, editor.selectedIds, editor.playhead),
+              )
             }
           >
             <Scissors size={17} />
@@ -756,15 +805,12 @@ export default function Timeline({
             <Type size={17} />
             添加文本
           </button>
-          <button
-            className="keyframe-add"
-            title={`为选中的对象添加默认 ${editor.preferences.timing.animation} 秒动画`}
-            disabled={!canAddAnimation}
-            onClick={() => editor.addSelectedAnimation()}
-          >
-            <Diamond size={15} />
-            添加动画
-          </button>
+          <TimelineAddAnimationButton
+            editor={editor}
+            project={project}
+            editableSelection={editableSelection}
+            animationIds={animationIds}
+          />
           <button
             title="将当前画面截为图片并插入新轨道"
             disabled={dropDisabled}
@@ -781,10 +827,10 @@ export default function Timeline({
               );
               const start = clips.length
                 ? Math.min(...clips.map((clip) => clip.start))
-                : playhead;
+                : editor.playhead;
               const end = clips.length
                 ? Math.max(...clips.map((clip) => clip.start + clip.duration))
-                : playhead + 1;
+                : editor.playhead + 1;
               addMarker(start, end);
             }}
           >
@@ -916,7 +962,7 @@ export default function Timeline({
                   track.captionTrack &&
                   !(event.target as HTMLElement).closest("button")
                 )
-                  editor.selectCaptionTrack(track.id, playhead);
+                  editor.selectCaptionTrack(track.id, editor.playhead);
               }}
             >
               <div>
@@ -1188,9 +1234,11 @@ export default function Timeline({
                   }}
                 />
               )}
-              <div className="ruler-playhead" style={{ left: playhead * zoom }}>
-                <span />
-              </div>
+              <TimelinePlayheadCursor
+                editor={editor}
+                zoom={zoom}
+                placement="ruler"
+              />
             </div>
             {fileDrop && (
               <div
@@ -1764,13 +1812,13 @@ export default function Timeline({
                                   key={channel}
                                   channel={channel}
                                   clip={c}
+                                  editor={editor}
                                   viewportStart={(viewport.left - 200) / zoom}
                                   viewportEnd={
                                     (viewport.left + viewport.width + 200) /
                                     zoom
                                   }
                                   zoom={zoom}
-                                  playhead={playhead}
                                   fps={project.canvas.fps}
                                   selected={selectedIdSet.has(c.id)}
                                   selectedFrame={
@@ -1948,9 +1996,11 @@ export default function Timeline({
                 }}
               />
             )}
-            <div className="playhead" style={{ left: playhead * zoom }}>
-              <i />
-            </div>
+            <TimelinePlayheadCursor
+              editor={editor}
+              zoom={zoom}
+              placement="body"
+            />
           </div>
         </div>
       </div>
@@ -2045,12 +2095,14 @@ export default function Timeline({
                 <button
                   disabled={
                     captionLocked ||
-                    playhead <= clip.start ||
-                    playhead >= clip.start + clip.duration
+                    editor.playhead <= clip.start ||
+                    editor.playhead >= clip.start + clip.duration
                   }
                   onClick={() => {
                     setContext(null);
-                    apply((current) => splitClip(current, clip.id, playhead));
+                    apply((current) =>
+                      splitClip(current, clip.id, editor.playhead),
+                    );
                   }}
                 >
                   拆分字幕
@@ -2109,8 +2161,8 @@ export default function Timeline({
               <button
                 disabled={
                   selectionLocked ||
-                  playhead <= clip.start ||
-                  playhead >= clip.start + clip.duration
+                  editor.playhead <= clip.start ||
+                  editor.playhead >= clip.start + clip.duration
                 }
                 onClick={() => {
                   setContext(null);
@@ -2120,7 +2172,7 @@ export default function Timeline({
                       editor.selectedIds.includes(context.id)
                         ? editor.selectedIds
                         : [context.id],
-                      playhead,
+                      editor.playhead,
                     ),
                   );
                 }}
