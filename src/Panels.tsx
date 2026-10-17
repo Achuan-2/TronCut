@@ -15,6 +15,7 @@ import {
   Paintbrush,
   ArrowRightLeft,
   Star,
+  Shapes,
 } from "lucide-react";
 import { type Asset, type Clip, textPresets, defaultTransform } from "../shared/model";
 import { createTransformSampler } from "../shared/editor";
@@ -390,10 +391,14 @@ export function Inspector({ editor }: { editor: Editor }) {
     return <TransitionProperties editor={editor} />;
   const hasCursor = c?.kind === "video" && !!selectedAsset?.cursor;
   const hasText = c?.kind === "text";
+  const hasAnnotation = c?.kind === "shape";
   const tabs = [
     ...(isRecording ? [{ name: "recording", label: "录屏", icon: MonitorDot }] : []),
     ...(c?.kind !== "audio"
       ? [{ name: "video", label: isRecording ? "画面" : hasCursor ? "视频" : "画面", icon: Film }]
+      : []),
+    ...(hasAnnotation
+      ? [{ name: "annotation", label: "标注", icon: Shapes }]
       : []),
     ...(hasCursor && !isRecording
       ? [{ name: "cursor", label: "鼠标", icon: MousePointer2 }]
@@ -408,13 +413,14 @@ export function Inspector({ editor }: { editor: Editor }) {
   ];
   const activeTab =
     editor.selectedKeyframe?.clipId === c?.id ? "video" :
+    editor.selectedDrawing?.clipId === c?.id ? "annotation" :
     editor.selectedBehavior?.clipId === c?.id
       ? "behaviors"
       : tab.clipId === c?.id &&
           tab.name !== "behaviors" &&
           tabs.some((item) => item.name === tab.name)
         ? tab.name
-        : isRecording ? "recording" : hasText
+        : hasAnnotation ? "annotation" : isRecording ? "recording" : hasText
           ? "text"
           : c?.kind === "audio"
             ? "audio"
@@ -522,6 +528,7 @@ export function Inspector({ editor }: { editor: Editor }) {
                       (event.key === "ArrowRight" ? 1 : -1) +
                       tabs.length) %
                     tabs.length;
+            if (tabs[index].name !== "video") editor.clearKeyframeEdit();
             if (tabs[index].name !== "behaviors") editor.select(c.id);
             else if (c.behaviors?.length)
               editor.selectBehavior(c.id, c.behaviors[0].id);
@@ -762,13 +769,22 @@ export function Inspector({ editor }: { editor: Editor }) {
                 />
               </div>
             )}
+            {hasAnnotation && (
+              <div
+                id="inspector-annotation"
+                role="tabpanel"
+                aria-labelledby="inspector-annotation-tab"
+                hidden={activeTab !== "annotation"}
+              >
+                <AnnotationProperties clip={c} editor={editor} />
+              </div>
+            )}
             <div
               id="inspector-video"
               role="tabpanel"
               aria-labelledby="inspector-video-tab"
               hidden={activeTab !== "video"}
             >
-              {c.kind === "shape" && <AnnotationProperties clip={c} editor={editor} />}
               {c.kind !== "audio" && (
                 <>
                   <FrameTransformProperties

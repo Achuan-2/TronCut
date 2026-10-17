@@ -123,6 +123,18 @@ try {
   await expect(overlay).toHaveCount(0);
   assert.equal(await time(), start, "完成绘制不应移动播放头");
   await expect(page.locator(".timeline-clip.shape")).toHaveCount(1);
+  const inspectorTabs = page.getByRole("tablist", { name: "片段属性", exact: true });
+  const annotationTab = inspectorTabs.getByRole("tab", { name: "标注", exact: true });
+  const frameTab = inspectorTabs.getByRole("tab", { name: "画面", exact: true });
+  await expect(annotationTab).toHaveAttribute("aria-selected", "true");
+  await expect(page.locator("#inspector-annotation")).toBeVisible();
+  await expect(page.locator("#inspector-video")).toBeHidden();
+  await frameTab.click();
+  await expect(page.locator("#inspector-video")).toBeVisible();
+  await expect(page.locator("#inspector-annotation")).toBeHidden();
+  await page.keyboard.press("End");
+  await expect(annotationTab).toBeFocused();
+  await expect(annotationTab).toHaveAttribute("aria-selected", "true");
   const shape = page.locator(".timeline-clip.shape");
   const layer = page.locator(".canvas .preview-layer.shape");
   const paths = layer.locator("svg path");
@@ -265,9 +277,17 @@ try {
   ).toHaveCount(2);
   await page.screenshot({ path: path.join(root, "hand-drawn-circle.png") });
   await page.getByRole("button", { name: "手绘矩形", exact: true }).click();
+  await expect(annotationTab).toHaveAttribute("aria-selected", "true");
   await page.screenshot({ path: path.join(root, "hand-drawn-rectangle.png") });
   await page.getByRole("button", { name: "勾选", exact: true }).click();
   await page.locator(".shape-presets").screenshot({ path: path.join(root, "sketch-presets.png") });
+  await page.getByRole("tab", { name: "模糊和高亮", exact: true }).click();
+  await page.getByRole("button", { name: "像素化", exact: true }).click();
+  await expect(annotationTab).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByLabel("标注像素大小", { exact: true })).toBeVisible();
+  await page.screenshot({ path: path.join(root, "annotation-inspector.png") });
+  await frameTab.click();
+  await expect(page.getByLabel("标注像素大小", { exact: true })).toBeHidden();
   assert.deepEqual(errors, []);
   console.log(
     `多笔绘制、混合笔刷、撤销/取消、播放头保持、完整编辑轨迹、绘制箭头拖动、叠加动画及保存重开通过：${root}`,
