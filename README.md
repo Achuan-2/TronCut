@@ -102,12 +102,6 @@ pnpm test:smoke     # Electron 桌面回归，先执行 build 和 test
 - [性能优化总结](docs/PERFORMANCE-IMPROVEMENTS.md) ⚡ **新增**
   - [视频导出性能优化方案](docs/EXPORT-OPTIMIZATION.md) 🚀 **2-3倍速度提升**
   - [导出优化实施报告](docs/EXPORT-OPTIMIZATION-REPORT.md) 📊 **详细数据**
-- **🎬 视频制作指南**（新增）
-  - [快速开始指南](docs/PROMO-VIDEO-QUICK-START.md) ⭐ - 5 分钟快速上手
-  - [宣传视频制作完整指南](docs/PROMO-VIDEO-GUIDE.md) - 3-5 分钟专业宣传视频制作流程
-  - [宣传视频制作清单](docs/PROMO-VIDEO-CHECKLIST.md) - 逐步制作检查清单
-  - [项目路线图](docs/PROMO-VIDEO-ROADMAP.md) - 制作路线图和时间表
-  - [AI 外部编辑工作流](docs/AI-EXTERNAL-EDIT-WORKFLOW.md) - 使用 Claude AI 自动化视频制作
 - [贡献指南](CONTRIBUTING.md) · [提交问题](https://github.com/Achuan-2/TronCut/issues/new/choose)
 
 欢迎提供可复现的问题、兼容样本、测试结果和改进代码。提交工程或日志前，请移除私人素材与敏感信息。
