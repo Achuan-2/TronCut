@@ -140,6 +140,7 @@ export function useEditor(
   const [editingTextId, setEditingTextId] = useState<string | null>(null);
   const [zoomPanDraft, setZoomPanDraft] = useState<Transform | null>(null);
   const [canvasMode, setCanvasMode] = useState<"select" | "crop" | "draw">("select");
+  const [penToolRequest, setPenToolRequest] = useState(0);
   const [penSettings, setPenSettings] = useState<PenSettings>({
     color: "#ff2020", width: 8, brush: "round", animate: true, duration: 1,
   });
@@ -813,6 +814,12 @@ export function useEditor(
     );
     setCanvasMode("select");
   };
+  const activatePen = () => {
+    setPlaying(false);
+    if (editingTextId) endTextEdit(editingTextId);
+    setCanvasMode("draw");
+    setPenToolRequest(value => value + 1);
+  };
   const addRoundedCorners = useCallback((id?: string) => {
     const project = current.current;
     const ids = id ? [id] : selectedIds;
@@ -1258,6 +1265,8 @@ export function useEditor(
     updateCrop,
     updateMask,
     canvasMode,
+    penToolRequest,
+    activatePen,
     setCanvasMode,
     penSettings,
     penDraft,

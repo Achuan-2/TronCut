@@ -217,7 +217,7 @@ export default function CanvasToolbar({
           title="在画布上绘制可编辑笔迹"
           aria-pressed={mode === "draw"}
           className={mode === "draw" ? "active" : ""}
-          onClick={() => changeMode(mode === "draw" ? "select" : "draw")}
+          onClick={editor.activatePen}
         >
           <PenTool size={18} />
         </button>

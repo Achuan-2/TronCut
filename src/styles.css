@@ -2606,19 +2606,25 @@ fieldset:disabled {
 .annotation-categories {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+  padding: 4px;
   border-bottom: 1px solid var(--line);
   margin-bottom: 16px;
 }
 .annotation-categories > button {
-  flex: 1;
+  width: 100%;
+  min-width: 0;
+  min-height: 62px;
   flex-direction: column;
   gap: 5px;
-  border-radius: 0;
+  border-radius: 5px;
   border-bottom: 2px solid transparent;
   color: var(--muted);
   font-size: 11px;
   padding: 9px 2px;
 }
+.annotation-categories > button svg { flex-shrink: 0; }
+.annotation-categories > button span { line-height: 16px; }
 .canvas-drawing-overlay {
   position: absolute;
   inset: 0;
@@ -2684,6 +2690,7 @@ fieldset:disabled {
 .annotation-categories > button[aria-selected="true"] {
   color: var(--accent);
   border-bottom-color: var(--accent);
+  background: #76e5b512;
 }
 .visual-effect-card {
   width: 100%;

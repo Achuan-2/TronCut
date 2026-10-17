@@ -38,11 +38,47 @@ try {
   page = await app.firstWindow();
   page.on("pageerror", (error) => errors.push(error.message));
   await expect(page.locator(".timeline-clip")).toHaveCount(1);
+  await page.getByRole("button", { name: "涂鸦笔模式", exact: true }).click();
+  await expect(page.locator(".tool-rail .selected")).toHaveText("标注");
+  const penTab = page.getByRole("tab", { name: "涂鸦笔", exact: true });
+  await expect(penTab).toHaveAttribute("aria-selected", "true");
+  await expect(penTab).toBeInViewport();
+  const picker = await page
+    .getByLabel("涂鸦笔颜色", { exact: true })
+    .boundingBox();
+  const palette = await page
+    .getByRole("group", { name: "涂鸦笔常用颜色", exact: true })
+    .boundingBox();
+  assert.ok(
+    palette.y >= picker.y + picker.height,
+    "常用色板应位于颜色选择器下方",
+  );
+  const categoryBounds = await page
+    .locator('.annotation-categories [role="tab"]')
+    .evaluateAll((elements) =>
+      elements.map((element) => {
+        const { x, y, width, height } = element.getBoundingClientRect();
+        return { x, y, width, height };
+      }),
+    );
+  assert.ok(
+    categoryBounds.every(
+      (bounds) =>
+        Math.abs(bounds.width - categoryBounds[0].width) < 1 &&
+        bounds.height === categoryBounds[0].height,
+    ),
+  );
+  assert.equal(categoryBounds[0].y, categoryBounds[2].y);
+  assert.equal(categoryBounds[3].y, categoryBounds[5].y);
+  await page.getByRole("tab", { name: "文字标注", exact: true }).click();
   await page
     .locator(".tool-rail")
-    .getByRole("button", { name: "标注", exact: true })
+    .getByRole("button", { name: "媒体", exact: true })
     .click();
-  await page.getByRole("tab", { name: "涂鸦笔", exact: true }).click();
+  await page.getByRole("button", { name: "涂鸦笔模式", exact: true }).click();
+  await expect(penTab).toHaveAttribute("aria-selected", "true");
+  await expect(page.locator(".tool-rail .selected")).toHaveText("标注");
+  await page.getByRole("button", { name: "选择模式", exact: true }).click();
   await expect(page.locator(".annotations-panel .pen-brush-card")).toHaveCount(
     5,
   );
@@ -154,7 +190,11 @@ try {
   saved = await save();
   clip = saved.clips.find((clip) => clip.id === id);
   assert.ok(clip.keyframes.some((frame) => frame.animation));
-  assert.ok(clip.keyframes.some((frame) => frame.animation && frame.value.scale === 1.5));
+  assert.ok(
+    clip.keyframes.some(
+      (frame) => frame.animation && frame.value.scale === 1.5,
+    ),
+  );
   assert.equal(clip.drawing.strokes.length, 2);
   // Deselecting at the clip start shows the animated state; selection reveals all strokes.
   await page
@@ -164,7 +204,9 @@ try {
   await expect(paths).toHaveCount(0);
   await shape.click({ position: { x: 35, y: 8 } });
   await expect(paths).toHaveCount(5);
-  await page.locator(".ruler").click({ position: { x: Number(start) * zoom, y: 12 } });
+  await page
+    .locator(".ruler")
+    .click({ position: { x: Number(start) * zoom, y: 12 } });
   await page.getByTitle("播放 / 暂停（空格）", { exact: true }).click();
   await expect(paths).toHaveCount(1);
   await page.getByTitle("播放 / 暂停（空格）", { exact: true }).click();
@@ -189,22 +231,38 @@ try {
   await expect(
     page.locator('.clip-animation[data-animation-kind="drawing"]'),
   ).toHaveCount(1);
-  await page.locator('.drawing-animations .animation-arrow').click({ button: "right" });
+  await page
+    .locator(".drawing-animations .animation-arrow")
+    .click({ button: "right" });
   await page.getByRole("menuitem", { name: "启用缓冲", exact: true }).click();
-  await page.getByRole("menuitemradio", { name: "指数缓入/缓出", exact: true }).click();
+  await page
+    .getByRole("menuitemradio", { name: "指数缓入/缓出", exact: true })
+    .click();
   saved = await save();
-  assert.equal(saved.clips.find(clip => clip.id === id).drawing.easing, "exponential");
+  assert.equal(
+    saved.clips.find((clip) => clip.id === id).drawing.easing,
+    "exponential",
+  );
   await page.keyboard.press("Delete");
   await expect(page.locator(".timeline-clip.shape")).toHaveCount(1);
-  await expect(page.locator('.clip-animation[data-animation-kind="drawing"]')).toHaveCount(0);
+  await expect(
+    page.locator('.clip-animation[data-animation-kind="drawing"]'),
+  ).toHaveCount(0);
   await page.getByTitle("撤销 Ctrl+Z", { exact: true }).click();
-  await expect(page.locator('.clip-animation[data-animation-kind="drawing"]')).toHaveCount(1);
-  await page.locator(".tool-rail").getByRole("button", { name: "标注", exact: true }).click();
+  await expect(
+    page.locator('.clip-animation[data-animation-kind="drawing"]'),
+  ).toHaveCount(1);
+  await page
+    .locator(".tool-rail")
+    .getByRole("button", { name: "标注", exact: true })
+    .click();
   await page.getByRole("tab", { name: "草图运动", exact: true }).click();
   const beforeSketch = await time();
   await page.getByRole("button", { name: "手绘圆", exact: true }).click();
   assert.equal(await time(), beforeSketch, "内置手绘形状也不应移动播放头");
-  await expect(page.locator('.clip-animation[data-animation-kind="drawing"]')).toHaveCount(2);
+  await expect(
+    page.locator('.clip-animation[data-animation-kind="drawing"]'),
+  ).toHaveCount(2);
   assert.deepEqual(errors, []);
   console.log(
     `多笔绘制、混合笔刷、撤销/取消、播放头保持、完整编辑轨迹、绘制箭头拖动、叠加动画及保存重开通过：${root}`,

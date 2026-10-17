@@ -123,6 +123,9 @@ export default function App() {
     [file, setFile] = useState(""),
     [importReport, setImportReport] = useState<string[] | null>(null);
   const [preferencesOpen, setPreferencesOpen] = useState(false);
+  useEffect(() => {
+    if (editor.canvasMode === "draw") setTab("annotations");
+  }, [editor.canvasMode, editor.penToolRequest]);
   const [preferencesTab, setPreferencesTab] = useState("program");
   const [editingInput, setEditingInput] = useState(false);
   const nativeEditMenu = useRef("");

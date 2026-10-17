@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Type,
   Shapes,
@@ -25,6 +25,15 @@ export default function AnnotationsPanel({ editor }: { editor: Editor }) {
   const [category, setCategory] = useState<
     "text" | "shapes" | "arrows" | "effects" | "sketch" | "pen"
   >("text");
+  const categories = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (editor.canvasMode !== "draw") return;
+    setCategory("pen");
+    const frame = requestAnimationFrame(() =>
+      categories.current?.scrollIntoView({ block: "nearest" }),
+    );
+    return () => cancelAnimationFrame(frame);
+  }, [editor.canvasMode, editor.penToolRequest]);
   const [style, setStyle] = useState("all");
   const drag = (event: React.DragEvent, template: AnnotationTemplate) => {
     event.dataTransfer.setData(annotationMime, JSON.stringify(template));
@@ -33,6 +42,7 @@ export default function AnnotationsPanel({ editor }: { editor: Editor }) {
   return (
     <div className="annotations-panel">
       <div
+        ref={categories}
         className="annotation-categories"
         role="tablist"
         aria-label="标注分类"
@@ -139,6 +149,20 @@ export default function AnnotationsPanel({ editor }: { editor: Editor }) {
               editor.setPenSettings({ ...editor.penSettings, brush })
             }
           />
+          <label className="field">
+            颜色
+            <input
+              type="color"
+              aria-label="涂鸦笔颜色"
+              value={editor.penSettings.color}
+              onChange={(event) =>
+                editor.setPenSettings({
+                  ...editor.penSettings,
+                  color: event.target.value,
+                })
+              }
+            />
+          </label>
           <div
             className="pen-color-palette"
             role="group"
@@ -157,20 +181,6 @@ export default function AnnotationsPanel({ editor }: { editor: Editor }) {
               />
             ))}
           </div>
-          <label className="field">
-            颜色
-            <input
-              type="color"
-              aria-label="涂鸦笔颜色"
-              value={editor.penSettings.color}
-              onChange={(event) =>
-                editor.setPenSettings({
-                  ...editor.penSettings,
-                  color: event.target.value,
-                })
-              }
-            />
-          </label>
           <label className="field">
             笔宽
             <input
