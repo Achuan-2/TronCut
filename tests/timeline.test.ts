@@ -24,11 +24,11 @@ describe("多片段编辑与波纹时间映射", () => {
     expect(moved.clips.map((c) => c.start)).toEqual([0, 2, 6]);
     expect(p.clips.map((c) => c.start)).toEqual([2, 4, 6]);
   });
-  it("波纹删除保留其他轨重叠内容，仅关闭真正空出的时间", () => {
+  it("波纹删除保留同轨重叠内容，仅关闭该轨真正空出的时间", () => {
     const p = createProject();
     const removed = newText("titles", 1),
-      overlap = newText("video", 2),
-      later = newText("video", 8);
+      overlap = newText("titles", 2),
+      later = newText("titles", 8);
     removed.duration = 5;
     overlap.duration = 2;
     p.clips = [removed, overlap, later];
@@ -40,6 +40,66 @@ describe("多片段编辑与波纹时间映射", () => {
     ]);
     expect(result.markers[0].time).toBe(4);
     expect(overlap.sourceIn).toBe(0);
+  });
+  it("其他轨道的标题和配音不阻止视频波纹删除，也不跟随移动", () => {
+    const p = createProject();
+    const video = { ...newText("video", 0), duration: 7, sourceIn: 10 };
+    const title = { ...newText("titles", 0), duration: 7 };
+    const voice = { ...newText("audio", 0.4), duration: 4.3 };
+    const laterTitle = newText("titles", 8);
+    p.clips = [video, title, voice, laterTitle];
+    const split = splitSelection(p, [video.id], 2.2);
+    const middle = split.clips.find(
+      (c) => c.trackId === "video" && c.start === 2.2,
+    )!;
+    const splitAgain = splitSelection(split, [middle.id], 3.5);
+    const result = deleteClips(splitAgain, [middle.id], true);
+    const videos = result.clips.filter((c) => c.trackId === "video");
+
+    expect(videos).toHaveLength(2);
+    expect(videos[0].start + videos[0].duration).toBeCloseTo(videos[1].start);
+    expect(videos[1]).toMatchObject({
+      start: 2.2,
+      duration: 3.5,
+      sourceIn: 13.5,
+    });
+    expect(result.clips.filter((c) => c.trackId !== "video")).toEqual([
+      title,
+      voice,
+      laterTitle,
+    ]);
+    expect(p.clips).toEqual([video, title, voice, laterTitle]);
+  });
+  it("多轨选区共享波纹时间映射，同轨存活片段防止重叠", () => {
+    const p = createProject();
+    const removedVideo = { ...newText("video", 2), duration: 2 };
+    const removedTitle = { ...newText("titles", 2), duration: 2 };
+    const overlappingTitle = { ...newText("titles", 3), duration: 1 };
+    const nextVideo = newText("video", 4);
+    const nextTitle = newText("titles", 4);
+    p.clips = [
+      removedVideo,
+      removedTitle,
+      overlappingTitle,
+      nextVideo,
+      nextTitle,
+    ];
+    const result = deleteClips(p, [removedVideo.id, removedTitle.id], true);
+    expect(result.clips.map((c) => [c.start, c.duration])).toEqual([
+      [2, 1],
+      [3, 5],
+      [3, 5],
+    ]);
+  });
+  it("锁定轨道即使覆盖删除区间也不会阻止其他轨道收拢", () => {
+    const p = createProject();
+    const removed = { ...newText("video", 1), duration: 2 };
+    const later = newText("video", 3);
+    const locked = { ...newText("audio", 0), duration: 10 };
+    p.tracks[2].locked = true;
+    p.clips = [removed, later, locked];
+    const result = deleteClips(p, [removed.id, locked.id], true);
+    expect(result.clips).toEqual([{ ...later, start: 1 }, locked]);
   });
   it("多段删除的重叠时长只计算一次，锁定片段不能删除", () => {
     const p = createProject();

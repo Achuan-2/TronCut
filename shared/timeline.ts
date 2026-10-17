@@ -109,7 +109,7 @@ function union(ranges: Range[]): Range[] {
   return result;
 }
 
-/** Ripple only closes deleted time which no surviving clip occupies. Never trims other media. */
+/** Close deleted time on selected tracks without trimming surviving media on those tracks. */
 export function deleteClips(
   project: Project,
   ids: readonly string[],
@@ -119,8 +119,13 @@ export function deleteClips(
   if (!selected.size) return project;
   const remaining = project.clips.filter((c) => !selected.has(c.id));
   if (!ripple) return { ...project, clips: remaining };
+  const affectedTracks = new Set(
+    project.clips.filter((c) => selected.has(c.id)).map((c) => c.trackId),
+  );
   const occupied = union(
-    remaining.map((c) => ({ start: c.start, end: c.start + c.duration })),
+    remaining
+      .filter((c) => affectedTracks.has(c.trackId))
+      .map((c) => ({ start: c.start, end: c.start + c.duration })),
   );
   let gaps = union(
     project.clips
@@ -143,13 +148,10 @@ export function deleteClips(
       (sum, g) => sum + Math.max(0, Math.min(time, g.end) - g.start),
       0,
     );
-  const locked = new Set(
-    project.tracks.filter((t) => t.locked).map((t) => t.id),
-  );
   return {
     ...project,
     clips: remaining.map((c) =>
-      locked.has(c.trackId) ? c : { ...c, start: shift(c.start) },
+      affectedTracks.has(c.trackId) ? { ...c, start: shift(c.start) } : c,
     ),
     markers: project.markers.map((marker) => ({
       ...marker,
