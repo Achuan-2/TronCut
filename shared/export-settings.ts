@@ -75,7 +75,7 @@ export function exportDimensions(
   const preset = exportResolutions[resolution];
   const portrait = canvas.height > canvas.width;
   const ratio =
-    resolution === "source"
+    resolution === "source" || !preset
       ? 1
       : Math.min(
           (portrait ? preset.height : preset.width) / canvas.width,

@@ -62,8 +62,9 @@ function createTestProject(options: {
     tracks: [{ id: "track-1", name: "Track 1", muted: false }],
     assets: [],
     exportSettings: {
-      quality: "medium",
-      resolution: 1,
+      encoder: "auto",
+      quality: "standard",
+      resolution: "1080p",
       format: "mp4",
     },
   } as any;
@@ -122,7 +123,7 @@ describe("导出策略选择", () => {
     const project = createTestProject({ duration: 30, clipCount: 5 });
     const shouldUseChunked = shouldUseChunkedExport(
       project,
-      { quality: "medium", resolution: 1, format: "mp4", encoder: "hardware" }
+      { quality: "standard", resolution: "1080p", format: "mp4", encoder: "auto" }
     );
 
     expect(shouldUseChunked).toBe(false);
@@ -132,7 +133,7 @@ describe("导出策略选择", () => {
     const project = createTestProject({ duration: 600, clipCount: 50 });
     const shouldUseChunked = shouldUseChunkedExport(
       project,
-      { quality: "medium", resolution: 1, format: "mp4", encoder: "hardware" }
+      { quality: "standard", resolution: "1080p", format: "mp4", encoder: "auto" }
     );
 
     // 在4核以上CPU上应该使用分块导出
@@ -276,7 +277,7 @@ function formatTime(seconds: number): string {
 }
 
 // 使用示例
-if (import.meta.vitest === undefined) {
+if ((import.meta as any).vitest === undefined) {
   // 仅在直接运行时执行（非测试环境）
   const exampleProject = createTestProject({
     duration: 600,

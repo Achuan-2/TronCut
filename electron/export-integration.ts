@@ -302,7 +302,7 @@ export function getExportPerformanceAdvice(project: Project): string[] {
 
   // 检查分辨率
   const resolution = settings.resolution;
-  if (resolution > 1 && duration > 600) {
+  if ((resolution === "2160p" || resolution === "1440p") && duration > 600) {
     advice.push("💡 超过 10 分钟的视频，考虑降低分辨率以加快导出");
   }
 

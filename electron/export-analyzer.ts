@@ -128,7 +128,7 @@ function calculateProjectStats(project: Project): ProjectStats {
 
   // GPU/CPU负载估算
   const estimatedGpuLoad = calculateGpuLoad(project, settings);
-  const estimatedCpuLoad = calculateCpuLoad(project, stats);
+  const estimatedCpuLoad = calculateCpuLoad(project, complexityScore, textClipCount);
 
   return {
     duration,
@@ -203,7 +203,7 @@ function calculateGpuLoad(project: Project, settings: Required<ExportSettings>):
   }
 
   // 高分辨率增加GPU负载
-  if (settings.resolution >= 1) {
+  if (settings.resolution === "2160p" || settings.resolution === "1440p") {
     load += 20;
   }
 
@@ -218,14 +218,14 @@ function calculateGpuLoad(project: Project, settings: Required<ExportSettings>):
 }
 
 /** 计算CPU负载 */
-function calculateCpuLoad(project: Project, stats: ProjectStats): number {
+function calculateCpuLoad(project: Project, complexityScore: number, textClipCount: number): number {
   let load = 30; // 基础负载
 
   // 复杂度
-  load += Math.min(40, stats.complexityScore / 10);
+  load += Math.min(40, complexityScore / 10);
 
   // 文本光栅化
-  load += Math.min(20, stats.textClipCount * 2);
+  load += Math.min(20, textClipCount * 2);
 
   // 软件编码
   const settings = resolvedExportSettings(project.exportSettings);
@@ -330,7 +330,10 @@ function generateRecommendations(
   }
 
   // 分辨率建议
-  if (settings.resolution > 1 && stats.duration > 600) {
+  if (
+    (settings.resolution === "2160p" || settings.resolution === "1440p") &&
+    stats.duration > 600
+  ) {
     recommendations.push({
       priority: "medium",
       type: "settings",
@@ -421,15 +424,23 @@ function estimateExportDuration(project: Project, stats: ProjectStats): number {
   rate *= 1 + stats.complexityScore / 500;
 
   // 质量影响
-  const qualityMultiplier = {
-    low: 0.7,
-    medium: 1.0,
+  const qualityMultiplier: Record<Required<ExportSettings>["quality"], number> = {
+    compact: 0.7,
+    standard: 1.0,
     high: 1.5,
   };
-  rate *= qualityMultiplier[settings.quality];
+  rate *= qualityMultiplier[settings.quality] ?? 1.0;
 
   // 分辨率影响
-  rate *= 1 + settings.resolution * 0.3;
+  const resolutionMultiplier: Record<Required<ExportSettings>["resolution"], number> = {
+    source: 1.0,
+    "2160p": 1.6,
+    "1440p": 1.3,
+    "1080p": 1.0,
+    "720p": 0.8,
+    "480p": 0.6,
+  };
+  rate *= resolutionMultiplier[settings.resolution] ?? 1.0;
 
   // 硬件加速
   if (settings.encoder !== "software") {

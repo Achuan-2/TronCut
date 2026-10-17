@@ -9,7 +9,7 @@ import { useCallback, useRef, useEffect } from 'react';
  * @returns A function to schedule updates
  */
 export function useRAFThrottle<T>(callback: (value: T) => void) {
-  const rafRef = useRef<number>();
+  const rafRef = useRef<number | null>(null);
   const pendingValue = useRef<T | null>(null);
   const callbackRef = useRef(callback);
 
@@ -27,10 +27,10 @@ export function useRAFThrottle<T>(callback: (value: T) => void) {
 
   const scheduleUpdate = useCallback((value: T) => {
     pendingValue.current = value;
-    if (!rafRef.current) {
+    if (rafRef.current === null) {
       rafRef.current = requestAnimationFrame(() => {
         flush();
-        rafRef.current = undefined;
+        rafRef.current = null;
       });
     }
   }, [flush]);
@@ -38,7 +38,7 @@ export function useRAFThrottle<T>(callback: (value: T) => void) {
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      if (rafRef.current) {
+      if (rafRef.current !== null) {
         cancelAnimationFrame(rafRef.current);
       }
     };
@@ -52,7 +52,7 @@ export function useRAFThrottle<T>(callback: (value: T) => void) {
  * Optimized for scroll handlers to prevent excessive re-renders.
  */
 export function useRAFScrollThrottle(callback: () => void) {
-  const rafRef = useRef<number>();
+  const rafRef = useRef<number | null>(null);
   const callbackRef = useRef(callback);
 
   useEffect(() => {
@@ -60,17 +60,17 @@ export function useRAFScrollThrottle(callback: () => void) {
   }, [callback]);
 
   const scheduleUpdate = useCallback(() => {
-    if (!rafRef.current) {
+    if (rafRef.current === null) {
       rafRef.current = requestAnimationFrame(() => {
         callbackRef.current();
-        rafRef.current = undefined;
+        rafRef.current = null;
       });
     }
   }, []);
 
   useEffect(() => {
     return () => {
-      if (rafRef.current) {
+      if (rafRef.current !== null) {
         cancelAnimationFrame(rafRef.current);
       }
     };
