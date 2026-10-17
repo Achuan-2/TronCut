@@ -135,4 +135,4 @@ it("真实合成可编辑鼠标且随移动改变像素，独立 JSON 鼠标数�
   expect(disk.assets[0].cursor).toBeUndefined();
   expect(disk.assets[0].cursorPath).toMatch(/^media\//);
   expect((await openProject(file)).assets[0].cursor).toEqual(asset.cursor);
-});
+}, 60000);

@@ -17,6 +17,14 @@ export function resolveContained(root: string, relative: string): string {
 }
 export async function openProject(file: string): Promise<Project> {
   const project = validateProject(JSON.parse(await fs.readFile(file, "utf8")));
+  const baseName = path.basename(file, path.extname(file)).trim();
+  if (
+    (!project.name || project.name === "未命名工程") &&
+    baseName &&
+    baseName !== "未命名工程"
+  ) {
+    project.name = baseName;
+  }
   const root = path.dirname(file);
   project.assets = await Promise.all(
     project.assets.map(async (asset) => {
@@ -65,6 +73,14 @@ export async function saveProject(
 ): Promise<Project> {
   const valid = validateProject(project),
     root = path.dirname(file);
+  const fileBaseName = path.basename(file, path.extname(file)).trim();
+  if (
+    (!valid.name || valid.name === "未命名工程") &&
+    fileBaseName &&
+    fileBaseName !== "未命名工程"
+  ) {
+    valid.name = fileBaseName;
+  }
   await fs.mkdir(path.join(root, "media"), { recursive: true });
   const realRoot = await fs.realpath(root),
     realMedia = await fs.realpath(path.join(root, "media"));

@@ -45,6 +45,52 @@ import {
 import { textEditSchema } from "../shared/edit-menu";
 import PresetLibraryOverlays from "./PresetLibraryOverlays";
 
+function ProjectTitleInput({
+  name,
+  disabled,
+  onChange,
+}: {
+  name: string;
+  disabled?: boolean;
+  onChange: (name: string) => void;
+}) {
+  const [value, setValue] = useState(name);
+  const [composing, setComposing] = useState(false);
+
+  useEffect(() => {
+    setValue(name);
+  }, [name]);
+
+  const commit = () => {
+    const next = value.trim() || name || "未命名工程";
+    setValue(next);
+    if (next !== name) {
+      onChange(next);
+    }
+  };
+
+  return (
+    <input
+      aria-label="工程名称"
+      disabled={disabled}
+      value={value}
+      onChange={(e) => setValue(e.target.value)}
+      onCompositionStart={() => setComposing(true)}
+      onCompositionEnd={() => setComposing(false)}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" && !composing) {
+          commit();
+          e.currentTarget.blur();
+        } else if (e.key === "Escape") {
+          setValue(name);
+          e.currentTarget.blur();
+        }
+      }}
+    />
+  );
+}
+
 export default function App() {
   const [editorPreferences, setEditorPreferences] = useState<EditorPreferences>(
     defaultEditorPreferences,
@@ -948,13 +994,11 @@ export default function App() {
             <span>首页</span>
           ) : (
             <>
-              <input
-                aria-label="工程名称"
+              <ProjectTitleInput
                 disabled={actionsBlocked}
-                value={editor.project.name}
-                onChange={(e) => {
-                  if (e.target.value.trim())
-                    editor.apply((p) => ({ ...p, name: e.target.value }));
+                name={editor.project.name}
+                onChange={(next) => {
+                  editor.apply((p) => ({ ...p, name: next }));
                 }}
               />
               <span

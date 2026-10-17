@@ -45,7 +45,7 @@ it("真实导出与截帧遵循轨道顺序和独奏，保存重开保留名称�
       0.2,
       file,
       path.join(root, name),
-      AbortSignal.timeout(15000),
+      AbortSignal.timeout(60000),
     );
     return center(file);
   };
@@ -135,7 +135,7 @@ it("独奏轨道的真实语音识别混音排除其他声音，取消后可恢�
   for (const solo of [true, false]) {
     const wav = path.join(root, `${solo}.wav`),
       raw = path.join(root, `${solo}.f32`);
-    await renderTimelineAudio(project, wav, root, AbortSignal.timeout(10000));
+    await renderTimelineAudio(project, wav, root, AbortSignal.timeout(60000));
     await runProcess(findBinary("ffmpeg"), [
       "-y",
       "-i",

@@ -699,6 +699,15 @@ function installHandlers() {
           root = path.join(parent, `${folderName}-${suffix++}`);
         file = path.join(root, `${folderName}.troncut`);
       }
+      const chosenName = path.basename(selected, path.extname(selected)).trim();
+      if (chosenName) {
+        project.name = chosenName;
+      }
+    } else if (file && (!project.name || project.name === "未命名工程")) {
+      const baseName = path.basename(file, path.extname(file)).trim();
+      if (baseName && baseName !== "未命名工程") {
+        project.name = baseName;
+      }
     }
     const icon = app.isPackaged
       ? path.join(process.resourcesPath, "project.ico")
