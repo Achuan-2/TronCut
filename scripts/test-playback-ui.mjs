@@ -70,6 +70,17 @@ try {
   await expect
     .poll(() => video.evaluate((media) => media.readyState))
     .toBeGreaterThanOrEqual(2);
+  const quality = page.getByLabel("预览画质", { exact: true });
+  await expect(quality).toHaveValue("smooth");
+  expect(await video.getAttribute("src")).toContain("preview=1");
+  await quality.selectOption("original");
+  await expect
+    .poll(() => video.getAttribute("src"))
+    .not.toContain("preview=1");
+  await quality.selectOption("smooth");
+  await expect
+    .poll(() => video.getAttribute("src"))
+    .toContain("preview=1");
   const rangeResponse = await app.evaluate(
     async ({ net }, url) => {
       const response = await net.fetch(url, {

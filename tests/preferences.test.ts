@@ -290,12 +290,14 @@ it("分组首选项串行合并保存，旧配置补全默认值，配置损坏�
       image: 5,
       animation: 1,
     });
+    expect((await store.get()).program.previewQuality).toBe("smooth");
     await Promise.all([
       store.save({
         program: {
           snapping: false,
           waveforms: false,
           selectionFollowsPlayhead: true,
+          previewQuality: "original",
         },
       }),
       store.save({ timing: { image: 8, animation: 2 } }),
@@ -306,6 +308,7 @@ it("分组首选项串行合并保存，旧配置补全默认值，配置损坏�
       snapping: false,
       waveforms: false,
       selectionFollowsPlayhead: true,
+      previewQuality: "original",
     });
     expect(saved.timing).toMatchObject({ image: 8, animation: 2 });
     expect(saved.project).toMatchObject({ width: 1080, height: 1920, fps: 60 });

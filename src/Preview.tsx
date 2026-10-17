@@ -104,6 +104,9 @@ import {
   customAnimationId,
   animationDropTarget,
 } from "../shared/animation-drag";
+import type { EditorPreferences } from "../shared/editor-preferences";
+
+type PreviewQuality = EditorPreferences["program"]["previewQuality"];
 
 export function timeLabel(t: number): string {
   const seconds = Math.max(0, t);
@@ -116,6 +119,7 @@ function MediaLayer({
   playing,
   muted,
   audioOnly = false,
+  previewQuality,
 }: {
   clip: Clip;
   asset: Asset;
@@ -123,14 +127,20 @@ function MediaLayer({
   playing: boolean;
   muted: boolean;
   audioOnly?: boolean;
+  previewQuality: PreviewQuality;
 }) {
   const ref = useRef<HTMLVideoElement & HTMLAudioElement>(null);
   const proxyReady = useRef(false);
   const [previewRevision, setPreviewRevision] = useState(0);
   useEffect(() => {
-    if (asset.kind !== "video" || !window.framecraft) return;
-    let active = true;
     proxyReady.current = false;
+    if (
+      asset.kind !== "video" ||
+      previewQuality === "original" ||
+      !window.framecraft
+    )
+      return;
+    let active = true;
     const ready = () => {
       if (!active || proxyReady.current) return;
       proxyReady.current = true;
@@ -149,10 +159,10 @@ function MediaLayer({
       active = false;
       unsubscribe();
     };
-  }, [asset.id, asset.kind]);
+  }, [asset.id, asset.kind, previewQuality]);
   const url = mediaAssetUrl(
     asset.id,
-    asset.kind === "video",
+    asset.kind === "video" && previewQuality === "smooth",
     previewRevision,
   );
   useEffect(() => {
@@ -233,6 +243,7 @@ function PreviewLayer({
   matteSource = false,
   recording,
   track,
+  previewQuality,
 }: {
   clip: Clip;
   project: Project;
@@ -245,6 +256,7 @@ function PreviewLayer({
   matteSource?: boolean;
   recording?: Clip;
   track: Project["tracks"][number];
+  previewQuality: PreviewQuality;
 }) {
   const localTime = Math.max(
     0,
@@ -794,6 +806,7 @@ function PreviewLayer({
                 }
                 playing={editor.playing && !held}
                 muted={muted || held}
+                previewQuality={previewQuality}
               />
               {cursor && (
                 <>
@@ -1007,6 +1020,7 @@ export function ScenePreview({
   mode?: CanvasMode;
 }) {
   const { playhead } = editor;
+  const previewQuality = editor.preferences.program.previewQuality;
   const project = !applyVideoZoomPan
     ? unzoomVideoPreview(editor.project, playhead)
     : editor.zoomPanDraft
@@ -1097,6 +1111,7 @@ export function ScenePreview({
           matteSource={matte}
           recording={recordingsByClip.get(clip.id)}
           track={tracksById.get(clip.trackId) ?? track}
+          previewQuality={previewQuality}
         />,
       );
     }
@@ -1121,9 +1136,11 @@ export function ScenePreview({
 export default function Preview({
   editor,
   onCommand,
+  onPreviewQualityChange,
 }: {
   editor: Editor;
   onCommand: (command: ClipCommand) => void;
+  onPreviewQualityChange: (quality: PreviewQuality) => void;
 }) {
   const playhead = useEditorPlayhead(editor);
   const panel = useRef<HTMLElement>(null);
@@ -1492,6 +1509,18 @@ export default function Preview({
         <span className="timecode">
           {timeLabel(playhead)} <span>/ {timeLabel(duration)}</span>
         </span>
+        <label className="preview-quality" title="预览画质设置">
+          <select
+            aria-label="预览画质"
+            value={editor.preferences.program.previewQuality}
+            onChange={(event) =>
+              onPreviewQualityChange(event.target.value as PreviewQuality)
+            }
+          >
+            <option value="smooth">流畅画质</option>
+            <option value="original">原画画质</option>
+          </select>
+        </label>
         <span className="playback-fps">{project.canvas.fps} fps</span>
         <button
           title={fullscreen ? "退出全屏预览" : "全屏预览"}

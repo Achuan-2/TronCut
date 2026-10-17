@@ -267,6 +267,23 @@ export default function PreferencesDialog({
                       ))}
                     </select>
                   </label>
+                  <label className="field">
+                    预览画质
+                    <select
+                      aria-label="默认预览画质"
+                      value={settings.program.previewQuality}
+                      onChange={(e) =>
+                        program(
+                          "previewQuality",
+                          e.target
+                            .value as typeof settings.program.previewQuality,
+                        )
+                      }
+                    >
+                      <option value="smooth">流畅画质</option>
+                      <option value="original">原画画质</option>
+                    </select>
+                  </label>
                   <label className="check-field">
                     <input
                       type="checkbox"

@@ -10,6 +10,7 @@ export const programPreferencesSchema = z.object({
   selectionFollowsPlayhead: z.boolean().default(false),
   defaultTool: z.enum(["select", "crop"]).default("select"),
   previewZoom: z.enum(["fit", "1", "0.5", "0.75", "0.25"]).default("fit"),
+  previewQuality: z.enum(["smooth", "original"]).default("smooth"),
 });
 export const timingPreferencesSchema = z.object({
   animation: seconds.default(1),

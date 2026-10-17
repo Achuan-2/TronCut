@@ -149,6 +149,19 @@ export default function App() {
     clearTimeout(toastTimer.current);
     toastTimer.current = setTimeout(() => setToast(""), 6500);
   }, []);
+  const changePreviewQuality = useCallback(
+    (previewQuality: EditorPreferences["program"]["previewQuality"]) => {
+      const program = { ...editorPreferences.program, previewQuality };
+      setEditorPreferences((current) => ({
+        ...current,
+        program: { ...current.program, ...program },
+      }));
+      void window.framecraft
+        ?.savePreferences({ program })
+        .catch((error) => toast(String(error)));
+    },
+    [editorPreferences.program, toast],
+  );
   const run = useCallback(
     async (fn: () => Promise<unknown>) => {
       if (mediaImportLock.current) return;
@@ -1174,6 +1187,7 @@ export default function App() {
             />
             <Preview
               editor={editor}
+              onPreviewQualityChange={changePreviewQuality}
               onCommand={(command) => commands.current(command)}
             />
             <Inspector editor={editor} />
