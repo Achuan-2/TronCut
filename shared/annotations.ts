@@ -282,7 +282,7 @@ export const sketchPresets: AnnotationPreset[] = [
     }),
     kind: "shape",
     shape: shape as z.infer<typeof annotationShapeSchema>,
-    ...(["ellipse", "rectangle", "check", "cross", "star"].includes(
+    ...(["ellipse", "rectangle", "check", "cross", "star", "curved-arrow"].includes(
       String(shape),
     )
       ? { size: { width: 300, height: 300 } }
