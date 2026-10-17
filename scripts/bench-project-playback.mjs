@@ -127,6 +127,17 @@ try {
     }
     return {
       layers: document.querySelectorAll(".preview-layer").length,
+      animatedLayers: document.querySelectorAll(
+        '.preview-layer[data-preview-animated="1"]',
+      ).length,
+      staticLayers: document.querySelectorAll(
+        '.preview-layer[data-preview-animated="0"]',
+      ).length,
+      transform3dLayers: [
+        ...document.querySelectorAll(".preview-layer"),
+      ].filter((layer) =>
+        getComputedStyle(layer).transform.startsWith("matrix3d"),
+      ).length,
       videos: document.querySelectorAll(".preview-panel video").length,
       videoStates,
       audio: document.querySelectorAll(".preview-panel audio").length,

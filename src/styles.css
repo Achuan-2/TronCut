@@ -2039,7 +2039,11 @@ fieldset:disabled {
   user-select: none;
   cursor: move;
   transform-origin: center center;
+  contain: layout style;
   max-width: none;
+}
+.preview-layer[data-preview-animated="1"] {
+  will-change: transform, opacity;
 }
 .preview-layer.selected:after,
 .preview-layer.effect-drop-target:after {

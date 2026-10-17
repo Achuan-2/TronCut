@@ -1,4 +1,5 @@
 import {
+  memo,
   useEffect,
   useId,
   useLayoutEffect,
@@ -105,8 +106,28 @@ import {
   animationDropTarget,
 } from "../shared/animation-drag";
 import type { EditorPreferences } from "../shared/editor-preferences";
+import { clipNeedsPreviewFrameAt } from "../shared/preview-motion";
 
 type PreviewQuality = EditorPreferences["program"]["previewQuality"];
+
+function previewTransform(
+  value: Transform,
+  fallbackRotation = 0,
+): string {
+  const parts = ["translate(-50%, -50%)"];
+  const rotation = value.rotation ?? fallbackRotation;
+  if (rotation) parts.push(`rotateZ(${rotation}deg)`);
+  if (value.rotationY) parts.push(`rotateY(${value.rotationY}deg)`);
+  if (value.rotationX) parts.push(`rotateX(${value.rotationX}deg)`);
+  parts.push(`scale(${value.scale * depthScale(value.z)})`);
+  if (value.skew) parts.push(`skewX(${value.skew}deg)`);
+  if (
+    (value.scaleX !== undefined && value.scaleX !== 1) ||
+    (value.scaleY !== undefined && value.scaleY !== 1)
+  )
+    parts.push(`scale(${value.scaleX ?? 1}, ${value.scaleY ?? 1})`);
+  return parts.join(" ");
+}
 
 export function timeLabel(t: number): string {
   const seconds = Math.max(0, t);
@@ -231,7 +252,7 @@ function MediaLayer({
     />
   );
 }
-function PreviewLayer({
+function PreviewLayerImpl({
   clip,
   project,
   editor,
@@ -244,6 +265,8 @@ function PreviewLayer({
   recording,
   track,
   previewQuality,
+  playhead,
+  animated,
 }: {
   clip: Clip;
   project: Project;
@@ -257,19 +280,19 @@ function PreviewLayer({
   recording?: Clip;
   track: Project["tracks"][number];
   previewQuality: PreviewQuality;
+  playhead: number;
+  animated: boolean;
 }) {
   const localTime = Math.max(
     0,
-    Math.min(clip.duration, editor.playhead - clip.start),
+    Math.min(clip.duration, playhead - clip.start),
   );
   const filterId = `visual-effect-${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
   const [regionDraft, setRegionDraft] = useState<{
     id: "mask" | "blur-region";
     geometry: Partial<Region>;
   } | null>(null);
-  const held =
-    editor.playhead < clip.start ||
-    editor.playhead >= clip.start + clip.duration;
+  const held = playhead < clip.start || playhead >= clip.start + clip.duration;
   const selectedObjectPart =
     interactive &&
     editor.selectedIds.includes(clip.id) &&
@@ -348,7 +371,7 @@ function PreviewLayer({
         project,
         clip,
         behaviorTransform(clip, drag?.value ?? transform, localTime),
-        editor.playhead,
+        playhead,
       );
   const textBox = clip.kind === "text" ? (drag?.box ?? textBoxFor(clip)) : null;
   const fill = textBox ? textFillGeometry(clip.style, textBox) : null;
@@ -356,7 +379,7 @@ function PreviewLayer({
     left: `${displayed.x * 100}%`,
     top: `${displayed.y * 100}%`,
     opacity: editing ? 1 : displayed.opacity * fadeOpacity(clip, localTime),
-    transform: `translate(-50%, -50%) rotateZ(${displayed.rotation ?? clip.rotation ?? 0}deg) rotateY(${displayed.rotationY ?? 0}deg) rotateX(${displayed.rotationX ?? 0}deg) scale(${displayed.scale * depthScale(displayed.z)}) skewX(${displayed.skew ?? 0}deg) scale(${displayed.scaleX ?? 1}, ${displayed.scaleY ?? 1})`,
+    transform: previewTransform(displayed, clip.rotation ?? 0),
     "--canvas-scale": scale,
   } as CSSProperties;
   if (textBox) {
@@ -486,6 +509,7 @@ function PreviewLayer({
     <div
       className={`preview-layer ${clip.kind} ${selectedObjectPart ? "selected" : ""} ${editing ? "editing" : ""} ${cropping ? "cropping" : ""} ${effectDrop && selectable ? "effect-drop-target" : ""}`}
       data-clip-id={clip.id}
+      data-preview-animated={animated ? "1" : "0"}
       style={style}
       onDragOver={(event) => {
         if (!interactive) return;
@@ -1004,6 +1028,26 @@ function PreviewLayer({
     </div>
   );
 }
+
+const PreviewLayer = memo(
+  PreviewLayerImpl,
+  (previous, next) =>
+    previous.clip === next.clip &&
+    previous.project === next.project &&
+    previous.editor === next.editor &&
+    previous.scale === next.scale &&
+    previous.muted === next.muted &&
+    previous.interactive === next.interactive &&
+    (!next.animated || previous.cameraScale === next.cameraScale) &&
+    previous.mode === next.mode &&
+    previous.matteSource === next.matteSource &&
+    previous.recording === next.recording &&
+    previous.track === next.track &&
+    previous.previewQuality === next.previewQuality &&
+    previous.animated === next.animated &&
+    (!next.animated || previous.playhead === next.playhead),
+);
+
 export function ScenePreview({
   editor,
   scale,
@@ -1038,6 +1082,14 @@ export function ScenePreview({
     () => new Map(project.tracks.map((track) => [track.id, track])),
     [project.tracks],
   );
+  const assetsById = useMemo(
+    () => new Map(project.assets.map((asset) => [asset.id, asset])),
+    [project.assets],
+  );
+  const selectedIds = useMemo(
+    () => new Set(editor.selectedIds),
+    [editor.selectedIds],
+  );
   const recordingsByClip = useMemo(() => {
     const groups = recordingGroups(project);
     return new Map(
@@ -1069,6 +1121,7 @@ export function ScenePreview({
   for (const track of [...project.tracks].reverse()) {
     if (track.hidden || (hasSolo && !track.solo)) continue;
     for (const clip of activeByTrack.get(track.id) ?? []) {
+      const asset = clip.assetId ? assetsById.get(clip.assetId) : undefined;
       const matteEffect = clip.visualEffects?.["media-matte"];
       const matte =
         !!matteEffect &&
@@ -1112,6 +1165,11 @@ export function ScenePreview({
           recording={recordingsByClip.get(clip.id)}
           track={tracksById.get(clip.trackId) ?? track}
           previewQuality={previewQuality}
+          playhead={playhead}
+          animated={
+            selectedIds.has(clip.id) ||
+            clipNeedsPreviewFrameAt(clip, asset, playhead - clip.start)
+          }
         />,
       );
     }
