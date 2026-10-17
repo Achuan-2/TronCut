@@ -276,7 +276,7 @@ export const sketchPresets: AnnotationPreset[] = [
   template: {
     ...styled(shape as z.infer<typeof annotationShapeSchema>, String(name), {
       stroke: "#ff2020",
-      strokeWidth: 9,
+      strokeWidth: ["rough-circle", "rough-rectangle", "check"].includes(String(id)) ? 18 : 9,
       fillEnabled: false,
       rough: !!rough,
     }),

@@ -263,6 +263,11 @@ try {
   await expect(
     page.locator('.clip-animation[data-animation-kind="drawing"]'),
   ).toHaveCount(2);
+  await page.screenshot({ path: path.join(root, "hand-drawn-circle.png") });
+  await page.getByRole("button", { name: "手绘矩形", exact: true }).click();
+  await page.screenshot({ path: path.join(root, "hand-drawn-rectangle.png") });
+  await page.getByRole("button", { name: "勾选", exact: true }).click();
+  await page.locator(".shape-presets").screenshot({ path: path.join(root, "sketch-presets.png") });
   assert.deepEqual(errors, []);
   console.log(
     `多笔绘制、混合笔刷、撤销/取消、播放头保持、完整编辑轨迹、绘制箭头拖动、叠加动画及保存重开通过：${root}`,

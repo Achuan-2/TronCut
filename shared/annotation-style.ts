@@ -105,6 +105,56 @@ type ShapePath = {
   brush?: ShapeStyle["brush"];
 };
 const point = (x: number, y: number): Point => ({ x, y });
+/** Authored curves preserve a gentle hand-drawn contour during path playback. */
+function sketchOutline(shape: "ellipse" | "rectangle" | "check"): Point[] {
+  let start =
+    shape === "ellipse"
+      ? point(150, 28)
+      : shape === "check"
+        ? point(60, 145)
+        : point(28, 28);
+  const curves =
+    shape === "ellipse"
+      ? [
+          [96, 23, 46, 67, 31, 123],
+          [16, 181, 42, 235, 96, 261],
+          [151, 285, 215, 263, 247, 215],
+          [281, 162, 261, 102, 219, 59],
+          [194, 36, 170, 25, 143, 31],
+        ]
+      : shape === "check"
+        ? [
+            [84, 160, 101, 198, 113, 226],
+            [132, 160, 188, 80, 244, 48],
+          ]
+        : [
+            [94, 23, 180, 25, 268, 28],
+            [270, 100, 265, 185, 267, 266],
+            [194, 263, 112, 268, 28, 267],
+            [31, 188, 26, 106, 28, 22],
+          ];
+  const points = [start];
+  for (const [cx1, cy1, cx2, cy2, x, y] of curves) {
+    for (let i = 1; i <= 20; i++) {
+      const t = i / 20,
+        u = 1 - t;
+      points.push(
+        point(
+          u ** 3 * start.x +
+            3 * u ** 2 * t * cx1 +
+            3 * u * t ** 2 * cx2 +
+            t ** 3 * x,
+          u ** 3 * start.y +
+            3 * u ** 2 * t * cy1 +
+            3 * u * t ** 2 * cy2 +
+            t ** 3 * y,
+        ),
+      );
+    }
+    start = point(x, y);
+  }
+  return points;
+}
 function polygon(count: number, radius: number, inner = radius) {
   return Array.from({ length: count }, (_, i) => {
     const angle = -Math.PI / 2 + (i * 2 * Math.PI) / count;
@@ -152,12 +202,14 @@ export function annotationPaths(
   let closed = true;
   switch (clip.shape) {
     case "ellipse":
-      points = Array.from({ length: 80 }, (_, i) =>
-        point(
-          300 + 280 * Math.cos((i * Math.PI) / 40),
-          150 + 140 * Math.sin((i * Math.PI) / 40),
-        ),
-      );
+      points = style.rough
+        ? sketchOutline("ellipse").map((p) => point(p.x * 2, p.y))
+        : Array.from({ length: 80 }, (_, i) =>
+            point(
+              300 + 280 * Math.cos((i * Math.PI) / 40),
+              150 + 140 * Math.sin((i * Math.PI) / 40),
+            ),
+          );
       break;
     case "triangle":
       points = [point(300, 18), point(580, 282), point(20, 282)];
@@ -177,7 +229,7 @@ export function annotationPaths(
       ];
       break;
     case "check":
-      points = [point(80, 150), point(230, 265), point(510, 30)];
+      points = sketchOutline("check").map((p) => point(p.x * 2, p.y));
       closed = false;
       break;
     case "cross":
@@ -286,10 +338,12 @@ export function annotationPaths(
       break;
     case "rectangle":
     default:
-      points = [point(15, 15), point(585, 15), point(585, 285), point(15, 285)];
+      points = style.rough
+        ? sketchOutline("rectangle").map((p) => point(p.x * 2, p.y))
+        : [point(15, 15), point(585, 15), point(585, 285), point(15, 285)];
       break;
   }
-  if (style.rough)
+  if (style.rough && clip.shape !== "ellipse" && clip.shape !== "rectangle")
     points = points.map((p, i) =>
       point(p.x + Math.sin(i * 9.7) * 3, p.y + Math.cos(i * 6.3) * 3),
     );
