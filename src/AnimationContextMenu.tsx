@@ -108,7 +108,7 @@ export function AnimationContextMenu({
           disabled={locked}
           aria-haspopup="menu"
           aria-expanded={expanded}
-          onClick={() => setExpanded(!expanded)}
+          onClick={() => setExpanded(true)}
           onKeyDown={(event) => {
             if (event.key === "ArrowRight") {
               event.preventDefault();

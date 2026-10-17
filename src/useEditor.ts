@@ -71,6 +71,7 @@ import { annotationClip, type AnnotationTemplate } from "../shared/annotations";
 import {
   animationEditTarget,
   animationRanges,
+  drawingAnimationRanges,
   type AnimationRange,
 } from "../shared/animation-ranges";
 import {
@@ -99,6 +100,8 @@ import {
 import { usePresetLibrary } from "./usePresetLibrary";
 import { animationDropTarget } from "../shared/animation-drag";
 import { shapeSize } from "../shared/annotation-style";
+import type { DrawingStroke } from "../shared/annotation-style";
+import { freehandAnnotation, type PenSettings } from "../shared/freehand";
 
 export function demoProject(): Project {
   const project = createProject("我的第一个视频");
@@ -137,7 +140,17 @@ export function useEditor(
   const [editingTextId, setEditingTextId] = useState<string | null>(null);
   const [zoomPanDraft, setZoomPanDraft] = useState<Transform | null>(null);
   const [canvasMode, setCanvasMode] = useState<"select" | "crop" | "draw">("select");
-  const [penSettings, setPenSettings] = useState({ color: "#ff2020", width: 8, animate: true, duration: 1 });
+  const [penSettings, setPenSettings] = useState<PenSettings>({
+    color: "#ff2020", width: 8, brush: "round", animate: true, duration: 1,
+  });
+  const [penDraft, setPenDraft] = useState<DrawingStroke[]>([]);
+  const penStart = useRef<number | null>(null);
+  useEffect(() => {
+    if (canvasMode !== "draw") {
+      setPenDraft([]);
+      penStart.current = null;
+    }
+  }, [canvasMode]);
   const [clipProperties, setClipProperties] = useState<Clip | null>(null);
   type KeyframeSelection = {
     clipId: string;
@@ -148,6 +161,8 @@ export function useEditor(
   };
   const [keyframeSelection, setKeyframeSelection] =
     useState<KeyframeSelection | null>(null);
+  const [drawingSelection, setDrawingSelection] =
+    useState<KeyframeSelection | null>(null);
   const keyframeRef = useRef<KeyframeSelection | null>(null);
   const animationClipboard = useRef<{
     token: string;
@@ -156,6 +171,7 @@ export function useEditor(
   const clearKeyframeEdit = useCallback(() => {
     keyframeRef.current = null;
     setKeyframeSelection(null);
+    setDrawingSelection(null);
   }, []);
   const [selection, selectMany] = useState<string[]>([]);
   const [editAllCaptions, setEditAllCaptionsState] = useState(true);
@@ -495,6 +511,7 @@ export function useEditor(
         side: target.side,
         localTime,
       };
+      setDrawingSelection(null);
       keyframeRef.current = selection;
       setKeyframeSelection(selection);
       // Recording zooms animate the content inside a fixed video frame.
@@ -509,6 +526,26 @@ export function useEditor(
       setPlayhead(clip.start + localTime);
     },
     [],
+  );
+  const editDrawing = useCallback(
+    (clipId: string, localTime: number, side: "start" | "end") => {
+      const clip = current.current.clips.find(clip => clip.id === clipId);
+      const track = current.current.tracks.find(track => track.id === clip?.trackId);
+      if (!clip || !track || track.locked || track.hidden ||
+        !drawingAnimationRanges(clip).some(range =>
+          Math.abs((side === "start" ? range.start : range.end) - localTime) < 1e-6))
+        return;
+      clearKeyframeEdit();
+      setBehaviorSelection(null);
+      setTransitionSelection(null);
+      setDrawingSelection({
+        clipId, time: localTime + (clip.animationOffset ?? 0), localTime, side,
+      });
+      selectMany([clipId]);
+      setPlayingState(false);
+      setPlayhead(clip.start + localTime);
+    },
+    [clearKeyframeEdit],
   );
   const updateTransform = useCallback(
     (id: string, patch: Partial<Transform>, clipPatch: Partial<Clip> = {}) => {
@@ -726,6 +763,11 @@ export function useEditor(
       position?: { x: number; y: number },
     ) => {
       const p = current.current;
+      const duration = Math.max(
+        defaults.current.timing.annotation,
+        template.kind === "shape" && template.drawing?.enabled
+          ? template.drawing.delay + template.drawing.duration : 0,
+      );
       const preferred = trackId
         ? p.tracks.filter(
             (track) => track.id === trackId && !track.captionTrack,
@@ -734,7 +776,7 @@ export function useEditor(
       let track = availableTrack(
         { tracks: preferred, clips: p.clips },
         time,
-        defaults.current.timing.annotation,
+        duration,
       );
       const tracks = [...p.tracks];
       if (!track) {
@@ -742,7 +784,7 @@ export function useEditor(
         tracks.unshift(track);
       }
       const clip = annotationClip(template, track.id, time);
-      clip.duration = defaults.current.timing.annotation;
+      clip.duration = duration;
       if (clip.kind === "shape" && clip.shape !== "freehand")
         clip.transform.scale = Math.max(
           0.05,
@@ -757,10 +799,20 @@ export function useEditor(
       setPlaying(false);
       select(clip.id);
       if (clip.shape !== "freehand") setCanvasMode("select");
-      if (clip.drawing?.enabled) seek(time + Math.min(clip.duration, clip.drawing.duration + clip.drawing.delay));
     },
-    [apply, playhead, select, setPlaying, seek],
+    [apply, playhead, select, setPlaying],
   );
+  const addPenStroke = (stroke: DrawingStroke) => {
+    penStart.current ??= playhead;
+    setPenDraft(strokes => [...strokes, stroke]);
+  };
+  const finishDrawing = () => {
+    const result = freehandAnnotation(penDraft, penSettings, project.canvas);
+    if (result) addAnnotation(
+      result.template, penStart.current ?? playhead, undefined, result.position,
+    );
+    setCanvasMode("select");
+  };
   const addRoundedCorners = useCallback((id?: string) => {
     const project = current.current;
     const ids = id ? [id] : selectedIds;
@@ -1114,13 +1166,17 @@ export function useEditor(
     );
     if (next === clip) return false;
     updateClip(clip.id, next);
+    if (animationClipboard.current.value.drawing) {
+      editDrawing(clip.id, playhead - clip.start + animationClipboard.current.value.duration, "end");
+      return true;
+    }
     editKeyframe(
       clip.id,
       playhead - clip.start + animationClipboard.current.value.duration,
       "end",
     );
     return true;
-  }, [selectedId, playhead, updateClip, editKeyframe]);
+  }, [selectedId, playhead, updateClip, editKeyframe, editDrawing]);
   const selected = selectedId ? clipsById.get(selectedId) : undefined;
   const editingTrack = project.tracks.find(
     (track) => track.id === selected?.trackId,
@@ -1146,7 +1202,16 @@ export function useEditor(
       ? keyframeSelection
       : null;
   keyframeRef.current = selectedKeyframe;
-  const selectedAnimation =
+  const selectedDrawingRange = drawingSelection &&
+    selected?.id === drawingSelection.clipId && !playing &&
+    !editingTrack?.locked && !editingTrack?.hidden &&
+    Math.abs(playhead - selected.start - drawingSelection.localTime) < 1e-6
+      ? drawingAnimationRanges(selected).find(range =>
+          Math.abs((drawingSelection.side === "start" ? range.start : range.end) -
+            drawingSelection.localTime) < 1e-6) ?? null
+      : null;
+  const selectedDrawing = selectedDrawingRange ? drawingSelection : null;
+  const selectedAnimation = selectedDrawingRange ?? (
     selectedKeyframe && selected
       ? (animationRanges(selected).find(
           (range) =>
@@ -1156,7 +1221,7 @@ export function useEditor(
                 selectedKeyframe.time,
             ) < 1e-6,
         ) ?? null)
-      : null;
+      : null);
   useEffect(() => {
     if (keyframeSelection && !selectedKeyframe) clearKeyframeEdit();
   }, [keyframeSelection, selectedKeyframe, clearKeyframeEdit]);
@@ -1195,6 +1260,10 @@ export function useEditor(
     canvasMode,
     setCanvasMode,
     penSettings,
+    penDraft,
+    setPenDraft,
+    addPenStroke,
+    finishDrawing,
     setPenSettings,
     updateTransform,
     copyClipProperties,
@@ -1204,6 +1273,7 @@ export function useEditor(
     addCustomAnimation,
     addSelectedAnimation,
     selectedKeyframe,
+    selectedDrawing,
     selectedAnimation,
     copyAnimation,
     deleteAnimation,
@@ -1213,6 +1283,7 @@ export function useEditor(
       animationClipboard.current = null;
     },
     editKeyframe,
+    editDrawing,
     clearKeyframeEdit,
     addText,
     addAnnotation,

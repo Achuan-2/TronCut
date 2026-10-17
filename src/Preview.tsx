@@ -788,7 +788,7 @@ function PreviewLayer({
           height={shapeSize(clip).height * scale}
           viewBox={`0 0 ${shapeSize(clip).width} ${shapeSize(clip).height}`}
           fill={clip.fill}
-          dangerouslySetInnerHTML={{ __html: annotationSvgBody(clip, drawingProgress(clip, localTime)) }}
+          dangerouslySetInnerHTML={{ __html: annotationSvgBody(clip, selectedObjectPart && !editor.playing && !matteSource ? 1 : drawingProgress(clip, localTime)) }}
         />
       )}
       </div>
@@ -874,7 +874,7 @@ export function ScenePreview({
   const active = projectIndex(editor.project).active(
     editor.project,
     playhead,
-    editor.selectedKeyframe?.clipId,
+    editor.selectedKeyframe?.clipId ?? editor.selectedDrawing?.clipId,
     project.clips,
   );
   const sceneId = `scene-${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;

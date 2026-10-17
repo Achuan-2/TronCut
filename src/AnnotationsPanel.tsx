@@ -18,6 +18,7 @@ import {
   type AnnotationTemplate,
 } from "../shared/annotations";
 import AnnotationPresetPreview from "./AnnotationPresetPreview";
+import PenBrushPicker, { penColors } from "./PenBrushPicker";
 import type { Editor } from "./useEditor";
 
 export default function AnnotationsPanel({ editor }: { editor: Editor }) {
@@ -129,8 +130,33 @@ export default function AnnotationsPanel({ editor }: { editor: Editor }) {
       ) : category === "pen" ? (
         <div className="annotation-pen-settings">
           <p className="small-note">
-            开启涂鸦笔后在画布上拖动绘制，每一笔保留为独立的可编辑对象。
+            可连续绘制多笔，切换笔刷和颜色，点击“完成绘制”保存为一个可编辑对象。
           </p>
+          <PenBrushPicker
+            value={editor.penSettings.brush}
+            color={editor.penSettings.color}
+            onChange={(brush) =>
+              editor.setPenSettings({ ...editor.penSettings, brush })
+            }
+          />
+          <div
+            className="pen-color-palette"
+            role="group"
+            aria-label="涂鸦笔常用颜色"
+          >
+            {penColors.map((color) => (
+              <button
+                key={color}
+                type="button"
+                aria-label={`笔色 ${color}`}
+                aria-pressed={editor.penSettings.color === color}
+                style={{ backgroundColor: color }}
+                onClick={() =>
+                  editor.setPenSettings({ ...editor.penSettings, color })
+                }
+              />
+            ))}
+          </div>
           <label className="field">
             颜色
             <input
@@ -204,13 +230,20 @@ export default function AnnotationsPanel({ editor }: { editor: Editor }) {
               editor.setPlaying(false);
               if (editor.editingTextId)
                 editor.endTextEdit(editor.editingTextId);
-              editor.setCanvasMode(
-                editor.canvasMode === "draw" ? "select" : "draw",
-              );
+              if (editor.canvasMode === "draw") editor.finishDrawing();
+              else editor.setCanvasMode("draw");
             }}
           >
-            {editor.canvasMode === "draw" ? "退出涂鸦笔" : "启用涂鸦笔"}
+            {editor.canvasMode === "draw" ? "完成绘制" : "启用涂鸦笔"}
           </button>
+          {editor.canvasMode === "draw" && (
+            <button
+              className="wide-button"
+              onClick={() => editor.setCanvasMode("select")}
+            >
+              取消绘制
+            </button>
+          )}
         </div>
       ) : (
         <div className="shape-presets">

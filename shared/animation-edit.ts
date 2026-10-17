@@ -16,6 +16,7 @@ export interface CopiedAnimation {
   to: Transform;
   easing?: AnimationEasing;
   samples?: { progress: number; value: Transform }[];
+  drawing?: boolean;
 }
 
 // An explicit animation can begin with identical states. Its end marker keeps
@@ -98,6 +99,14 @@ export function snapshotAnimation(
   clip: Clip,
   range: AnimationRange,
 ): CopiedAnimation | null {
+  if (range.kind === "drawing" && clip.drawing)
+    return {
+      duration: range.end - range.start,
+      from: clip.transform,
+      to: clip.transform,
+      drawing: true,
+      easing: clip.drawing.easing ?? "linear",
+    };
   const pair = rangeFrames(clip, range);
   return pair
     ? {
@@ -131,6 +140,10 @@ export function setAnimationEasing(
   range: AnimationRange,
   easing: AnimationEasing,
 ): Clip {
+  if (range.kind === "drawing")
+    return clip.drawing
+      ? { ...clip, drawing: { ...clip.drawing, easing } }
+      : clip;
   const pair = rangeFrames(clip, range);
   if (!pair) return clip;
   return {
@@ -142,6 +155,17 @@ export function setAnimationEasing(
 }
 
 export function removeAnimation(clip: Clip, range: AnimationRange): Clip {
+  if (range.kind === "drawing")
+    return clip.drawing
+      ? {
+          ...clip,
+          drawing: {
+            ...clip.drawing,
+            enabled: false,
+            frozenProgress: undefined,
+          },
+        }
+      : clip;
   const pair = rangeFrames(clip, range);
   if (!pair) return clip;
   const held = new Set(pair.frames.slice(pair.index + 1, pair.endIndex + 1));
@@ -183,6 +207,27 @@ export function pasteAnimation(
   localStart: number,
 ): Clip {
   const localEnd = localStart + copied.duration;
+  if (copied.drawing) {
+    if (
+      !clip.drawing ||
+      localStart < 0 ||
+      localEnd > clip.duration ||
+      copied.duration <= 0 ||
+      localStart + (clip.animationOffset ?? 0) < 0
+    )
+      return clip;
+    return {
+      ...clip,
+      drawing: {
+        ...clip.drawing,
+        enabled: true,
+        frozenProgress: undefined,
+        delay: localStart + (clip.animationOffset ?? 0),
+        duration: copied.duration,
+        easing: copied.easing,
+      },
+    };
+  }
   if (
     localStart < 0 ||
     localEnd > clip.duration ||

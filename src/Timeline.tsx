@@ -54,6 +54,7 @@ import { MediaThumbnail } from "./MediaThumbnail";
 import { TimelineAnimations } from "./TimelineAnimations";
 import {
   animationRanges,
+  drawingAnimationRanges,
   type AnimationRange,
 } from "../shared/animation-ranges";
 import type { Editor } from "./useEditor";
@@ -1248,11 +1249,13 @@ export default function Timeline({
                               ? visualDraft
                               : original;
                     const isRecording = !!c.groupId && recordingObjects.get(c.groupId)?.id === c.id;
+                    const hasTransformAnimation = animationRanges(c).length > 0;
+                    const hasDrawingAnimation = drawingAnimationRanges(c).length > 0;
                     return (
                       <Fragment key={c.id}>
                         <div
                           data-clip-id={c.id}
-                          className={`timeline-clip ${c.kind} ${isRecording ? "recording-object" : ""} ${c.caption ? "caption" : ""} ${animationRanges(c).length ? "has-animation" : ""} ${editor.selectedIds.includes(c.id) ? "selected" : ""} ${track.locked ? "locked" : ""} ${effectDrop === c.id ? "effect-drop-target" : ""} ${transitionHighlights.some((item) => item.clipId === c.id) ? "transition-drop-target" : ""}`}
+                          className={`timeline-clip ${c.kind} ${isRecording ? "recording-object" : ""} ${c.caption ? "caption" : ""} ${hasTransformAnimation || hasDrawingAnimation ? "has-animation" : ""} ${hasTransformAnimation && hasDrawingAnimation ? "has-drawing-and-transform" : ""} ${editor.selectedIds.includes(c.id) ? "selected" : ""} ${track.locked ? "locked" : ""} ${effectDrop === c.id ? "effect-drop-target" : ""} ${transitionHighlights.some((item) => item.clipId === c.id) ? "transition-drop-target" : ""}`}
                           style={{
                             left: c.start * zoom,
                             width: Math.max(4, c.duration * zoom),
@@ -1609,7 +1612,11 @@ export default function Timeline({
                                   </div>
                                 );
                               })()}
-                            <TimelineAnimations
+                            {(["transform", "drawing"] as const)
+                              .filter(channel => channel === "transform" || hasDrawingAnimation)
+                              .map(channel => <TimelineAnimations
+                              key={channel}
+                              channel={channel}
                               clip={c}
                               viewportStart={(viewport.left - 200) / zoom}
                               viewportEnd={
@@ -1620,7 +1627,7 @@ export default function Timeline({
                               fps={project.canvas.fps}
                               selected={editor.selectedIds.includes(c.id)}
                               selectedFrame={
-                                editor.selectedKeyframe?.clipId === c.id
+                                channel === "drawing" ? (editor.selectedDrawing?.clipId === c.id ? editor.selectedDrawing : null) : editor.selectedKeyframe?.clipId === c.id
                                   ? editor.selectedKeyframe
                                   : null
                               }
@@ -1636,21 +1643,23 @@ export default function Timeline({
                                   ...current,
                                   transform: clip.transform,
                                   keyframes: clip.keyframes,
+                                  drawing: clip.drawing,
                                 }))
                               }
-                              locate={(time, side) => {
+                              locate={(time, side, kind) => {
                                 if (track.locked) {
                                   editor.setPlaying(false);
                                   select(c.id);
                                   seek(time);
-                                } else
+                                } else if (kind === "drawing") editor.editDrawing(c.id, time - c.start, side);
+                                else
                                   editor.editKeyframe(
                                     c.id,
                                     time - c.start,
                                     side,
                                   );
                               }}
-                            />
+                            />)}
                             <span
                               className="trim-handle right"
                               data-trim="right"

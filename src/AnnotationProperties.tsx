@@ -2,6 +2,7 @@ import type { Clip } from "../shared/model";
 import { shapeStyleSchema, type ShapeStyle } from "../shared/annotation-style";
 import type { Editor } from "./useEditor";
 import NumberInput from "./NumberInput";
+import PenBrushPicker from "./PenBrushPicker";
 
 export default function AnnotationProperties({
   clip,
@@ -13,7 +14,20 @@ export default function AnnotationProperties({
   const style = shapeStyleSchema.parse(clip.shapeStyle ?? {});
   const change = (patch: Partial<Clip>) => editor.updateClip(clip.id, patch);
   const styleChange = (patch: Partial<ShapeStyle>) =>
-    change({ shapeStyle: { ...style, ...patch } });
+    change({
+      shapeStyle: { ...style, ...patch },
+      ...(clip.drawing?.strokes
+        ? {
+            drawing: {
+              ...clip.drawing,
+              strokes: clip.drawing.strokes.map((stroke) => ({
+                ...stroke,
+                style: { ...(stroke.style ?? style), ...patch },
+              })),
+            },
+          }
+        : {}),
+    });
   const effect = clip.annotationEffect;
   const drawing = clip.drawing;
   return (
@@ -94,6 +108,13 @@ export default function AnnotationProperties({
       ) : (
         <>
           <h3 className="section-title">标注外观</h3>
+          {drawing && (
+            <PenBrushPicker
+              value={style.brush ?? "round"}
+              color={style.stroke}
+              onChange={(brush) => styleChange({ brush })}
+            />
+          )}
           <label className="field">
             填充
             <input

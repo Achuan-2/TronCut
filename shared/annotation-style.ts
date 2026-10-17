@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { Clip } from "./model";
+import { animationEasings, easeProgress } from "./easing";
 
 const finite = z.number().finite();
 const color = z.string().regex(/^#[\da-f]{6}$/i);
@@ -26,21 +27,35 @@ export const shapeStyleSchema = z.object({
   startHead: z.enum(["none", "arrow", "dot"]).default("none"),
   endHead: z.enum(["none", "arrow", "dot"]).default("none"),
   rough: z.boolean().default(false),
+  brush: z
+    .enum(["round", "marker", "pencil", "calligraphy", "neon"])
+    .optional(),
 });
+const drawingPointsSchema = z
+  .array(
+    z.object({
+      x: finite.min(-32768).max(32768),
+      y: finite.min(-32768).max(32768),
+    }),
+  )
+  .min(2)
+  .max(20000);
 export const drawingSchema = z.object({
   enabled: z.boolean().default(true),
   duration: finite.min(0.01).max(86400).default(1),
   delay: finite.min(0).max(86400).default(0),
   frozenProgress: finite.min(0).max(1).optional(),
-  points: z
+  easing: z.enum(animationEasings).optional(),
+  points: drawingPointsSchema.optional(),
+  strokes: z
     .array(
       z.object({
-        x: finite.min(-32768).max(32768),
-        y: finite.min(-32768).max(32768),
+        points: drawingPointsSchema,
+        style: shapeStyleSchema.optional(),
       }),
     )
-    .min(2)
-    .max(20000)
+    .min(1)
+    .max(1000)
     .optional(),
 });
 export const annotationEffectSchema = z.object({
@@ -52,6 +67,7 @@ export const annotationEffectSchema = z.object({
 export type AnnotationShape = z.infer<typeof annotationShapeSchema>;
 export type ShapeStyle = z.infer<typeof shapeStyleSchema>;
 export type Drawing = z.infer<typeof drawingSchema>;
+export type DrawingStroke = NonNullable<Drawing["strokes"]>[number];
 export type AnnotationEffect = z.infer<typeof annotationEffectSchema>;
 export type Point = { x: number; y: number };
 export const defaultShapeSize = { width: 600, height: 300 };
@@ -70,8 +86,11 @@ export function drawingProgress(
         0,
         Math.min(
           1,
-          (time + (clip.animationOffset ?? 0) - drawing.delay) /
-            drawing.duration,
+          easeProgress(
+            (time + (clip.animationOffset ?? 0) - drawing.delay) /
+              drawing.duration,
+            drawing.easing ?? "linear",
+          ),
         ),
       );
 }
@@ -83,6 +102,7 @@ type ShapePath = {
   stroke?: string;
   width?: number;
   solid?: boolean;
+  brush?: ShapeStyle["brush"];
 };
 const point = (x: number, y: number): Point => ({ x, y });
 function polygon(count: number, radius: number, inner = radius) {
@@ -117,13 +137,17 @@ export function annotationPaths(
       return point((x * width) / 600, (y * height) / 300);
     });
   if (clip.shape === "freehand")
-    return [
-      {
-        points: clip.drawing?.points ?? [],
-        stroke: style.stroke,
-        width: style.strokeWidth,
-      },
-    ];
+    return (
+      clip.drawing?.strokes ?? [{ points: clip.drawing?.points ?? [] }]
+    ).map((stroke) => {
+      const ink = stroke.style ?? style;
+      return {
+        points: stroke.points,
+        stroke: ink.stroke,
+        width: ink.strokeWidth,
+        brush: ink.brush,
+      };
+    });
   let points: Point[];
   let closed = true;
   switch (clip.shape) {
@@ -276,6 +300,7 @@ export function annotationPaths(
       fill: style.fillEnabled ? (clip.fill ?? "#00b5ef") : undefined,
       stroke: style.strokeWidth ? style.stroke : undefined,
       width: style.strokeWidth,
+      brush: style.brush,
     },
   ];
 }
@@ -331,7 +356,36 @@ export function annotationSvgBody(
         style.lineStyle === "solid" || path.solid
           ? ""
           : ` stroke-dasharray="${style.lineStyle === "dotted" ? `1 ${style.strokeWidth * 2.5}` : `${style.strokeWidth * 4} ${style.strokeWidth * 2}`}"`;
-      return `<path d="${d}" fill="${complete ? (path.fill ?? "none") : "none"}" stroke="${path.stroke ?? "none"}" stroke-width="${path.width ?? 0}" stroke-linecap="round" stroke-linejoin="round"${dash}/>`;
+      const ink = (width: number, color = path.stroke ?? "none", extra = "") =>
+        `<path d="${d}" fill="${complete ? (path.fill ?? "none") : "none"}" stroke="${color}" stroke-width="${width}" stroke-linecap="round" stroke-linejoin="round"${dash}${extra}/>`;
+      const width = path.width ?? 0;
+      switch (path.brush ?? style.brush) {
+        case "marker":
+          return `<g opacity="0.45">${ink(width, path.stroke, ' style="stroke-linecap:square"')}</g>`;
+        case "pencil":
+          return `<g opacity="0.72">${[-0.22, 0, 0.22].map((shift, i) => ink(width * (i === 1 ? 0.28 : 0.13), path.stroke, ` transform="translate(${shift * width},${-shift * width})" opacity="${i === 1 ? 0.8 : 0.5}"`)).join("")}</g>`;
+        case "calligraphy": {
+          // A flat nib keeps a fixed diagonal orientation as the path changes direction.
+          const half = width * 0.42;
+          const outline = [
+            ...points.map((p) => point(p.x - half, p.y + half)),
+            ...points
+              .slice()
+              .reverse()
+              .map((p) => point(p.x + half, p.y - half)),
+          ];
+          return `<path d="${outline.map((p, i) => `${i ? "L" : "M"}${p.x.toFixed(3)},${p.y.toFixed(3)}`).join(" ")} Z" fill="${path.stroke ?? "none"}"/>${ink(width * 0.16)}`;
+        }
+        case "neon":
+          return (
+            ink(width * 1.8, path.stroke, ' opacity="0.12"') +
+            ink(width * 1.35, path.stroke, ' opacity="0.28"') +
+            ink(width * 0.8) +
+            ink(width * 0.28, "#ffffff")
+          );
+        default:
+          return ink(width);
+      }
     })
     .join("");
 }

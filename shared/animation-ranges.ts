@@ -73,6 +73,27 @@ export interface AnimationRange {
   hasStart: boolean;
   hasEnd: boolean;
   motion?: RecordingMotion;
+  kind?: "drawing";
+}
+
+/** Drawing is an independent animation channel and may overlap transforms. */
+export function drawingAnimationRanges(
+  clip: Pick<Clip, "drawing" | "animationOffset" | "duration">,
+): AnimationRange[] {
+  const drawing = clip.drawing;
+  if (!drawing?.enabled || drawing.frozenProgress !== undefined) return [];
+  const start = drawing.delay - (clip.animationOffset ?? 0);
+  const end = start + drawing.duration;
+  if (end <= 0 || start >= clip.duration) return [];
+  return [
+    {
+      kind: "drawing",
+      start: Math.max(0, start),
+      end: Math.min(clip.duration, end),
+      hasStart: start >= 0,
+      hasEnd: end <= clip.duration,
+    },
+  ];
 }
 
 /** Ranges from animationRanges are ordered and do not overlap. Keep the global
@@ -161,6 +182,48 @@ export function retimeAnimation(
   fps: number,
 ): Clip {
   if (!Number.isFinite(delta) || delta === 0) return clip;
+  if (range.kind === "drawing") {
+    const drawing = clip.drawing;
+    if (!drawing || !Number.isFinite(fps) || fps <= 0) return clip;
+    const offset = clip.animationOffset ?? 0;
+    const minimum = Math.min(1 / fps, clip.duration);
+    const a = drawing.delay - offset,
+      b = a + drawing.duration;
+    const snap = (time: number) =>
+      Math.round((time + clip.start) * fps) / fps - clip.start;
+    let start = a,
+      end = b;
+    if (mode === "move") {
+      const low = Math.max(0, -offset) - a,
+        high = clip.duration - b;
+      if (high < low) return clip;
+      const shift = Math.max(
+        low,
+        Math.min(high, Math.round(delta * fps) / fps),
+      );
+      start += shift;
+      end += shift;
+    } else if (mode === "start" && range.hasStart) {
+      const low = Math.max(0, -offset),
+        high = Math.min(clip.duration, b - minimum);
+      if (high < low) return clip;
+      start = Math.max(low, Math.min(high, snap(a + delta)));
+    } else if (mode === "end" && range.hasEnd) {
+      const low = Math.max(0, a + minimum);
+      if (low > clip.duration) return clip;
+      end = Math.max(low, Math.min(clip.duration, snap(b + delta)));
+    }
+    return start === a && end === b
+      ? clip
+      : {
+          ...clip,
+          drawing: {
+            ...drawing,
+            delay: Math.max(0, start + offset),
+            duration: end - start,
+          },
+        };
+  }
   const frames = [...clip.keyframes].sort((a, b) => a.time - b.time);
   if (frames[0]?.time > 0) frames.unshift({ time: 0, value: clip.transform });
   const offset = clip.animationOffset ?? 0,

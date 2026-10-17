@@ -15,6 +15,7 @@ import {
 import { AnimationContextMenu } from "./AnimationContextMenu";
 import {
   animationRanges,
+  drawingAnimationRanges,
   visibleAnimationRanges,
   retimeAnimation,
   type AnimationRange,
@@ -38,13 +39,14 @@ export const TimelineAnimations = memo(function TimelineAnimations({
   remove,
   viewportStart,
   viewportEnd,
+  channel = "transform",
 }: {
   clip: Clip;
   zoom: number;
   playhead: number;
   fps: number;
   selected: boolean;
-  locate: (time: number, side: "start" | "end") => void;
+  locate: (time: number, side: "start" | "end", kind?: "drawing") => void;
   locked: boolean;
   commit: (clip: Clip) => void;
   selectedFrame: { time: number; side: "start" | "end" } | null;
@@ -52,6 +54,7 @@ export const TimelineAnimations = memo(function TimelineAnimations({
   remove: (range: AnimationRange) => void;
   viewportStart: number;
   viewportEnd: number;
+  channel?: "transform" | "drawing";
 }) {
   type Gesture = {
     x: number;
@@ -63,6 +66,8 @@ export const TimelineAnimations = memo(function TimelineAnimations({
     index: number;
   };
   const [gesture, setGesture] = useState<Gesture | null>(null);
+  const getRanges =
+    channel === "drawing" ? drawingAnimationRanges : animationRanges;
   const live = useRef<Gesture | null>(null);
 
   // RAF-throttled gesture updates for smooth 60fps animation dragging
@@ -135,11 +140,14 @@ export const TimelineAnimations = memo(function TimelineAnimations({
   ]);
   useEffect(() => () => pulse.current?.animation.cancel(), []);
 
-  const setDrag = useCallback((next: Gesture | null) => {
-    live.current = next;
-    // Use RAF throttling for visual updates, but keep live.current immediate
-    scheduleGestureUpdate(next);
-  }, [scheduleGestureUpdate]);
+  const setDrag = useCallback(
+    (next: Gesture | null) => {
+      live.current = next;
+      // Use RAF throttling for visual updates, but keep live.current immediate
+      scheduleGestureUpdate(next);
+    },
+    [scheduleGestureUpdate],
+  );
   const begin = (
     event: PointerEvent<HTMLButtonElement>,
     range: AnimationRange,
@@ -153,6 +161,7 @@ export const TimelineAnimations = memo(function TimelineAnimations({
     locate(
       clip.start + (mode === "start" ? range.start : range.end),
       mode === "start" ? "start" : "end",
+      range.kind,
     );
     event.currentTarget.setPointerCapture(event.pointerId);
     setDrag({
@@ -175,10 +184,10 @@ export const TimelineAnimations = memo(function TimelineAnimations({
       suppressClick.current = false;
       return;
     }
-    locate(time, side);
+    locate(time, side, channel === "drawing" ? "drawing" : undefined);
   };
   const displayed = gesture?.value ?? clip;
-  const ranges = useMemo(() => animationRanges(displayed), [displayed]);
+  const ranges = useMemo(() => getRanges(displayed), [displayed, getRanges]);
   const visible = useMemo(
     () =>
       visibleAnimationRanges(
@@ -193,7 +202,7 @@ export const TimelineAnimations = memo(function TimelineAnimations({
     <>
       <div
         ref={points}
-        className={`clip-animations ${locked ? "locked" : ""} ${gesture?.moved ? "dragging" : ""}`}
+        className={`clip-animations ${channel === "drawing" ? "drawing-animations" : "transform-animations"} ${locked ? "locked" : ""} ${gesture?.moved ? "dragging" : ""}`}
         onPointerDown={(event) => event.stopPropagation()}
         onDoubleClick={(event) => event.stopPropagation()}
         onPointerMove={(event) => {
@@ -221,16 +230,18 @@ export const TimelineAnimations = memo(function TimelineAnimations({
           suppressClick.current = drag.moved;
           if (!locked && drag.value !== drag.original) {
             commit(drag.value);
-            const index = animationRanges(drag.original).findIndex(
+            const index = getRanges(drag.original).findIndex(
               (range) =>
                 range.start === drag.range.start &&
                 range.end === drag.range.end,
             );
-            const range = animationRanges(drag.value)[index];
+            const range = getRanges(drag.value)[index];
             if (range)
               locate(
-                clip.start + (drag.mode === "start" ? range.start : range.end),
+                clip.start +
+                  (drag.mode === "start" ? range.start : range.end),
                 drag.mode === "start" ? "start" : "end",
+                range.kind,
               );
           }
           setDrag(null);
@@ -242,10 +253,20 @@ export const TimelineAnimations = memo(function TimelineAnimations({
           const start = clip.start + range.start,
             end = clip.start + range.end;
           const width = (range.end - range.start) * zoom;
-          const motion = range.motion ? { "zoom-in": "放大", "zoom-out": "缩小", pan: "平移" }[range.motion] : "动画";
+          const motion =
+            range.kind === "drawing"
+              ? "绘制动画"
+              : range.motion
+                ? { "zoom-in": "放大", "zoom-out": "缩小", pan: "平移" }[
+                    range.motion
+                  ]
+                : "动画";
           // Nearby endpoints also need separate hit targets at the current zoom.
-          const sharedStart = index > 0 && (range.start - ranges[index - 1].end) * zoom < 12;
-          const sharedEnd = index + 1 < ranges.length && (ranges[index + 1].start - range.end) * zoom < 12;
+          const sharedStart =
+            index > 0 && (range.start - ranges[index - 1].end) * zoom < 12;
+          const sharedEnd =
+            index + 1 < ranges.length &&
+            (ranges[index + 1].start - range.end) * zoom < 12;
           const head = range.hasEnd ? Math.min(12, width * 0.4) : 0;
           const active = selected && Math.abs(playhead - end) <= 0.5 / fps;
           const startSelected =
@@ -265,12 +286,13 @@ export const TimelineAnimations = memo(function TimelineAnimations({
               onContextMenu={(event) => {
                 event.preventDefault();
                 event.stopPropagation();
-                locate(end, "end");
+                locate(end, "end", range.kind);
                 setContext({ x: event.clientX, y: event.clientY, range });
               }}
               data-start={start}
               data-end={end}
               data-motion={range.motion}
+              data-animation-kind={channel}
               style={{ left: range.start * zoom, width }}
             >
               <button
@@ -301,9 +323,11 @@ export const TimelineAnimations = memo(function TimelineAnimations({
                   style={
                     locked ? undefined : { cursor: animationCursor("start") }
                   }
-                  aria-label={`动画开始 ${timeLabel(start)}`}
-                  title={`动画开始 ${timeLabel(start)}`}
-                  onPointerDown={(event) => begin(event, range, "start", index)}
+                  aria-label={`${channel === "drawing" ? "绘制动画" : "动画"}开始 ${timeLabel(start)}`}
+                  title={`${channel === "drawing" ? "绘制动画" : "动画"}开始 ${timeLabel(start)}`}
+                  onPointerDown={(event) =>
+                    begin(event, range, "start", index)
+                  }
                   onClick={(event) => click(event, start, "start")}
                 />
               )}
@@ -315,8 +339,8 @@ export const TimelineAnimations = memo(function TimelineAnimations({
                   style={
                     locked ? undefined : { cursor: animationCursor("end") }
                   }
-                  aria-label={`动画结束 ${timeLabel(end)}`}
-                  title={`动画结束 ${timeLabel(end)}`}
+                  aria-label={`${channel === "drawing" ? "绘制动画" : "动画"}结束 ${timeLabel(end)}`}
+                  title={`${channel === "drawing" ? "绘制动画" : "动画"}结束 ${timeLabel(end)}`}
                   onPointerDown={(event) => begin(event, range, "end", index)}
                   onClick={(event) => click(event, end, "end")}
                 />
@@ -350,6 +374,7 @@ export const TimelineAnimations = memo(function TimelineAnimations({
   }
   return (
     prev.clip === next.clip &&
+    prev.channel === next.channel &&
     prev.zoom === next.zoom &&
     prev.fps === next.fps &&
     prev.locked === next.locked &&
