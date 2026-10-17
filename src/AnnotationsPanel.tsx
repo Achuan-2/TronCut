@@ -72,7 +72,6 @@ export default function AnnotationsPanel({ editor }: { editor: Editor }) {
           </button>
         ))}
       </div>
-      <p className="panel-intro">拖到画布或时间线添加，也可点击模板。</p>
       {category === "text" ? (
         <>
           <label className="field">
