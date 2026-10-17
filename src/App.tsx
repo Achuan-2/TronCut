@@ -52,7 +52,7 @@ function ProjectTitleInput({
 }: {
   name: string;
   disabled?: boolean;
-  onChange: (name: string) => void;
+  onChange: (name: string) => Promise<void> | void;
 }) {
   const [value, setValue] = useState(name);
   const [composing, setComposing] = useState(false);
@@ -61,11 +61,15 @@ function ProjectTitleInput({
     setValue(name);
   }, [name]);
 
-  const commit = () => {
+  const commit = async () => {
     const next = value.trim() || name || "未命名工程";
     setValue(next);
     if (next !== name) {
-      onChange(next);
+      try {
+        await onChange(next);
+      } catch {
+        setValue(name);
+      }
     }
   };
 
@@ -77,10 +81,9 @@ function ProjectTitleInput({
       onChange={(e) => setValue(e.target.value)}
       onCompositionStart={() => setComposing(true)}
       onCompositionEnd={() => setComposing(false)}
-      onBlur={commit}
+      onBlur={() => void commit()}
       onKeyDown={(e) => {
         if (e.key === "Enter" && !composing) {
-          commit();
           e.currentTarget.blur();
         } else if (e.key === "Escape") {
           setValue(name);
@@ -328,6 +331,26 @@ export default function App() {
         toast("工程已保存，工程文件和素材已归档到工程文件夹");
       }
     });
+  const renameProject = async (nextName: string) => {
+    const trimmed = nextName.trim();
+    if (!trimmed || trimmed === editor.project.name) return;
+    if (!file || !window.framecraft) {
+      editor.apply((p) => ({ ...p, name: trimmed }));
+      return;
+    }
+    let success = false;
+    await run(async () => {
+      const result = await bridge().renameProject(editor.project, trimmed);
+      if (result) {
+        editor.markSaved(result.project);
+        setFile(result.file);
+        void refreshHome().catch(() => {});
+        toast(`工程及文件夹已重命名为“${result.project.name}”`);
+        success = true;
+      }
+    });
+    if (!success) throw new Error("重命名未完成");
+  };
   const open = () =>
     run(async () => {
       if (editor.dirty && !confirm("当前工程有未保存修改，确定打开其他工程？"))
@@ -997,9 +1020,7 @@ export default function App() {
               <ProjectTitleInput
                 disabled={actionsBlocked}
                 name={editor.project.name}
-                onChange={(next) => {
-                  editor.apply((p) => ({ ...p, name: next }));
-                }}
+                onChange={renameProject}
               />
               <span
                 className="project-save-state"
