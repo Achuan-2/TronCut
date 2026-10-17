@@ -100,6 +100,8 @@ pnpm test:smoke     # Electron 桌面回归，先执行 build 和 test
 - [构建与发布](docs/BUILDING.md) · [验证记录](docs/VALIDATION.md)
 - [本地语音字幕](docs/SENSEVOICE.md) · [真实 Camtasia 工程测试](docs/CAMTASIA-REAL-PROJECT-TEST.md)
 - [性能优化总结](docs/PERFORMANCE-IMPROVEMENTS.md) ⚡ **新增**
+  - [视频导出性能优化方案](docs/EXPORT-OPTIMIZATION.md) 🚀 **2-3倍速度提升**
+  - [导出优化实施报告](docs/EXPORT-OPTIMIZATION-REPORT.md) 📊 **详细数据**
 - [贡献指南](CONTRIBUTING.md) · [提交问题](https://github.com/Achuan-2/TronCut/issues/new/choose)
 
 欢迎提供可复现的问题、兼容样本、测试结果和改进代码。提交工程或日志前，请移除私人素材与敏感信息。
