@@ -1,5 +1,9 @@
 # 验证记录（含历史与 TronCut 0.3）
 
+## v0.5.2 发布前检查（2026-10-17）
+
+89 个测试文件、404 项测试与 Rust 时间线引擎测试全部通过。TypeScript 类型检查（`tsc --noEmit`）、Rust/Wasm 编译全部通过。打包媒体引擎与 Windows 语音依赖资源预检（`node scripts/check-packaging.mjs`）通过。多周期播放与跳转验证（`node scripts/test-playback-ui.mjs`）及桌面端 UI 完整烟测（`pnpm test:smoke`）验证通过，无控制台错误，播放头隔离位移、画质切换、预览代理加载与多层合成正常。发布包由 GitHub Actions 标签工作流构建并校验 SHA256；macOS 包未经真机安装与验收。
+
 ## v0.5.1 发布前检查（2026-10-17）
 
 87 个测试文件、397 项测试与 Rust 时间线引擎测试全部通过。TypeScript 类型检查（`tsc --noEmit`）、Rust/Wasm 编译、Vite 打包与 Electron 构建全部通过。打包媒体引擎与 Windows 语音依赖资源预检（`node scripts/check-packaging.mjs`）通过。预览切换与拆分视频专项烟测（`node scripts/smoke-preview-media-switch.mjs`）验证通过，跨视频定位与拖动无离线闪烁、解码帧与定位正确、拆分视频图层复用顺畅、真正离线素材提示正常。发布包由 GitHub Actions 标签工作流构建并校验 SHA256；macOS 包未经真机安装与验收。
