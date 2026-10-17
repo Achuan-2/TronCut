@@ -1,5 +1,9 @@
 # 验证记录（含历史与 TronCut 0.3）
 
+## v0.4.9 发布前检查（2026-10-17）
+
+85 个测试文件、385 项测试与 Rust 时间线引擎测试全部通过，包含导出性能分析、智能分块策略、真实 FFmpeg 导出、标注与录屏回归。TypeScript 类型检查（`tsc --noEmit`）、Rust/Wasm 编译、Vite 打包与 Electron 构建全部通过。打包媒体引擎与 Windows 语音依赖资源预检（`node scripts/check-packaging.mjs`）通过。
+
 ## v0.4.8 发布前检查（2026-10-16）
 
 84 个文件、373 项测试与 2 项 Rust 测试全部通过，包含真实 FFmpeg 导出、绘制动画、区域效果、工程归档及录屏回归。TypeScript、Rust/Wasm、Vite、Electron 构建与打包资源预检通过。完整开发版编辑回归通过，产物为 `test-output/editing-ui/run-1792164364142/`；保存流程的测试对话框已适配路径与文件名选择。基础冒烟脚本补齐显式关闭新增右键菜单的步骤后，`pnpm test:smoke` 的编辑、工程归档与实际 MP4 导出通过。Windows 安装包的编辑回归由发布工作流再次执行；macOS arm64/x64 包不代表真机安装、权限、录制或导出验收。
