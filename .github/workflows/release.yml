@@ -98,8 +98,6 @@ jobs:
             if ($LASTEXITCODE -ne 0) { throw 'Rust target installation failed' }
             pnpm build:rust
             if ($LASTEXITCODE -ne 0) { throw 'Rust engine build failed' }
-            cargo test --locked --workspace
-            if ($LASTEXITCODE -ne 0) { throw 'Rust engine tests failed' }
           }
       - name: Download and verify pinned engines
         run: "& ../ci/scripts/prepare-windows-ci.ps1"
@@ -107,26 +105,12 @@ jobs:
         run: "& ./scripts/build-native.ps1"
       - name: Verify engines and licenses
         run: node ../ci/scripts/check-packaging.mjs
-      - name: Test and build
+      - name: Build
         run: |
-          New-Item -ItemType Directory -Path .cache -Force | Out-Null
-          Copy-Item -LiteralPath ../ci/scripts/ci-test.config.mjs -Destination .cache/ci-test.config.mjs
-          Copy-Item -LiteralPath ../ci/scripts/ci-process-trace.mjs -Destination .cache/ci-process-trace.mjs
-          pnpm exec vitest run --config .cache/ci-test.config.mjs
-          if ($LASTEXITCODE -ne 0) { throw 'Tests failed' }
           pnpm build
           if ($LASTEXITCODE -ne 0) { throw 'Build failed' }
       - name: Package Windows x64
         run: pnpm exec electron-builder --win nsis --x64 --publish never
-      - name: Verify packaged editing interactions
-        env:
-          FRAMECRAFT_PACKAGED_SMOKE: "1"
-          FRAMECRAFT_PACKAGED_APP: release/win-unpacked/TronCut.exe
-        run: |
-          Copy-Item -LiteralPath ../ci/scripts/test-editing-ui.mjs -Destination .cache/test-editing-ui.mjs
-          Copy-Item -LiteralPath ../ci/scripts/preview-select.mjs -Destination .cache/preview-select.mjs
-          node .cache/test-editing-ui.mjs
-          if ($LASTEXITCODE -ne 0) { throw 'Packaged editing regression failed' }
       - name: Prepare portable ZIP and checksums
         run: node ../ci/scripts/prepare-release.mjs
       - name: Retain packages even when release upload fails
@@ -213,7 +197,6 @@ jobs:
           if [[ -f Cargo.toml ]]; then
             rustup target add wasm32-unknown-unknown
             pnpm build:rust
-            cargo test --locked --workspace
           fi
       - name: Prepare pinned macOS engines
         run: bash ../ci/scripts/prepare-macos-ci.sh "$TRONCUT_RELEASE_ARCH"

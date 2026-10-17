@@ -98,6 +98,10 @@ export interface FrameCraftBridge {
     project: Project,
     saveAs?: boolean,
   ): Promise<{ project: Project; file: string } | null>;
+  renameProject(
+    project: Project,
+    name: string,
+  ): Promise<{ project: Project; file: string }>;
   importCamtasia(): Promise<Project | null>;
   importSubtitles(): Promise<Cue[] | null>;
   exportSubtitles(cues: Cue[]): Promise<string | null>;

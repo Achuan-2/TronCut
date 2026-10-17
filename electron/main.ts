@@ -27,7 +27,7 @@ import {
 import { parseSrt, toSrt } from "../shared/subtitles";
 import { capabilities, probeMedia } from "./media";
 import { findBinary, runProcess } from "./process";
-import { openProject, saveProject } from "./project-store";
+import { openProject, saveProject, renameProjectStorage } from "./project-store";
 import { importCamtasia } from "./camtasia";
 import { audioFilters, exportVideo, exportFrame } from "./export";
 import { speechEngineSchema, speechOptionsSchema } from "../shared/asr";
@@ -719,6 +719,35 @@ function installHandlers() {
       force: true,
     });
     return { project: saved, file };
+  });
+  handle("project:rename", async (input: unknown, nameInput: unknown) => {
+    if (!projectFile) throw new Error("工程尚未保存到文件，无法重命名文件夹");
+    const project = authorizedProject(input);
+    const newName = z.string().min(1).max(180).parse(nameInput);
+    const icon = app.isPackaged
+      ? path.join(process.resourcesPath, "project.ico")
+      : path.resolve("resources/icon.ico");
+    const oldFile = projectFile;
+    const result = await renameProjectStorage(project, oldFile, newName, icon);
+
+    // 移除旧路径的授权，并注册新工程素材
+    for (const asset of project.assets) {
+      approvedPaths.delete(path.resolve(asset.path));
+      if (asset.cursorPath) approvedPaths.delete(path.resolve(asset.cursorPath));
+    }
+    const saved = registerProject(result.project);
+    projectFile = result.file;
+    if (
+      path.resolve(oldFile).toLowerCase() !==
+      path.resolve(result.file).toLowerCase()
+    ) {
+      await recentProjects.remove(oldFile);
+    }
+    await rememberProject(saved, result.file);
+    await fs.rm(path.join(app.getPath("userData"), "recovery.json"), {
+      force: true,
+    });
+    return { project: saved, file: result.file };
   });
   handle("project:camtasia", async () => {
     const file = await chooseFile(

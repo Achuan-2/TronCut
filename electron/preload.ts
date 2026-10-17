@@ -60,6 +60,8 @@ const bridge: FrameCraftBridge = {
   readRecovery: () => ipcRenderer.invoke("project:recovery:read"),
   saveProject: (project, saveAs) =>
     ipcRenderer.invoke("project:save", project, saveAs),
+  renameProject: (project, name) =>
+    ipcRenderer.invoke("project:rename", project, name),
   importCamtasia: () => ipcRenderer.invoke("project:camtasia"),
   importSubtitles: () => ipcRenderer.invoke("subtitles:import"),
   exportSubtitles: (cues) => ipcRenderer.invoke("subtitles:export", cues),

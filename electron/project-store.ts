@@ -167,3 +167,132 @@ export async function saveProject(
     })),
   };
 }
+
+export async function renameProjectStorage(
+  project: Project,
+  currentFile: string,
+  newName: string,
+  iconPath?: string,
+): Promise<{ project: Project; file: string; oldRoot: string; newRoot: string }> {
+  const sanitized = newName
+    .replace(/[<>:"/\\|?*\x00-\x1f]/g, "_")
+    .replace(/[. ]+$/, "")
+    .trim();
+  if (!sanitized) throw new Error("工程名称无效");
+
+  const oldRoot = path.dirname(path.resolve(currentFile));
+  const oldFileName = path.basename(currentFile);
+  const oldFileBase = path.basename(currentFile, path.extname(currentFile));
+  const oldFolderName = path.basename(oldRoot);
+  const parent = path.dirname(oldRoot);
+
+  const isDedicatedFolder = oldFolderName === oldFileBase;
+  const newRoot = isDedicatedFolder ? path.join(parent, sanitized) : oldRoot;
+  const newFile = isDedicatedFolder
+    ? path.join(newRoot, `${sanitized}.troncut`)
+    : path.join(oldRoot, `${sanitized}.troncut`);
+
+  const sameFile =
+    process.platform === "win32"
+      ? path.resolve(currentFile).toLowerCase() ===
+        path.resolve(newFile).toLowerCase()
+      : path.resolve(currentFile) === path.resolve(newFile);
+
+  const sameFolder =
+    process.platform === "win32"
+      ? path.resolve(oldRoot).toLowerCase() ===
+        path.resolve(newRoot).toLowerCase()
+      : path.resolve(oldRoot) === path.resolve(newRoot);
+
+  if (!sameFile && !sameFolder) {
+    if (isDedicatedFolder) {
+      if (
+        await fs.access(newRoot).then(
+          () => true,
+          () => false,
+        )
+      ) {
+        throw new Error(`同名工程文件夹“${sanitized}”已存在，请更换名称`);
+      }
+    } else {
+      if (
+        await fs.access(newFile).then(
+          () => true,
+          () => false,
+        )
+      ) {
+        throw new Error(
+          `同名工程文件“${sanitized}.troncut”已存在，请更换名称`,
+        );
+      }
+    }
+  }
+
+  // 1. 如果是专属工程文件夹，先重命名文件夹
+  if (isDedicatedFolder && !sameFolder) {
+    if (
+      process.platform === "win32" &&
+      path.resolve(oldRoot).toLowerCase() === path.resolve(newRoot).toLowerCase()
+    ) {
+      const tempRoot = `${oldRoot}_rename_tmp_${Date.now()}`;
+      await fs.rename(oldRoot, tempRoot);
+      await fs.rename(tempRoot, newRoot);
+    } else {
+      await fs.rename(oldRoot, newRoot);
+    }
+  }
+
+  // 2. 如果文件夹内的工程文件需要改名
+  const currentFileInNewRoot = isDedicatedFolder
+    ? path.join(newRoot, oldFileName)
+    : currentFile;
+
+  if (currentFileInNewRoot !== newFile) {
+    if (
+      process.platform === "win32" &&
+      path.resolve(currentFileInNewRoot).toLowerCase() ===
+        path.resolve(newFile).toLowerCase()
+    ) {
+      const tempFile = `${currentFileInNewRoot}_rename_tmp_${Date.now()}`;
+      await fs.rename(currentFileInNewRoot, tempFile);
+      await fs.rename(tempFile, newFile);
+    } else {
+      await fs.rename(currentFileInNewRoot, newFile);
+    }
+  }
+
+  // 3. 将素材的绝对路径从 oldRoot 映射到 newRoot
+  const updatedAssets = project.assets.map((asset) => {
+    const rel = path.relative(oldRoot, asset.path);
+    const isInside = !rel.startsWith("..") && !path.isAbsolute(rel);
+    const nextPath = isInside ? path.resolve(newRoot, rel) : asset.path;
+
+    let nextCursorPath = asset.cursorPath;
+    if (asset.cursorPath) {
+      const relCursor = path.relative(oldRoot, asset.cursorPath);
+      const isCursorInside =
+        !relCursor.startsWith("..") && !path.isAbsolute(relCursor);
+      nextCursorPath = isCursorInside
+        ? path.resolve(newRoot, relCursor)
+        : asset.cursorPath;
+    }
+
+    return {
+      ...asset,
+      path: nextPath,
+      cursorPath: nextCursorPath,
+    };
+  });
+
+  const updatedProject: Project = {
+    ...project,
+    name: sanitized,
+    assets: updatedAssets,
+  };
+
+  // 4. 保存更新后的 project 到 newFile
+  const saved = await saveProject(updatedProject, newFile, iconPath);
+
+  return { project: saved, file: newFile, oldRoot, newRoot };
+}
+
