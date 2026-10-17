@@ -33,7 +33,7 @@ import {
   setKeyframeTransform,
   transformAt,
 } from "../shared/editor";
-import { selectionWithGroups } from "../shared/timeline";
+import { findClipAtPlayhead, selectionWithGroups } from "../shared/timeline";
 import { recordingMaster } from "../shared/recording-objects";
 import {
   captionTrackSelection,
@@ -259,6 +259,31 @@ export function useEditor(
   );
   const [dirty, setDirty] = useState(false);
   const [autoAnimate, setAutoAnimate] = useState(false);
+
+  useEffect(() => {
+    if (!preferences.program.selectionFollowsPlayhead) return;
+    if (editingTextId) return;
+    const clip = findClipAtPlayhead(project, playhead);
+    if (!clip) {
+      if (selectedIds.length > 0) select(null);
+      return;
+    }
+    const targetGroup = selectionWithGroups(project, [clip.id]);
+    const isSame =
+      selectedIds.length === targetGroup.length &&
+      targetGroup.every((id) => selectedIds.includes(id));
+    if (!isSame) {
+      select(clip.id);
+    }
+  }, [
+    preferences.program.selectionFollowsPlayhead,
+    playhead,
+    project,
+    editingTextId,
+    selectedIds,
+    select,
+  ]);
+
   const past = useRef<Project[]>([]),
     future = useRef<Project[]>([]),
     current = useRef(project);

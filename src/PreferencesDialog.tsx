@@ -283,6 +283,16 @@ export default function PreferencesDialog({
                     />
                     显示时间线音频波形
                   </label>
+                  <label className="check-field">
+                    <input
+                      type="checkbox"
+                      checked={settings.program.selectionFollowsPlayhead}
+                      onChange={(e) =>
+                        program("selectionFollowsPlayhead", e.target.checked)
+                      }
+                    />
+                    选择跟随播放指示器
+                  </label>
                   <h3>项目恢复</h3>
                   <label className="check-field">
                     <input

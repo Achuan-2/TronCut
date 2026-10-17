@@ -7,6 +7,7 @@ export const programPreferencesSchema = z.object({
   recoveryDelay: z.number().finite().min(1).max(600).default(2),
   snapping: z.boolean().default(true),
   waveforms: z.boolean().default(true),
+  selectionFollowsPlayhead: z.boolean().default(false),
   defaultTool: z.enum(["select", "crop"]).default("select"),
   previewZoom: z.enum(["fit", "1", "0.5", "0.75", "0.25"]).default("fit"),
 });

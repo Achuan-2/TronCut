@@ -2,6 +2,7 @@ import { type Clip, type Project, uid } from "./model";
 import { splitClip } from "./editor";
 import { markerEnd } from "./markers";
 import { recordingGroups, releasedRecordingTracks } from "./recording-objects";
+import { isTrackActive } from "./tracks";
 
 export function editableIds(
   project: Project,
@@ -245,3 +246,35 @@ export function pasteClips(
     ids: clips.map((c) => c.id),
   };
 }
+
+/**
+ * Find the primary clip located at the given playhead position.
+ * Respects track visibility, lock status, solo state, and top-to-bottom visual track priority.
+ */
+export function findClipAtPlayhead(
+  project: Project,
+  playhead: number,
+): Clip | undefined {
+  for (const track of project.tracks) {
+    if (track.locked || !isTrackActive(project.tracks, track.id)) continue;
+    const match = project.clips.find(
+      (clip) =>
+        clip.trackId === track.id &&
+        clip.start <= playhead &&
+        playhead < clip.start + clip.duration,
+    );
+    if (match) return match;
+  }
+  for (const track of project.tracks) {
+    if (track.locked || !isTrackActive(project.tracks, track.id)) continue;
+    const match = project.clips.find(
+      (clip) =>
+        clip.trackId === track.id &&
+        clip.start < playhead &&
+        Math.abs(playhead - (clip.start + clip.duration)) < 1e-4,
+    );
+    if (match) return match;
+  }
+  return undefined;
+}
+

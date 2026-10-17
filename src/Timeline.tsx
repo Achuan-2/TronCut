@@ -1845,19 +1845,21 @@ export default function Timeline({
               >
                 <hr />
                 <button
-                  onClick={() =>
+                  onClick={() => {
+                    setContext(null);
                     editor.selectMany(
                       project.clips
                         .filter((item) => item.caption)
                         .map((item) => item.id),
-                    )
-                  }
+                    );
+                  }}
                 >
                   选择全部字幕
                 </button>
                 <button
                   disabled={captionLocked}
                   onClick={() => {
+                    setContext(null);
                     editor.seek(clip.start);
                     editor.beginTextEdit(clip.id);
                   }}
@@ -1866,7 +1868,10 @@ export default function Timeline({
                 </button>
                 <button
                   disabled={captionLocked || !previousCaption(project, clip.id)}
-                  onClick={() => mergeCaption(clip.id)}
+                  onClick={() => {
+                    setContext(null);
+                    mergeCaption(clip.id);
+                  }}
                 >
                   与上一字幕合并
                 </button>
@@ -1876,26 +1881,31 @@ export default function Timeline({
                     playhead <= clip.start ||
                     playhead >= clip.start + clip.duration
                   }
-                  onClick={() =>
-                    apply((current) => splitClip(current, clip.id, playhead))
-                  }
+                  onClick={() => {
+                    setContext(null);
+                    apply((current) => splitClip(current, clip.id, playhead));
+                  }}
                 >
                   拆分字幕
                 </button>
                 <button
                   disabled={captionLocked}
-                  onClick={() =>
+                  onClick={() => {
+                    setContext(null);
                     editor.updateClip(clip.id, {
                       text: "",
                       name: "空白字幕",
-                    })
-                  }
+                    });
+                  }}
                 >
                   清除字幕文本
                 </button>
                 <button
                   disabled={captionLocked}
-                  onClick={() => convertCaptionSelection(clip.id)}
+                  onClick={() => {
+                    setContext(null);
+                    convertCaptionSelection(clip.id);
+                  }}
                 >
                   转换为普通文本
                 </button>
@@ -1922,7 +1932,10 @@ export default function Timeline({
                         ?.trackId,
                   )?.locked
                 }
-                onClick={() => editor.pasteBehavior(context.id)}
+                onClick={() => {
+                  setContext(null);
+                  editor.pasteBehavior(context.id);
+                }}
               >
                 粘贴效果
               </button>
@@ -1931,7 +1944,18 @@ export default function Timeline({
                   selectionLocked || playhead <= clip.start ||
                   playhead >= clip.start + clip.duration
                 }
-                onClick={() => apply((p) => splitClip(p, context.id, playhead))}
+                onClick={() => {
+                  setContext(null);
+                  apply((p) =>
+                    splitSelection(
+                      p,
+                      editor.selectedIds.includes(context.id)
+                        ? editor.selectedIds
+                        : [context.id],
+                      playhead,
+                    ),
+                  );
+                }}
               >
                 <Scissors size={14} />
                 在播放头拆分

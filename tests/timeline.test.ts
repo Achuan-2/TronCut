@@ -3,6 +3,7 @@ import { createProject, newText, validateProject } from "../shared/model";
 import {
   clipsInTimelineRange,
   deleteClips,
+  findClipAtPlayhead,
   groupSelection,
   moveClips,
   pasteClips,
@@ -157,6 +158,50 @@ describe("多片段编辑与波纹时间映射", () => {
       3,
     );
     expect(result.clips.map((c) => c.duration)).toEqual([3, 2, 2, 3, 5]);
+  });
+  it("选择跟随播放指示器按顶轨、可见性和锁定状态选取当前素材，接点处优先后段", () => {
+    const p = createProject();
+    const title = { ...newText("titles", 0), duration: 4 };
+    const video = { ...newText("video", 2), duration: 6 };
+    const audio = { ...newText("audio", 0), duration: 10 };
+    p.clips = [title, video, audio];
+
+    // 在 1s 时，title (0-4) 和 audio (0-10) 均覆盖，但 titles 是顶轨，优先选中 title
+    expect(findClipAtPlayhead(p, 1)?.id).toBe(title.id);
+
+    // 在 3s 时，title (0-4), video (2-8), audio (0-10) 均覆盖，titles 依然最顶层
+    expect(findClipAtPlayhead(p, 3)?.id).toBe(title.id);
+
+    // 当 titles 轨锁定时，跳过 titles，选中 video
+    p.tracks[0].locked = true;
+    expect(findClipAtPlayhead(p, 3)?.id).toBe(video.id);
+
+    // 当 titles 轨解锁但隐藏时，跳过 titles，选中 video
+    p.tracks[0].locked = false;
+    p.tracks[0].hidden = true;
+    expect(findClipAtPlayhead(p, 3)?.id).toBe(video.id);
+
+    // 当音频轨独奏时，非独奏轨均不激活，选中 audio
+    p.tracks[0].hidden = false;
+    p.tracks[2].solo = true;
+    expect(findClipAtPlayhead(p, 3)?.id).toBe(audio.id);
+    p.tracks[2].solo = false;
+
+    // 在 5s 时，title 已结束，选中 video
+    expect(findClipAtPlayhead(p, 5)?.id).toBe(video.id);
+
+    // 在 9s 时，video 已结束，选中 audio
+    expect(findClipAtPlayhead(p, 9)?.id).toBe(audio.id);
+
+    // 在 11s 时，所有素材均已结束，返回 undefined
+    expect(findClipAtPlayhead(p, 11)).toBeUndefined();
+
+    // 在接点处（如拆分后的两段），优先选取在播放头起步的后段素材
+    const split = splitSelection(p, [video.id], 5);
+    const right = split.clips.find((c) => c.trackId === "video" && c.start === 5)!;
+    // 隐藏 titles 观察 video 轨
+    split.tracks[0].hidden = true;
+    expect(findClipAtPlayhead(split, 5)?.id).toBe(right.id);
   });
 });
 

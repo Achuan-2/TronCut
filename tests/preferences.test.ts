@@ -291,12 +291,22 @@ it("分组首选项串行合并保存，旧配置补全默认值，配置损坏�
       animation: 1,
     });
     await Promise.all([
-      store.save({ program: { snapping: false, waveforms: false } }),
+      store.save({
+        program: {
+          snapping: false,
+          waveforms: false,
+          selectionFollowsPlayhead: true,
+        },
+      }),
       store.save({ timing: { image: 8, animation: 2 } }),
       store.save({ project: { width: 1080, height: 1920, fps: 60 } }),
     ]);
     const saved = await new PreferencesStore(file, secrets).get();
-    expect(saved.program).toMatchObject({ snapping: false, waveforms: false });
+    expect(saved.program).toMatchObject({
+      snapping: false,
+      waveforms: false,
+      selectionFollowsPlayhead: true,
+    });
     expect(saved.timing).toMatchObject({ image: 8, animation: 2 });
     expect(saved.project).toMatchObject({ width: 1080, height: 1920, fps: 60 });
     await fs.writeFile(file, "{invalid");
