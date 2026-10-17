@@ -74,6 +74,7 @@ import {
 } from "../shared/visual-effect-drag";
 import { transitionTransform } from "../shared/transitions";
 import { projectIndex } from "../shared/project-index";
+import { mediaAssetUrl } from "../shared/media-url";
 import { visualEffectSvg } from "../shared/visual-effect-svg";
 import MatteDefinition from "./MatteDefinition";
 import EffectRegionOverlay from "./EffectRegionOverlay";
@@ -97,35 +98,6 @@ export function timeLabel(t: number): string {
   const seconds = Math.max(0, t);
   return `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(Math.floor(seconds % 60)).padStart(2, "0")}.${String(Math.floor((seconds % 1) * 100)).padStart(2, "0")}`;
 }
-// 缓存素材 URL：拆分/复制片段会以新 clip.id 重新挂载图层，
-// 若每次都从空串等 IPC 返回，会短暂闪出“素材离线”
-const mediaUrlCache = new Map<string, string>();
-const mediaUrlKey = (asset: Asset) => `${asset.id}|${asset.path}`;
-/** "" = 加载中；null = 获取失败 */
-export function useMediaUrl(asset?: Asset): string | null {
-  const [url, setUrl] = useState<string | null>(() =>
-    asset ? mediaUrlCache.get(mediaUrlKey(asset)) ?? "" : "",
-  );
-  useEffect(() => {
-    let alive = true;
-    const cached = asset ? mediaUrlCache.get(mediaUrlKey(asset)) : undefined;
-    setUrl(cached ?? "");
-    if (asset && !cached && window.framecraft)
-      window.framecraft
-        .mediaUrl(asset.id)
-        .then((next) => {
-          mediaUrlCache.set(mediaUrlKey(asset), next);
-          if (alive) setUrl(next);
-        })
-        .catch(() => {
-          if (alive) setUrl(null);
-        });
-    return () => {
-      alive = false;
-    };
-  }, [asset?.id, asset?.path]);
-  return url;
-}
 function MediaLayer({
   clip,
   asset,
@@ -142,7 +114,8 @@ function MediaLayer({
   audioOnly?: boolean;
 }) {
   const ref = useRef<HTMLVideoElement & HTMLAudioElement>(null),
-    url = useMediaUrl(asset);
+    // The protocol already resolves registered IDs; no IPC/loading state is needed.
+    url = mediaAssetUrl(asset.id);
   useEffect(() => {
     const media = ref.current;
     if (!media) return;
@@ -160,8 +133,7 @@ function MediaLayer({
     if (playing) void media.play().catch(() => {});
     else media.pause();
   }, [localTime, playing, clip.speed, clip.sourceIn, clip.volume, clip.loop, asset.duration, muted, url]);
-  if (url === "" && !asset.missing) return null;
-  if (!url || asset.missing)
+  if (asset.missing)
     return (
       <div className="offline">
         素材离线

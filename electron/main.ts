@@ -43,6 +43,7 @@ import { ClonedVoices, validateVoiceReference } from "./cloned-voices";
 import { createClonedVoiceSchema } from "../shared/cloned-voices";
 import { mediaThumbnail } from "./thumbnails";
 import { serveMediaFile } from "./media-protocol";
+import { mediaAssetUrl } from "../shared/media-url";
 import { NativeRecording } from "./native-recording";
 import { recordingName } from "./recording-name";
 import { RecordingBorder } from "./recording-border";
@@ -521,7 +522,7 @@ function installHandlers() {
         { signal: task.signal },
       );
       const preview = register(await probeMedia(file, process.resourcesPath));
-      return `framecraft-media://asset/${preview.id}`;
+      return mediaAssetUrl(preview.id);
     } finally {
       task = null;
     }
@@ -630,7 +631,7 @@ function installHandlers() {
   });
   handle("media:url", (id: unknown) => {
     const asset = assetById(id);
-    return `framecraft-media://asset/${encodeURIComponent(asset.id)}`;
+    return mediaAssetUrl(asset.id);
   });
   handle("media:thumbnail", (id: unknown, waveform: unknown) =>
     mediaThumbnail(
