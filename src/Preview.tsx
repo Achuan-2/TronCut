@@ -97,18 +97,29 @@ export function timeLabel(t: number): string {
   const seconds = Math.max(0, t);
   return `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(Math.floor(seconds % 60)).padStart(2, "0")}.${String(Math.floor((seconds % 1) * 100)).padStart(2, "0")}`;
 }
-export function useMediaUrl(asset?: Asset) {
-  const [url, setUrl] = useState("");
+// 缓存素材 URL：拆分/复制片段会以新 clip.id 重新挂载图层，
+// 若每次都从空串等 IPC 返回，会短暂闪出“素材离线”
+const mediaUrlCache = new Map<string, string>();
+const mediaUrlKey = (asset: Asset) => `${asset.id}|${asset.path}`;
+/** "" = 加载中；null = 获取失败 */
+export function useMediaUrl(asset?: Asset): string | null {
+  const [url, setUrl] = useState<string | null>(() =>
+    asset ? mediaUrlCache.get(mediaUrlKey(asset)) ?? "" : "",
+  );
   useEffect(() => {
     let alive = true;
-    setUrl("");
-    if (asset && window.framecraft)
+    const cached = asset ? mediaUrlCache.get(mediaUrlKey(asset)) : undefined;
+    setUrl(cached ?? "");
+    if (asset && !cached && window.framecraft)
       window.framecraft
         .mediaUrl(asset.id)
-        .then((url) => {
-          if (alive) setUrl(url);
+        .then((next) => {
+          mediaUrlCache.set(mediaUrlKey(asset), next);
+          if (alive) setUrl(next);
         })
-        .catch(() => {});
+        .catch(() => {
+          if (alive) setUrl(null);
+        });
     return () => {
       alive = false;
     };
@@ -149,6 +160,7 @@ function MediaLayer({
     if (playing) void media.play().catch(() => {});
     else media.pause();
   }, [localTime, playing, clip.speed, clip.sourceIn, clip.volume, clip.loop, asset.duration, muted, url]);
+  if (url === "" && !asset.missing) return null;
   if (!url || asset.missing)
     return (
       <div className="offline">
@@ -880,6 +892,16 @@ export function ScenePreview({
   const sceneId = `scene-${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
   const definitions: ReactNode[] = [];
   let layers: ReactNode[] = [];
+  // 同轨同素材的媒体片段共用 key：拆分产生新 clip.id 时复用 <video>，预览画面不中断
+  const mediaKeys = new Map<string, number>();
+  const layerKey = (clip: Clip) => {
+    if (!clip.assetId || !["video", "audio", "image"].includes(clip.kind))
+      return clip.id;
+    const base = `media:${clip.trackId}:${clip.assetId}`;
+    const n = mediaKeys.get(base) ?? 0;
+    mediaKeys.set(base, n + 1);
+    return n ? `${base}#${n}` : base;
+  };
   for (const track of [...project.tracks].reverse()) {
     if (!isTrackActive(project.tracks, track.id)) continue;
     for (const clip of active.filter((clip) => clip.trackId === track.id)) {
@@ -900,7 +922,7 @@ export function ScenePreview({
       }
       layers.push(
         <PreviewLayer
-          key={clip.id} clip={clip} project={project} editor={editor} scale={scale}
+          key={layerKey(clip)} clip={clip} project={project} editor={editor} scale={scale}
           muted={!interactive || track.muted || !!editor.narrationRecording?.muted}
           interactive={interactive} cameraScale={camera?.scale ?? 1}
           mode={mode} matteSource={matte}
