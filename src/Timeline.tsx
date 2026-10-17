@@ -33,10 +33,18 @@ import {
   MonitorDot,
 } from "lucide-react";
 import {
-  type Clip, type Marker, projectDuration, uid, newTrack,
+  type Clip,
+  type Marker,
+  projectDuration,
+  uid,
+  newTrack,
 } from "../shared/model";
 import {
-  createMarker, markerEnd, markerFrameTime, putMarker, removeMarker,
+  createMarker,
+  markerEnd,
+  markerFrameTime,
+  putMarker,
+  removeMarker,
 } from "../shared/markers";
 import TimelineMarkers from "./TimelineMarkers";
 import MarkerDialog from "./MarkerDialog";
@@ -105,11 +113,22 @@ import { useViewportZoom, type ZoomPoint } from "./useViewportZoom";
 import { useRAFThrottle } from "./hooks/useRAFThrottle";
 import { usePerformanceMonitor } from "./hooks/usePerformanceMonitor";
 import {
-  animationMime, customAnimationId, animationDropTarget,
+  animationMime,
+  customAnimationId,
+  animationDropTarget,
 } from "../shared/animation-drag";
 import { projectIndex } from "../shared/project-index";
-import { recordingGroups, recordingTimeline, trimRecordingObject } from "../shared/recording-objects";
-import { timelineZoomMin, timelineZoomMax, timelineRulerStep, timelineRulerLabel } from "../shared/timeline-scale";
+import {
+  recordingGroups,
+  recordingTimeline,
+  trimRecordingObject,
+} from "../shared/recording-objects";
+import {
+  timelineZoomMin,
+  timelineZoomMax,
+  timelineRulerStep,
+  timelineRulerLabel,
+} from "../shared/timeline-scale";
 
 interface Drag {
   id: string;
@@ -152,9 +171,15 @@ export default function Timeline({
 
   const { project, apply, playhead, seek, selected, selectedId, select } =
     editor;
-  const timeline = useMemo(() => recordingTimeline(project), [project.clips, project.tracks]);
+  const timeline = useMemo(
+    () => recordingTimeline(project),
+    [project.clips, project.tracks],
+  );
   const timelineTracks = timeline.tracks;
-  const recordingObjects = useMemo(() => recordingGroups(project), [project.clips]);
+  const recordingObjects = useMemo(
+    () => recordingGroups(project),
+    [project.clips],
+  );
   const assetsById = useMemo(
     () => new Map(project.assets.map((asset) => [asset.id, asset])),
     [project.assets],
@@ -178,10 +203,11 @@ export default function Timeline({
   const zoomAnchor = useRef<{ time: number; x: number } | null>(null);
   const scroll = useRef<HTMLDivElement>(null),
     duration = useMemo(
-      () => project.markers.reduce(
-        (end, marker) => Math.max(end, markerEnd(marker) + 5),
-        Math.max(20, projectDuration(project) + 5),
-      ),
+      () =>
+        project.markers.reduce(
+          (end, marker) => Math.max(end, markerEnd(marker) + 5),
+          Math.max(20, projectDuration(project) + 5),
+        ),
       [project.clips, project.markers],
     ),
     width = duration * zoom;
@@ -233,11 +259,13 @@ export default function Timeline({
     setMarkerEditor(marker);
   };
   const addMarker = (start: number, end = start) =>
-    editMarker(createMarker(
-      markerFrameTime(Math.min(start, end), project.canvas.fps),
-      `标记 ${project.markers.length + 1}`,
-      markerFrameTime(Math.abs(end - start), project.canvas.fps),
-    ));
+    editMarker(
+      createMarker(
+        markerFrameTime(Math.min(start, end), project.canvas.fps),
+        `标记 ${project.markers.length + 1}`,
+        markerFrameTime(Math.abs(end - start), project.canvas.fps),
+      ),
+    );
   const [fileDrop, setFileDrop] = useState<{
     time: number;
     trackId?: string;
@@ -273,13 +301,23 @@ export default function Timeline({
       window.removeEventListener("blur", clear);
     };
   }, [animationDrop?.clipId, effectDrop]);
-  const animationAtPointer = (clip: Clip, event: React.DragEvent<HTMLDivElement>) => {
+  const animationAtPointer = (
+    clip: Clip,
+    event: React.DragEvent<HTMLDivElement>,
+  ) => {
     const bounds = event.currentTarget.getBoundingClientRect();
-    const localTime = Math.max(0, Math.min(clip.duration,
-      (event.clientX - bounds.left) / zoom));
-    return dropDisabled ? null : animationDropTarget(
-      project, clip.id, clip.start + localTime, editor.preferences.timing.animation,
+    const localTime = Math.max(
+      0,
+      Math.min(clip.duration, (event.clientX - bounds.left) / zoom),
     );
+    return dropDisabled
+      ? null
+      : animationDropTarget(
+          project,
+          clip.id,
+          clip.start + localTime,
+          editor.preferences.timing.animation,
+        );
   };
   const [marquee, setMarquee] = useState<Marquee | null>(null);
   const marqueeMoved = useRef(false);
@@ -331,7 +369,7 @@ export default function Timeline({
         trackHeightDraft?.projectId === project.id &&
           trackHeightDraft.trackId === track.id
           ? trackHeightDraft.height
-          : track.height ?? defaultTrackHeight,
+          : (track.height ?? defaultTrackHeight),
       );
       const compact = baseHeight < 56;
       const clipInset = compact ? 4 : 9;
@@ -357,14 +395,15 @@ export default function Timeline({
     // Commit all lanes together so one zoom click is one undo step.
     apply((project) =>
       timelineTracks.reduce(
-        (next, track, index) => setTrackHeight(
-          next,
-          track.id,
-          Math.max(
-            trackLayouts[index].minHeight,
-            trackLayouts[index].baseHeight * factor,
+        (next, track, index) =>
+          setTrackHeight(
+            next,
+            track.id,
+            Math.max(
+              trackLayouts[index].minHeight,
+              trackLayouts[index].baseHeight * factor,
+            ),
           ),
-        ),
         project,
       ),
     );
@@ -493,8 +532,7 @@ export default function Timeline({
   const [viewport, setViewport] = useState({ left: 0, width: 1600 });
   const rulerStep = timelineRulerStep(zoom, project.canvas.fps);
   const rulerTicks = useMemo(() => {
-    const count =
-      Math.ceil((viewport.width + 400) / zoom / rulerStep) + 1;
+    const count = Math.ceil((viewport.width + 400) / zoom / rulerStep) + 1;
     const start = Math.max(
       0,
       Math.floor((viewport.left - 200) / zoom / rulerStep),
@@ -506,15 +544,21 @@ export default function Timeline({
     return new Map(
       timelineTracks.map((track) => [
         track.id,
-        index.visible(
-          track.id,
-          (viewport.left - 200) / zoom,
-          (viewport.left + viewport.width + 200) / zoom,
-          drag?.ids,
-        ).filter(clip => !timeline.hidden.has(clip.id)),
+        index
+          .visible(
+            track.id,
+            (viewport.left - 200) / zoom,
+            (viewport.left + viewport.width + 200) / zoom,
+            drag?.ids,
+          )
+          .filter((clip) => !timeline.hidden.has(clip.id)),
       ]),
     );
   }, [project.clips, project.tracks, timeline, viewport, zoom, drag?.ids]);
+  const selectedIdSet = useMemo(
+    () => new Set(editor.selectedIds),
+    [editor.selectedIds],
+  );
   useLayoutEffect(() => {
     const element = scroll.current;
     const labels = headers.current;
@@ -736,7 +780,8 @@ export default function Timeline({
                 editor.selectedIds.includes(clip.id),
               );
               const start = clips.length
-                ? Math.min(...clips.map((clip) => clip.start)) : playhead;
+                ? Math.min(...clips.map((clip) => clip.start))
+                : playhead;
               const end = clips.length
                 ? Math.max(...clips.map((clip) => clip.start + clip.duration))
                 : playhead + 1;
@@ -809,7 +854,11 @@ export default function Timeline({
                 type="button"
                 title="缩小轨道高度"
                 aria-label="缩小轨道高度"
-                disabled={!trackLayouts.some((layout) => layout.baseHeight > layout.minHeight)}
+                disabled={
+                  !trackLayouts.some(
+                    (layout) => layout.baseHeight > layout.minHeight,
+                  )
+                }
                 onClick={() => changeTrackZoom(1 / 1.25)}
               >
                 <ZoomOut size={15} />
@@ -818,7 +867,11 @@ export default function Timeline({
                 type="button"
                 title="放大轨道高度"
                 aria-label="放大轨道高度"
-                disabled={!trackLayouts.some((layout) => layout.baseHeight < maxTrackHeight)}
+                disabled={
+                  !trackLayouts.some(
+                    (layout) => layout.baseHeight < maxTrackHeight,
+                  )
+                }
                 onClick={() => changeTrackZoom(1.25)}
               >
                 <ZoomIn size={15} />
@@ -829,10 +882,15 @@ export default function Timeline({
                 title="添加轨道"
                 aria-label="添加轨道"
                 disabled={project.tracks.length >= 128}
-                onClick={() => apply((project) => ({
-                  ...project,
-                  tracks: [newTrack(project.tracks.length), ...project.tracks],
-                }))}
+                onClick={() =>
+                  apply((project) => ({
+                    ...project,
+                    tracks: [
+                      newTrack(project.tracks.length),
+                      ...project.tracks,
+                    ],
+                  }))
+                }
               >
                 <Plus size={17} />
               </button>
@@ -886,9 +944,7 @@ export default function Timeline({
                           : "锁定 / 解锁轨道"
                     }
                     className={track[key] ? "active-tool" : ""}
-                    onClick={() =>
-                      apply((p) => toggleTrack(p, track.id, key))
-                    }
+                    onClick={() => apply((p) => toggleTrack(p, track.id, key))}
                   >
                     {key === "hidden" ? (
                       track.hidden ? (
@@ -1069,10 +1125,15 @@ export default function Timeline({
               onPointerDown={(event) => {
                 if (event.button !== 0) return;
                 const time = markerFrameTime(
-                  timeFromEvent(event), project.canvas.fps,
+                  timeFromEvent(event),
+                  project.canvas.fps,
                 );
                 if (event.shiftKey)
-                  setMarkerRange({ pointerId: event.pointerId, start: time, end: time });
+                  setMarkerRange({
+                    pointerId: event.pointerId,
+                    start: time,
+                    end: time,
+                  });
                 seek(timeFromEvent(event));
                 editor.setPlaying(false);
                 event.currentTarget.setPointerCapture(event.pointerId);
@@ -1081,14 +1142,23 @@ export default function Timeline({
                 if (markerRange?.pointerId === event.pointerId) {
                   setMarkerRange({
                     ...markerRange,
-                    end: markerFrameTime(timeFromEvent(event), project.canvas.fps),
+                    end: markerFrameTime(
+                      timeFromEvent(event),
+                      project.canvas.fps,
+                    ),
                   });
                 } else if (event.buttons === 1) seek(timeFromEvent(event));
               }}
               onPointerUp={(event) => {
                 if (markerRange?.pointerId !== event.pointerId) return;
-                const end = markerFrameTime(timeFromEvent(event), project.canvas.fps);
-                if (Math.abs(end - markerRange.start) >= 1 / project.canvas.fps - 1e-8)
+                const end = markerFrameTime(
+                  timeFromEvent(event),
+                  project.canvas.fps,
+                );
+                if (
+                  Math.abs(end - markerRange.start) >=
+                  1 / project.canvas.fps - 1e-8
+                )
                   addMarker(markerRange.start, end);
                 setMarkerRange(null);
               }}
@@ -1100,12 +1170,23 @@ export default function Timeline({
                   {timelineRulerLabel(t, project.canvas.fps, rulerStep)}
                 </span>
               ))}
-              <TimelineMarkers editor={editor} zoom={zoom} snap={snap} onEdit={editMarker} />
+              <TimelineMarkers
+                editor={editor}
+                zoom={zoom}
+                snap={snap}
+                onEdit={editMarker}
+              />
               {markerRange && (
-                <div className="marker-range-draft" style={{
-                  left: Math.min(markerRange.start, markerRange.end) * zoom,
-                  width: Math.max(2, Math.abs(markerRange.end - markerRange.start) * zoom),
-                }} />
+                <div
+                  className="marker-range-draft"
+                  style={{
+                    left: Math.min(markerRange.start, markerRange.end) * zoom,
+                    width: Math.max(
+                      2,
+                      Math.abs(markerRange.end - markerRange.start) * zoom,
+                    ),
+                  }}
+                />
               )}
               <div className="ruler-playhead" style={{ left: playhead * zoom }}>
                 <span />
@@ -1248,22 +1329,27 @@ export default function Timeline({
                             : visualDraft?.id === original.id
                               ? visualDraft
                               : original;
-                    const isRecording = !!c.groupId && recordingObjects.get(c.groupId)?.id === c.id;
+                    const isRecording =
+                      !!c.groupId &&
+                      recordingObjects.get(c.groupId)?.id === c.id;
                     const hasTransformAnimation = animationRanges(c).length > 0;
-                    const hasDrawingAnimation = drawingAnimationRanges(c).length > 0;
+                    const hasDrawingAnimation =
+                      drawingAnimationRanges(c).length > 0;
                     return (
                       <Fragment key={c.id}>
                         <div
                           data-clip-id={c.id}
-                          className={`timeline-clip ${c.kind} ${isRecording ? "recording-object" : ""} ${c.caption ? "caption" : ""} ${hasTransformAnimation || hasDrawingAnimation ? "has-animation" : ""} ${hasTransformAnimation && hasDrawingAnimation ? "has-drawing-and-transform" : ""} ${editor.selectedIds.includes(c.id) ? "selected" : ""} ${track.locked ? "locked" : ""} ${effectDrop === c.id ? "effect-drop-target" : ""} ${transitionHighlights.some((item) => item.clipId === c.id) ? "transition-drop-target" : ""}`}
+                          className={`timeline-clip ${c.kind} ${isRecording ? "recording-object" : ""} ${c.caption ? "caption" : ""} ${hasTransformAnimation || hasDrawingAnimation ? "has-animation" : ""} ${hasTransformAnimation && hasDrawingAnimation ? "has-drawing-and-transform" : ""} ${selectedIdSet.has(c.id) ? "selected" : ""} ${track.locked ? "locked" : ""} ${effectDrop === c.id ? "effect-drop-target" : ""} ${transitionHighlights.some((item) => item.clipId === c.id) ? "transition-drop-target" : ""}`}
                           style={{
                             left: c.start * zoom,
                             width: Math.max(4, c.duration * zoom),
-                            top: trackLayouts[trackIndex].clipInset -
-                              (editor.selectedIds.includes(c.id) ? 1 : 0),
+                            top:
+                              trackLayouts[trackIndex].clipInset -
+                              (selectedIdSet.has(c.id) ? 1 : 0),
                             height:
-                              trackLayouts[trackIndex].contentHeight + 2 +
-                              (editor.selectedIds.includes(c.id) ? 2 : 0) +
+                              trackLayouts[trackIndex].contentHeight +
+                              2 +
+                              (selectedIdSet.has(c.id) ? 2 : 0) +
                               (expandedEffects[c.id]
                                 ? 24 *
                                   (Number(hasClipSpeed(c)) +
@@ -1276,14 +1362,24 @@ export default function Timeline({
                                 : undefined,
                           }}
                           onDragOver={(event) => {
-                            if (event.dataTransfer.types.includes(animationMime)) {
+                            if (
+                              event.dataTransfer.types.includes(animationMime)
+                            ) {
                               event.preventDefault();
                               event.stopPropagation();
                               const target = animationAtPointer(c, event);
-                              event.dataTransfer.dropEffect = target ? "copy" : "none";
-                              setAnimationDrop(target ? {
-                                clipId: c.id, start: target.start, end: target.end,
-                              } : null);
+                              event.dataTransfer.dropEffect = target
+                                ? "copy"
+                                : "none";
+                              setAnimationDrop(
+                                target
+                                  ? {
+                                      clipId: c.id,
+                                      start: target.start,
+                                      end: target.end,
+                                    }
+                                  : null,
+                              );
                               setEffectDrop(target ? c.id : null);
                               return;
                             }
@@ -1354,14 +1450,24 @@ export default function Timeline({
                             }
                           }}
                           onDrop={(event) => {
-                            if (event.dataTransfer.types.includes(animationMime)) {
+                            if (
+                              event.dataTransfer.types.includes(animationMime)
+                            ) {
                               event.preventDefault();
                               event.stopPropagation();
                               setAnimationDrop(null);
                               setEffectDrop(null);
-                              if (event.dataTransfer.getData(animationMime) !== customAnimationId) return;
+                              if (
+                                event.dataTransfer.getData(animationMime) !==
+                                customAnimationId
+                              )
+                                return;
                               const target = animationAtPointer(c, event);
-                              if (target) editor.addCustomAnimation(target.clipId, target.end);
+                              if (target)
+                                editor.addCustomAnimation(
+                                  target.clipId,
+                                  target.end,
+                                );
                               return;
                             }
                             if (
@@ -1401,18 +1507,27 @@ export default function Timeline({
                               }
                               return;
                             }
-                            const effect = event.dataTransfer.getData("troncut-effect");
+                            const effect =
+                              event.dataTransfer.getData("troncut-effect");
                             if (!effect) return;
                             event.preventDefault();
                             event.stopPropagation();
                             setEffectDrop(null);
                             if (track.locked) return;
-                            if (effect !== "clip-speed" && effect !== "rounded-corners") {
-                              if (supportsVisualEffect(c, effect)) editor.addVisualEffect(effect as VisualEffectId, c.id);
+                            if (
+                              effect !== "clip-speed" &&
+                              effect !== "rounded-corners"
+                            ) {
+                              if (supportsVisualEffect(c, effect))
+                                editor.addVisualEffect(
+                                  effect as VisualEffectId,
+                                  c.id,
+                                );
                               return;
                             }
                             if (effect === "rounded-corners") {
-                              if (supportsMediaFrame(c)) editor.addRoundedCorners(c.id);
+                              if (supportsMediaFrame(c))
+                                editor.addRoundedCorners(c.id);
                               return;
                             }
                             if (!supportsClipSpeed(c)) return;
@@ -1440,13 +1555,12 @@ export default function Timeline({
                               select(c.id, true);
                               return;
                             }
-                            const ids = editor.selectedIds.includes(c.id)
+                            const ids = selectedIdSet.has(c.id)
                               ? editor.selectedIds
                               : c.caption
                                 ? captionTrackSelection(project, c.id)
                                 : selectionWithGroups(project, [c.id]);
-                            if (!editor.selectedIds.includes(c.id))
-                              select(c.id);
+                            if (!selectedIdSet.has(c.id)) select(c.id);
                             else if (c.caption)
                               editor.selectMany([
                                 ...ids.filter((id) => id !== c.id),
@@ -1516,8 +1630,13 @@ export default function Timeline({
                                     next.start - drag.original.start,
                                   ),
                                 );
-                              else if (drag.original.recording && drag.original.groupId)
-                                apply(p => trimRecordingObject(p, drag.original, next));
+                              else if (
+                                drag.original.recording &&
+                                drag.original.groupId
+                              )
+                                apply((p) =>
+                                  trimRecordingObject(p, drag.original, next),
+                                );
                               else editor.updateClip(drag.id, next);
                             }
                             setDrag(null);
@@ -1555,15 +1674,23 @@ export default function Timeline({
                               data-end={animationDrop.end}
                               style={{
                                 left: (animationDrop.start - c.start) * zoom,
-                                width: Math.max(2, (animationDrop.end - animationDrop.start) * zoom),
+                                width: Math.max(
+                                  2,
+                                  (animationDrop.end - animationDrop.start) *
+                                    zoom,
+                                ),
                               }}
                             >
-                              <span>动画终点 {timeLabel(animationDrop.end)}</span>
+                              <span>
+                                动画终点 {timeLabel(animationDrop.end)}
+                              </span>
                             </div>
                           )}
                           <div
                             className="clip-content"
-                            style={{ height: trackLayouts[trackIndex].contentHeight }}
+                            style={{
+                              height: trackLayouts[trackIndex].contentHeight,
+                            }}
                           >
                             <span
                               className="trim-handle left"
@@ -1571,7 +1698,12 @@ export default function Timeline({
                             />
                             <div className="clip-label">
                               {isRecording ? (
-                                <MonitorDot size={15} className="recording-object-icon" role="img" aria-label="录屏组合" />
+                                <MonitorDot
+                                  size={15}
+                                  className="recording-object-icon"
+                                  role="img"
+                                  aria-label="录屏组合"
+                                />
                               ) : c.kind === "text" ? (
                                 <Type size={13} />
                               ) : c.kind === "audio" ? (
@@ -1579,10 +1711,19 @@ export default function Timeline({
                               ) : (
                                 <span className="clip-media-icon">▣</span>
                               )}
-                              <span title={isRecording ? `录屏组合 · ${c.name}` : c.kind === "text" ? c.text : c.name}>
+                              <span
+                                title={
+                                  isRecording
+                                    ? `录屏组合 · ${c.name}`
+                                    : c.kind === "text"
+                                      ? c.text
+                                      : c.name
+                                }
+                              >
                                 {c.groupId && !isRecording ? "▧ " : ""}
                                 {c.kind === "text"
-                                  ? c.text?.replace(/\s+/g, " ").trim() || c.name
+                                  ? c.text?.replace(/\s+/g, " ").trim() ||
+                                    c.name
                                   : c.name}
                               </span>
                               {c.speed !== 1 && (
@@ -1613,59 +1754,76 @@ export default function Timeline({
                                 );
                               })()}
                             {(["transform", "drawing"] as const)
-                              .filter(channel => channel === "transform" || hasDrawingAnimation)
-                              .map(channel => <TimelineAnimations
-                              key={channel}
-                              channel={channel}
-                              clip={c}
-                              viewportStart={(viewport.left - 200) / zoom}
-                              viewportEnd={
-                                (viewport.left + viewport.width + 200) / zoom
-                              }
-                              zoom={zoom}
-                              playhead={playhead}
-                              fps={project.canvas.fps}
-                              selected={editor.selectedIds.includes(c.id)}
-                              selectedFrame={
-                                channel === "drawing" ? (editor.selectedDrawing?.clipId === c.id ? editor.selectedDrawing : null) : editor.selectedKeyframe?.clipId === c.id
-                                  ? editor.selectedKeyframe
-                                  : null
-                              }
-                              locked={track.locked}
-                              copy={(range, cut) =>
-                                onCopyAnimation(c.id, range, cut)
-                              }
-                              remove={(range) =>
-                                editor.deleteAnimation(c.id, range)
-                              }
-                              commit={(clip) =>
-                                editor.updateClip(c.id, (current) => ({
-                                  ...current,
-                                  transform: clip.transform,
-                                  keyframes: clip.keyframes,
-                                  drawing: clip.drawing,
-                                }))
-                              }
-                              locate={(time, side, kind) => {
-                                if (track.locked) {
-                                  editor.setPlaying(false);
-                                  select(c.id);
-                                  seek(time);
-                                } else if (kind === "drawing") editor.editDrawing(c.id, time - c.start, side);
-                                else
-                                  editor.editKeyframe(
-                                    c.id,
-                                    time - c.start,
-                                    side,
-                                  );
-                              }}
-                            />)}
+                              .filter(
+                                (channel) =>
+                                  channel === "transform" ||
+                                  hasDrawingAnimation,
+                              )
+                              .map((channel) => (
+                                <TimelineAnimations
+                                  key={channel}
+                                  channel={channel}
+                                  clip={c}
+                                  viewportStart={(viewport.left - 200) / zoom}
+                                  viewportEnd={
+                                    (viewport.left + viewport.width + 200) /
+                                    zoom
+                                  }
+                                  zoom={zoom}
+                                  playhead={playhead}
+                                  fps={project.canvas.fps}
+                                  selected={selectedIdSet.has(c.id)}
+                                  selectedFrame={
+                                    channel === "drawing"
+                                      ? editor.selectedDrawing?.clipId === c.id
+                                        ? editor.selectedDrawing
+                                        : null
+                                      : editor.selectedKeyframe?.clipId === c.id
+                                        ? editor.selectedKeyframe
+                                        : null
+                                  }
+                                  locked={track.locked}
+                                  copy={(range, cut) =>
+                                    onCopyAnimation(c.id, range, cut)
+                                  }
+                                  remove={(range) =>
+                                    editor.deleteAnimation(c.id, range)
+                                  }
+                                  commit={(clip) =>
+                                    editor.updateClip(c.id, (current) => ({
+                                      ...current,
+                                      transform: clip.transform,
+                                      keyframes: clip.keyframes,
+                                      drawing: clip.drawing,
+                                    }))
+                                  }
+                                  locate={(time, side, kind) => {
+                                    if (track.locked) {
+                                      editor.setPlaying(false);
+                                      select(c.id);
+                                      seek(time);
+                                    } else if (kind === "drawing")
+                                      editor.editDrawing(
+                                        c.id,
+                                        time - c.start,
+                                        side,
+                                      );
+                                    else
+                                      editor.editKeyframe(
+                                        c.id,
+                                        time - c.start,
+                                        side,
+                                      );
+                                  }}
+                                />
+                              ))}
                             <span
                               className="trim-handle right"
                               data-trim="right"
                             />
                           </div>
-                          {(hasClipSpeed(c) || hasBehaviors(c) ||
+                          {(hasClipSpeed(c) ||
+                            hasBehaviors(c) ||
                             visualEffectEntries(c).length > 0) && (
                             <button
                               className="clip-effects-toggle"
@@ -1752,7 +1910,9 @@ export default function Timeline({
                                     setActiveVisual({ clipId: c.id, id });
                                   }}
                                   preview={setVisualDraft}
-                                  commit={(next) => editor.updateClip(next.id, next)}
+                                  commit={(next) =>
+                                    editor.updateClip(next.id, next)
+                                  }
                                 />
                               ))}
                             </div>
@@ -1801,8 +1961,13 @@ export default function Timeline({
           <span className="separator-dot">·</span>Shift+拖动标尺 区域标记
         </span>
         <span>
-          {timeline.clips.length} 个片段 · 已选 {timeline.clips.filter(clip => editor.selectedIds.includes(clip.id)).length} ·{" "}
-          {timeLabel(projectDuration(project))}
+          {timeline.clips.length} 个片段 · 已选{" "}
+          {
+            timeline.clips.filter((clip) =>
+              editor.selectedIds.includes(clip.id),
+            ).length
+          }{" "}
+          · {timeLabel(projectDuration(project))}
         </span>
       </div>
       {markerEditor && (
@@ -1810,7 +1975,9 @@ export default function Timeline({
           key={`${project.id}-${markerEditor.id}`}
           marker={markerEditor}
           fps={project.canvas.fps}
-          existing={project.markers.some((marker) => marker.id === markerEditor.id)}
+          existing={project.markers.some(
+            (marker) => marker.id === markerEditor.id,
+          )}
           onClose={() => setMarkerEditor(null)}
           onSave={(marker) => {
             apply((project) => putMarker(project, marker));
@@ -1941,7 +2108,8 @@ export default function Timeline({
               </button>
               <button
                 disabled={
-                  selectionLocked || playhead <= clip.start ||
+                  selectionLocked ||
+                  playhead <= clip.start ||
                   playhead >= clip.start + clip.duration
                 }
                 onClick={() => {

@@ -6,7 +6,11 @@ import {
 import { effectWindow, type EffectWindow } from "./effect-timing";
 
 export type RangedVisualEffectId = AdditionalVisualEffectId | "rounded-corners";
-export function visualEffectEntries(clip: Clip) {
+const entriesCache = new WeakMap<
+  Clip,
+  ReturnType<typeof buildVisualEffectEntries>
+>();
+function buildVisualEffectEntries(clip: Clip) {
   return [
     ...(clip.mediaFrame
       ? [
@@ -23,6 +27,13 @@ export function visualEffectEntries(clip: Clip) {
         : [],
     ),
   ];
+}
+export function visualEffectEntries(clip: Clip) {
+  const cached = entriesCache.get(clip);
+  if (cached) return cached;
+  const entries = buildVisualEffectEntries(clip);
+  entriesCache.set(clip, entries);
+  return entries;
 }
 export function rangedVisualEffect(clip: Clip, id: RangedVisualEffectId) {
   return id === "rounded-corners" ? clip.mediaFrame : clip.visualEffects?.[id];

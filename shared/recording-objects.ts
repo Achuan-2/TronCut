@@ -12,8 +12,12 @@ import {
 } from "./recording-camera";
 import type { RecordingSettings } from "./recording-settings";
 
+const groupsCache = new WeakMap<readonly Clip[], Map<string, Clip>>();
+
 /** Recording objects keep ordinary editable media underneath one timeline entry. */
 export function recordingGroups(project: Pick<Project, "clips">) {
+  const cached = groupsCache.get(project.clips);
+  if (cached) return cached;
   const members = new Map<string, Clip[]>();
   for (const clip of project.clips) {
     if (!clip.groupId) continue;
@@ -29,6 +33,7 @@ export function recordingGroups(project: Pick<Project, "clips">) {
     if (masters.length === 1 && clips.every((clip) => clip.recordingRole))
       groups.set(id, masters[0]);
   }
+  groupsCache.set(project.clips, groups);
   return groups;
 }
 

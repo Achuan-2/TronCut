@@ -1,4 +1,7 @@
-import { addMediaFrame as addFrameEffect, supportsMediaFrame } from "../shared/media-frame";
+import {
+  addMediaFrame as addFrameEffect,
+  supportsMediaFrame,
+} from "../shared/media-frame";
 import {
   addVisualEffect as addVisualEffectToClip,
   isAdditionalVisualEffect,
@@ -139,10 +142,16 @@ export function useEditor(
   const [project, setProject] = useState<Project>(() => createProject());
   const [editingTextId, setEditingTextId] = useState<string | null>(null);
   const [zoomPanDraft, setZoomPanDraft] = useState<Transform | null>(null);
-  const [canvasMode, setCanvasMode] = useState<"select" | "crop" | "draw">("select");
+  const [canvasMode, setCanvasMode] = useState<"select" | "crop" | "draw">(
+    "select",
+  );
   const [penToolRequest, setPenToolRequest] = useState(0);
   const [penSettings, setPenSettings] = useState<PenSettings>({
-    color: "#ff2020", width: 8, brush: "round", animate: true, duration: 1,
+    color: "#ff2020",
+    width: 8,
+    brush: "round",
+    animate: true,
+    duration: 1,
   });
   const [penDraft, setPenDraft] = useState<DrawingStroke[]>([]);
   const penStart = useRef<number | null>(null);
@@ -201,7 +210,8 @@ export function useEditor(
   );
   const lastSelectedId = selectedIds.at(-1);
   const selectedId = lastSelectedId
-    ? recordingMaster(project, lastSelectedId)?.id ?? lastSelectedId : null;
+    ? (recordingMaster(project, lastSelectedId)?.id ?? lastSelectedId)
+    : null;
   const setEditAllCaptions = useCallback(
     (all: boolean) => {
       setEditAllCaptionsState(all);
@@ -216,28 +226,31 @@ export function useEditor(
     },
     [selectedId, clearKeyframeEdit],
   );
-  const select = useCallback((id: string | null, additive = false) => {
-    setBehaviorSelection(null);
-    setTransitionSelection(null);
-    if (id && !additive && keyframeRef.current?.clipId === id) return;
-    clearKeyframeEdit();
-    if (!id) {
-      selectMany([]);
-      return;
-    }
-    const clip = current.current.clips.find((clip) => clip.id === id);
-    const group =
-      clip?.caption && !additive
-        ? captionTrackSelection(current.current, id, editAllCaptions)
-        : selectionWithGroups(current.current, [id]);
-    selectMany((previous) =>
-      additive
-        ? previous.includes(id)
-          ? previous.filter((x) => !group.includes(x))
-          : [...new Set([...previous, ...group])]
-        : group,
-    );
-  }, [clearKeyframeEdit, editAllCaptions]);
+  const select = useCallback(
+    (id: string | null, additive = false) => {
+      setBehaviorSelection(null);
+      setTransitionSelection(null);
+      if (id && !additive && keyframeRef.current?.clipId === id) return;
+      clearKeyframeEdit();
+      if (!id) {
+        selectMany([]);
+        return;
+      }
+      const clip = current.current.clips.find((clip) => clip.id === id);
+      const group =
+        clip?.caption && !additive
+          ? captionTrackSelection(current.current, id, editAllCaptions)
+          : selectionWithGroups(current.current, [id]);
+      selectMany((previous) =>
+        additive
+          ? previous.includes(id)
+            ? previous.filter((x) => !group.includes(x))
+            : [...new Set([...previous, ...group])]
+          : group,
+      );
+    },
+    [clearKeyframeEdit, editAllCaptions],
+  );
   const [playhead, setPlayhead] = useState(1.2);
   const seek = useCallback(
     (next: SetStateAction<number>) => {
@@ -246,6 +259,11 @@ export function useEditor(
     },
     [clearKeyframeEdit],
   );
+  // Playback advances dozens of times per second. It only moves the clock and
+  // must not pay for interactive seek cleanup on every frame.
+  const advancePlayback = useCallback((next: number) => {
+    setPlayhead((current) => (current === next ? current : next));
+  }, []);
   const [playing, setPlayingState] = useState(false);
   const [narrationRecording, setNarrationRecording] = useState<{
     muted: boolean;
@@ -454,12 +472,14 @@ export function useEditor(
   const updateMask = useCallback(
     (id: string, patch: Partial<MaskGeometry>) => {
       const frame = keyframeRef.current;
-      updateClip(id, (clip) => animateMask(clip, patch, {
-        time: playhead - clip.start,
-        auto: autoAnimate,
-        duration: defaults.current.timing.animation,
-        endpoint: frame?.clipId === id ? frame : undefined,
-      }));
+      updateClip(id, (clip) =>
+        animateMask(clip, patch, {
+          time: playhead - clip.start,
+          auto: autoAnimate,
+          duration: defaults.current.timing.animation,
+          endpoint: frame?.clipId === id ? frame : undefined,
+        }),
+      );
     },
     [updateClip, playhead, autoAnimate],
   );
@@ -555,17 +575,30 @@ export function useEditor(
   );
   const editDrawing = useCallback(
     (clipId: string, localTime: number, side: "start" | "end") => {
-      const clip = current.current.clips.find(clip => clip.id === clipId);
-      const track = current.current.tracks.find(track => track.id === clip?.trackId);
-      if (!clip || !track || track.locked || track.hidden ||
-        !drawingAnimationRanges(clip).some(range =>
-          Math.abs((side === "start" ? range.start : range.end) - localTime) < 1e-6))
+      const clip = current.current.clips.find((clip) => clip.id === clipId);
+      const track = current.current.tracks.find(
+        (track) => track.id === clip?.trackId,
+      );
+      if (
+        !clip ||
+        !track ||
+        track.locked ||
+        track.hidden ||
+        !drawingAnimationRanges(clip).some(
+          (range) =>
+            Math.abs((side === "start" ? range.start : range.end) - localTime) <
+            1e-6,
+        )
+      )
         return;
       clearKeyframeEdit();
       setBehaviorSelection(null);
       setTransitionSelection(null);
       setDrawingSelection({
-        clipId, time: localTime + (clip.animationOffset ?? 0), localTime, side,
+        clipId,
+        time: localTime + (clip.animationOffset ?? 0),
+        localTime,
+        side,
       });
       selectMany([clipId]);
       setPlayingState(false);
@@ -792,7 +825,8 @@ export function useEditor(
       const duration = Math.max(
         defaults.current.timing.annotation,
         template.kind === "shape" && template.drawing?.enabled
-          ? template.drawing.delay + template.drawing.duration : 0,
+          ? template.drawing.delay + template.drawing.duration
+          : 0,
       );
       const preferred = trackId
         ? p.tracks.filter(
@@ -830,33 +864,47 @@ export function useEditor(
   );
   const addPenStroke = (stroke: DrawingStroke) => {
     penStart.current ??= playhead;
-    setPenDraft(strokes => [...strokes, stroke]);
+    setPenDraft((strokes) => [...strokes, stroke]);
   };
   const finishDrawing = () => {
     const result = freehandAnnotation(penDraft, penSettings, project.canvas);
-    if (result) addAnnotation(
-      result.template, penStart.current ?? playhead, undefined, result.position,
-    );
+    if (result)
+      addAnnotation(
+        result.template,
+        penStart.current ?? playhead,
+        undefined,
+        result.position,
+      );
     setCanvasMode("select");
   };
   const activatePen = () => {
     setPlaying(false);
     if (editingTextId) endTextEdit(editingTextId);
     setCanvasMode("draw");
-    setPenToolRequest(value => value + 1);
+    setPenToolRequest((value) => value + 1);
   };
-  const addRoundedCorners = useCallback((id?: string) => {
-    const project = current.current;
-    const ids = id ? [id] : selectedIds;
-    const clips = project.clips.map((clip) =>
-      ids.includes(clip.id) && !project.tracks.find((track) => track.id === clip.trackId)?.locked
-        ? addFrameEffect(clip) : clip,
-    );
-    if (clips.some((clip, index) => clip !== project.clips[index])) apply({ ...project, clips });
-    if (id && project.clips.some((clip) => clip.id === id && supportsMediaFrame(clip))) select(id);
-    clearKeyframeEdit();
-    setPlaying(false);
-  }, [apply, selectedIds, select, clearKeyframeEdit, setPlaying]);
+  const addRoundedCorners = useCallback(
+    (id?: string) => {
+      const project = current.current;
+      const ids = id ? [id] : selectedIds;
+      const clips = project.clips.map((clip) =>
+        ids.includes(clip.id) &&
+        !project.tracks.find((track) => track.id === clip.trackId)?.locked
+          ? addFrameEffect(clip)
+          : clip,
+      );
+      if (clips.some((clip, index) => clip !== project.clips[index]))
+        apply({ ...project, clips });
+      if (
+        id &&
+        project.clips.some((clip) => clip.id === id && supportsMediaFrame(clip))
+      )
+        select(id);
+      clearKeyframeEdit();
+      setPlaying(false);
+    },
+    [apply, selectedIds, select, clearKeyframeEdit, setPlaying],
+  );
   const addSpeedEffect = useCallback(
     (id?: string) => {
       const p = current.current;
@@ -899,7 +947,15 @@ export function useEditor(
       clearKeyframeEdit();
       setPlaying(false);
     },
-    [addSpeedEffect, addRoundedCorners, selectedIds, apply, select, clearKeyframeEdit, setPlaying],
+    [
+      addSpeedEffect,
+      addRoundedCorners,
+      selectedIds,
+      apply,
+      select,
+      clearKeyframeEdit,
+      setPlaying,
+    ],
   );
   const selectTransition = useCallback(
     (selection: TransitionSelection) => {
@@ -958,7 +1014,10 @@ export function useEditor(
           p.tracks.find((track) => track.id === clip.trackId)?.locked
         )
           return clip;
-        const behavior = { ...behaviorFromPreset(preset, clip.duration, clip.kind), name: preset.name };
+        const behavior = {
+          ...behaviorFromPreset(preset, clip.duration, clip.kind),
+          name: preset.name,
+        };
         added = { clipId: clip.id, behaviorId: behavior.id };
         return { ...clip, behaviors: [...(clip.behaviors ?? []), behavior] };
       });
@@ -1199,7 +1258,11 @@ export function useEditor(
     if (next === clip) return false;
     updateClip(clip.id, next);
     if (animationClipboard.current.value.drawing) {
-      editDrawing(clip.id, playhead - clip.start + animationClipboard.current.value.duration, "end");
+      editDrawing(
+        clip.id,
+        playhead - clip.start + animationClipboard.current.value.duration,
+        "end",
+      );
       return true;
     }
     editKeyframe(
@@ -1234,17 +1297,25 @@ export function useEditor(
       ? keyframeSelection
       : null;
   keyframeRef.current = selectedKeyframe;
-  const selectedDrawingRange = drawingSelection &&
-    selected?.id === drawingSelection.clipId && !playing &&
-    !editingTrack?.locked && !editingTrack?.hidden &&
+  const selectedDrawingRange =
+    drawingSelection &&
+    selected?.id === drawingSelection.clipId &&
+    !playing &&
+    !editingTrack?.locked &&
+    !editingTrack?.hidden &&
     Math.abs(playhead - selected.start - drawingSelection.localTime) < 1e-6
-      ? drawingAnimationRanges(selected).find(range =>
-          Math.abs((drawingSelection.side === "start" ? range.start : range.end) -
-            drawingSelection.localTime) < 1e-6) ?? null
+      ? (drawingAnimationRanges(selected).find(
+          (range) =>
+            Math.abs(
+              (drawingSelection.side === "start" ? range.start : range.end) -
+                drawingSelection.localTime,
+            ) < 1e-6,
+        ) ?? null)
       : null;
   const selectedDrawing = selectedDrawingRange ? drawingSelection : null;
-  const selectedAnimation = selectedDrawingRange ?? (
-    selectedKeyframe && selected
+  const selectedAnimation =
+    selectedDrawingRange ??
+    (selectedKeyframe && selected
       ? (animationRanges(selected).find(
           (range) =>
             Math.abs(
@@ -1274,6 +1345,7 @@ export function useEditor(
     selectCaptionTrack,
     playhead,
     seek,
+    advancePlayback,
     playing,
     setPlaying,
     narrationRecording,

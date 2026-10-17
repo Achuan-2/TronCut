@@ -76,16 +76,65 @@ export interface AnimationRange {
   kind?: "drawing";
 }
 
+// Clips are immutable snapshots in the editor. Playback requests the same
+// ranges every frame, so retain them with the clip object and let GC evict old
+// edits automatically.
+const transformRangeCache = new WeakMap<
+  object,
+  {
+    keyframes: unknown;
+    transform: unknown;
+    animationOffset: number;
+    duration: number;
+    rotation?: number;
+    ranges: AnimationRange[];
+  }
+>();
+const drawingRangeCache = new WeakMap<
+  object,
+  {
+    drawing: unknown;
+    animationOffset: number;
+    duration: number;
+    ranges: AnimationRange[];
+  }
+>();
+
 /** Drawing is an independent animation channel and may overlap transforms. */
 export function drawingAnimationRanges(
   clip: Pick<Clip, "drawing" | "animationOffset" | "duration">,
 ): AnimationRange[] {
+  const offset = clip.animationOffset ?? 0;
+  const cached = drawingRangeCache.get(clip);
+  if (
+    cached &&
+    cached.drawing === clip.drawing &&
+    cached.animationOffset === offset &&
+    cached.duration === clip.duration
+  )
+    return cached.ranges;
   const drawing = clip.drawing;
-  if (!drawing?.enabled || drawing.frozenProgress !== undefined) return [];
-  const start = drawing.delay - (clip.animationOffset ?? 0);
+  if (!drawing?.enabled || drawing.frozenProgress !== undefined) {
+    drawingRangeCache.set(clip, {
+      drawing: clip.drawing,
+      animationOffset: offset,
+      duration: clip.duration,
+      ranges: [],
+    });
+    return [];
+  }
+  const start = drawing.delay - offset;
   const end = start + drawing.duration;
-  if (end <= 0 || start >= clip.duration) return [];
-  return [
+  if (end <= 0 || start >= clip.duration) {
+    drawingRangeCache.set(clip, {
+      drawing: clip.drawing,
+      animationOffset: offset,
+      duration: clip.duration,
+      ranges: [],
+    });
+    return [];
+  }
+  const ranges: AnimationRange[] = [
     {
       kind: "drawing",
       start: Math.max(0, start),
@@ -94,6 +143,13 @@ export function drawingAnimationRanges(
       hasEnd: end <= clip.duration,
     },
   ];
+  drawingRangeCache.set(clip, {
+    drawing: clip.drawing,
+    animationOffset: offset,
+    duration: clip.duration,
+    ranges,
+  });
+  return ranges;
 }
 
 /** Ranges from animationRanges are ordered and do not overlap. Keep the global
@@ -454,9 +510,19 @@ export function animationRanges(
     "transform" | "keyframes" | "animationOffset" | "duration" | "rotation"
   >,
 ): AnimationRange[] {
+  const offset = clip.animationOffset ?? 0;
+  const cached = transformRangeCache.get(clip);
+  if (
+    cached &&
+    cached.keyframes === clip.keyframes &&
+    cached.transform === clip.transform &&
+    cached.animationOffset === offset &&
+    cached.duration === clip.duration &&
+    cached.rotation === clip.rotation
+  )
+    return cached.ranges;
   const frames = [...clip.keyframes].sort((a, b) => a.time - b.time);
   if (frames[0]?.time > 0) frames.unshift({ time: 0, value: clip.transform });
-  const offset = clip.animationOffset ?? 0;
   const ranges: AnimationRange[] = [];
   const groups = new Map(
     recordingSegments(frames).map((group) => [group.start + 1, group]),
@@ -485,5 +551,13 @@ export function animationRanges(
       ...(group?.motion ? { motion: group.motion } : {}),
     });
   }
+  transformRangeCache.set(clip, {
+    keyframes: clip.keyframes,
+    transform: clip.transform,
+    animationOffset: offset,
+    duration: clip.duration,
+    rotation: clip.rotation,
+    ranges,
+  });
   return ranges;
 }

@@ -33,10 +33,16 @@ import {
   fadeOpacity,
   previewFilter,
 } from "../shared/effects";
-import { cursorAt, cursorSvg, cursorAnchor, cursorAspect, defaultCursorStyle } from "../shared/cursor";
+import {
+  cursorAt,
+  cursorSvg,
+  cursorAnchor,
+  cursorAspect,
+  defaultCursorStyle,
+} from "../shared/cursor";
 import { depthScale } from "../shared/rotation";
 import { mediaFrameRadii } from "../shared/media-frame";
-import { recordingMaster } from "../shared/recording-objects";
+import { recordingGroups, recordingMaster } from "../shared/recording-objects";
 import { cameraAt, resizeHandles, resizeTransform } from "../shared/canvas";
 import { setVideoZoomPan, unzoomVideoPreview } from "../shared/video-zoom-pan";
 import {
@@ -47,7 +53,6 @@ import {
   type TextBox,
 } from "../shared/text";
 import { textBoxFor, fittedTextFont } from "./text";
-import { isTrackActive } from "../shared/tracks";
 import {
   croppedTransform,
   dragCrop,
@@ -81,7 +86,11 @@ import EffectRegionOverlay from "./EffectRegionOverlay";
 import type { Region } from "../shared/visual-effects";
 import { effectActive } from "../shared/effect-timing";
 import BehaviorText from "./BehaviorText";
-import { annotationSvgBody, drawingProgress, shapeSize } from "../shared/annotation-style";
+import {
+  annotationSvgBody,
+  drawingProgress,
+  shapeSize,
+} from "../shared/annotation-style";
 import AnnotationEffectLayer from "./AnnotationEffectLayer";
 import CanvasDrawingOverlay from "./CanvasDrawingOverlay";
 import ClipContextMenu, {
@@ -91,7 +100,9 @@ import ClipContextMenu, {
 import { useViewportZoom, type ZoomPoint } from "./useViewportZoom";
 import { useRAFThrottle } from "./hooks/useRAFThrottle";
 import {
-  animationMime, customAnimationId, animationDropTarget,
+  animationMime,
+  customAnimationId,
+  animationDropTarget,
 } from "../shared/animation-drag";
 
 export function timeLabel(t: number): string {
@@ -119,20 +130,36 @@ function MediaLayer({
   useEffect(() => {
     const media = ref.current;
     if (!media) return;
+    media.playbackRate = clip.speed;
+    media.preservesPitch = true;
+    media.volume = Math.min(1, clip.volume);
+    media.muted = muted;
+    if (playing) {
+      if (media.paused) void media.play().catch(() => {});
+    } else if (!media.paused) media.pause();
+  }, [playing, clip.speed, clip.volume, muted, url]);
+  useEffect(() => {
+    const media = ref.current;
+    if (!media) return;
     const absoluteTime = clip.sourceIn + localTime * clip.speed;
-    const sourceTime = clip.loop && asset.duration > 0 ? absoluteTime % asset.duration : absoluteTime;
+    const sourceTime =
+      clip.loop && asset.duration > 0
+        ? absoluteTime % asset.duration
+        : absoluteTime;
     if (
       Number.isFinite(media.duration) &&
       Math.abs(media.currentTime - sourceTime) > (playing ? 0.22 : 0.025)
     )
       media.currentTime = Math.min(media.duration, sourceTime);
-    media.playbackRate = clip.speed;
-    media.preservesPitch = true;
-    media.volume = Math.min(1, clip.volume);
-    media.muted = muted;
-    if (playing) void media.play().catch(() => {});
-    else media.pause();
-  }, [localTime, playing, clip.speed, clip.sourceIn, clip.volume, clip.loop, asset.duration, muted, url]);
+  }, [
+    localTime,
+    playing,
+    clip.speed,
+    clip.sourceIn,
+    clip.loop,
+    asset.duration,
+    url,
+  ]);
   if (asset.missing)
     return (
       <div className="offline">
@@ -143,9 +170,10 @@ function MediaLayer({
     );
   const syncLoaded = () => {
     if (ref.current)
-      ref.current.currentTime = clip.loop && asset.duration > 0
-        ? (clip.sourceIn + localTime * clip.speed) % asset.duration
-        : clip.sourceIn + localTime * clip.speed;
+      ref.current.currentTime =
+        clip.loop && asset.duration > 0
+          ? (clip.sourceIn + localTime * clip.speed) % asset.duration
+          : clip.sourceIn + localTime * clip.speed;
   };
   if (clip.kind === "image")
     return <img draggable={false} src={url} alt={asset.name} />;
@@ -175,6 +203,8 @@ function PreviewLayer({
   cameraScale = 1,
   mode = "select",
   matteSource = false,
+  recording,
+  track,
 }: {
   clip: Clip;
   project: Project;
@@ -185,6 +215,8 @@ function PreviewLayer({
   cameraScale?: number;
   mode?: CanvasMode;
   matteSource?: boolean;
+  recording?: Clip;
+  track: Project["tracks"][number];
 }) {
   const localTime = Math.max(
     0,
@@ -198,8 +230,10 @@ function PreviewLayer({
   const held =
     editor.playhead < clip.start ||
     editor.playhead >= clip.start + clip.duration;
-  const recording = useMemo(() => recordingMaster(project, clip.id), [project.clips, clip.id]);
-  const selectedObjectPart = interactive && editor.selectedIds.includes(clip.id) && (!recording || recording.id === clip.id);
+  const selectedObjectPart =
+    interactive &&
+    editor.selectedIds.includes(clip.id) &&
+    (!recording || recording.id === clip.id);
   const sampleTransform = useMemo(() => createTransformSampler(clip), [clip]);
   const transform = sampleTransform(localTime),
     asset = useMemo(
@@ -209,7 +243,6 @@ function PreviewLayer({
   clip = visualClipAt(clip, transform);
   const editing = interactive && editor.editingTextId === clip.id;
   const textInput = useRef<HTMLTextAreaElement>(null);
-  const track = project.tracks.find((t) => t.id === clip.trackId);
   useEffect(() => {
     if (editing) {
       textInput.current?.focus();
@@ -260,12 +293,15 @@ function PreviewLayer({
   // RAF-throttled gesture updates for smooth 60fps dragging
   const scheduleDragUpdate = useRAFThrottle<typeof drag>(setDrag);
 
-  const setGesture = useCallback((value: typeof drag) => {
-    // Pointer-up can arrive before React renders the latest pointer-move. Keep
-    // the live gesture in a ref so a fast drag still commits its final position.
-    dragRef.current = value;
-    scheduleDragUpdate(value);
-  }, [scheduleDragUpdate]);
+  const setGesture = useCallback(
+    (value: typeof drag) => {
+      // Pointer-up can arrive before React renders the latest pointer-move. Keep
+      // the live gesture in a ref so a fast drag still commits its final position.
+      dragRef.current = value;
+      scheduleDragUpdate(value);
+    },
+    [scheduleDragUpdate],
+  );
   const displayed = editing
     ? (drag?.value ?? transform)
     : transitionTransform(
@@ -335,7 +371,8 @@ function PreviewLayer({
   );
   if (effects.flipX) radii = [radii[1], radii[0], radii[3], radii[2]];
   if (effects.flipY) radii = [radii[3], radii[2], radii[1], radii[0]];
-  const selectable = interactive && !track?.locked && clip.kind !== "audio" && mode !== "draw";
+  const selectable =
+    interactive && !track?.locked && clip.kind !== "audio" && mode !== "draw";
   const [effectDrop, setEffectDrop] = useState(false);
   useEffect(() => {
     if (!effectDrop) return;
@@ -362,27 +399,49 @@ function PreviewLayer({
   );
   const effectTime = Object.values(clip.visualEffects ?? {}).some(
     (effect) => effect?.easeIn || effect?.easeOut || effect?.window,
-  ) ? localTime : 0;
-  const effectMarkup = useMemo(() => visualEffectSvg(
-    regionDraft ? {
-      ...clip,
-      visualEffects: {
-        ...clip.visualEffects,
-        [regionDraft.id]: {
-          ...clip.visualEffects?.[regionDraft.id],
-          ...regionDraft.geometry,
-        },
-      },
-    } : clip,
-    Number(style.width) || 1,
-    Number(style.height) || 1,
-    scale,
-    effectTime,
-    filterId,
-  ), [clip.visualEffects, clip.style, clip.duration, style.width, style.height, scale, effectTime, filterId, regionDraft]);
-  const regionId = Object.keys(clip.visualEffects ?? {}).reverse().find(
-    (id) => (id === "mask" || id === "blur-region") && clip.visualEffects?.[id]?.enabled,
-  ) as "mask" | "blur-region" | undefined;
+  )
+    ? localTime
+    : 0;
+  const effectMarkup = useMemo(
+    () =>
+      visualEffectSvg(
+        regionDraft
+          ? {
+              ...clip,
+              visualEffects: {
+                ...clip.visualEffects,
+                [regionDraft.id]: {
+                  ...clip.visualEffects?.[regionDraft.id],
+                  ...regionDraft.geometry,
+                },
+              },
+            }
+          : clip,
+        Number(style.width) || 1,
+        Number(style.height) || 1,
+        scale,
+        effectTime,
+        filterId,
+      ),
+    [
+      clip.visualEffects,
+      clip.style,
+      clip.duration,
+      style.width,
+      style.height,
+      scale,
+      effectTime,
+      filterId,
+      regionDraft,
+    ],
+  );
+  const regionId = Object.keys(clip.visualEffects ?? {})
+    .reverse()
+    .find(
+      (id) =>
+        (id === "mask" || id === "blur-region") &&
+        clip.visualEffects?.[id]?.enabled,
+    ) as "mask" | "blur-region" | undefined;
   return (
     <div
       className={`preview-layer ${clip.kind} ${selectedObjectPart ? "selected" : ""} ${editing ? "editing" : ""} ${cropping ? "cropping" : ""} ${effectDrop && selectable ? "effect-drop-target" : ""}`}
@@ -398,14 +457,19 @@ function PreviewLayer({
         event.stopPropagation();
         const allowed =
           selectable &&
-          (animation ? !!animationDropTarget(
-            project, clip.id, editor.playhead, editor.preferences.timing.animation,
-          ) : behavior
-            ? supportsBehaviors(clip) && (clip.behaviors?.length ?? 0) < 32
-            : supportsVisualEffect(
-                clip,
-                visualEffectFromDragTypes(event.dataTransfer.types),
-              ));
+          (animation
+            ? !!animationDropTarget(
+                project,
+                clip.id,
+                editor.playhead,
+                editor.preferences.timing.animation,
+              )
+            : behavior
+              ? supportsBehaviors(clip) && (clip.behaviors?.length ?? 0) < 32
+              : supportsVisualEffect(
+                  clip,
+                  visualEffectFromDragTypes(event.dataTransfer.types),
+                ));
         event.dataTransfer.dropEffect = allowed ? "copy" : "none";
         setEffectDrop(allowed);
       }}
@@ -607,9 +671,11 @@ function PreviewLayer({
                 ? {
                     scale: drag.value.scale,
                     ...(drag.value.scaleX === undefined
-                      ? {} : { scaleX: drag.value.scaleX }),
+                      ? {}
+                      : { scaleX: drag.value.scaleX }),
                     ...(drag.value.scaleY === undefined
-                      ? {} : { scaleY: drag.value.scaleY }),
+                      ? {}
+                      : { scaleY: drag.value.scaleY }),
                   }
                 : {}),
             },
@@ -620,170 +686,234 @@ function PreviewLayer({
       onPointerCancel={() => setGesture(null)}
       onLostPointerCapture={() => setGesture(null)}
     >
-      {effectMarkup && <svg className="effect-svg-definitions" aria-hidden="true"><defs dangerouslySetInnerHTML={{ __html: effectMarkup }} /></svg>}
-      <div className="preview-effect-content" style={effectMarkup || matteSource ? {
-        width: "100%", height: "100%", position: "relative",
-        display: "flex", alignItems: "center", justifyContent: "center",
-        filter: effectMarkup ? `url(#${filterId})` : undefined,
-        visibility: matteSource ? "hidden" : undefined,
-      } : { display: "contents" }}>
-      {fill && (
-        <div
-          className="preview-text-fill"
-          aria-hidden="true"
-          style={{
-            position: "absolute",
-            left: -fill.paddingX * scale,
-            top: -fill.paddingY * scale,
-            width: fill.width * scale,
-            height: fill.height * scale,
-            borderRadius: fill.radius * scale,
-            backgroundColor: textFillCss(clip.style),
-            zIndex: -1,
-          }}
-        />
+      {effectMarkup && (
+        <svg className="effect-svg-definitions" aria-hidden="true">
+          <defs dangerouslySetInnerHTML={{ __html: effectMarkup }} />
+        </svg>
       )}
-      {asset ? (
-        <div
-          style={{
-            width: "100%",
-            height: "100%",
-            overflow: "hidden",
-            borderRadius: radii.map((radius) => `${radius * scale}px`).join(" "),
-            position: "relative",
-            transform: `scale(${effects.flipX ? -1 : 1}, ${effects.flipY ? -1 : 1})`,
-          }}
-        >
+      <div
+        className="preview-effect-content"
+        style={
+          effectMarkup || matteSource
+            ? {
+                width: "100%",
+                height: "100%",
+                position: "relative",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                filter: effectMarkup ? `url(#${filterId})` : undefined,
+                visibility: matteSource ? "hidden" : undefined,
+              }
+            : { display: "contents" }
+        }
+      >
+        {fill && (
+          <div
+            className="preview-text-fill"
+            aria-hidden="true"
+            style={{
+              position: "absolute",
+              left: -fill.paddingX * scale,
+              top: -fill.paddingY * scale,
+              width: fill.width * scale,
+              height: fill.height * scale,
+              borderRadius: fill.radius * scale,
+              backgroundColor: textFillCss(clip.style),
+              zIndex: -1,
+            }}
+          />
+        )}
+        {asset ? (
           <div
             style={{
-              width: layout.width,
-              height: layout.height,
-              position: "absolute",
-              left: layout.left,
-              top: layout.top,
-              filter: previewFilter(clip).replace(
-                `blur(${effects.blur}px)`,
-                `blur(${effects.blur * scale}px)`,
-              ),
+              width: "100%",
+              height: "100%",
+              overflow: "hidden",
+              borderRadius: radii
+                .map((radius) => `${radius * scale}px`)
+                .join(" "),
+              position: "relative",
+              transform: `scale(${effects.flipX ? -1 : 1}, ${effects.flipY ? -1 : 1})`,
             }}
           >
-            <MediaLayer
-              clip={clip}
-              asset={asset}
-              localTime={
-                held
-                  ? Math.max(
-                      0,
-                      Math.min(
-                        clip.duration - 1 / project.canvas.fps,
-                        localTime,
-                      ),
-                    )
-                  : localTime
-              }
-              playing={editor.playing && !held}
-              muted={muted || held}
-            />
-            {cursor && (
-              <>
-                {cursor.click && cursorStyle.clicks && (
-                  <div
-                    className="cursor-click"
+            <div
+              style={{
+                width: layout.width,
+                height: layout.height,
+                position: "absolute",
+                left: layout.left,
+                top: layout.top,
+                filter: previewFilter(clip).replace(
+                  `blur(${effects.blur}px)`,
+                  `blur(${effects.blur * scale}px)`,
+                ),
+              }}
+            >
+              <MediaLayer
+                clip={clip}
+                asset={asset}
+                localTime={
+                  held
+                    ? Math.max(
+                        0,
+                        Math.min(
+                          clip.duration - 1 / project.canvas.fps,
+                          localTime,
+                        ),
+                      )
+                    : localTime
+                }
+                playing={editor.playing && !held}
+                muted={muted || held}
+              />
+              {cursor && (
+                <>
+                  {cursor.click && cursorStyle.clicks && (
+                    <div
+                      className="cursor-click"
+                      style={{
+                        left: (cursor.clickX ?? cursor.x) * layout.width,
+                        top: (cursor.clickY ?? cursor.y) * layout.height,
+                        width: cursorStyle.size * 2 * scale * contentView.scale,
+                        height:
+                          cursorStyle.size * 2 * scale * contentView.scale,
+                        borderColor: cursorStyle.color,
+                      }}
+                    />
+                  )}
+                  <img
+                    className="cursor-overlay"
+                    src={`data:image/svg+xml,${encodeURIComponent(cursorSvg(cursorStyle, cursor.cursorType))}`}
+                    alt="可编辑鼠标"
                     style={{
-                      left: (cursor.clickX ?? cursor.x) * layout.width,
-                      top: (cursor.clickY ?? cursor.y) * layout.height,
-                      width: cursorStyle.size * 2 * scale * contentView.scale,
-                      height: cursorStyle.size * 2 * scale * contentView.scale,
-                      borderColor: cursorStyle.color,
+                      left: cursor.x * layout.width,
+                      top: cursor.y * layout.height,
+                      width:
+                        cursorStyle.size *
+                        cursorAspect(cursorStyle.style, cursor.cursorType) *
+                        scale *
+                        contentView.scale,
+                      height: cursorStyle.size * scale * contentView.scale,
+                      transform: `translate(-${cursorAnchor(cursorStyle.style, cursor.cursorType).x * 100}%, -${cursorAnchor(cursorStyle.style, cursor.cursorType).y * 100}%)`,
                     }}
                   />
-                )}
-                <img
-                  className="cursor-overlay"
-                  src={`data:image/svg+xml,${encodeURIComponent(cursorSvg(cursorStyle, cursor.cursorType))}`}
-                  alt="可编辑鼠标"
-                  style={{
-                    left: cursor.x * layout.width,
-                    top: cursor.y * layout.height,
-                    width: cursorStyle.size * cursorAspect(cursorStyle.style, cursor.cursorType) * scale * contentView.scale,
-                    height: cursorStyle.size * scale * contentView.scale,
-                    transform: `translate(-${cursorAnchor(cursorStyle.style, cursor.cursorType).x * 100}%, -${cursorAnchor(cursorStyle.style, cursor.cursorType).y * 100}%)`,
-                  }}
-                />
-              </>
+                </>
+              )}
+            </div>
+          </div>
+        ) : clip.kind === "text" ? (
+          <div
+            className="preview-text-content"
+            style={{
+              fontFamily: `${clip.style?.fontFamily}, "PingFang SC", sans-serif`,
+              fontWeight: 700,
+              fontSize: (drag?.fontSize ?? clip.style?.fontSize ?? 68) * scale,
+              color: clip.style?.color,
+              WebkitTextStroke: `${(clip.style?.outlineWidth ?? 0) * scale}px ${clip.style?.outline}`,
+              paintOrder: "stroke fill",
+              lineHeight: textLineHeight,
+              whiteSpace: "pre",
+              textAlign: "center",
+            }}
+          >
+            {editing ? (
+              <textarea
+                ref={textInput}
+                className="preview-text-editor"
+                aria-label="画布文本内容"
+                value={clip.text ?? ""}
+                rows={1}
+                wrap="off"
+                maxLength={10000}
+                spellCheck={false}
+                onChange={(event) =>
+                  editor.updateClip(clip.id, {
+                    text: event.target.value,
+                    name: event.target.value.slice(0, 24) || "文本",
+                  })
+                }
+                onBlur={() => editor.endTextEdit(clip.id)}
+                onKeyDown={(event) => {
+                  if (event.nativeEvent.isComposing) return;
+                  if (
+                    event.key === "Escape" ||
+                    (event.key === "Enter" && (event.ctrlKey || event.metaKey))
+                  ) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    editor.endTextEdit(clip.id);
+                  }
+                }}
+              />
+            ) : clip.behaviors?.length ? (
+              <BehaviorText clip={clip} time={localTime} scale={scale} />
+            ) : (
+              clip.text || " "
             )}
           </div>
-        </div>
-      ) : clip.kind === "text" ? (
-        <div
-          className="preview-text-content"
-          style={{
-            fontFamily: `${clip.style?.fontFamily}, "PingFang SC", sans-serif`,
-            fontWeight: 700,
-            fontSize: (drag?.fontSize ?? clip.style?.fontSize ?? 68) * scale,
-            color: clip.style?.color,
-            WebkitTextStroke: `${(clip.style?.outlineWidth ?? 0) * scale}px ${clip.style?.outline}`,
-            paintOrder: "stroke fill",
-            lineHeight: textLineHeight,
-            whiteSpace: "pre",
-            textAlign: "center",
-          }}
-        >
-          {editing ? (
-            <textarea
-              ref={textInput}
-              className="preview-text-editor"
-              aria-label="画布文本内容"
-              value={clip.text ?? ""}
-              rows={1}
-              wrap="off"
-              maxLength={10000}
-              spellCheck={false}
-              onChange={(event) =>
-                editor.updateClip(clip.id, {
-                  text: event.target.value,
-                  name: event.target.value.slice(0, 24) || "文本",
-                })
-              }
-              onBlur={() => editor.endTextEdit(clip.id)}
-              onKeyDown={(event) => {
-                if (event.nativeEvent.isComposing) return;
-                if (
-                  event.key === "Escape" ||
-                  (event.key === "Enter" && (event.ctrlKey || event.metaKey))
-                ) {
-                  event.preventDefault();
-                  event.stopPropagation();
-                  editor.endTextEdit(clip.id);
-                }
-              }}
-            />
-          ) : clip.behaviors?.length ? (
-            <BehaviorText clip={clip} time={localTime} scale={scale} />
-          ) : (
-            clip.text || " "
-          )}
-        </div>
-      ) : clip.annotationEffect ? (
-        <AnnotationEffectLayer clip={clip} width={mediaWidth} height={mediaHeight} scale={scale / Math.max(0.05, displayed.scale)} opacity={displayed.opacity * fadeOpacity(clip, localTime)} canvas={project.canvas} pose={displayed} canvasScale={scale} />
-      ) : (
-        <svg
-          width={shapeSize(clip).width * scale}
-          height={shapeSize(clip).height * scale}
-          viewBox={`0 0 ${shapeSize(clip).width} ${shapeSize(clip).height}`}
-          fill={clip.fill}
-          dangerouslySetInnerHTML={{ __html: annotationSvgBody(clip, selectedObjectPart && !editor.playing && !matteSource ? 1 : drawingProgress(clip, localTime)) }}
-        />
-      )}
+        ) : clip.annotationEffect ? (
+          <AnnotationEffectLayer
+            clip={clip}
+            width={mediaWidth}
+            height={mediaHeight}
+            scale={scale / Math.max(0.05, displayed.scale)}
+            opacity={displayed.opacity * fadeOpacity(clip, localTime)}
+            canvas={project.canvas}
+            pose={displayed}
+            canvasScale={scale}
+          />
+        ) : (
+          <svg
+            width={shapeSize(clip).width * scale}
+            height={shapeSize(clip).height * scale}
+            viewBox={`0 0 ${shapeSize(clip).width} ${shapeSize(clip).height}`}
+            fill={clip.fill}
+            dangerouslySetInnerHTML={{
+              __html: annotationSvgBody(
+                clip,
+                selectedObjectPart && !editor.playing && !matteSource
+                  ? 1
+                  : drawingProgress(clip, localTime),
+              ),
+            }}
+          />
+        )}
       </div>
-      {regionId && selectable && !editing && !editor.playing && mode === "select" && selectedObjectPart && <EffectRegionOverlay
-        key={`${clip.id}-${regionId}`} name={regionId === "mask" ? "遮罩" : "模糊区域"} region={clip.visualEffects![regionId]!}
-        width={Number(style.width) || 1} height={Number(style.height) || 1} pose={displayed} cameraScale={cameraScale} canvasScale={scale}
-        onDraft={(geometry) => setRegionDraft(geometry ? { id: regionId, geometry } : null)}
-        onCommit={(geometry) => regionId === "mask"
-          ? editor.updateMask(clip.id, geometry)
-          : editor.updateClip(clip.id, (source) => ({ ...source, visualEffects: { ...source.visualEffects, [regionId]: { ...source.visualEffects![regionId]!, ...geometry } } }))}
-      />}
+      {regionId &&
+        selectable &&
+        !editing &&
+        !editor.playing &&
+        mode === "select" &&
+        selectedObjectPart && (
+          <EffectRegionOverlay
+            key={`${clip.id}-${regionId}`}
+            name={regionId === "mask" ? "遮罩" : "模糊区域"}
+            region={clip.visualEffects![regionId]!}
+            width={Number(style.width) || 1}
+            height={Number(style.height) || 1}
+            pose={displayed}
+            cameraScale={cameraScale}
+            canvasScale={scale}
+            onDraft={(geometry) =>
+              setRegionDraft(geometry ? { id: regionId, geometry } : null)
+            }
+            onCommit={(geometry) =>
+              regionId === "mask"
+                ? editor.updateMask(clip.id, geometry)
+                : editor.updateClip(clip.id, (source) => ({
+                    ...source,
+                    visualEffects: {
+                      ...source.visualEffects,
+                      [regionId]: {
+                        ...source.visualEffects![regionId]!,
+                        ...geometry,
+                      },
+                    },
+                  }))
+            }
+          />
+        )}
       {selectable &&
         !editing &&
         ((mode === "select" && ["text", "shape"].includes(clip.kind)) ||
@@ -862,6 +992,26 @@ export function ScenePreview({
     project.clips,
   );
   const sceneId = `scene-${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
+  const tracksById = useMemo(
+    () => new Map(project.tracks.map((track) => [track.id, track])),
+    [project.tracks],
+  );
+  const recordingsByClip = useMemo(() => {
+    const groups = recordingGroups(project);
+    return new Map(
+      project.clips.map((clip) => [
+        clip.id,
+        clip.groupId ? groups.get(clip.groupId) : undefined,
+      ]),
+    );
+  }, [project.clips]);
+  const activeByTrack = new Map<string, Clip[]>();
+  for (const clip of active) {
+    const clips = activeByTrack.get(clip.trackId);
+    if (clips) clips.push(clip);
+    else activeByTrack.set(clip.trackId, [clip]);
+  }
+  const hasSolo = project.tracks.some((track) => track.solo);
   const definitions: ReactNode[] = [];
   let layers: ReactNode[] = [];
   // 同轨同素材的媒体片段共用 key：拆分产生新 clip.id 时复用 <video>，预览画面不中断
@@ -875,29 +1025,50 @@ export function ScenePreview({
     return n ? `${base}#${n}` : base;
   };
   for (const track of [...project.tracks].reverse()) {
-    if (!isTrackActive(project.tracks, track.id)) continue;
-    for (const clip of active.filter((clip) => clip.trackId === track.id)) {
+    if (track.hidden || (hasSolo && !track.solo)) continue;
+    for (const clip of activeByTrack.get(track.id) ?? []) {
       const matteEffect = clip.visualEffects?.["media-matte"];
-      const matte = !!matteEffect && effectActive(
-        matteEffect, playhead - clip.start, clip.duration,
-      );
+      const matte =
+        !!matteEffect &&
+        effectActive(matteEffect, playhead - clip.start, clip.duration);
       if (matte) {
         const id = `${sceneId}-matte-${clip.id}`;
         definitions.push(
-          <MatteDefinition key={id} id={id} clip={clip} project={project} time={playhead} scale={scale} />,
+          <MatteDefinition
+            key={id}
+            id={id}
+            clip={clip}
+            project={project}
+            time={playhead}
+            scale={scale}
+          />,
         );
         layers = [
-          <div className="matte-layer-group" key={id} style={{ mask: `url(#${id})` }}>
+          <div
+            className="matte-layer-group"
+            key={id}
+            style={{ mask: `url(#${id})` }}
+          >
             {layers}
           </div>,
         ];
       }
       layers.push(
         <PreviewLayer
-          key={layerKey(clip)} clip={clip} project={project} editor={editor} scale={scale}
-          muted={!interactive || track.muted || !!editor.narrationRecording?.muted}
-          interactive={interactive} cameraScale={camera?.scale ?? 1}
-          mode={mode} matteSource={matte}
+          key={layerKey(clip)}
+          clip={clip}
+          project={project}
+          editor={editor}
+          scale={scale}
+          muted={
+            !interactive || track.muted || !!editor.narrationRecording?.muted
+          }
+          interactive={interactive}
+          cameraScale={camera?.scale ?? 1}
+          mode={mode}
+          matteSource={matte}
+          recording={recordingsByClip.get(clip.id)}
+          track={tracksById.get(clip.trackId) ?? track}
         />,
       );
     }
@@ -975,7 +1146,8 @@ export default function Preview({
       );
     }
   };
-  const { project, playing, playhead, seek, setPlaying } = editor,
+  const { project, playing, playhead, seek, advancePlayback, setPlaying } =
+      editor,
     duration = useMemo(() => projectDuration(project), [project.clips]);
   useEffect(() => {
     const element = holder.current;
@@ -994,19 +1166,24 @@ export default function Preview({
     const start = performance.now(),
       at = playhead;
     let frame: number;
-    const tick = () => {
-      const time = at + (performance.now() - start) / 1000;
-      if (time >= duration) {
-        seek(duration);
-        setPlaying(false);
-      } else {
-        seek(time);
-        frame = requestAnimationFrame(tick);
+    const fps = Math.max(1, project.canvas.fps);
+    let renderedFrame = -1;
+    const tick = (now: number) => {
+      const frameIndex = Math.floor(((now - start) * fps) / 1000 + 1e-6);
+      if (frameIndex > renderedFrame) {
+        renderedFrame = frameIndex;
+        const time = Math.min(duration, at + frameIndex / fps);
+        advancePlayback(time);
+        if (time >= duration) {
+          setPlaying(false);
+          return;
+        }
       }
+      frame = requestAnimationFrame(tick);
     };
     frame = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frame);
-  }, [playing, duration, seek, setPlaying]);
+  }, [playing, duration, project.canvas.fps, advancePlayback, setPlaying]);
   const fitScale = Math.max(
     0.01,
     Math.min(
@@ -1057,11 +1234,18 @@ export default function Preview({
     if (clip) editor.updateCrop(clip.id, defaultCrop, true);
   };
   const canvasAnimationTarget = (target: EventTarget) => {
-    const hit = (target as HTMLElement).closest<HTMLElement>(".preview-layer[data-clip-id]");
+    const hit = (target as HTMLElement).closest<HTMLElement>(
+      ".preview-layer[data-clip-id]",
+    );
     const id = hit?.dataset.clipId ?? editor.selectedId;
-    return !fullscreen && id ? animationDropTarget(
-      project, id, editor.playhead, editor.preferences.timing.animation,
-    ) : null;
+    return !fullscreen && id
+      ? animationDropTarget(
+          project,
+          id,
+          editor.playhead,
+          editor.preferences.timing.animation,
+        )
+      : null;
   };
   return (
     <section
@@ -1093,14 +1277,15 @@ export default function Preview({
             (event.target as HTMLElement).closest(
               'textarea, input, [contenteditable="true"]',
             )
-          ) return;
+          )
+            return;
           event.preventDefault();
           const hit = (event.target as HTMLElement).closest<HTMLElement>(
             ".preview-layer[data-clip-id]",
           );
           const clipId = hit?.dataset.clipId;
           const id = clipId
-            ? recordingMaster(project, clipId)?.id ?? clipId
+            ? (recordingMaster(project, clipId)?.id ?? clipId)
             : null;
           editor.setPlaying(false);
           editor.clearKeyframeEdit();
@@ -1144,8 +1329,12 @@ export default function Preview({
                 event.preventDefault();
                 event.stopPropagation();
                 setAnimationHover(false);
-                if (!fullscreen && editor.selectedId &&
-                  event.dataTransfer.getData(animationMime) === customAnimationId)
+                if (
+                  !fullscreen &&
+                  editor.selectedId &&
+                  event.dataTransfer.getData(animationMime) ===
+                    customAnimationId
+                )
                   editor.addCustomAnimation(editor.selectedId);
                 return;
               }
@@ -1169,7 +1358,11 @@ export default function Preview({
               });
             }}
             onDragLeave={(event) => {
-              if (!event.currentTarget.contains(event.relatedTarget as Node | null))
+              if (
+                !event.currentTarget.contains(
+                  event.relatedTarget as Node | null,
+                )
+              )
                 setAnimationHover(false);
             }}
             style={{
@@ -1179,7 +1372,9 @@ export default function Preview({
             }}
           >
             <ScenePreview editor={editor} scale={scale} mode={mode} />
-            {mode === "draw" && !fullscreen && <CanvasDrawingOverlay editor={editor} />}
+            {mode === "draw" && !fullscreen && (
+              <CanvasDrawingOverlay editor={editor} />
+            )}
             {!project.clips.length && (
               <div className="canvas-empty">
                 <span className="empty-symbol">T</span>
