@@ -2,7 +2,7 @@
 
 ## v0.4.9 发布前检查（2026-10-17）
 
-85 个测试文件、385 项测试与 Rust 时间线引擎测试全部通过，包含导出性能分析、智能分块策略、真实 FFmpeg 导出、标注与录屏回归。TypeScript 类型检查（`tsc --noEmit`）、Rust/Wasm 编译、Vite 打包与 Electron 构建全部通过。打包媒体引擎与 Windows 语音依赖资源预检（`node scripts/check-packaging.mjs`）通过。
+85 个测试文件、385 项测试与 Rust 时间线引擎测试全部通过，包含导出性能分析、智能分块策略、真实 FFmpeg 导出、标注与录屏回归。TypeScript 类型检查（`tsc --noEmit`）、Rust/Wasm 编译、Vite 打包与 Electron 构建全部通过。打包媒体引擎与 Windows 语音依赖资源预检（`node scripts/check-packaging.mjs`）通过。完整编辑交互回归通过（`node scripts/test-editing-ui.mjs`），修复了 `useRAFThrottle` 在手势结束时对 `null` 状态的即时清理。
 
 ## v0.4.8 发布前检查（2026-10-16）
 
