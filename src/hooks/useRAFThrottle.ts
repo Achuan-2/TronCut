@@ -10,7 +10,8 @@ import { useCallback, useRef, useEffect } from 'react';
  */
 export function useRAFThrottle<T>(callback: (value: T) => void) {
   const rafRef = useRef<number | null>(null);
-  const pendingValue = useRef<T | null>(null);
+  const pendingValue = useRef<T | undefined>(undefined);
+  const hasPending = useRef(false);
   const callbackRef = useRef(callback);
 
   // Keep callback reference up to date
@@ -19,18 +20,31 @@ export function useRAFThrottle<T>(callback: (value: T) => void) {
   }, [callback]);
 
   const flush = useCallback(() => {
-    if (pendingValue.current !== null) {
-      callbackRef.current(pendingValue.current);
-      pendingValue.current = null;
+    if (hasPending.current) {
+      callbackRef.current(pendingValue.current as T);
+      hasPending.current = false;
+      pendingValue.current = undefined;
     }
   }, []);
 
   const scheduleUpdate = useCallback((value: T) => {
+    if (value === null) {
+      if (rafRef.current !== null) {
+        cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
+      }
+      hasPending.current = false;
+      pendingValue.current = undefined;
+      callbackRef.current(value);
+      return;
+    }
+
     pendingValue.current = value;
+    hasPending.current = true;
     if (rafRef.current === null) {
       rafRef.current = requestAnimationFrame(() => {
-        flush();
         rafRef.current = null;
+        flush();
       });
     }
   }, [flush]);
