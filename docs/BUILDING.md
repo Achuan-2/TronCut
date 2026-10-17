@@ -25,7 +25,7 @@ pnpm test:smoke
 pnpm dist:win
 ```
 
-The installer is written to `release/TronCut Setup 0.4.9.exe`; the unpacked app is under `release/win-unpacked/`. Test the packaged app before uploading. Release asset names use hyphens for stable direct-download URLs.
+The installer is written to `release/TronCut Setup 0.5.0.exe`; the unpacked app is under `release/win-unpacked/`. Test the packaged app before uploading. Release asset names use hyphens for stable direct-download URLs.
 
 ```powershell
 $env:FRAMECRAFT_PACKAGED_SMOKE='1'
@@ -49,7 +49,7 @@ Mac 安装包不要求先完成本地验收。工作流直接构建并发布 arm
 
 Release 标题填写在 GitHub 的标题栏；`docs/releases/v<version>.md` 正文直接从简介开始，不再添加 `# TronCut v<version>`，避免页面重复显示标题。
 
-The [Build release workflow](../.github/workflows/release.yml) runs when a GitHub Release is published, including prereleases. It checks that `v<version>` matches `package.json` and checks out the exact tag commit. The Windows job downloads SHA256-verified FFmpeg 9.0.2 and uv 0.6.5, compiles the native capture helpers, runs tests and the packaged editing regression, and produces the x64 installer and portable ZIP. Native macOS jobs produce unsigned arm64 and x64 DMGs without local acceptance tests. The final job combines checksums before uploading all packages. Upload permissions are limited to that final job; no extra secret or personal access token is required.
+The [Build release workflow](../.github/workflows/release.yml) runs when a GitHub Release is published, including prereleases. It checks that `v<version>` matches `package.json` and checks out the exact tag commit. The Windows job downloads SHA256-verified FFmpeg 9.0.2 and uv 0.6.5, compiles the native capture helpers, and builds the x64 installer and portable ZIP. Run the full test suite and packaged desktop regressions separately before publishing; the current workflow only builds, packages, and verifies release assets. Native macOS jobs produce unsigned arm64 and x64 DMGs without local acceptance tests. The final job combines checksums before uploading all packages. Upload permissions are limited to that final job; no extra secret or personal access token is required.
 
 发布正式 Release 或预发布后，GitHub Actions 会自动上传 Windows x64 安装包、免安装 ZIP、macOS arm64/x64 DMG、FFmpeg 上游源码及统一 SHA256 校验文件，不再生成或上传 `build-info.json`。TronCut 项目源码由 GitHub 版本标签提供，不再重复生成 `TronCut-<version>-source.zip`。先修改 `package.json` 版本并提交，推送对应 `v<version>` 标签，再在 GitHub 发布该标签的 Release。正式版不勾选预发布；普通提交或仅推送标签不会触发发版。
 

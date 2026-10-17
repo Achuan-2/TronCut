@@ -1,5 +1,13 @@
 # 验证记录（含历史与 TronCut 0.3）
 
+## v0.5.0 发布前检查（2026-10-17）
+
+完整测试的 87 个文件、393 项测试与 2 项 Rust 测试全部通过，覆盖多笔涂鸦、五种笔刷、绘制动画调时和缓动、动画叠加、工程重命名，以及真实 FFmpeg 绘制动画和区域效果输出。TypeScript、Rust/Wasm、Vite、Electron 构建与打包媒体引擎、原生组件、语音 worker 资源预检通过。
+
+`scripts/smoke-freehand.mjs` 验证多笔合并、混合笔刷和颜色、撤销与取消、完成绘制后播放头保持、编辑完整轨迹和播放进度、绘制箭头调时、缩放动画叠加、保存重开、独立标注属性标签与键盘切换、像素化属性及手绘模板预览，产物为 `test-output/freehand-1792210261228/`。`scripts/test-editing-ui.mjs` 完整开发版编辑回归通过，产物为 `test-output/editing-ui/run-1792210268800/`，前端运行错误为零。
+
+涂鸦专项支持通过 `FRAMECRAFT_PACKAGED_APP` 指定发布程序，复用同一套测试检查打包后的功能。发布包另由标签锁定的云端工作流构建并校验 SHA256；macOS 包未经真机安装、权限、录制和导出验收。
+
 ## v0.4.9 发布前检查（2026-10-17）
 
 85 个测试文件、385 项测试与 Rust 时间线引擎测试全部通过，包含导出性能分析、智能分块策略、真实 FFmpeg 导出、标注与录屏回归。TypeScript 类型检查（`tsc --noEmit`）、Rust/Wasm 编译、Vite 打包与 Electron 构建全部通过。打包媒体引擎与 Windows 语音依赖资源预检（`node scripts/check-packaging.mjs`）通过。完整编辑交互回归通过（`node scripts/test-editing-ui.mjs`），修复了 `useRAFThrottle` 在手势结束时对 `null` 状态的即时清理。

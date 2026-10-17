@@ -31,7 +31,12 @@ const env = {
   FRAMECRAFT_USER_DATA: path.join(root, "profile"),
 };
 delete env.ELECTRON_RUN_AS_NODE;
-const app = await electron.launch({ args: [".", file], env });
+const executablePath = process.env.FRAMECRAFT_PACKAGED_APP;
+const app = await electron.launch({
+  ...(executablePath ? { executablePath: path.resolve(executablePath) } : {}),
+  args: executablePath ? [file] : [".", file],
+  env,
+});
 const errors = [];
 let page;
 try {
