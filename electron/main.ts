@@ -44,6 +44,7 @@ import { createClonedVoiceSchema } from "../shared/cloned-voices";
 import { mediaThumbnail } from "./thumbnails";
 import { serveMediaFile } from "./media-protocol";
 import { mediaAssetUrl } from "../shared/media-url";
+import { PreviewProxyService } from "./preview-proxies";
 import { NativeRecording } from "./native-recording";
 import { recordingName } from "./recording-name";
 import { RecordingBorder } from "./recording-border";
@@ -212,9 +213,19 @@ const recordings = new Map<
   string,
   { file: string; handle: FileHandle; bytes: number; kind: string; crop?: CaptureRegion; displaySize?: { width: number; height: number } }
 >();
+const previewProxies = new PreviewProxyService(
+  path.join(app.getPath("userData"), "preview-proxies"),
+  process.resourcesPath,
+  (assetId) => {
+    if (window && !window.isDestroyed() && !window.webContents.isDestroyed())
+      window.webContents.send("media:preview-proxy-ready", assetId);
+  },
+);
+app.on("before-quit", () => previewProxies.dispose());
 const register = (asset: Asset) => {
   assets.set(asset.id, asset);
   approvedPaths.add(path.resolve(asset.path));
+  previewProxies.request(asset);
   return asset;
 };
 const registerProject = (project: Project) => {
@@ -633,6 +644,9 @@ function installHandlers() {
     const asset = assetById(id);
     return mediaAssetUrl(asset.id);
   });
+  handle("media:preview-proxy", (id: unknown) =>
+    !!previewProxies.path(assetById(id).id),
+  );
   handle("media:thumbnail", (id: unknown, waveform: unknown) =>
     mediaThumbnail(
       assetById(id),
@@ -1406,10 +1420,15 @@ app
       return;
     }
     protocol.handle("framecraft-media", (request) => {
-      const id = decodeURIComponent(new URL(request.url).pathname.slice(1)),
+      const url = new URL(request.url),
+        id = decodeURIComponent(url.pathname.slice(1)),
         asset = assets.get(id);
       if (!asset) return new Response("素材不存在", { status: 404 });
-      return serveMediaFile(request, asset.path);
+      const preview =
+        url.searchParams.get("preview") === "1"
+          ? previewProxies.path(asset.id)
+          : undefined;
+      return serveMediaFile(request, preview ?? asset.path);
     });
     session.defaultSession.setPermissionRequestHandler(
       (contents, permission, callback) =>

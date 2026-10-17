@@ -47,6 +47,13 @@ const bridge: FrameCraftBridge = {
   mediaThumbnail: (id, waveform) =>
     ipcRenderer.invoke("media:thumbnail", id, waveform),
   mediaUrl: (id) => ipcRenderer.invoke("media:url", id),
+  previewProxyAvailable: (id) =>
+    ipcRenderer.invoke("media:preview-proxy", id),
+  onPreviewProxyReady: (callback) => {
+    const fn = (_: unknown, assetId: string) => callback(assetId);
+    ipcRenderer.on("media:preview-proxy-ready", fn);
+    return () => ipcRenderer.removeListener("media:preview-proxy-ready", fn);
+  },
   openProject: () => ipcRenderer.invoke("project:open"),
   recentProjects: () => ipcRenderer.invoke("project:recent"),
   removeRecentProject: (file) => ipcRenderer.invoke("project:recent:remove", file),

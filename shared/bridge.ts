@@ -84,6 +84,8 @@ export interface FrameCraftBridge {
   relinkMedia(assetId: string, requiredDuration: number): Promise<Asset | null>;
   mediaThumbnail(assetId: string, waveform: boolean): Promise<string | null>;
   mediaUrl(assetId: string): Promise<string>;
+  previewProxyAvailable(assetId: string): Promise<boolean>;
+  onPreviewProxyReady(callback: (assetId: string) => void): () => void;
   openProject(): Promise<{ project: Project; file: string } | null>;
   recentProjects(): Promise<RecentProject[]>;
   removeRecentProject(file: string): Promise<RecentProject[]>;

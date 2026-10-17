@@ -124,9 +124,37 @@ function MediaLayer({
   muted: boolean;
   audioOnly?: boolean;
 }) {
-  const ref = useRef<HTMLVideoElement & HTMLAudioElement>(null),
-    // The protocol already resolves registered IDs; no IPC/loading state is needed.
-    url = mediaAssetUrl(asset.id);
+  const ref = useRef<HTMLVideoElement & HTMLAudioElement>(null);
+  const proxyReady = useRef(false);
+  const [previewRevision, setPreviewRevision] = useState(0);
+  useEffect(() => {
+    if (asset.kind !== "video" || !window.framecraft) return;
+    let active = true;
+    proxyReady.current = false;
+    const ready = () => {
+      if (!active || proxyReady.current) return;
+      proxyReady.current = true;
+      setPreviewRevision((value) => value + 1);
+    };
+    const unsubscribe = window.framecraft.onPreviewProxyReady((assetId) => {
+      if (assetId === asset.id) ready();
+    });
+    void window.framecraft
+      .previewProxyAvailable(asset.id)
+      .then((available) => {
+        if (available) ready();
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+      unsubscribe();
+    };
+  }, [asset.id, asset.kind]);
+  const url = mediaAssetUrl(
+    asset.id,
+    asset.kind === "video",
+    previewRevision,
+  );
   useEffect(() => {
     const media = ref.current;
     if (!media) return;

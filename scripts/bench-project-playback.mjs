@@ -14,7 +14,10 @@ const projectPath = path.resolve(projectArg);
 const startAt = Number(process.argv[3] ?? 6.5);
 const sampleMs = Number(process.env.TRONCUT_BENCH_MS ?? 5000);
 const root = path.resolve("test-output/project-playback", `run-${Date.now()}`);
-const profile = path.join(root, "profile");
+const profile = process.env.TRONCUT_BENCH_PROFILE
+  ? path.resolve(process.env.TRONCUT_BENCH_PROFILE)
+  : path.join(root, "profile");
+await fs.mkdir(root, { recursive: true });
 await fs.mkdir(profile, { recursive: true });
 
 const env = {
@@ -49,6 +52,21 @@ try {
       Number(await page.getByLabel("播放进度", { exact: true }).inputValue()),
     )
     .toBeCloseTo(startAt, 2);
+  if (process.env.TRONCUT_BENCH_WAIT_PROXY === "1") {
+    await expect
+      .poll(
+        () =>
+          page.evaluate(() =>
+            [...document.querySelectorAll(".preview-panel video")].every(
+              (video) =>
+                video.readyState >= 2 &&
+                (video.videoWidth <= 1280 || video.videoHeight <= 720),
+            ),
+          ),
+        { timeout: 120_000 },
+      )
+      .toBe(true);
+  }
 
   const cdp = await page.context().newCDPSession(page);
   await cdp.send("Performance.enable");
@@ -92,11 +110,25 @@ try {
       (before.metrics.find((metric) => metric.name === name)?.value ?? 0)) *
     1000;
 
-  const preview = await page.evaluate(() => {
+  const preview = await page.evaluate(async () => {
     const video = document.querySelector(".preview-panel video");
+    const videoStates = [];
+    for (const item of document.querySelectorAll(".preview-panel video")) {
+      const id = new URL(item.currentSrc).pathname.slice(1);
+      videoStates.push({
+        width: item.videoWidth,
+        height: item.videoHeight,
+        src: item.currentSrc,
+        proxyAvailable:
+          (await window.framecraft?.previewProxyAvailable(
+            decodeURIComponent(id),
+          )) ?? false,
+      });
+    }
     return {
       layers: document.querySelectorAll(".preview-layer").length,
       videos: document.querySelectorAll(".preview-panel video").length,
+      videoStates,
       audio: document.querySelectorAll(".preview-panel audio").length,
       timelineClips: document.querySelectorAll(".timeline-clip").length,
       quality: video?.getVideoPlaybackQuality
