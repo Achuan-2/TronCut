@@ -15,6 +15,7 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
   type SetStateAction,
 } from "react";
 import {
@@ -105,6 +106,7 @@ import { animationDropTarget } from "../shared/animation-drag";
 import { shapeSize } from "../shared/annotation-style";
 import type { DrawingStroke } from "../shared/annotation-style";
 import { freehandAnnotation, type PenSettings } from "../shared/freehand";
+import { createPlaybackStore } from "./playback-store";
 
 export function demoProject(): Project {
   const project = createProject("我的第一个视频");
@@ -139,6 +141,8 @@ export function useEditor(
   const presetLibrary = usePresetLibrary();
   const defaults = useRef(preferences);
   defaults.current = preferences;
+  const playback = useMemo(() => createPlaybackStore(1.2), []);
+  const playhead = playback.getSnapshot();
   const [project, setProject] = useState<Project>(() => createProject());
   const [editingTextId, setEditingTextId] = useState<string | null>(null);
   const [zoomPanDraft, setZoomPanDraft] = useState<Transform | null>(null);
@@ -251,19 +255,18 @@ export function useEditor(
     },
     [clearKeyframeEdit, editAllCaptions],
   );
-  const [playhead, setPlayhead] = useState(1.2);
   const seek = useCallback(
     (next: SetStateAction<number>) => {
       clearKeyframeEdit();
-      setPlayhead(next);
+      playback.set(next);
     },
-    [clearKeyframeEdit],
+    [clearKeyframeEdit, playback],
   );
   // Playback advances dozens of times per second. It only moves the clock and
   // must not pay for interactive seek cleanup on every frame.
   const advancePlayback = useCallback((next: number) => {
-    setPlayhead((current) => (current === next ? current : next));
-  }, []);
+    playback.set(next);
+  }, [playback]);
   const [playing, setPlayingState] = useState(false);
   const [narrationRecording, setNarrationRecording] = useState<{
     muted: boolean;
@@ -280,22 +283,24 @@ export function useEditor(
 
   useEffect(() => {
     if (!preferences.program.selectionFollowsPlayhead) return;
-    if (editingTextId) return;
-    const clip = findClipAtPlayhead(project, playhead);
-    if (!clip) {
-      if (selectedIds.length > 0) select(null);
-      return;
-    }
-    const targetGroup = selectionWithGroups(project, [clip.id]);
-    const isSame =
-      selectedIds.length === targetGroup.length &&
-      targetGroup.every((id) => selectedIds.includes(id));
-    if (!isSame) {
-      select(clip.id);
-    }
+    const follow = () => {
+      if (editingTextId) return;
+      const clip = findClipAtPlayhead(project, playback.getSnapshot());
+      if (!clip) {
+        if (selectedIds.length > 0) select(null);
+        return;
+      }
+      const targetGroup = selectionWithGroups(project, [clip.id]);
+      const isSame =
+        selectedIds.length === targetGroup.length &&
+        targetGroup.every((id) => selectedIds.includes(id));
+      if (!isSame) select(clip.id);
+    };
+    follow();
+    return playback.subscribe(follow);
   }, [
     preferences.program.selectionFollowsPlayhead,
-    playhead,
+    playback,
     project,
     editingTextId,
     selectedIds,
@@ -460,28 +465,28 @@ export function useEditor(
       const frame = keyframeRef.current;
       updateClip(id, (clip) =>
         animateContent(clip, patch, {
-          time: playhead - clip.start,
+          time: playback.getSnapshot() - clip.start,
           auto: autoAnimate,
           duration: defaults.current.timing.animation,
           endpoint: frame?.clipId === id ? frame : undefined,
         }),
       );
     },
-    [updateClip, playhead, autoAnimate],
+    [updateClip, playback, autoAnimate],
   );
   const updateMask = useCallback(
     (id: string, patch: Partial<MaskGeometry>) => {
       const frame = keyframeRef.current;
       updateClip(id, (clip) =>
         animateMask(clip, patch, {
-          time: playhead - clip.start,
+          time: playback.getSnapshot() - clip.start,
           auto: autoAnimate,
           duration: defaults.current.timing.animation,
           endpoint: frame?.clipId === id ? frame : undefined,
         }),
       );
     },
-    [updateClip, playhead, autoAnimate],
+    [updateClip, playback, autoAnimate],
   );
   const updateCrop = useCallback(
     (id: string, crop: Crop, resetContent = false) => {
@@ -500,7 +505,7 @@ export function useEditor(
           { width: asset.width * fit, height: asset.height * fit },
           project.canvas,
           {
-            time: playhead - clip.start,
+            time: playback.getSnapshot() - clip.start,
             auto: autoAnimate,
             duration: defaults.current.timing.animation,
             endpoint: frame?.clipId === id ? frame : undefined,
@@ -509,7 +514,7 @@ export function useEditor(
         );
       });
     },
-    [updateClip, playhead, autoAnimate],
+    [updateClip, playback, autoAnimate],
   );
   const editKeyframe = useCallback(
     (
@@ -569,9 +574,9 @@ export function useEditor(
           : [clipId],
       );
       setPlayingState(false);
-      setPlayhead(clip.start + localTime);
+      playback.set(clip.start + localTime);
     },
-    [],
+    [playback],
   );
   const editDrawing = useCallback(
     (clipId: string, localTime: number, side: "start" | "end") => {
@@ -602,16 +607,19 @@ export function useEditor(
       });
       selectMany([clipId]);
       setPlayingState(false);
-      setPlayhead(clip.start + localTime);
+      playback.set(clip.start + localTime);
     },
-    [clearKeyframeEdit],
+    [clearKeyframeEdit, playback],
   );
   const updateTransform = useCallback(
     (id: string, patch: Partial<Transform>, clipPatch: Partial<Clip> = {}) => {
       const frame = keyframeRef.current;
       const clip = current.current.clips.find((clip) => clip.id === id);
       if (clip?.caption && frame?.clipId !== id) {
-        const sampled = transformAt(clip, playhead - clip.start);
+        const sampled = transformAt(
+          clip,
+          playback.getSnapshot() - clip.start,
+        );
         updateTextAppearance(id, {
           ...(clipPatch.style ? { style: clipPatch.style } : {}),
           ...(clipPatch.textBox ? { textBox: clipPatch.textBox } : {}),
@@ -639,24 +647,27 @@ export function useEditor(
           : setTransform(
               source,
               patch,
-              playhead - clip.start,
+              playback.getSnapshot() - clip.start,
               autoAnimate,
               defaults.current.timing.animation,
             );
       });
     },
-    [updateClip, updateTextAppearance, playhead, autoAnimate],
+    [updateClip, updateTextAppearance, playback, autoAnimate],
   );
   const copyClipProperties = useCallback(
     (id: string) => {
       const source = current.current.clips.find((clip) => clip.id === id);
       if (!source) return;
-      const value = transformAt(source, playhead - source.start);
+      const value = transformAt(
+        source,
+        playback.getSnapshot() - source.start,
+      );
       setClipProperties(
         structuredClone({ ...visualClipAt(source, value), transform: value }),
       );
     },
-    [playhead],
+    [playback],
   );
   const pasteClipProperties = useCallback(
     (ids: readonly string[]) => {
@@ -679,7 +690,10 @@ export function useEditor(
           ...project,
           clips: project.clips.map((clip) => {
             if (!targets.has(clip.id) || clip.kind === "audio") return clip;
-            const value = transformAt(clip, playhead - clip.start);
+            const value = transformAt(
+              clip,
+              playback.getSnapshot() - clip.start,
+            );
             const sampled = visualClipAt(clip, value);
             const asset = project.assets.find(
               (asset) => asset.id === clip.assetId,
@@ -704,7 +718,7 @@ export function useEditor(
             return setTransform(
               clip,
               fitFrameTransform(value, size, project.canvas, clip.rotation),
-              playhead - clip.start,
+              playback.getSnapshot() - clip.start,
               autoAnimate,
               defaults.current.timing.animation,
             );
@@ -712,10 +726,10 @@ export function useEditor(
         };
       });
     },
-    [apply, playhead, autoAnimate],
+    [apply, playback, autoAnimate],
   );
   const addCustomAnimation = useCallback(
-    (clipId: string, time = playhead) => {
+    (clipId: string, time = playback.getSnapshot()) => {
       const project = current.current;
       const target = animationDropTarget(
         project,
@@ -739,7 +753,7 @@ export function useEditor(
       editKeyframe(target.clipId, target.result.time, "end", true);
       return true;
     },
-    [playhead, apply, select, editKeyframe],
+    [playback, apply, select, editKeyframe],
   );
   const addSelectedAnimation = useCallback(() => {
     const project = current.current;
@@ -757,7 +771,7 @@ export function useEditor(
           clip,
           frame?.clipId === clip.id && frame.side === "end"
             ? frame.time - (clip.animationOffset ?? 0)
-            : playhead - clip.start,
+            : playback.getSnapshot() - clip.start,
           project.canvas.fps,
           defaults.current.timing.animation,
         ),
@@ -789,7 +803,7 @@ export function useEditor(
     )
       editKeyframe(focused.clip.id, focused.time, "end", true);
     return true;
-  }, [selectedIds, selectedId, playhead, apply, editKeyframe]);
+  }, [selectedIds, selectedId, playback, apply, editKeyframe]);
   const addText = useCallback(
     (preset = 0, text?: string) => {
       const p = current.current;
@@ -799,7 +813,7 @@ export function useEditor(
           tracks: p.tracks.filter((track) => !track.captionTrack).slice(0, 1),
           clips: p.clips,
         },
-        playhead,
+        playback.getSnapshot(),
         defaults.current.timing.text,
       );
       const tracks = [...p.tracks];
@@ -807,17 +821,17 @@ export function useEditor(
         track = newTrack(tracks.length);
         tracks.unshift(track);
       }
-      const clip = newText(track.id, playhead, preset, text);
+      const clip = newText(track.id, playback.getSnapshot(), preset, text);
       clip.duration = defaults.current.timing.text;
       apply({ ...p, tracks, clips: [...p.clips, clip] });
       select(clip.id);
     },
-    [apply, playhead],
+    [apply, playback],
   );
   const addAnnotation = useCallback(
     (
       template: AnnotationTemplate,
-      time = playhead,
+      time = playback.getSnapshot(),
       trackId?: string,
       position?: { x: number; y: number },
     ) => {
@@ -860,10 +874,10 @@ export function useEditor(
       select(clip.id);
       if (clip.shape !== "freehand") setCanvasMode("select");
     },
-    [apply, playhead, select, setPlaying],
+    [apply, playback, select, setPlaying],
   );
   const addPenStroke = (stroke: DrawingStroke) => {
-    penStart.current ??= playhead;
+    penStart.current ??= playback.getSnapshot();
     setPenDraft((strokes) => [...strokes, stroke]);
   };
   const finishDrawing = () => {
@@ -871,7 +885,7 @@ export function useEditor(
     if (result)
       addAnnotation(
         result.template,
-        penStart.current ?? playhead,
+        penStart.current ?? playback.getSnapshot(),
         undefined,
         result.position,
       );
@@ -1142,7 +1156,7 @@ export function useEditor(
       const next = addMediaAssets(
         before,
         assets,
-        options.time ?? playhead,
+        options.time ?? playback.getSnapshot(),
         toTimeline,
         { ...options, imageDuration: defaults.current.timing.image },
       );
@@ -1158,7 +1172,7 @@ export function useEditor(
         );
       }
     },
-    [apply, playhead],
+    [apply, playback],
   );
   const beginTextEdit = useCallback(
     (id: string) => {
@@ -1182,7 +1196,7 @@ export function useEditor(
     setEditingTextId((current) => (current === id ? null : current));
   }, []);
   const updateVideoZoomPan = useCallback(
-    (patch: Partial<Transform>, time = playhead) => {
+    (patch: Partial<Transform>, time = playback.getSnapshot()) => {
       setPlaying(false);
       apply((project) =>
         setVideoZoomPan(
@@ -1193,7 +1207,7 @@ export function useEditor(
         ),
       );
     },
-    [apply, playhead],
+    [apply, playback],
   );
   const stepFrame = useCallback(
     (direction: PlaybackDirection) => {
@@ -1253,25 +1267,29 @@ export function useEditor(
     const next = pasteAnimation(
       clip,
       animationClipboard.current.value,
-      playhead - clip.start,
+      playback.getSnapshot() - clip.start,
     );
     if (next === clip) return false;
     updateClip(clip.id, next);
     if (animationClipboard.current.value.drawing) {
       editDrawing(
         clip.id,
-        playhead - clip.start + animationClipboard.current.value.duration,
+        playback.getSnapshot() -
+          clip.start +
+          animationClipboard.current.value.duration,
         "end",
       );
       return true;
     }
     editKeyframe(
       clip.id,
-      playhead - clip.start + animationClipboard.current.value.duration,
+      playback.getSnapshot() -
+        clip.start +
+        animationClipboard.current.value.duration,
       "end",
     );
     return true;
-  }, [selectedId, playhead, updateClip, editKeyframe, editDrawing]);
+  }, [selectedId, playback, updateClip, editKeyframe, editDrawing]);
   const selected = selectedId ? clipsById.get(selectedId) : undefined;
   const editingTrack = project.tracks.find(
     (track) => track.id === selected?.trackId,
@@ -1343,7 +1361,10 @@ export function useEditor(
     selectMany,
     select,
     selectCaptionTrack,
-    playhead,
+    playback,
+    get playhead() {
+      return playback.getSnapshot();
+    },
     seek,
     advancePlayback,
     playing,
@@ -1447,3 +1468,12 @@ export function useEditor(
   };
 }
 export type Editor = ReturnType<typeof useEditor>;
+
+export function useEditorPlayhead(editor: Pick<Editor, "playback">): number {
+  const { playback } = editor;
+  return useSyncExternalStore(
+    playback.subscribe,
+    playback.getSnapshot,
+    playback.getServerSnapshot,
+  );
+}

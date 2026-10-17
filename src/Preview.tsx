@@ -67,7 +67,7 @@ import CanvasToolbar, {
   type CanvasMode,
   type CanvasZoom,
 } from "./CanvasToolbar";
-import type { Editor } from "./useEditor";
+import { useEditorPlayhead, type Editor } from "./useEditor";
 import { visualClipAt } from "../shared/visual-state";
 import { annotationMime, parseAnnotation } from "../shared/annotations";
 import { behaviorTransform, supportsBehaviors } from "../shared/behaviors";
@@ -1097,6 +1097,7 @@ export default function Preview({
   editor: Editor;
   onCommand: (command: ClipCommand) => void;
 }) {
+  const playhead = useEditorPlayhead(editor);
   const panel = useRef<HTMLElement>(null);
   const holder = useRef<HTMLDivElement>(null),
     [size, setSize] = useState({ width: 700, height: 400 });
@@ -1146,8 +1147,7 @@ export default function Preview({
       );
     }
   };
-  const { project, playing, playhead, seek, advancePlayback, setPlaying } =
-      editor,
+  const { project, playing, seek, advancePlayback, setPlaying } = editor,
     duration = useMemo(() => projectDuration(project), [project.clips]);
   useEffect(() => {
     const element = holder.current;

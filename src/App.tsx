@@ -218,7 +218,7 @@ export default function App() {
       editable: selected.filter((clip) => !locked.has(clip.trackId)),
     };
   }, [editor.project.clips, editor.project.tracks, editor.selectedIds]);
-  useEffect(() => {
+  const syncNativeEditMenu = useCallback(() => {
     const { selected, editable } = menuSelection;
     const state = {
       blocked:
@@ -251,7 +251,6 @@ export default function App() {
     });
   }, [
     menuSelection,
-    editor.playhead,
     editor.canUndo,
     editor.canRedo,
     busy,
@@ -264,6 +263,10 @@ export default function App() {
     !!editor.narrationRecording,
     toast,
   ]);
+  useEffect(() => {
+    syncNativeEditMenu();
+    return editor.playback.subscribe(syncNativeEditMenu);
+  }, [editor.playback, syncNativeEditMenu]);
   useEffect(() => {
     const desktop = window.framecraft;
     void desktop

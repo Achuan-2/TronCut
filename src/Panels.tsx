@@ -21,7 +21,7 @@ import { type Asset, type Clip, textPresets, defaultTransform } from "../shared/
 import { createTransformSampler } from "../shared/editor";
 import { dimensionTransform } from "../shared/canvas";
 import type { Capabilities } from "../shared/bridge";
-import type { Editor } from "./useEditor";
+import { useEditorPlayhead, type Editor } from "./useEditor";
 import { timeLabel } from "./Preview";
 import { defaultCrop, defaultEffects } from "../shared/effects";
 import { textBoxFor } from "./text";
@@ -361,6 +361,7 @@ function CursorProperties({
 }
 
 export function Inspector({ editor }: { editor: Editor }) {
+  const playhead = useEditorPlayhead(editor);
   const c = editor.selected,
     locked = editor.project.tracks.find((t) => t.id === c?.trackId)?.locked ||
       (!!c?.recording && editor.project.clips.some(clip => clip.groupId === c.groupId &&
@@ -429,7 +430,7 @@ export function Inspector({ editor }: { editor: Editor }) {
   const textActive = activeTab === "text";
   const value =
     c && sampleTransform
-      ? sampleTransform(editor.playhead - c.start)
+      ? sampleTransform(playhead - c.start)
       : defaultTransform;
   const update = (patch: Partial<Clip>) => {
     if (!c || locked) return;

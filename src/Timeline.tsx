@@ -65,7 +65,7 @@ import {
   drawingAnimationRanges,
   type AnimationRange,
 } from "../shared/animation-ranges";
-import type { Editor } from "./useEditor";
+import { useEditorPlayhead, type Editor } from "./useEditor";
 import { timeLabel } from "./Preview";
 import { hasClipSpeed, supportsClipSpeed } from "../shared/clip-speed";
 import { supportsMediaFrame } from "../shared/media-frame";
@@ -166,11 +166,11 @@ export default function Timeline({
   onCommand: (command: ClipCommand) => void;
   dropDisabled?: boolean;
 }) {
+  const playhead = useEditorPlayhead(editor);
   // Performance monitoring in development
   usePerformanceMonitor("Timeline");
 
-  const { project, apply, playhead, seek, selected, selectedId, select } =
-    editor;
+  const { project, apply, seek, selected, selectedId, select } = editor;
   const timeline = useMemo(
     () => recordingTimeline(project),
     [project.clips, project.tracks],

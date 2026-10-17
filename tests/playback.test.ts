@@ -1,8 +1,25 @@
 import { describe, expect, it } from "vitest";
 import { createProject, newText } from "../shared/model";
 import { stepFrameTime, mediaBoundaryTime } from "../shared/playback";
+import { createPlaybackStore } from "../src/playback-store";
 
 describe("播放条定位", () => {
+  it("独立播放时钟通知订阅者，并对相同时间保持无操作", () => {
+    const playback = createPlaybackStore(1);
+    let notifications = 0;
+    const unsubscribe = playback.subscribe(() => notifications++);
+
+    playback.set(2);
+    playback.set((time) => time + 0.5);
+    playback.set(2.5);
+    expect(playback.getSnapshot()).toBe(2.5);
+    expect(notifications).toBe(2);
+
+    unsubscribe();
+    playback.set(3);
+    expect(playback.getSnapshot()).toBe(3);
+    expect(notifications).toBe(2);
+  });
   it("逐帧按项目帧率对齐，处理非整帧位置与浮点误差", () => {
     expect(stepFrameTime(1, 30, 1, 10)).toBeCloseTo(31 / 30);
     expect(stepFrameTime(1, 30, -1, 10)).toBeCloseTo(29 / 30);

@@ -6,11 +6,12 @@ import {
   zoomPanVideos,
   clearVideoZoomPan,
 } from "../shared/video-zoom-pan";
-import type { Editor } from "./useEditor";
+import { useEditorPlayhead, type Editor } from "./useEditor";
 import { ScenePreview } from "./Preview";
 import NumberInput from "./NumberInput";
 
 export default function ZoomPanPanel({ editor }: { editor: Editor }) {
+  const playhead = useEditorPlayhead(editor);
   const overview = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(240);
   const drag = useRef<{
@@ -24,8 +25,8 @@ export default function ZoomPanPanel({ editor }: { editor: Editor }) {
     handle?: { x: number; y: number };
   } | null>(null);
   const camera =
-    editor.zoomPanDraft ?? zoomPanAt(editor.project, editor.playhead);
-  const available = zoomPanVideos(editor.project, editor.playhead).length > 0;
+    editor.zoomPanDraft ?? zoomPanAt(editor.project, playhead);
+  const available = zoomPanVideos(editor.project, playhead).length > 0;
   useEffect(() => {
     const element = overview.current;
     if (!element) return;
@@ -77,7 +78,7 @@ export default function ZoomPanPanel({ editor }: { editor: Editor }) {
             y: event.clientY,
             width: bounds.width,
             height: bounds.height,
-            time: editor.playhead,
+            time: playhead,
             original: value,
             value,
             handle,
