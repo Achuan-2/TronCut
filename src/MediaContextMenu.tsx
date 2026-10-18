@@ -13,11 +13,15 @@ export default function MediaContextMenu({
   unavailable,
   onClose,
   onCommand,
+  onSaveToLibrary,
+  commands: customCommands,
 }: {
   menu: MediaMenuPosition;
   unavailable: Partial<Record<MediaCommand, string>>;
   onClose: () => void;
   onCommand: (command: MediaCommand) => void;
+  onSaveToLibrary?: () => void;
+  commands?: [MediaCommand, string][];
 }) {
   const root = useRef<HTMLDivElement>(null);
   const [position, setPosition] = useState({ x: menu.x, y: menu.y });
@@ -50,7 +54,7 @@ export default function MediaContextMenu({
       window.removeEventListener("blur", onClose);
     };
   }, [onClose]);
-  const commands: [MediaCommand, string][] = [
+  const commands: [MediaCommand, string][] = customCommands ?? [
     ["add", "添加到时间轴播放头所处位置"],
     ["replace", "替换时间轴上所选的媒体"],
     ["update", "更新"],
@@ -103,6 +107,17 @@ export default function MediaContextMenu({
           {label}
         </button>
       ))}
+      {onSaveToLibrary && (
+        <button
+          role="menuitem"
+          onClick={() => {
+            onClose();
+            onSaveToLibrary();
+          }}
+        >
+          添加到素材库…
+        </button>
+      )}
     </div>,
     document.body,
   );

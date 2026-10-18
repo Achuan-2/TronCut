@@ -36,6 +36,15 @@ const bridge: FrameCraftBridge = {
     return () => ipcRenderer.removeListener("window:state", fn);
   },
   importMedia: () => ipcRenderer.invoke("media:import"),
+  assetLibraries: () => ipcRenderer.invoke("libraries:list"),
+  createAssetLibrary: (name) => ipcRenderer.invoke("libraries:create", name),
+  renameAssetLibrary: (id, name) => ipcRenderer.invoke("libraries:rename", id, name),
+  deleteAssetLibrary: (id) => ipcRenderer.invoke("libraries:delete", id),
+  addLibraryAssets: (id, assets) => ipcRenderer.invoke("libraries:add", id, assets),
+  removeLibraryAsset: (id, assetId) => ipcRenderer.invoke("libraries:remove-asset", id, assetId),
+  useLibraryAsset: (id, assetId) => ipcRenderer.invoke("libraries:use", id, assetId),
+  exportAssetLibrary: (id) => ipcRenderer.invoke("libraries:export", id),
+  importAssetLibrary: () => ipcRenderer.invoke("libraries:import"),
   importDroppedMedia: (files) =>
     ipcRenderer.invoke(
       "media:import-paths",

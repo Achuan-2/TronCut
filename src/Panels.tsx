@@ -24,7 +24,7 @@ import { useEditorPlayhead, type Editor } from "./useEditor";
 import { timeLabel } from "./Preview";
 import { defaultCrop, defaultEffects } from "../shared/effects";
 import { textBoxFor } from "./text";
-import MediaLibrary from "./MediaLibrary";
+import AssetLibraryPanel from "./AssetLibraryPanel";
 import {
   assetClips,
   mediaReplacementError,
@@ -127,20 +127,19 @@ export default function Panels(props: Props) {
           editor.presetLibrary.showMenu({ kind: "behavior", x: event.clientX, y: event.clientY });
         } : undefined}
       >
-        {tab !== "captions" && tab !== "animations" && tab !== "narration" && (
+        {tab !== "media" && tab !== "captions" && tab !== "animations" && tab !== "narration" && (
           <div className="library-heading">
             <h2>
-              {tabs.find((t) => t.id === tab)?.name === "媒体"
-                ? "素材库"
-                : tabs.find((t) => t.id === tab)?.name}
+              {tabs.find((t) => t.id === tab)?.name}
             </h2>
-            {tab === "media" && <span>{project.assets.length} 个素材</span>}
           </div>
         )}
         {editor.presetLibrary.error && <p className="preset-library-error" role="alert">{editor.presetLibrary.error}</p>}
         {tab === "favorites" && <FavoritesPanel editor={editor} toast={toast} />}
         {tab === "media" && (
-          <MediaLibrary
+          <AssetLibraryPanel
+            toast={toast}
+            busy={props.busy}
             assets={project.assets}
             query={query}
             onQueryChange={setQuery}

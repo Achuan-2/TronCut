@@ -1,0 +1,112 @@
+.media-panel-tabs {
+  display: flex;
+  flex-shrink: 0;
+  margin-bottom: 10px;
+  border-bottom: 1px solid var(--line);
+}
+.media-panel-tabs button {
+  flex: 1;
+  gap: 6px;
+  padding: 9px 4px;
+  border-radius: 0;
+  border-bottom: 2px solid transparent;
+  font-size: 11px;
+  color: var(--muted);
+}
+.media-panel-tabs button[aria-selected="true"] {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+  background: #ffffff05;
+}
+.media-source-panel {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+.asset-library-selector {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px 10px;
+  font-size: 11px;
+}
+.asset-library-selector select {
+  flex: 1;
+  min-width: 0;
+  padding: 6px;
+  font-size: 11px;
+  background: #30383d;
+}
+.asset-library-management {
+  position: relative;
+}
+.asset-library-management summary {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 6px 3px;
+  cursor: pointer;
+  list-style: none;
+}
+.asset-library-management summary::-webkit-details-marker {
+  display: none;
+}
+.asset-library-management [role="menu"] {
+  position: absolute;
+  right: 0;
+  top: 30px;
+  z-index: 20;
+  width: 180px;
+  padding: 5px;
+  border: 1px solid #4b555b;
+  border-radius: 5px;
+  background: #252d32;
+  box-shadow: 0 8px 24px #0008;
+}
+.asset-library-management button {
+  width: 100%;
+  padding: 9px 10px;
+  justify-content: flex-start;
+  font-size: 12px;
+}
+.asset-library-management button:hover:enabled {
+  background: #3b474c;
+}
+.asset-library-management hr {
+  border: 0;
+  border-top: 1px solid var(--line);
+  margin: 4px 0;
+}
+.asset-library-error {
+  margin: 6px 10px;
+  font-size: 11px;
+  line-height: 1.6;
+  color: #ffad9d;
+  overflow-wrap: anywhere;
+}
+.asset-library-dialog {
+  width: min(420px, calc(100vw - 40px));
+  padding: 22px;
+  border: 1px solid #4b555b;
+  border-radius: 10px;
+  background: #252d32;
+  color: #d9dde0;
+}
+.asset-library-dialog::backdrop {
+  background: #0009;
+}
+.asset-library-dialog p {
+  font-size: 13px;
+  line-height: 1.8;
+  overflow-wrap: anywhere;
+}
+.asset-library-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 22px;
+}
+.asset-library-dialog-actions button {
+  padding: 8px 18px;
+}

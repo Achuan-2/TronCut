@@ -11,6 +11,7 @@ import {
   X,
 } from "lucide-react";
 import type { Asset } from "../shared/model";
+import { libraryAssetMime } from "../shared/asset-libraries";
 import { MediaThumbnail } from "./MediaThumbnail";
 import { timeLabel } from "./Preview";
 import MediaContextMenu, {
@@ -41,9 +42,11 @@ function readPreferences(): Preferences {
 const AssetCard = memo(function AssetCard({
   asset,
   selected,
+  libraryId,
 }: {
   asset: Asset;
   selected: boolean;
+  libraryId?: string;
 }) {
   const card = useRef<HTMLButtonElement>(null);
   const [visible, setVisible] = useState(false);
@@ -74,7 +77,12 @@ const AssetCard = memo(function AssetCard({
       data-asset-id={asset.id}
       draggable={!asset.missing}
       onDragStart={(event) =>
-        event.dataTransfer.setData("framecraft-asset", asset.id)
+        event.dataTransfer.setData(
+          libraryId ? libraryAssetMime : "framecraft-asset",
+          libraryId
+            ? JSON.stringify({ libraryId, assetId: asset.id })
+            : asset.id,
+        )
       }
       title={`${asset.name}\n${asset.missing ? "双击重新链接素材" : "双击添加到时间线"}`}
     >
@@ -93,6 +101,18 @@ const AssetCard = memo(function AssetCard({
   );
 });
 
+export interface MediaLibraryProps {
+  assets: Asset[];
+  query: string;
+  onQueryChange: (query: string) => void;
+  onActivate: (asset: Asset) => void;
+  onImport: () => void;
+  onCommand: (asset: Asset, command: MediaCommand) => void;
+  unavailable: (asset: Asset) => Partial<Record<MediaCommand, string>>;
+  libraryId?: string;
+  onSaveToLibrary?: (asset: Asset) => void;
+}
+
 export default function MediaLibrary({
   assets,
   query,
@@ -101,15 +121,9 @@ export default function MediaLibrary({
   onImport,
   onCommand,
   unavailable,
-}: {
-  assets: Asset[];
-  query: string;
-  onQueryChange: (query: string) => void;
-  onActivate: (asset: Asset) => void;
-  onImport: () => void;
-  onCommand: (asset: Asset, command: MediaCommand) => void;
-  unavailable: (asset: Asset) => Partial<Record<MediaCommand, string>>;
-}) {
+  libraryId,
+  onSaveToLibrary,
+}: MediaLibraryProps) {
   const [menu, setMenu] = useState<MediaMenuPosition | null>(null);
   const closeMenu = useCallback(() => setMenu(null), []);
   const [preferences, setPreferences] = useState(readPreferences);
@@ -118,8 +132,12 @@ export default function MediaLibrary({
   const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set());
   const items = useRef<HTMLDivElement>(null);
   useEffect(() => {
+    closeMenu();
+    setSelectedId(null);
+  }, [libraryId, closeMenu]);
+  useEffect(() => {
     items.current?.scrollTo({ top: 0 });
-  }, [query, category, preferences.view, preferences.grouping]);
+  }, [query, category, preferences.view, preferences.grouping, libraryId]);
   useEffect(() => {
     try {
       localStorage.setItem(preferenceKey, JSON.stringify(preferences));
@@ -242,9 +260,13 @@ export default function MediaLibrary({
         {!assets.length ? (
           <div className="library-empty">
             <Film size={36} />
-            <b>导入视频、音频或图片</b>
+            <b>
+              {libraryId ? "添加常用素材，跨工程复用" : "导入视频、音频或图片"}
+            </b>
             <p>
-              拖入素材，或点击下方“导入媒体”
+              {libraryId
+                ? "点击下方“导入到库”，或在项目媒体中右键添加"
+                : "拖入素材，或点击下方“导入媒体”"}
               <br />
               双击素材即可加入时间线
             </p>
@@ -301,6 +323,7 @@ export default function MediaLibrary({
                         key={asset.id}
                         asset={asset}
                         selected={selectedId === asset.id}
+                        libraryId={libraryId}
                       />
                     ))}
                   </div>
@@ -313,7 +336,7 @@ export default function MediaLibrary({
       <div className="media-browser-footer">
         <button className="media-import-button" onClick={onImport}>
           <Plus size={16} />
-          导入媒体
+          {libraryId ? "导入到库" : "导入媒体"}
         </button>
         <div className="media-view-buttons" role="group" aria-label="素材视图">
           {(
@@ -342,6 +365,17 @@ export default function MediaLibrary({
           onClose={closeMenu}
           unavailable={unavailable(menuAsset)}
           onCommand={(command) => onCommand(menuAsset, command)}
+          onSaveToLibrary={
+            onSaveToLibrary ? () => onSaveToLibrary(menuAsset) : undefined
+          }
+          commands={
+            libraryId
+              ? [
+                  ["add", "添加到时间线"],
+                  ["delete", "从素材库移除…"],
+                ]
+              : undefined
+          }
         />
       )}
     </div>

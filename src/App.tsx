@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { LibraryAssetDrag } from "../shared/asset-libraries";
 import {
   ArrowUpRight,
   ChevronDown,
@@ -489,6 +490,22 @@ export default function App() {
       editor.setPlaying(false);
       editor.addAssets(assets, true, { time, trackId });
       toast(`已添加 ${assets.length} 个素材到时间线`);
+    });
+  const dropLibraryAsset = (
+    source: LibraryAssetDrag,
+    time: number,
+    trackId?: string,
+  ) =>
+    importIntoTimeline(async () => {
+      const track = editor.project.tracks.find((track) => track.id === trackId);
+      if (track?.locked || track?.captionTrack) return;
+      const asset = await bridge().useLibraryAsset(
+        source.libraryId,
+        source.assetId,
+      );
+      editor.setPlaying(false);
+      editor.addAssets([asset], true, { time, trackId });
+      toast("已从素材库添加到时间线");
     });
   const captureFrame = () =>
     importIntoTimeline(async () => {
@@ -1215,6 +1232,7 @@ export default function App() {
             onCommand={(command) => commands.current(command)}
             onCopyAnimation={copyAnimation}
             onDropFiles={dropFiles}
+            onDropLibraryAsset={dropLibraryAsset}
             onCaptureFrame={() => void captureFrame()}
             dropDisabled={busy || recordingModalOpen || mediaImporting}
           />

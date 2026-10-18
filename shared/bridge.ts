@@ -1,4 +1,5 @@
 import type { Asset, Project } from "./model";
+import type { AssetLibrary } from "./asset-libraries";
 import type { Cue } from "./subtitles";
 import type { SpeechEngine, SpeechOptions } from "./asr";
 import type { TtsOptions, WindowsSpeechVoice } from "./tts";
@@ -76,6 +77,15 @@ export interface FrameCraftBridge {
   editText(command: z.infer<typeof textEditSchema>): Promise<void>;
   onWindowState(callback: (state: WindowState) => void): () => void;
   importMedia(): Promise<Asset[]>;
+  assetLibraries(): Promise<AssetLibrary[]>;
+  createAssetLibrary(name: string): Promise<string>;
+  renameAssetLibrary(id: string, name: string): Promise<void>;
+  deleteAssetLibrary(id: string): Promise<void>;
+  addLibraryAssets(id: string, assetIds: string[]): Promise<void>;
+  removeLibraryAsset(id: string, assetId: string): Promise<void>;
+  useLibraryAsset(id: string, assetId: string): Promise<Asset>;
+  exportAssetLibrary(id: string): Promise<boolean>;
+  importAssetLibrary(): Promise<string | null>;
   importDroppedMedia(files: File[]): Promise<Asset[]>;
   copyClipClipboard(token: string): Promise<void>;
   importClipboardMedia(): Promise<{

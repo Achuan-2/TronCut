@@ -1,5 +1,10 @@
 import { trimClip } from "../shared/clip-trim";
 import {
+  libraryAssetMime,
+  libraryAssetDragSchema,
+  type LibraryAssetDrag,
+} from "../shared/asset-libraries";
+import {
   type CSSProperties,
   Fragment,
   useEffect,
@@ -216,6 +221,7 @@ export default function Timeline({
   editor,
   onCopyAnimation,
   onDropFiles,
+  onDropLibraryAsset,
   onCaptureFrame,
   onCommand,
   dropDisabled = false,
@@ -227,6 +233,11 @@ export default function Timeline({
     cut?: boolean,
   ) => void;
   onDropFiles: (files: File[], time: number, trackId?: string) => void;
+  onDropLibraryAsset: (
+    asset: LibraryAssetDrag,
+    time: number,
+    trackId?: string,
+  ) => void;
   onCaptureFrame: () => void;
   onCommand: (command: ClipCommand) => void;
   dropDisabled?: boolean;
@@ -1090,7 +1101,10 @@ export default function Timeline({
             if (event.target === event.currentTarget) select(null);
           }}
           onDragOver={(event) => {
-            if (!event.dataTransfer.types.includes("Files")) return;
+            if (
+              !event.dataTransfer.types.includes("Files") &&
+              !event.dataTransfer.types.includes(libraryAssetMime)
+            ) return;
             event.preventDefault();
             const trackId = (event.target as HTMLElement).closest<HTMLElement>(
               ".track-lane",
@@ -1125,7 +1139,8 @@ export default function Timeline({
               setFileDrop(null);
           }}
           onDrop={(event) => {
-            if (!event.dataTransfer.files.length) return;
+            const libraryData = event.dataTransfer.getData(libraryAssetMime);
+            if (!event.dataTransfer.files.length && !libraryData) return;
             event.preventDefault();
             event.stopPropagation();
             setFileDrop(null);
@@ -1134,7 +1149,8 @@ export default function Timeline({
               ".track-lane",
             )?.dataset.track;
             if (
-              project.tracks.find((track) => track.id === trackId)?.captionTrack
+              project.tracks.find((track) => track.id === trackId)?.captionTrack ||
+              project.tracks.find((track) => track.id === trackId)?.locked
             )
               return;
             const seconds =
@@ -1142,12 +1158,25 @@ export default function Timeline({
                 event.currentTarget.getBoundingClientRect().left +
                 event.currentTarget.scrollLeft) /
               zoom;
+            const time = Math.max(
+              0,
+              Math.round(seconds * project.canvas.fps) / project.canvas.fps,
+            );
+            if (libraryData) {
+              try {
+                const result = libraryAssetDragSchema.safeParse(
+                  JSON.parse(libraryData),
+                );
+                if (result.success)
+                  onDropLibraryAsset(result.data, time, trackId);
+              } catch {
+                // Ignore invalid external drag data.
+              }
+              return;
+            }
             onDropFiles(
               Array.from(event.dataTransfer.files),
-              Math.max(
-                0,
-                Math.round(seconds * project.canvas.fps) / project.canvas.fps,
-              ),
+              time,
               trackId,
             );
           }}
@@ -1359,7 +1388,10 @@ export default function Timeline({
                 }}
                 onDrop={(e) => {
                   e.preventDefault();
-                  if (e.dataTransfer.files.length) return;
+                  if (
+                    e.dataTransfer.files.length ||
+                    e.dataTransfer.types.includes(libraryAssetMime)
+                  ) return;
                   if (track.locked) return;
                   const template = parseAnnotation(
                     e.dataTransfer.getData(annotationMime),

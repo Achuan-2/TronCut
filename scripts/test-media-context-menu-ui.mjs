@@ -80,7 +80,8 @@ const save = async () => {
 try {
   await page.getByRole("button", { name: "恢复编辑", exact: true }).click();
   await card("image-0").click({ button: "right" });
-  await expect(menu.getByRole("menuitem")).toHaveCount(5);
+  await expect(menu.getByRole("menuitem")).toHaveCount(6);
+  await expect(menu.getByRole("menuitem", { name: "添加到素材库…", exact: true })).toBeEnabled();
   await expect(action("替换时间轴上所选的媒体")).toBeDisabled();
   await expect(action("在时间线上选择")).toBeDisabled();
   await page.keyboard.press("Escape");
@@ -164,7 +165,7 @@ try {
     JSON.stringify({
       root,
       checks:
-        "五项菜单、禁用状态、播放头添加、仅替换所选、更新全部引用、删除保留原文件、撤销重做、列表视图、保存重开",
+        "六项菜单、禁用状态、播放头添加、仅替换所选、更新全部引用、删除保留原文件、撤销重做、列表视图、保存重开",
       rendererErrors: errors,
     }),
   );

@@ -54,6 +54,8 @@ import { captureRegionSchema, validateCaptureRegion, type CaptureRegion } from "
 import { copyClipClipboard, importClipboardMedia } from "./clipboard-media";
 import { importMediaPaths } from "./import-media";
 import { RecentProjects } from "./recent-projects";
+import { AssetLibraries } from "./asset-libraries";
+import { libraryNameSchema } from "../shared/asset-libraries";
 import { runCli } from "./cli";
 import { PreferencesStore } from "./preferences";
 import { preferencesUpdateSchema, aiProviderUpdateSchema } from "../shared/preferences";
@@ -206,6 +208,7 @@ const recordingControls = new RecordingControls((command) => {
     window.webContents.send("shortcut", command === "pause" ? "pauseRecording" : "stopRecording");
 });
 const assets = new Map<string, Asset>();
+const assetLibraries = new AssetLibraries(app.getPath("userData"));
 const speechVoicePreviews = new SpeechVoicePreviews();
 const clonedVoices = new ClonedVoices(app.getPath("userData"));
 const temporaryReferences = new Set<string>();
@@ -620,6 +623,55 @@ function installHandlers() {
     projectFile = file;
     await rememberProject(project, file);
     return { project, file };
+  });
+  handle("libraries:list", async () => {
+    const libraries = await assetLibraries.list();
+    // Browsing a large library should not queue video proxy generation.
+    libraries.forEach((library) =>
+      library.assets.forEach((asset) => {
+        assets.set(asset.id, asset);
+        approvedPaths.add(path.resolve(asset.path));
+      }),
+    );
+    return libraries;
+  });
+  handle("libraries:create", (name: unknown) =>
+    assetLibraries.create(libraryNameSchema.parse(name)),
+  );
+  handle("libraries:rename", (id: unknown, name: unknown) =>
+    assetLibraries.rename(z.string().parse(id), libraryNameSchema.parse(name)),
+  );
+  handle("libraries:delete", (id: unknown) =>
+    assetLibraries.remove(z.string().parse(id)),
+  );
+  handle("libraries:add", (id: unknown, ids: unknown) =>
+    assetLibraries.add(
+      z.string().parse(id),
+      z.array(z.string()).min(1).max(10000).parse(ids).map(assetById),
+    ),
+  );
+  handle("libraries:remove-asset", (id: unknown, assetId: unknown) =>
+    assetLibraries.removeAsset(z.string().parse(id), z.string().parse(assetId)),
+  );
+  handle("libraries:use", async (id: unknown, assetId: unknown) =>
+    register(await assetLibraries.materialize(z.string().parse(id), z.string().parse(assetId))),
+  );
+  handle("libraries:export", async (input: unknown) => {
+    const id = z.string().parse(input);
+    const library = (await assetLibraries.list()).find((library) => library.id === id);
+    if (!library) throw new Error("素材库不存在");
+    const result = await dialog.showSaveDialog(window, {
+      title: "导出素材库",
+      defaultPath: `${library.name.replace(/[<>:"/\\|?*\x00-\x1f]/g, "_")}.zip`,
+      filters: [{ name: "TronCut 素材库压缩包", extensions: ["zip"] }],
+    });
+    if (result.canceled || !result.filePath) return false;
+    await assetLibraries.export(id, result.filePath);
+    return true;
+  });
+  handle("libraries:import", async () => {
+    const file = await chooseFile("导入素材库压缩包", ["zip"]);
+    return file ? assetLibraries.import(file) : null;
   });
   handle("media:import", async () => {
     const result = await dialog.showOpenDialog(window, {
