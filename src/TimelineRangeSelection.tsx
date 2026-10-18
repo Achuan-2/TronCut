@@ -131,7 +131,7 @@ export function TimelineRangeHandles({
             update(part, time, range);
           }}
         >
-          <span />
+          <span aria-hidden="true" />
         </button>
       ))}
       <div
