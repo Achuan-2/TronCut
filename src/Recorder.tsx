@@ -22,6 +22,8 @@ import RecordingBackgroundPreview from "./RecordingBackgroundPreview";
 import RecordingBackgroundSelect from "./RecordingBackgroundSelect";
 import CursorStyleSelect from "./CursorStyleSelect";
 import NumberInput from "./NumberInput";
+import RecordingCameraSettings from "./RecordingCameraSettings";
+import { useCameraPreview, useCameraFrames } from "./useCameraPreview";
 
 interface Session {
   id: string;
@@ -49,7 +51,6 @@ export default function Recorder({
 }) {
   const [sources, setSources] = useState<CaptureSource[]>([]),
     [sourceId, setSourceId] = useState(""),
-    [camera, setCamera] = useState(false),
     [system, setSystem] = useState(false);
   const [phase, setPhase] = useState<
       "configure" | "starting" | "recording" | "paused" | "saving"
@@ -75,6 +76,8 @@ export default function Recorder({
   }
   const pauseBusy = useRef(false);
   const [settings, setSettings] = useState(defaultRecordingSettings);
+  const camera = settings.camera;
+  const cameraPreview = useCameraPreview(camera);
   const mic = settings.microphone;
   const [settingsReady, setSettingsReady] = useState(false);
   const [savingSettings, setSavingSettings] = useState(false);
@@ -212,12 +215,13 @@ export default function Recorder({
   useEffect(() => () => onCaptureActiveChange(false), [onCaptureActiveChange]);
   useEffect(() => {
     if (phase !== "recording" && phase !== "paused" && phase !== "saving") return;
-    void window.framecraft?.updateRecordingControls({ phase, elapsed, error: error.slice(0, 4000) })
+    void window.framecraft?.updateRecordingControls({ phase, elapsed, error: error.slice(0, 4000), ...(camera ? { cameraStyle: settings.cameraStyle } : {}) })
       .catch((e) => {
         setError(`录制控制窗口不可用：${String(e)}`);
         void stopRef.current();
       });
-  }, [phase, elapsed, error]);
+  }, [phase, elapsed, error, camera, settings.cameraStyle]);
+  useCameraFrames(cameraPreview.stream, captureActive);
   useEffect(
     () =>
       window.framecraft?.onShortcut((command) => {
@@ -284,14 +288,7 @@ export default function Recorder({
         requests.push(
           acquire(
             "camera",
-            navigator.mediaDevices.getUserMedia({
-              video: {
-                width: { ideal: 1920 },
-                height: { ideal: 1080 },
-                frameRate: 30,
-              },
-              audio: false,
-            }),
+            cameraPreview.acquire(),
           ),
         );
       // Wait for every request before cleanup, including devices that finish
@@ -312,7 +309,10 @@ export default function Recorder({
       setCountingDown(true);
       if (!(await bridge.recordingCountdown(sourceId, native ? { fps, systemAudio: system, region } : undefined))) {
         streams.forEach((s) => s.stream.getTracks().forEach((t) => t.stop()));
-        if (mounted.current) setPhase("configure");
+        if (mounted.current) {
+          setPhase("configure");
+          if (camera) cameraPreview.retry();
+        }
         return;
       }
       if (!mounted.current) {
@@ -429,6 +429,7 @@ export default function Recorder({
         nativeActive.current = false;
       }
       streams.forEach((s) => s.stream.getTracks().forEach((t) => t.stop()));
+      if (camera && mounted.current) cameraPreview.retry();
     }
   }
   async function pause() {
@@ -518,7 +519,7 @@ export default function Recorder({
               value: system,
               change: setSystem,
             },
-            { label: "摄像头", icon: Camera, value: camera, change: setCamera },
+            { label: "摄像头", icon: Camera, value: camera, change: (camera: boolean) => changeSettings({ camera }) },
           ].map((option) => (
             <label key={option.label}>
               <option.icon size={22} />
@@ -532,6 +533,8 @@ export default function Recorder({
             </label>
           ))}
         </div>
+        {camera && <RecordingCameraSettings stream={cameraPreview.stream} style={settings.cameraStyle} error={cameraPreview.error}
+          disabled={phase === "starting" || savingSettings} onChange={(cameraStyle) => changeSettings({ cameraStyle })} onRetry={cameraPreview.retry} />}
         <label className="field">
           录制帧率
           <select

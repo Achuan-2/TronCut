@@ -23,6 +23,14 @@ export async function probeMedia(
     ].includes(ext)
   ) {
     const info = await sharp(file).metadata();
+    if (ext === ".gif" && (info.pages ?? 1) > 1) {
+      return {
+        id: uid(), name, path: file, kind: "video", animated: true,
+        duration: Math.max(0.1, (info.delay ?? []).reduce((total, delay) => total + Math.max(10, delay), 0) / 1000),
+        width: info.width ?? 1, height: info.pageHeight ?? info.height ?? 1,
+        hasAudio: false,
+      };
+    }
     return {
       id: uid(),
       name,

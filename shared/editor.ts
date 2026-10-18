@@ -101,6 +101,7 @@ export function addMediaAssets(
         trackId: track.id,
         assetId: asset.id,
         kind: asset.kind,
+        ...(asset.animated ? { loop: true } : {}),
         name: asset.name,
         start,
         duration,

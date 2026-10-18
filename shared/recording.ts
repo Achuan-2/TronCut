@@ -7,6 +7,7 @@ import {
   type Project,
 } from "./model";
 import type { RecordingSettings } from "./recording-settings";
+import { cameraMask } from "./camera-style";
 import {
   recordingCameraFrames,
   sceneRecordingFrames,
@@ -102,7 +103,7 @@ export function addRecordedAssets(
     const framed = kind === "screen" && settings.background && !!background;
     const clip: Clip = {
       id: uid(),
-      groupId,
+      groupId: kind === "camera" ? undefined : groupId,
       ...(groupId ? { recordingRole: kind } : {}),
       ...(kind === "screen"
         ? { recording: { ...structuredClone(settings), background: framed } }
@@ -128,7 +129,16 @@ export function addRecordedAssets(
       ...(kind === "screen" && asset.cursor
         ? { cursorStyle: { ...settings.cursor } }
         : {}),
-      ...(framed ? { mediaFrame: { radius: settings.radius, unit: "percent" as const } } : {}),
+      ...(framed
+        ? { mediaFrame: { radius: settings.radius, unit: "percent" as const } }
+        : {}),
+      ...(kind === "camera" && settings.cameraStyle.preset !== "rectangle"
+        ? {
+            visualEffects: {
+              mask: cameraMask(settings.cameraStyle, asset.width, asset.height),
+            },
+          }
+        : {}),
     };
     if (kind === "screen" && settings.autoZoom)
       clip.keyframes = recordingZoomFrames(asset, clip, settings.zoom);

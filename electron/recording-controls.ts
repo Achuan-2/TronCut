@@ -1,16 +1,19 @@
 import { BrowserWindow, ipcMain, screen } from "electron";
 import path from "node:path";
+import { cameraClipPath } from "../shared/camera-style";
 import type {
   RecordingControlCommand,
   RecordingControlsState,
 } from "../shared/recording-controls";
 
 const controlsHtml = `<!doctype html><html lang="zh-CN"><meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src blob:; style-src 'unsafe-inline'; script-src 'unsafe-inline'">
 <title>TronCut 录制控制</title><style>
 * { box-sizing:border-box; }
 html,body { margin:0; height:100%; overflow:hidden; background:#18231c; color:#edf5ef; font:12px system-ui,sans-serif; }
-main { display:flex; align-items:center; gap:6px; height:100%; padding:5px 7px; border:1px solid #4d6656; border-radius:7px; -webkit-app-region:drag; }
+main { display:flex; align-items:center; gap:6px; height:42px; padding:5px 7px; border:1px solid #4d6656; border-radius:7px; -webkit-app-region:drag; }
+.camera { height:180px; display:grid; place-items:center; -webkit-app-region:drag; background:#111b15; }
+.camera img { display:block; max-width:100%; max-height:180px; }
 .grip { width:6px; height:14px; color:#779483; flex-shrink:0; }
 button { display:grid; place-items:center; flex-shrink:0; width:26px; height:26px; padding:0; -webkit-app-region:no-drag; cursor:pointer; border:0; border-radius:4px; background:transparent; color:inherit; }
 button:hover { background:#304738; }
@@ -27,7 +30,7 @@ time { margin-right:auto; font-size:14px; font-variant-numeric:tabular-nums; whi
 #stop:hover { background:#54362f; }
 #error { color:#ffd18c; font-weight:700; cursor:help; -webkit-app-region:no-drag; }
 .separator { height:14px; width:1px; background:#405647; flex-shrink:0; }
-</style><main aria-label="录制控制" title="拖动移动">
+</style><div class="camera" hidden><img id="camera" alt="录制中的摄像头画面"></div><main aria-label="录制控制" title="拖动移动">
 <svg class="grip" viewBox="0 0 6 14" aria-hidden="true"><path d="M1 2v10M5 2v10"/></svg>
 <i id="dot" title="正在录制"></i><span id="status" class="sr-only" role="status">正在录制</span>
 <time aria-label="录制时长">00:00</time><span id="error" role="alert" hidden>!</span>
@@ -38,7 +41,23 @@ time { margin-right:auto; font-size:14px; font-variant-numeric:tabular-nums; whi
 <button id="minimize" aria-label="最小化" title="最小化到任务栏，继续录制"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 11h10"/></svg></button>
 </main><script>
 const pause = document.querySelector('#pause'), stop = document.querySelector('#stop');
+const camera = document.querySelector('#camera');
+const cameraClipPath = ${cameraClipPath.toString()};
+let cameraStyle, cameraUrl;
+const updateCameraMask = () => {
+  if (cameraStyle && camera.naturalWidth) camera.style.clipPath = cameraClipPath(cameraStyle, camera.naturalWidth, camera.naturalHeight);
+};
+camera.onload = updateCameraMask;
+window.recordingControls.onCameraFrame(frame => {
+  const previous = cameraUrl;
+  cameraUrl = URL.createObjectURL(new Blob([frame], { type: 'image/jpeg' }));
+  camera.src = cameraUrl;
+  if (previous) URL.revokeObjectURL(previous);
+});
 window.recordingControls.onState(state => {
+  cameraStyle = state.cameraStyle;
+  document.querySelector('.camera').hidden = !cameraStyle;
+  updateCameraMask();
   document.body.dataset.phase = state.phase;
   const status = state.phase === 'starting' ? '正在启动录制…' : state.phase === 'paused' ? '已暂停' : state.phase === 'saving' ? '正在保存…' : '正在录制';
   document.querySelector('#status').textContent = status;
@@ -96,7 +115,7 @@ export class RecordingControls {
       screen.getPrimaryDisplay();
     const { workArea } = display;
     const width = Math.min(272, workArea.width),
-      height = Math.min(42, workArea.height);
+      height = Math.min(this.state?.cameraStyle ? 222 : 42, workArea.height);
     return {
       x: Math.round(workArea.x + (workArea.width - width) / 2),
       y: workArea.y + Math.max(0, workArea.height - height - 24),
@@ -151,8 +170,10 @@ export class RecordingControls {
       this.close();
       return;
     }
+    const cameraChanged = !!this.state?.cameraStyle !== !!state.cameraStyle;
     this.state = state;
     if (this.window && !this.window.isDestroyed()) {
+      if (cameraChanged) this.window.setBounds(this.bounds());
       if (!this.window.webContents.isLoadingMainFrame())
         this.window.webContents.send("recording:controls:state", state);
       if (reveal && !this.presentationRequested) this.show();
@@ -221,5 +242,10 @@ export class RecordingControls {
     this.loaded = false;
     this.presentationRequested = false;
     if (controls && !controls.isDestroyed()) controls.destroy();
+  }
+
+  cameraFrame(frame: Uint8Array) {
+    if (this.loaded && this.state?.cameraStyle && this.window && !this.window.isDestroyed())
+      this.window.webContents.send("recording:camera:frame", frame);
   }
 }

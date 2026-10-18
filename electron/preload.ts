@@ -5,6 +5,7 @@ const bridge: FrameCraftBridge = {
   recordingCountdown: (sourceId, native) => ipcRenderer.invoke("recording:countdown", sourceId, native),
   cancelRecordingCountdown: () => ipcRenderer.invoke("recording:countdown:cancel"),
   updateRecordingControls: (state) => ipcRenderer.invoke("recording:controls:update", state),
+  updateCameraPreview: (frame) => ipcRenderer.invoke("recording:camera:frame", frame),
   showRecordingControls: () => ipcRenderer.invoke("recording:controls:show"),
   recordingSettings: () => ipcRenderer.invoke("recording:settings"),
   saveRecordingSettings: (settings) =>

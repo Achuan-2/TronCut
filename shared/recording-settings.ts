@@ -66,12 +66,23 @@ export const customRecordingBackgroundSchema = z.object({
   width: finite.positive(),
   height: finite.positive(),
   hasAudio: z.boolean(),
+  animated: z.boolean().optional(),
 });
 export type CustomRecordingBackground = z.infer<
   typeof customRecordingBackgroundSchema
 >;
+export const cameraStyleSchema = z.object({
+  preset: z.enum(["rectangle", "rounded", "circle"]).default("rectangle"),
+  maskX: finite.min(0).max(1).default(0.5),
+  maskY: finite.min(0).max(1).default(0.5),
+  maskSize: finite.min(0.2).max(1).default(0.9),
+});
+export type CameraStyle = z.infer<typeof cameraStyleSchema>;
+export const defaultCameraStyle: CameraStyle = cameraStyleSchema.parse({});
 export const recordingSettingsSchema = z.object({
   microphone: z.boolean().default(true),
+  camera: z.boolean().default(false),
+  cameraStyle: cameraStyleSchema.default({}),
   background: z.boolean(),
   preset: z.preprocess(
     (value) =>
@@ -91,6 +102,8 @@ export const recordingSettingsSchema = z.object({
 export type RecordingSettings = z.infer<typeof recordingSettingsSchema>;
 export const defaultRecordingSettings: RecordingSettings = {
   microphone: true,
+  camera: false,
+  cameraStyle: { ...defaultCameraStyle },
   background: true,
   preset: "perspective-grid",
   padding: 0.08,

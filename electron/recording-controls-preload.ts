@@ -11,4 +11,6 @@ contextBridge.exposeInMainWorld("recordingControls", {
     ipcRenderer.on("recording:controls:state", (_event, state) =>
       callback(state),
     ),
+  onCameraFrame: (callback: (frame: Uint8Array) => void) =>
+    ipcRenderer.on("recording:camera:frame", (_event, frame) => callback(frame)),
 });

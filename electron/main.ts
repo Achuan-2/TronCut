@@ -354,10 +354,18 @@ function installHandlers() {
     await discardNativePreparation();
   });
   handle("recording:window:restore", () => restoreRecordingWindow());
-  handle("recording:controls:update", (state: unknown) =>
-    recordingControls.update(state === null ? null : recordingControlsStateSchema.parse(state)),
-  );
+  handle("recording:controls:update", (state: unknown) => {
+    const value = state === null ? null : recordingControlsStateSchema.parse(state);
+    // A minimized editor still owns the recorder and the live camera frames.
+    window.webContents.setBackgroundThrottling(value === null);
+    recordingControls.update(value);
+  });
   handle("recording:controls:show", () => recordingControls.show());
+  handle("recording:camera:frame", (frame: unknown) => {
+    if (!(frame instanceof Uint8Array) || frame.byteLength > 512 * 1024)
+      throw new Error("摄像头预览帧无效");
+    recordingControls.cameraFrame(frame);
+  });
   handle("recording:settings:save", async (input: unknown) =>
     (await preferences.save({ recording: recordingSettingsSchema.parse(input) })).recording,
   );
@@ -1429,7 +1437,7 @@ app
         asset = assets.get(id);
       if (!asset) return new Response("素材不存在", { status: 404 });
       const preview =
-        url.searchParams.get("preview") === "1"
+        asset.animated || url.searchParams.get("preview") === "1"
           ? previewProxies.path(asset.id)
           : undefined;
       return serveMediaFile(request, preview ?? asset.path);

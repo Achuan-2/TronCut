@@ -27,8 +27,12 @@ export default function RecordingBackgroundPreview({
         if (active) setCustomUrl({ id: customId, url: "", error: true });
       },
     );
+    const unsubscribe = window.framecraft?.onPreviewProxyReady((id) => {
+      if (active && id === customId) setCustomUrl({ id, url: `framecraft-media://asset/${encodeURIComponent(id)}?preview=1&revision=${Date.now()}`, error: false });
+    });
     return () => {
       active = false;
+      unsubscribe?.();
     };
   }, [customId]);
   if (settings.preset === "custom") {

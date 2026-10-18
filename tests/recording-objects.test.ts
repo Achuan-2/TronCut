@@ -78,13 +78,15 @@ function recording(backgroundEnabled = true) {
   );
 }
 
-it("录屏及镜头、声音、背景自动组成一个对象，取消组合释放所有原素材", () => {
+it("录屏、声音和背景组成对象，摄像头始终作为独立图层处理", () => {
   const project = recording();
   const master = project.clips[0],
     selected = selectionWithGroups(project, [master.id]);
-  expect(selected).toHaveLength(4);
+  expect(selected).toHaveLength(3);
+  const camera = project.clips.find((clip) => clip.assetId === "camera")!;
+  expect(camera.groupId).toBeUndefined();
   expect(recordingGroups(project).size).toBe(1);
-  expect(recordingTimeline(project).clips).toEqual([master]);
+  expect(recordingTimeline(project).clips).toEqual([master, camera]);
   expect(
     recordingTimeline(project).tracks.some(
       (track) => track.id === project.clips[3].trackId,
@@ -94,9 +96,9 @@ it("录屏及镜头、声音、背景自动组成一个对象，取消组合释�
   const released = groupSelection(project, [master.id], true);
   expect(recordingTimeline(released).clips).toHaveLength(4);
   expect(
-    released.clips.every(
-      (clip) => !clip.groupId && !clip.recording && !clip.recordingRole,
-    ),
+    released.clips
+      .filter((clip) => clip.id !== camera.id)
+      .every((clip) => !clip.groupId && !clip.recording && !clip.recordingRole),
   ).toBe(true);
   expect(released.clips.map((clip) => clip.keyframes)).toEqual(
     project.clips.map((clip) => clip.keyframes),
@@ -113,9 +115,12 @@ it("录屏及镜头、声音、背景自动组成一个对象，取消组合释�
     ],
   };
   const ordered = groupSelection(legacy, [master.id], true);
+  const recordingTracks = ordered.tracks.filter(
+    (track) => track.id !== camera.trackId,
+  );
   expect(
-    ordered.tracks.findIndex((track) => track.id === screenTrack) + 1,
-  ).toBe(ordered.tracks.findIndex((track) => track.id === micTrack));
+    recordingTracks.findIndex((track) => track.id === screenTrack) + 1,
+  ).toBe(recordingTracks.findIndex((track) => track.id === micTrack));
   const sharedTrack = {
     ...legacy,
     clips: [
@@ -138,16 +143,25 @@ it("对象移动、复制、删除与拆分保持子素材同步，副本和拆�
   const project = recording(),
     master = project.clips[0];
   const moved = moveClips(project, [master.id], 3);
-  expect(moved.clips.every((clip) => clip.start === 5)).toBe(true);
+  expect(
+    moved.clips
+      .filter((clip) => clip.assetId !== "camera")
+      .every((clip) => clip.start === 5),
+  ).toBe(true);
+  expect(moved.clips.find((clip) => clip.assetId === "camera")?.start).toBe(2);
   const pasted = pasteClips(project, project.clips, 12).project;
   expect(recordingGroups(pasted).size).toBe(2);
-  expect(recordingTimeline(pasted).clips).toHaveLength(2);
+  expect(recordingTimeline(pasted).clips).toHaveLength(4);
   const split = splitSelection(project, [master.id], 5);
   expect(recordingGroups(split).size).toBe(2);
-  expect(recordingTimeline(split).clips.map((clip) => clip.duration)).toEqual([
-    3, 5,
-  ]);
-  expect(deleteClips(project, [master.id]).clips).toEqual([]);
+  expect(
+    recordingTimeline(split)
+      .clips.filter((clip) => clip.recording)
+      .map((clip) => clip.duration),
+  ).toEqual([3, 5]);
+  expect(
+    deleteClips(project, [master.id]).clips.map((clip) => clip.assetId),
+  ).toEqual(["camera"]);
   const locked = {
     ...project,
     tracks: project.tracks.map((track) =>
@@ -208,7 +222,7 @@ it("更换静态及动态背景、圆角、鼠标不覆盖已编辑镜头，禁�
     { background: true, preset: "mint" },
     background,
   );
-  expect(recordingTimeline(enabled).clips).toHaveLength(1);
+  expect(recordingTimeline(enabled).clips).toHaveLength(2);
   expect(enabled.clips[0].transform.scale).toBeCloseTo(0.84);
   expect(enabled.clips[0].mediaFrame?.radius).toBe(24);
 });
@@ -235,9 +249,12 @@ it("仅录屏与整体缩放可来回切换，裁剪后样式编辑保留源时�
     animationOffset: 1,
   });
   expect(
-    trimmed.clips.every(
-      (clip) => clip.start === 3 && clip.duration === 6 && clip.sourceIn === 1,
-    ),
+    trimmed.clips
+      .filter((clip) => clip.assetId !== "camera")
+      .every(
+        (clip) =>
+          clip.start === 3 && clip.duration === 6 && clip.sourceIn === 1,
+      ),
   ).toBe(true);
   const styled = updateRecordingObject(
     trimmed,
@@ -292,7 +309,9 @@ it("归档重开保留录屏对象、动态背景和统一样式", async () => {
 it("轨道静音、隐藏、独奏和锁定作用于整个录屏对象，删除时清理内部素材", () => {
   const project = recording(),
     trackId = project.clips[0].trackId;
-  const memberTracks = new Set(project.clips.map((clip) => clip.trackId));
+  const memberTracks = new Set(
+    project.clips.filter((clip) => clip.groupId).map((clip) => clip.trackId),
+  );
   for (const key of ["muted", "hidden", "solo", "locked"] as const) {
     const changed = toggleTrack(project, trackId, key);
     expect(
@@ -306,5 +325,7 @@ it("轨道静音、隐藏、独奏和锁定作用于整个录屏对象，删除�
         .every((track) => !track[key]),
     ).toBe(true);
   }
-  expect(removeTrack(project, trackId).clips).toEqual([]);
+  expect(
+    removeTrack(project, trackId).clips.map((clip) => clip.assetId),
+  ).toEqual(["camera"]);
 });

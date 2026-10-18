@@ -12,8 +12,9 @@ export function needsPreviewProxy(asset: Asset): boolean {
   return (
     asset.kind === "video" &&
     !asset.missing &&
-    proxyExtensions.has(path.extname(asset.path).toLowerCase()) &&
-    asset.width * asset.height > proxyWidth * proxyHeight
+    (asset.animated ||
+      (proxyExtensions.has(path.extname(asset.path).toLowerCase()) &&
+        asset.width * asset.height > proxyWidth * proxyHeight))
   );
 }
 
@@ -74,14 +75,15 @@ export class PreviewProxyService {
       )
       .digest("hex");
     await fs.mkdir(this.cacheDir, { recursive: true });
-    const file = path.join(this.cacheDir, `${key}.mp4`);
+    const extension = asset.animated ? "webm" : "mp4";
+    const file = path.join(this.cacheDir, `${key}.${extension}`);
     if (
       !(await fs.access(file).then(
         () => true,
         () => false,
       ))
     ) {
-      const temporary = `${file}.${process.pid}.partial.mp4`;
+      const temporary = `${file}.${process.pid}.partial.${extension}`;
       try {
         await runProcess(
           findBinary("ffmpeg", this.resourcesPath),
@@ -90,32 +92,49 @@ export class PreviewProxyService {
             "-hide_banner",
             "-loglevel",
             "error",
+            ...(asset.animated ? ["-ignore_loop", "1"] : []),
             "-i",
             asset.path,
             "-map",
             "0:v:0",
             "-map",
             "0:a:0?",
-            "-vf",
-            `scale=${proxyWidth}:${proxyHeight}:force_original_aspect_ratio=decrease:force_divisible_by=2`,
-            "-c:v",
-            "libx264",
-            "-preset",
-            "veryfast",
-            "-crf",
-            "23",
-            "-pix_fmt",
-            "yuv420p",
-            "-c:a",
-            "aac",
-            "-b:a",
-            "160k",
-            "-ar",
-            "48000",
-            "-ac",
-            "2",
-            "-movflags",
-            "+faststart",
+            ...(asset.animated
+              ? [
+                  "-vf",
+                  "pad=ceil(iw/2)*2:ceil(ih/2)*2:color=black@0",
+                  "-c:v",
+                  "libvpx-vp9",
+                  "-lossless",
+                  "1",
+                  "-pix_fmt",
+                  "yuva420p",
+                  "-auto-alt-ref",
+                  "0",
+                  "-an",
+                ]
+              : [
+                  "-vf",
+                  `scale=${proxyWidth}:${proxyHeight}:force_original_aspect_ratio=decrease:force_divisible_by=2`,
+                  "-c:v",
+                  "libx264",
+                  "-preset",
+                  "veryfast",
+                  "-crf",
+                  "23",
+                  "-pix_fmt",
+                  "yuv420p",
+                  "-c:a",
+                  "aac",
+                  "-b:a",
+                  "160k",
+                  "-ar",
+                  "48000",
+                  "-ac",
+                  "2",
+                  "-movflags",
+                  "+faststart",
+                ]),
             temporary,
           ],
           { signal: this.abort.signal, timeout: 30 * 60 * 1000 },

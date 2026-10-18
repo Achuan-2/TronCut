@@ -44,6 +44,7 @@ export interface FrameCraftBridge {
   ): Promise<boolean>;
   cancelRecordingCountdown(): Promise<void>;
   updateRecordingControls(state: RecordingControlsState | null): Promise<void>;
+  updateCameraPreview(frame: Uint8Array): Promise<void>;
   showRecordingControls(): Promise<void>;
   recordingSettings(): Promise<RecordingSettings>;
   saveRecordingSettings(

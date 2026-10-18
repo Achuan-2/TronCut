@@ -1,3 +1,4 @@
+import { trimClip } from "../shared/clip-trim";
 import {
   type CSSProperties,
   Fragment,
@@ -684,30 +685,13 @@ export default function Timeline({
       const wanted = snap
         ? snapTime(c.start + d.delta, project, c.id, 8 / zoom) - c.start
         : d.delta;
-      const offset = Math.max(
-        -c.start,
-        ["video", "audio"].includes(c.kind) ? -c.sourceIn / c.speed : -c.start,
-        Math.min(c.duration - minimum, wanted),
-      );
-      return {
-        ...c,
-        start: c.start + offset,
-        duration: c.duration - offset,
-        sourceIn: Math.max(0, c.sourceIn + offset * c.speed),
-        animationOffset: (c.animationOffset ?? 0) + offset,
-        ...(c.fadeTiming ? { fadeTiming: { ...c.fadeTiming, offset: c.fadeTiming.offset + offset } } : {}),
-      };
+      return trimClip(c, asset, "left", wanted, project.canvas.fps);
     }
     const wanted = snap
       ? snapTime(c.start + c.duration + d.delta, project, c.id, 8 / zoom) -
         c.start
       : c.duration + d.delta;
-    const maxDuration =
-      asset && ["video", "audio"].includes(c.kind)
-        ? ((c.stitch?.reduce((sum, part) => sum + part.duration, 0) ?? asset.duration) - c.sourceIn) / c.speed
-        : 86400;
-    const duration = Math.max(minimum, Math.min(maxDuration, wanted));
-    return { ...c, duration };
+    return trimClip(c, asset, "right", wanted, project.canvas.fps);
   }
   const timeFromEvent = (
     event:
@@ -1335,6 +1319,7 @@ export default function Timeline({
                     id: uid(),
                     trackId: track.id,
                     kind: asset.kind,
+                    ...(asset.animated ? { loop: true } : {}),
                     assetId: asset.id,
                     name: asset.name,
                     start: Math.max(0, start),

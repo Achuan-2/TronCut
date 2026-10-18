@@ -49,6 +49,7 @@ function mediaClip(
   return {
     id: uid(),
     assetId: asset.id,
+    ...(asset.animated ? { loop: true } : {}),
     trackId,
     kind: asset.kind,
     name: asset.name,

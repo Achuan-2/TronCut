@@ -160,7 +160,7 @@ function MediaLayer({
     proxyReady.current = false;
     if (
       asset.kind !== "video" ||
-      previewQuality === "original" ||
+      (previewQuality === "original" && !asset.animated) ||
       !window.framecraft
     )
       return;
@@ -183,10 +183,10 @@ function MediaLayer({
       active = false;
       unsubscribe();
     };
-  }, [asset.id, asset.kind, previewQuality]);
+  }, [asset.id, asset.kind, asset.animated, previewQuality]);
   const url = mediaAssetUrl(
     asset.id,
-    asset.kind === "video" && previewQuality === "smooth",
+    asset.kind === "video" && (previewQuality === "smooth" || !!asset.animated),
     previewRevision,
   );
   useEffect(() => {

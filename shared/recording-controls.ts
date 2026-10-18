@@ -1,9 +1,11 @@
 import { z } from "zod";
+import { cameraStyleSchema } from "./recording-settings";
 
 export const recordingControlsStateSchema = z.object({
   phase: z.enum(["starting", "recording", "paused", "saving"]),
   elapsed: z.number().finite().nonnegative(),
   error: z.string().max(4000),
+  cameraStyle: cameraStyleSchema.optional(),
 });
 
 export type RecordingControlsState = z.infer<

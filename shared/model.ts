@@ -121,6 +121,7 @@ export const projectSchema = z.object({
         width: finite.nonnegative(),
         height: finite.nonnegative(),
         hasAudio: z.boolean(),
+        animated: z.boolean().optional(),
         missing: z.boolean().optional(),
         cursor: cursorRecordingSchema.optional(),
         cursorPath: z.string().optional(),

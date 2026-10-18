@@ -4240,6 +4240,11 @@ fieldset:disabled {
   padding: 14px;
   margin-top: 18px;
 }
+.recording-camera-settings { border:1px solid var(--border); border-radius:8px; margin:16px 0; padding:12px; }
+.recording-camera-settings legend { color:var(--muted); font-size:12px; padding:0 6px; }
+.camera-preview { position:relative; width:100%; max-width:420px; margin:0 auto 12px; overflow:hidden; background:repeating-conic-gradient(#26332c 0 25%,#1a241e 0 50%) 0/20px 20px; touch-action:none; cursor:crosshair; }
+.camera-preview video { display:block; width:100%; height:100%; }
+.camera-preview span { position:absolute; inset:0; display:grid; place-items:center; color:var(--muted); }
 .export-dialog {
   width: min(600px, calc(100vw - 40px));
   max-height: 85vh;
