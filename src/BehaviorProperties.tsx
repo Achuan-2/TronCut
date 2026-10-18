@@ -27,9 +27,25 @@ export default function BehaviorProperties({
   clip: Clip;
   editor: Editor;
 }) {
-  const [phaseKey, setPhaseKey] = useState<BehaviorPhaseKey>("incoming");
-  const [collapsedId, setCollapsedId] = useState<string | null>(null);
+  const [phaseKeys, setPhaseKeys] = useState<Record<string, BehaviorPhaseKey>>(
+    {},
+  );
+  const [expandedIds, setExpandedIds] = useState<ReadonlySet<string>>(
+    () =>
+      new Set(
+        editor.selectedBehavior ? [editor.selectedBehavior.behaviorId] : [],
+      ),
+  );
   const [menuId, setMenuId] = useState<string | null>(null);
+  useEffect(() => {
+    const selection = editor.selectedBehavior;
+    if (!selection || selection.clipId !== clip.id) return;
+    setExpandedIds((ids) =>
+      ids.has(selection.behaviorId)
+        ? ids
+        : new Set(ids).add(selection.behaviorId),
+    );
+  }, [editor.selectedBehavior, clip.id]);
   useEffect(() => {
     if (!menuId) return;
     const close = (event: PointerEvent) => {
@@ -43,6 +59,8 @@ export default function BehaviorProperties({
     <section className="behavior-properties" aria-label="行为属性">
       {clip.behaviors?.map((behavior) => {
         const selected = editor.selectedBehavior?.behaviorId === behavior.id;
+        const expanded = expandedIds.has(behavior.id);
+        const phaseKey = phaseKeys[behavior.id] ?? "incoming";
         const phase = behavior[phaseKey];
         const update = (patch: Partial<Behavior>) => {
           if (behaviorSchema.safeParse({ ...behavior, ...patch }).success)
@@ -92,17 +110,18 @@ export default function BehaviorProperties({
               <button
                 className="behavior-name"
                 type="button"
-                aria-expanded={selected && collapsedId !== behavior.id}
+                aria-expanded={expanded}
                 onClick={() => {
-                  setCollapsedId(
-                    selected && collapsedId !== behavior.id
-                      ? behavior.id
-                      : null,
-                  );
-                  editor.selectBehavior(clip.id, behavior.id);
+                  setExpandedIds((ids) => {
+                    const next = new Set(ids);
+                    if (expanded) next.delete(behavior.id);
+                    else next.add(behavior.id);
+                    return next;
+                  });
+                  if (!expanded) editor.selectBehavior(clip.id, behavior.id);
                 }}
               >
-                {selected && collapsedId !== behavior.id ? (
+                {expanded ? (
                   <ChevronDown size={15} />
                 ) : (
                   <ChevronRight size={15} />
@@ -195,7 +214,7 @@ export default function BehaviorProperties({
                 onChange={(event) => update({ enabled: event.target.checked })}
               />
             </div>
-            {selected && collapsedId !== behavior.id && (
+            {expanded && (
               <>
                 <div
                   className="behavior-phase-tabs"
@@ -214,7 +233,13 @@ export default function BehaviorProperties({
                       role="tab"
                       aria-selected={phaseKey === key}
                       aria-controls={`behavior-${behavior.id}-phase`}
-                      onClick={() => setPhaseKey(key)}
+                      onClick={() => {
+                        setPhaseKeys((keys) => ({
+                          ...keys,
+                          [behavior.id]: key,
+                        }));
+                        editor.selectBehavior(clip.id, behavior.id);
+                      }}
                     >
                       {label}
                     </button>

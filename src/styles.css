@@ -65,7 +65,8 @@ select:focus-visible {
 }
 input,
 textarea,
-select {
+select,
+.behavior-type-menu > button {
   color: #d5dade;
   background: #151719;
   border: 1px solid #35393d;
@@ -2562,7 +2563,8 @@ fieldset:disabled {
   gap: 9px;
 }
 .field input:not([type="color"]):not([type="range"]),
-.field select {
+.field select,
+.field .behavior-type-menu > button {
   width: 125px;
   font-size: 10px;
   padding: 6px 7px;
@@ -3318,6 +3320,7 @@ fieldset:disabled {
   margin: 8px 0;
 }
 .behavior-property .field select,
+.behavior-property .field .behavior-type-menu > button,
 .behavior-property .field input:not([type="range"]):not([type="color"]) {
   width: 100%;
 }

@@ -8,10 +8,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 6px 8px;
-  background: #343e45;
   text-align: left;
-  font-size: 12px;
 }
 .behavior-type-menu > button > span {
   min-width: 0;
