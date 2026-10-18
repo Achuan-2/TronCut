@@ -668,10 +668,7 @@ export default function App() {
       else if (editor.selectedAnimation && editor.selected)
         editor.deleteAnimation(editor.selected.id, editor.selectedAnimation);
       else {
-        editor.apply((p) =>
-          deleteClips(p, editor.selectedIds, command === "rippleDelete"),
-        );
-        editor.select(null);
+        editor.deleteSelectedClips(command === "rippleDelete");
       }
       return;
     }
@@ -827,8 +824,7 @@ export default function App() {
       !locked
     ) {
       event.preventDefault();
-      editor.apply((p) => deleteClips(p, editor.selectedIds, event.shiftKey));
-      editor.select(null);
+      editor.deleteSelectedClips(event.shiftKey);
     } else if (
       (event.ctrlKey || event.metaKey) &&
       event.key.toLowerCase() === "c" &&

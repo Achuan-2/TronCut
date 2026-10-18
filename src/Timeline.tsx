@@ -52,7 +52,6 @@ import MarkerDialog from "./MarkerDialog";
 import { snapTime, splitClip, transformAt } from "../shared/editor";
 import { editableCanvasIds } from "../shared/canvas-actions";
 import {
-  deleteClips,
   moveClips,
   splitSelection,
   selectionWithGroups,
@@ -287,6 +286,15 @@ export default function Timeline({
       zoomAnchor.current = null;
     }
   }, [zoom]);
+  useLayoutEffect(() => {
+    const element = scroll.current;
+    if (element && editor.timelineFocus) {
+      element.scrollLeft = Math.max(
+        0,
+        editor.timelineFocus.time * zoom - element.clientWidth / 2,
+      );
+    }
+  }, [editor.timelineFocus]);
   const [trackMenu, setTrackMenu] = useState<TrackMenuPosition | null>(null);
   const [markerEditor, setMarkerEditor] = useState<Marker | null>(null);
   const [markerRange, setMarkerRange] = useState<{
@@ -559,8 +567,7 @@ export default function Timeline({
       setDeleteMenu(false);
       return;
     }
-    apply((project) => deleteClips(project, editor.selectedIds, ripple));
-    select(null);
+    editor.deleteSelectedClips(ripple);
     setDeleteMenu(false);
   };
   useEffect(() => {

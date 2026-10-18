@@ -37,7 +37,11 @@ import {
   setKeyframeTransform,
   transformAt,
 } from "../shared/editor";
-import { findClipAtPlayhead, selectionWithGroups } from "../shared/timeline";
+import {
+  deleteClips,
+  findClipAtPlayhead,
+  selectionWithGroups,
+} from "../shared/timeline";
 import { recordingMaster } from "../shared/recording-objects";
 import {
   captionTrackSelection,
@@ -280,6 +284,7 @@ export function useEditor(
   );
   const [dirty, setDirty] = useState(false);
   const [autoAnimate, setAutoAnimate] = useState(false);
+  const [timelineFocus, setTimelineFocus] = useState<{ time: number } | null>(null);
 
   useEffect(() => {
     if (!preferences.program.selectionFollowsPlayhead) return;
@@ -336,6 +341,33 @@ export function useEditor(
     },
     [],
   );
+  const deleteSelectedClips = useCallback(
+    (ripple = false) => {
+      const before = current.current;
+      const next = deleteClips(before, selectedIds, ripple);
+      if (next === before) return;
+      apply(next);
+      select(null);
+      if (ripple) {
+        // Use clips actually removed, including recording objects and excluding
+        // locked tracks. Multiple deletions focus the earliest splice.
+        const remaining = new Set(next.clips.map((clip) => clip.id));
+        const time = Math.min(
+          projectDuration(next),
+          before.clips.reduce(
+            (start, clip) =>
+              remaining.has(clip.id) ? start : Math.min(start, clip.start),
+            Infinity,
+          ),
+        );
+        setPlaying(false);
+        seek(time);
+        // A new request also reveals repeated deletions at the same splice.
+        setTimelineFocus({ time });
+      }
+    },
+    [apply, selectedIds, select, setPlaying, seek],
+  );
   const replace = useCallback((next: Project, unsaved = false) => {
     next = { ...next, tracks: numberTracks(next.tracks) };
     past.current = [];
@@ -344,6 +376,7 @@ export function useEditor(
     setProject(next);
     setEditingTextId(null);
     setZoomPanDraft(null);
+    setTimelineFocus(null);
     setClipProperties(null);
     setCanvasMode(defaults.current.program.defaultTool);
     select(null);
@@ -1351,6 +1384,8 @@ export function useEditor(
     presetLibrary,
     preferences,
     apply,
+    deleteSelectedClips,
+    timelineFocus,
     replace,
     markSaved,
     selected,
