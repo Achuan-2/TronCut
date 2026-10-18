@@ -191,7 +191,7 @@ describe("视觉效果时间条", () => {
     ).toThrow();
   });
 
-  it("真实视频与截帧只在效果条内应用遮罩、圆角和媒体哑光，保存重开一致", async () => {
+  it("真实视频与截帧只在效果条内应用遮罩、圆角和媒体遮罩，保存重开一致", async () => {
     const root = path.resolve(`test-output/visual-effect-range-${Date.now()}`);
     await fs.mkdir(root, { recursive: true });
     const input = path.join(root, "green.mp4");
@@ -262,7 +262,7 @@ describe("视觉效果时间条", () => {
             kind: "shape",
             shape: "rectangle",
             fill: "#0000ff",
-              duration: 3.4,
+            duration: 3.4,
           },
           {
             ...base,
@@ -305,7 +305,7 @@ describe("视觉效果时间条", () => {
         path.join(root, `render-${name}`),
         false,
         AbortSignal.timeout(20000),
-        () => {},
+        () => { },
       );
       for (const local of [0.5, 1.5, 2.5]) {
         const time = base.start + local;

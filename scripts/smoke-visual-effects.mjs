@@ -223,13 +223,13 @@ try {
       near(pixel(0.05, 0.05), [16, 19, 25]);
       near(pixel(0.3, 0.5), [34, 68, 170]);
       await page
-        .getByLabel("媒体哑光模式", { exact: true })
+        .getByLabel("媒体遮罩模式", { exact: true })
         .selectOption("alpha-invert");
       pixel = await pixels("matte-invert");
       near(pixel(0.05, 0.05), [34, 68, 170]);
       near(pixel(0.3, 0.5), [16, 19, 25]);
       await page
-        .getByLabel("媒体哑光模式", { exact: true })
+        .getByLabel("媒体遮罩模式", { exact: true })
         .selectOption("luma");
       await page.getByLabel("不透明度 (%)", { exact: true }).fill("50");
       pixel = await pixels("matte-luma-opacity");
@@ -339,7 +339,7 @@ try {
       .dragTo(page.locator('.canvas .preview-layer[data-clip-id="source"]'));
     if (kind === "video") {
       await page
-        .getByLabel("媒体哑光模式", { exact: true })
+        .getByLabel("媒体遮罩模式", { exact: true })
         .selectOption("luma");
       near((await pixels("video-black"))(0.3, 0.5), [16, 19, 25]);
       await page.getByLabel("播放进度", { exact: true }).focus();
@@ -369,7 +369,7 @@ try {
     const failed = await app.firstWindow();
     await failed
       .screenshot({ path: path.join(root, "failure.png") })
-      .catch(() => {});
+      .catch(() => { });
     console.error(
       await failed.evaluate(() => ({
         videos: [...document.querySelectorAll("video")].map((video) => {

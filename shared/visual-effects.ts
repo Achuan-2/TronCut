@@ -90,7 +90,7 @@ export type AdditionalVisualEffectId = keyof VisualEffects;
 export type Region = z.infer<typeof visualEffectSchemas.mask>;
 export type EffectTiming = z.infer<typeof common>;
 export const additionalVisualEffectPresets = [
-  { id: "media-matte", name: "媒体哑光" },
+  { id: "media-matte", name: "媒体遮罩" },
   { id: "mask", name: "遮罩" },
   { id: "shadow", name: "阴影" },
   { id: "remove-color", name: "移除颜色" },
@@ -205,15 +205,15 @@ export function retimeVisualEffects(
           easeOut: effect.easeOut * ratio,
           window: effect.window
             ? {
-                start: effect.window.start * ratio,
-                end: effect.window.end * ratio,
-              }
+              start: effect.window.start * ratio,
+              end: effect.window.end * ratio,
+            }
             : undefined,
           timing: effect.timing
             ? {
-                offset: effect.timing.offset * ratio,
-                duration: effect.timing.duration * ratio,
-              }
+              offset: effect.timing.offset * ratio,
+              duration: effect.timing.duration * ratio,
+            }
             : undefined,
         },
       ]),

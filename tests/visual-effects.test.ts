@@ -100,7 +100,7 @@ describe("新增视觉效果", () => {
     ).toBe(0.75);
   });
 
-  it("真实导出抠色、着色、遮罩、阴影、区域模糊、边框与四种媒体哑光，保存重开及缓入一致", async () => {
+  it("真实导出抠色、着色、遮罩、阴影、区域模糊、边框与四种媒体遮罩，保存重开及缓入一致", async () => {
     const root = path.resolve(`test-output/visual-effects-${Date.now()}`);
     await fs.mkdir(root, { recursive: true });
     const source = path.join(root, "source.png");
@@ -345,7 +345,7 @@ describe("新增视觉效果", () => {
       path.join(root, "video"),
       false,
       AbortSignal.timeout(20000),
-      () => {},
+      () => { },
     );
     expect(
       (await probeMedia(path.join(root, "effects.mp4"))).duration,
