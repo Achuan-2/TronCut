@@ -128,7 +128,11 @@ try {
   expect(styles[2].size).toBe(styles[1].size);
   expect(styles[1].size / styles[0].size).toBeCloseTo(80 / 48);
   expect(styles[3].family).toContain("Microsoft YaHei");
-  await page.getByRole("button", { name: "应用整段", exact: true }).click();
+  await content.focus();
+  await content.press("End");
+  await expect(page.locator(".text-selection-status")).toContainText(
+    "未选择时应用于整段",
+  );
   await page.locator(".preview-layer.text").dblclick();
   const canvas = page.getByRole("textbox", {
     name: "画布文本内容",

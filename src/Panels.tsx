@@ -45,6 +45,7 @@ import BehaviorsPanel from "./BehaviorsPanel";
 import BehaviorProperties from "./BehaviorProperties";
 import TextFillFields from "./TextFillFields";
 import FontSelect from "./FontSelect";
+import TextPresetPicker from "./TextPresetPicker";
 import { characterStyleAt } from "../shared/rich-text";
 import TransitionsPanel from "./TransitionsPanel";
 import TransitionProperties from "./TransitionProperties";
@@ -668,7 +669,10 @@ export function Inspector({ editor }: { editor: Editor }) {
                   maxLength={10000}
                   onSelect={(event) => {
                     const { selectionStart: start, selectionEnd: end } = event.currentTarget;
-                    editor.setTextSelection(end > start ? { clipId: c.id, start, end } : null);
+                    if (end > start)
+                      editor.setTextSelection({ clipId: c.id, start, end });
+                    else if (document.activeElement === event.currentTarget)
+                      editor.setTextSelection(null);
                   }}
                   onChange={(e) =>
                     update({
@@ -679,47 +683,32 @@ export function Inspector({ editor }: { editor: Editor }) {
                 />
                 <p className="field-help text-selection-status">
                   {textSelection ? `已选中 ${Array.from((c.text ?? "").slice(textSelection.start, textSelection.end)).length} 个字符，样式仅应用于选中文字。` : "选中部分文字可单独修改样式，未选择时应用于整段。"}
-                  {textSelection && <button type="button" onClick={() => editor.setTextSelection(null)}>应用整段</button>}
                 </p>
-                <label className="field">
-                  花字
-                  <select
-                    aria-label="花字模板"
-                    value=""
-                    onChange={(e) => {
-                      if (locked) return;
-                      const preset = editor.presetLibrary.findTextPreset(
-                        e.target.value,
-                      );
-                      if (!preset) return;
-                      const { fontFamily, color, outline, outlineWidth } =
-                        preset.style;
-                      const characterPatch = { fontFamily, color, outline, outlineWidth };
-                      if (textSelection) {
-                        editor.updateCharacterStyle(c.id, characterPatch);
-                        return;
-                      }
-                      editor.updateTextAppearance(
-                        c.id,
-                        {
-                          style: {
-                            ...preset.style,
-                          },
-                        },
-                        { preserveFontSize: true, characterPatch },
-                      );
-                    }}
-                  >
-                    <option value="" disabled>
-                      选择模板
-                    </option>
-                    {editor.presetLibrary.textPresets.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                <TextPresetPicker
+                  presets={editor.presetLibrary.textPresets}
+                  style={characterStyle}
+                  disabled={locked}
+                  onSelect={(preset) => {
+                    if (locked) return;
+                    const { fontFamily, color, outline, outlineWidth } =
+                      preset.style;
+                    const characterPatch = {
+                      fontFamily,
+                      color,
+                      outline,
+                      outlineWidth,
+                    };
+                    if (textSelection) {
+                      editor.updateCharacterStyle(c.id, characterPatch);
+                      return;
+                    }
+                    editor.updateTextAppearance(
+                      c.id,
+                      { style: { ...preset.style } },
+                      { preserveFontSize: true, characterPatch },
+                    );
+                  }}
+                />
                 <button
                   type="button"
                   className="wide-button save-text-preset"

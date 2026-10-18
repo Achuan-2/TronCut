@@ -65,11 +65,13 @@ try {
   await dialog.getByRole("button", { name: "确定", exact: true }).click();
   const custom = (await storage(page)).customTextPresets[0];
   expect(custom.style).toEqual(project.clips[0].style);
+  await page.getByRole("button", { name: /花字模板/ }).click();
   await expect(
     page
-      .getByLabel("花字模板", { exact: true })
-      .locator(`option[value="${custom.id}"]`),
-  ).toHaveText("我的背景花字");
+      .getByRole("listbox", { name: "花字模板", exact: true })
+      .getByRole("option", { name: "我的背景花字", exact: true }),
+  ).toBeVisible();
+  await page.keyboard.press("Escape");
   const rail = page.locator(".tool-rail");
   await rail.getByRole("button", { name: "标注", exact: true }).click();
   await expect(
@@ -131,7 +133,11 @@ try {
     .locator(`.timeline-clip[data-clip-id="${project.clips[0].id}"]`)
     .click();
   await page.getByRole("spinbutton", { name: "字号", exact: true }).fill("42");
-  await page.getByLabel("花字模板", { exact: true }).selectOption(custom.id);
+  await page.getByRole("button", { name: /花字模板/ }).click();
+  await page
+    .getByRole("listbox", { name: "花字模板", exact: true })
+    .getByRole("option", { name: "重命名花字", exact: true })
+    .click();
   await expect(
     page.getByRole("spinbutton", { name: "字号", exact: true }),
   ).toHaveValue("42");

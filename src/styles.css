@@ -2118,10 +2118,114 @@ fieldset:disabled {
   font-size: 11px;
   line-height: 1.5;
 }
-.text-selection-status button {
-  margin-left: 8px;
-  padding: 2px 6px;
-  font-size: inherit;
+.text-preset-field {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 7px;
+}
+.text-preset-picker {
+  position: relative;
+  min-width: 0;
+}
+.text-preset-trigger {
+  width: 100%;
+  min-height: 46px;
+  justify-content: flex-start;
+  gap: 9px;
+  padding: 6px 8px;
+  border: 1px solid #35393d;
+  background: #151719;
+  color: #d5dade;
+  border-radius: 5px;
+}
+.text-preset-trigger:hover {
+  border-color: #4b565c;
+  background: #1a1e20;
+}
+.text-preset-trigger > svg {
+  flex-shrink: 0;
+  color: #84928a;
+}
+.text-preset-sample {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  max-width: 100%;
+  min-width: 52px;
+  min-height: 27px;
+  padding: 2px 7px;
+  overflow: hidden;
+  font-size: 16px;
+  font-weight: 850;
+  line-height: 1.15;
+  white-space: nowrap;
+}
+.text-preset-trigger-sample {
+  flex: 0 0 72px;
+  background-color: #202524;
+}
+.text-preset-trigger-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 10px;
+  color: #c4cec8;
+}
+.text-preset-choices {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px;
+  max-height: 232px;
+  overflow-y: auto;
+  margin-top: 6px;
+  padding: 8px;
+  border: 1px solid #3b4440;
+  border-radius: 6px;
+  background: #181c1b;
+  box-shadow: 0 10px 28px #0006;
+}
+.text-preset-option {
+  position: relative;
+  min-width: 0;
+  height: 64px;
+  flex-direction: column;
+  gap: 4px;
+  padding: 5px 4px;
+  border: 1px solid #343c38;
+  border-radius: 5px;
+  background: #242a27;
+}
+.text-preset-option:hover {
+  border-color: #607068;
+  background: #2b332f;
+}
+.text-preset-option.is-selected {
+  border-color: var(--accent);
+  background: #26392f;
+}
+.text-preset-option-name {
+  width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 9px;
+  color: #a4b2aa;
+}
+.text-preset-option-check {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  color: var(--accent);
+}
+.text-preset-empty {
+  grid-column: 1 / -1;
+  margin: 4px;
+  color: var(--muted);
+  font-size: 10px;
+  text-align: center;
 }
 .preview-text-editor {
   display: block;
