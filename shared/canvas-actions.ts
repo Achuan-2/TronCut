@@ -12,8 +12,9 @@ import {
   optionalTransformKeys,
 } from "./rotation";
 import { visualValues } from "./visual-state";
-import { setTransform } from "./editor";
+import { setTransform, setKeyframeTransform } from "./editor";
 import { recordingGroups } from "./recording-objects";
+import { maskValues } from "./mask-state";
 
 // Recording children travel with their master, but appearance editing targets
 // only the screen, matching canvas selection and the inspector.
@@ -51,13 +52,81 @@ const appearanceKeys = [
 ] as const;
 const textKeys = ["style", "textBox", "autoResizeText"] as const;
 
+export interface ClipPropertyEndpoint {
+  clipId: string;
+  /** Stored animation time, including animationOffset. */
+  time: number;
+  side: "start" | "end";
+}
+
+function copiedTransform(source: Clip): Transform {
+  return structuredClone({
+    ...source.transform,
+    ...Object.fromEntries(
+      optionalTransformKeys.map((key) => [
+        key,
+        source.transform[key] ??
+          (key === "rotation"
+            ? (source.rotation ?? 0)
+            : optionalTransformDefault(key)),
+      ]),
+    ),
+    ...visualValues(source, source.transform),
+  });
+}
+
 export function pasteClipProperties(
   project: Project,
   ids: readonly string[],
   source: Clip,
+  endpoint?: ClipPropertyEndpoint,
 ): Project {
   const editable = editableCanvasIds(project, ids);
   if (!editable.size) return project;
+  if (endpoint) {
+    const clip = project.clips.find((clip) => clip.id === endpoint.clipId);
+    if (!clip || !editable.has(clip.id)) return project;
+    const ordered = [...clip.keyframes].sort((a, b) => a.time - b.time);
+    const existing = ordered.find(
+      (frame) => Math.abs(frame.time - endpoint.time) < 1e-6,
+    );
+    const implicitStart =
+      endpoint.time === 0 && ordered.length > 0 && ordered[0].time > 0;
+    if (!existing && !implicitStart) return project;
+    // A first-start edit changes the base pose. Freeze the other points' crop,
+    // content and mask defaults first so they cannot inherit the pasted values.
+    const initial =
+      endpoint.side === "start" || existing === ordered[0] || implicitStart;
+    const normalize = (value: Transform) => ({
+      ...value,
+      ...visualValues(clip, value),
+      ...(clip.visualEffects?.mask ? maskValues(clip, value) : {}),
+    });
+    const target = initial
+      ? {
+          ...clip,
+          keyframes: clip.keyframes.map((frame) => ({
+            ...frame,
+            value: normalize(frame.value),
+          })),
+        }
+      : clip;
+    const next = setKeyframeTransform(
+      target,
+      {
+        ...copiedTransform(source),
+        ...(clip.visualEffects?.mask
+          ? maskValues(source, source.transform)
+          : {}),
+      },
+      endpoint.time,
+      endpoint.side === "start",
+    );
+    return {
+      ...project,
+      clips: project.clips.map((clip) => (clip.id === next.id ? next : clip)),
+    };
+  }
   return {
     ...project,
     clips: project.clips.map((clip) => {
@@ -66,26 +135,22 @@ export function pasteClipProperties(
         ...appearanceKeys,
         ...(source.kind === "text" && clip.kind === "text" ? textKeys : []),
         ...(source.kind === "shape" && clip.kind === "shape"
-          ? ["fill" as const, "shapeStyle" as const, "annotationEffect" as const]
+          ? [
+              "fill" as const,
+              "shapeStyle" as const,
+              "annotationEffect" as const,
+            ]
           : []),
       ];
       const patch = Object.fromEntries(
         keys.map((key) => [key, structuredClone(source[key])]),
       );
-      const transform = {
-        ...source.transform,
-        ...Object.fromEntries(
-          optionalTransformKeys.map((key) => [
-            key,
-            source.transform[key] ??
-              (key === "rotation"
-                ? (source.rotation ?? 0)
-                : optionalTransformDefault(key)),
-          ]),
-        ),
-        ...visualValues(source, source.transform),
-      };
-      return setTransform({ ...clip, ...patch }, transform, 0, false);
+      return setTransform(
+        { ...clip, ...patch },
+        copiedTransform(source),
+        0,
+        false,
+      );
     }),
   };
 }

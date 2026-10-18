@@ -1710,7 +1710,6 @@ export default function Timeline({
                             event.preventDefault();
                             event.stopPropagation();
                             editor.setPlaying(false);
-                            editor.clearKeyframeEdit();
                             if (editor.editingTextId)
                               editor.endTextEdit(editor.editingTextId);
                             const previous = editor.selectedIds;

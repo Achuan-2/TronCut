@@ -734,7 +734,9 @@ export function useEditor(
   const pasteClipProperties = useCallback(
     (ids: readonly string[]) => {
       if (clipProperties)
-        apply((project) => applyClipProperties(project, ids, clipProperties));
+        apply((project) =>
+          applyClipProperties(project, ids, clipProperties, keyframeRef.current ?? undefined),
+        );
     },
     [apply, clipProperties],
   );

@@ -590,7 +590,6 @@ function PreviewLayerImpl({
         if (!selectable || event.button !== 0) return;
         event.stopPropagation();
         editor.setPlaying(false);
-        if (clip.caption) editor.clearKeyframeEdit();
         editor.select(
           clip.id,
           event.ctrlKey || event.metaKey || event.shiftKey,
@@ -1400,7 +1399,6 @@ export default function Preview({
             ? (recordingMaster(project, clipId)?.id ?? clipId)
             : null;
           editor.setPlaying(false);
-          editor.clearKeyframeEdit();
           if (editor.editingTextId) editor.endTextEdit(editor.editingTextId);
           const previous = editor.selectedIds;
           editor.select(id);
