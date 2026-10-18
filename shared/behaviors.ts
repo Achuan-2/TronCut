@@ -6,6 +6,7 @@ export const behaviorStyles = [
   "none",
   "reveal",
   "fade",
+  "float",
   "pop",
   "slide",
   "fly",
@@ -23,6 +24,7 @@ export const behaviorStyleLabels: Record<BehaviorStyle, string> = {
   none: "无",
   reveal: "显示",
   fade: "淡入淡出",
+  float: "浮现",
   pop: "弹出",
   slide: "滑动",
   fly: "飞入",
@@ -41,6 +43,7 @@ export const behaviorPhaseSchema = z.object({
   type: z.enum(["whole", "forward", "backward", "center", "simultaneous"]),
   easing: z.enum([
     "linear",
+    "smoothstep",
     "quad-in",
     "quad-out",
     "quad-in-out",
@@ -114,6 +117,7 @@ export const behaviorMovementOptions: readonly (readonly [
   string,
 ])[] = [
   ["linear", "线性"],
+  ["smoothstep", "平滑缓入缓出"],
   ["quad-in", "缓入 - 四次函数缓动"],
   ["quad-out", "缓出 - 四次函数缓动"],
   ["quad-in-out", "缓入缓出 - 四次函数缓动"],
@@ -217,6 +221,31 @@ export const behaviorPresets: BehaviorPreset[] = presetDefinitions
       outgoing: { ...preset.outgoing, ...reference.outgoing },
     };
   });
+
+// Opening title “你的灵感，” in TronCut宣传片-v12-丝滑版.troncut:
+// 88 px text rises 34 px in 0.85 s, holds, then rises 16 px in 0.45 s.
+// Text-simultaneous motion preserves that silhouette at other font sizes.
+behaviorPresets.unshift({
+  id: "float",
+  name: "浮现",
+  incoming: {
+    ...phase("float", "simultaneous"),
+    easing: "smoothstep",
+    direction: "bottom",
+    offset: 0,
+    duration: 0.85,
+    shift: (34 / 88) * 100,
+  },
+  during: { ...phase("none", "simultaneous"), offset: 0 },
+  outgoing: {
+    ...phase("float", "simultaneous"),
+    easing: "smoothstep",
+    direction: "top",
+    offset: 0,
+    duration: 0.45,
+    shift: (16 / 88) * 100,
+  },
+});
 
 export function createBehavior(
   presetId: string,
@@ -328,6 +357,8 @@ export function behaviorEase(
 ) {
   if (p <= 0 || p >= 1) return Math.max(0, Math.min(1, p));
   switch (easing) {
+    case "smoothstep":
+      return p * p * (3 - 2 * p);
     case "linear":
       return p;
     case "quad-in":
@@ -422,12 +453,18 @@ function transition(
     q = entering ? eased : 1 - eased,
     hidden = 1 - q;
   if (phase.style === "none") return value;
-  if (phase.style === "fade" || phase.style === "reveal")
+  if (["fade", "reveal", "float"].includes(phase.style))
     value.opacity = Math.max(0, Math.min(1, q));
   else value.opacity = (entering ? p > 0 : p < 1) ? 1 : 0;
   if (phase.style === "cut")
     value.y =
       (phase.type === "whole" ? -12.5 : (index % 2 ? 1 : -1) * 1.25) * hidden;
+  if (phase.style === "float") {
+    const distance = (phase.shift / 100) * hidden;
+    if (phase.direction === "left" || phase.direction === "right")
+      value.x = distance * (phase.direction === "left" ? -1 : 1);
+    else value.y = distance * (phase.direction === "top" ? -1 : 1);
+  }
   const distance = phase.style === "drift" ? 8 : 12;
   if (["slide", "drift"].includes(phase.style)) {
     if (phase.direction === "left" || phase.direction === "right")

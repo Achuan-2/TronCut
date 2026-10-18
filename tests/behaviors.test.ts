@@ -16,8 +16,76 @@ import { objectBehaviorExpressions } from "../electron/behavior-export";
 import { behaviorPresets } from "../shared/behaviors";
 import { splitClip } from "../shared/editor";
 import { setClipSpeed } from "../shared/clip-speed";
+import { createTransformSampler } from "../shared/editor";
+import { libraryBehaviors, emptyPresetLibrary } from "../shared/preset-library";
 
 describe("行为的对象与逐字时序", () => {
+  it("浮现位于首位，复现丝滑版开场标题的上移、透明度与平滑时序", () => {
+    expect(libraryBehaviors(emptyPresetLibrary())[0]).toMatchObject({
+      id: "float",
+      name: "浮现",
+    });
+    // Authored keyframes of “你的灵感，” in TronCut宣传片-v12-丝滑版.troncut.
+    const title = newText("titles", 0, 0, "你的灵感，");
+    title.duration = 4.6;
+    title.style!.fontSize = 88;
+    title.transform.y = 0.3592592592592593;
+    title.keyframes = [
+      {
+        time: 0,
+        value: {
+          ...title.transform,
+          y: title.transform.y + 34 / 1080,
+          opacity: 0,
+        },
+        easing: "auto",
+      },
+      { time: 0.85, value: { ...title.transform }, easing: "auto" },
+      { time: 4.15, value: { ...title.transform }, easing: "auto" },
+      {
+        time: 4.6,
+        value: {
+          ...title.transform,
+          y: title.transform.y - 16 / 1080,
+          opacity: 0,
+        },
+        easing: "auto",
+      },
+    ];
+    const sample = createTransformSampler(title);
+    const behavior = createBehavior("float", title.duration)!;
+    for (const time of [
+      0, 0.1, 0.2125, 0.425, 0.6375, 0.85, 2, 4.15, 4.2625, 4.375, 4.4875,
+      4.599,
+    ]) {
+      const reference = sample(time);
+      for (const index of [0, 2, 5]) {
+        const motion = glyphMotion(
+          { behaviors: [behavior] },
+          time,
+          index,
+          6,
+          "text",
+        );
+        expect(title.transform.y + (motion.y * 88) / 1080).toBeCloseTo(
+          reference.y,
+          10,
+        );
+        expect(motion.opacity).toBeCloseTo(reference.opacity, 10);
+        expect(motion.x).toBe(0);
+        expect(motion.scale).toBe(1);
+        expect(motion.rotation).toBe(0);
+      }
+    }
+    const short = createBehavior("float", 0.3)!;
+    const windows = behaviorWindows(short, 6);
+    expect(windows.incoming + windows.outgoing).toBeCloseTo(0.3);
+    const restored = validateProject({
+      ...createProject(),
+      clips: [{ ...title, keyframes: [], behaviors: [behavior] }],
+    });
+    expect(restored.clips[0].behaviors![0]).toEqual(behavior);
+  });
   it("切换为位移行为，默认参数区分视频与文本，张力与平移影响实际运动", () => {
     const video = createBehavior("cut", 5, "video")!;
     expect(video.incoming).toMatchObject({
@@ -136,6 +204,7 @@ describe("行为的对象与逐字时序", () => {
     for (const preset of behaviorPresets)
       for (const easing of [
         "linear",
+        "smoothstep",
         "quad-in",
         "quad-out",
         "quad-in-out",

@@ -41,6 +41,11 @@ try {
   page.on("pageerror", (error) => errors.push(error.message));
   // The timeline virtualizes clips outside the visible viewport.
   await expect(page.locator(".timeline-clip.text").first()).toBeVisible();
+  await page
+    .locator(".tool-rail")
+    .getByRole("button", { name: "行为", exact: true })
+    .click();
+  await expect(page.locator(".behavior-card").first()).toContainText("浮现");
   const seek = async (time) => {
     await page
       .getByLabel("播放进度", { exact: true })
@@ -89,7 +94,7 @@ try {
   await seek(0.5);
   await page
     .locator(".canvas")
-    .screenshot({ path: path.join(root, "cut-preview.png") });
+    .screenshot({ path: path.join(root, "float-preview.png") });
   const swayIndex = behaviorPresets.findIndex((preset) => preset.id === "sway");
   await page
     .locator(".timeline-clip.text")

@@ -251,7 +251,7 @@ export default function BehaviorProperties({
                           />
                         </div>
                         {selectField("移动", "easing", behaviorMovementOptions)}
-                        {["slide", "drift", "pop", "bounce"].includes(
+                        {["slide", "drift", "pop", "bounce", "float"].includes(
                           phase.style,
                         ) &&
                           selectField(
@@ -264,6 +264,18 @@ export default function BehaviorProperties({
                               ["bottom", "下"],
                             ],
                           )}
+                        {phase.style === "float" && phaseKey !== "during" && (
+                          <NumberControl
+                            key={`${phaseKey}-shift`}
+                            label="平移"
+                            name="行为平移（%）"
+                            value={phase.shift}
+                            min={0}
+                            max={100}
+                            unit="%"
+                            change={(shift) => change({ shift })}
+                          />
+                        )}
                         {phaseKey !== "during" &&
                           (phase.easing === "spring" ? (
                             <NumberControl

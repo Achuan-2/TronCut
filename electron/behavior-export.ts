@@ -26,6 +26,8 @@ function eased(
   seconds = 1,
 ) {
   switch (easing) {
+    case "smoothstep":
+      return `((${p})*(${p})*(3-2*(${p})))`;
     case "linear":
       return p;
     case "quad-in":
@@ -73,9 +75,14 @@ function transition(
   const q = entering ? curve : `(1-(${curve}))`;
   const hidden = `(1-(${q}))`;
   result.opacity = entering ? `gt(${p},0)` : `lt(${p},1)`;
-  if (phase.style === "fade" || phase.style === "reveal")
+  if (["fade", "reveal", "float"].includes(phase.style))
     result.opacity = `clip(${q},0,1)`;
   if (phase.style === "cut") result.y = `(-12.5*${hidden})`;
+  if (phase.style === "float") {
+    const key = ["left", "right"].includes(phase.direction) ? "x" : "y";
+    result[key] =
+      `(${hidden}*${(phase.shift / 100) * (["left", "top"].includes(phase.direction) ? -1 : 1)})`;
+  }
   if (["slide", "drift"].includes(phase.style)) {
     const distance = phase.style === "drift" ? 8 : 12;
     const key = ["left", "right"].includes(phase.direction) ? "x" : "y";

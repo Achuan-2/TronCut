@@ -8,6 +8,82 @@ import { exportFrame, exportVideo } from "../electron/export";
 import { findBinary, runProcess } from "../electron/process";
 import { saveProject, openProject } from "../electron/project-store";
 
+it("浮现的真实截帧复现参考关键帧的平移和淡入淡出", async () => {
+  const root = path.resolve(`test-output/behavior-float-${Date.now()}`);
+  await fs.mkdir(root, { recursive: true });
+  const project = createProject();
+  project.canvas = { width: 960, height: 540, fps: 60, background: "#000000" };
+  const clip = newText("titles", 0, 0, "ABC");
+  clip.duration = 2;
+  clip.style = {
+    ...clip.style!,
+    fontSize: 44,
+    outlineWidth: 0,
+    fillEnabled: false,
+  };
+  const reference = structuredClone(clip);
+  reference.keyframes = [
+    {
+      time: 0,
+      value: { ...clip.transform, y: 0.5 + 17 / 540, opacity: 0 },
+      easing: "auto",
+    },
+    { time: 0.85, value: { ...clip.transform }, easing: "auto" },
+    { time: 1.55, value: { ...clip.transform }, easing: "auto" },
+    {
+      time: 2,
+      value: { ...clip.transform, y: 0.5 - 8 / 540, opacity: 0 },
+      easing: "auto",
+    },
+  ];
+  clip.behaviors = [createBehavior("float", 2)!];
+  const samples = [0.2125, 0.425, 0.85, 1, 1.775];
+  const stats: { y: number; light: number }[][] = [];
+  for (const [kind, value] of [
+    ["reference", reference],
+    ["float", clip],
+  ] as const) {
+    project.clips = [value];
+    const frames: { y: number; light: number }[] = [];
+    for (const time of samples) {
+      const image = path.join(root, `${kind}-${time}.png`);
+      await exportFrame(
+        project,
+        time,
+        image,
+        path.join(root, `${kind}-${time}`),
+        AbortSignal.timeout(15000),
+      );
+      const { data, info } = await sharp(image)
+        .removeAlpha()
+        .raw()
+        .toBuffer({ resolveWithObject: true });
+      let light = 0,
+        weightedY = 0;
+      for (let y = 0; y < info.height; y++)
+        for (let x = 0; x < info.width; x++) {
+          const brightness = data[(y * info.width + x) * info.channels];
+          light += brightness;
+          weightedY += y * brightness;
+        }
+      frames.push({ y: weightedY / light, light });
+    }
+    stats.push(frames);
+  }
+  for (let index = 0; index < samples.length; index++) {
+    const expected = stats[0][index],
+      actual = stats[1][index];
+    expect(
+      Math.abs(actual.y - stats[1][3].y - (expected.y - stats[0][3].y)),
+    ).toBeLessThan(1.5);
+    expect(
+      Math.abs(
+        actual.light / stats[1][3].light - expected.light / stats[0][3].light,
+      ),
+    ).toBeLessThan(0.03);
+  }
+}, 45000);
+
 async function whiteBounds(image: string) {
   const { data, info } = await sharp(image)
     .removeAlpha()
