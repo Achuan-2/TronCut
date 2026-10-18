@@ -35,7 +35,12 @@ export const visualEffectSchemas = {
       .default("alpha"),
     strength: number.min(0).max(1).default(1),
   }),
-  mask: common.extend({ ...region, opacity: number.min(0).max(1).default(0) }),
+  mask: common.extend({
+    ...region,
+    width: number.min(0.01).max(3).default(1),
+    height: number.min(0.01).max(3).default(1),
+    opacity: number.min(0).max(1).default(0),
+  }),
   shadow: common.extend({
     angle: number.min(-3600).max(3600).default(315),
     color: color.default("#000000"),

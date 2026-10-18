@@ -23,15 +23,20 @@ type Field = {
   max?: number;
   step?: number;
   scale?: number;
+  unit?: string;
   options?: [string, string][];
 };
-const percent = (key: string, label: string, min = 0, max = 100): Field => ({
-  key,
-  label,
-  min,
-  max,
-  scale: 100,
-});
+const percent = (key: string, label: string, min = 0, max = 100): Field => {
+  const suffix = " (%)";
+  return {
+    key,
+    label: label.endsWith(suffix) ? label.slice(0, -suffix.length) : label,
+    min,
+    max,
+    scale: 100,
+    unit: "%",
+  };
+};
 const shapes: Field[] = [
   {
     key: "shape",
@@ -50,6 +55,9 @@ const shapes: Field[] = [
   { key: "radius", label: "角", min: 0, max: 500 },
   { key: "feather", label: "羽化", min: -100, max: 100 },
 ];
+const maskShapes = shapes.filter(
+  ({ key }) => key !== "width" && key !== "height",
+);
 const fields: Record<AdditionalVisualEffectId, Field[]> = {
   "media-matte": [
     {
@@ -65,10 +73,10 @@ const fields: Record<AdditionalVisualEffectId, Field[]> = {
     percent("strength", "强度 (%)"),
   ],
   mask: [
-    ...shapes.map((field) =>
+    ...maskShapes.map((field) =>
       field.key === "feather" ? { ...field, label: "混合" } : field,
     ),
-    percent("opacity", "遮挡区域不透明度 (%)"),
+    percent("opacity", "不透明度 (%)"),
   ],
   shadow: [
     { key: "angle", label: "角度 (°)", min: -3600, max: 3600 },
@@ -223,7 +231,7 @@ export default function VisualEffectProperties({
             },
           ].map((field) => {
             const value = values[field.key];
-            const label = `${name}${field.label}`;
+            const label = `${name}${field.label}${field.unit ? ` (${field.unit})` : ""}`;
             if (
               typeof value === "number" &&
               !["x", "y", "angle", "rotation", "easeIn", "easeOut"].includes(
@@ -239,6 +247,7 @@ export default function VisualEffectProperties({
                   min={field.min ?? 0}
                   max={field.max ?? 100}
                   step={field.step ?? 1}
+                  unit={field.unit}
                   onChange={(value) =>
                     update({ [field.key]: value / (field.scale ?? 1) })
                   }

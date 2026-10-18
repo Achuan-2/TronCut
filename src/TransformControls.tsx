@@ -48,27 +48,29 @@ export function ScaleControl({
   return (
     <div className="transform-scale property-slider-row">
       <span>缩放</span>
-      <input
-        aria-label="缩放滑条"
-        type="range"
-        min={5}
-        max={800}
-        step={0.1}
-        value={value}
-        disabled={disabled}
-        onChange={(event) => onChange(Number(event.target.value))}
-      />
-      <div className="transform-number">
-        <NumberInput
-          aria-label="缩放 (%)"
+      <div className="property-slider-control">
+        <input
+          aria-label="缩放滑条"
+          type="range"
           min={5}
           max={800}
           step={0.1}
-          value={Number(value.toFixed(3))}
+          value={value}
           disabled={disabled}
-          onValueChange={onChange}
+          onChange={(event) => onChange(Number(event.target.value))}
         />
-        <span>%</span>
+        <div className="transform-number">
+          <NumberInput
+            aria-label="缩放 (%)"
+            min={5}
+            max={800}
+            step={0.1}
+            value={Number(value.toFixed(3))}
+            disabled={disabled}
+            onValueChange={onChange}
+          />
+          <span>%</span>
+        </div>
       </div>
       <PropertyResetButton
         label="重置缩放"
@@ -237,27 +239,29 @@ export function PropertySlider({
   return (
     <div className="property-slider-row">
       <span>{label}</span>
-      <input
-        type="range"
-        aria-label={`${label}滑条`}
-        min={min}
-        max={max}
-        step={step}
-        value={value}
-        disabled={disabled}
-        onChange={(event) => change(Number(event.target.value))}
-      />
-      <div className="transform-number">
-        <NumberInput
-          aria-label={ariaLabel}
+      <div className="property-slider-control">
+        <input
+          type="range"
+          aria-label={`${label}滑条`}
           min={min}
           max={max}
           step={step}
-          value={Number(value.toFixed(3))}
+          value={value}
           disabled={disabled}
-          onValueChange={change}
+          onChange={(event) => change(Number(event.target.value))}
         />
-        {unit && <span>{unit}</span>}
+        <div className="transform-number">
+          <NumberInput
+            aria-label={ariaLabel}
+            min={min}
+            max={max}
+            step={step}
+            value={Number(value.toFixed(3))}
+            disabled={disabled}
+            onValueChange={change}
+          />
+          {unit && <span>{unit}</span>}
+        </div>
       </div>
       {onReset ? (
         <PropertyResetButton

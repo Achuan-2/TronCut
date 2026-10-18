@@ -29,6 +29,11 @@ describe("新增视觉效果", () => {
   it("可持久化、拒绝音频与非法参数，拖动期间可识别预设", () => {
     const project = createProject("效果");
     let clip = newText(project.tracks[0].id, 0);
+    expect(defaultVisualEffect("mask")).toMatchObject({ width: 1, height: 1 });
+    expect(defaultVisualEffect("blur-region")).toMatchObject({
+      width: 0.5,
+      height: 0.5,
+    });
     for (const { id } of additionalVisualEffectPresets) {
       clip = addVisualEffect(clip, id);
       expect(addVisualEffect(clip, id)).toBe(clip);

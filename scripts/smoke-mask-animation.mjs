@@ -137,25 +137,52 @@ try {
     if (hidden >= 0)
       expect((await pixel(`hidden-${time}`, hidden))[2]).toBeGreaterThan(160);
   }
+  await expect(
+    page.getByLabel("遮罩区域宽度 (%)", { exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByLabel("遮罩区域高度 (%)", { exact: true }),
+  ).toHaveCount(0);
   await page.locator(".animation-point.start").click();
-  await page.getByLabel("遮罩区域宽度 (%)", { exact: true }).fill("20");
+  const dragControl = async (control, deltaX) => {
+    const handle = await control.boundingBox();
+    const x = handle.x + handle.width / 2,
+      y = handle.y + handle.height / 2;
+    await page.mouse.move(x, y);
+    await page.mouse.down();
+    await page.mouse.move(x + deltaX, y, { steps: 6 });
+    await page.mouse.up();
+  };
+  const dragHandle = (name, deltaX) =>
+    dragControl(
+      page.getByRole("button", {
+        name: `调整遮罩区域 ${name}`,
+        exact: true,
+      }),
+      deltaX,
+    );
+  const currentBounds = await source.boundingBox();
+  await dragHandle("e", currentBounds.width * 0.1);
   saved = await save();
   expect(
     saved.clips[0].keyframes.find((frame) => frame.time === 1).value.maskWidth,
-  ).toBe(0.2);
+  ).toBeCloseTo(0.2, 2);
   expect(
     saved.clips[0].keyframes.find((frame) => frame.time === 2).value.maskWidth,
   ).toBeCloseTo(1, 2);
   await page.getByTitle("撤销 Ctrl+Z", { exact: true }).click();
+  await seek(2);
   await page.locator(".animation-point.end").click();
-  await page.getByLabel("遮罩区域宽度 (%)", { exact: true }).fill("80");
+  await page.getByLabel("遮罩不透明度 (%)", { exact: true }).fill("40");
   saved = await save();
   expect(
-    saved.clips[0].keyframes.find((frame) => frame.time === 1).value.maskWidth,
-  ).toBe(0.1);
+    saved.clips[0].keyframes.find((frame) => frame.time === 1).value
+      .maskOpacity,
+  ).toBe(0);
   expect(
-    saved.clips[0].keyframes.find((frame) => frame.time === 2).value.maskWidth,
-  ).toBe(0.8);
+    saved.clips[0].keyframes.find((frame) => frame.time === 2).value
+      .maskOpacity,
+  ).toBeCloseTo(0.4, 2);
   await page.getByTitle("撤销 Ctrl+Z", { exact: true }).click();
   const end = await page.locator(".animation-point.end").boundingBox();
   await page.mouse.move(end.x + end.width / 2, end.y + end.height / 2);
