@@ -93,6 +93,15 @@ try {
   const zoomTab = page.getByRole("tab", { name: "缩放与平移", exact: true });
   const presetsTab = page.getByRole("tab", { name: "动画", exact: true });
   await expect(zoomTab).toHaveAttribute("aria-selected", "true");
+  const autoAnimate = page.getByRole("checkbox", {
+    name: "开启自动动画",
+    exact: true,
+  });
+  await expect(autoAnimate).toBeVisible();
+  await expect(autoAnimate).toHaveAttribute("title", /自动记录位置/);
+  await autoAnimate.check();
+  await expect(autoAnimate).toBeChecked();
+  await autoAnimate.uncheck();
   await expect(page.getByLabel("画布取景预览")).toBeVisible();
   const zoom = Number(await page.getByLabel("时间线缩放").inputValue());
   await page.locator(".ruler").click({ position: { x: 2 * zoom, y: 12 } });

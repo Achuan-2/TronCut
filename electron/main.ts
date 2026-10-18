@@ -1395,7 +1395,7 @@ async function createWindow() {
       },
       {
         label: "视图",
-        submenu: [{ role: "togglefullscreen" }, { role: "toggleDevTools" }],
+        submenu: [{ role: "togglefullscreen" }],
       },
     ]),
   );

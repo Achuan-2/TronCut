@@ -664,6 +664,26 @@ fieldset:disabled {
   border-bottom-color: var(--accent);
   background: #ffffff05;
 }
+.animation-auto-control {
+  display: flex;
+  align-items: center;
+  min-height: 30px;
+  margin: -4px 0 12px;
+}
+.animation-auto-control label {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: #a9c4b3;
+  font-size: 11px;
+  cursor: pointer;
+}
+.animation-auto-control input[type="checkbox"] {
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  padding: 0;
+}
 .wide-button {
   width: 100%;
   padding: 9px 10px;

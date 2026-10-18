@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { Check, Diamond } from "lucide-react";
 import { animationPresets } from "../shared/preset-library";
 import type { Editor } from "./useEditor";
 import ZoomPanPanel from "./ZoomPanPanel";
@@ -10,6 +9,8 @@ const categories = [
   { id: "presets", name: "动画" },
 ] as const;
 type Category = (typeof categories)[number]["id"];
+const autoAnimateHelp =
+  "移动播放头后修改右侧属性，会自动记录位置、缩放和不透明度，无需拖拽动画箭头。";
 
 export default function AnimationsPanel({
   editor,
@@ -62,6 +63,18 @@ export default function AnimationsPanel({
           </button>
         ))}
       </div>
+      <div className="animation-auto-control">
+        <label title={autoAnimateHelp}>
+          <input
+            type="checkbox"
+            aria-label="开启自动动画"
+            title={autoAnimateHelp}
+            checked={editor.autoAnimate}
+            onChange={(event) => editor.setAutoAnimate(event.target.checked)}
+          />
+          <span>开启自动动画</span>
+        </label>
+      </div>
       <div
         role="tabpanel"
         id={`animation-panel-${category}`}
@@ -83,20 +96,6 @@ export default function AnimationsPanel({
                   toast={toast}
                 />
               ))}
-            </div>
-            <div className="tip-card">
-              <Diamond size={19} />
-              <b>开启自动动画</b>
-              <p>
-                移动播放头，再修改右侧属性。TronCut
-                会自动记录位置、缩放和不透明度，无需拖拽动画箭头。
-              </p>
-              <button
-                onClick={() => editor.setAutoAnimate(!editor.autoAnimate)}
-              >
-                {editor.autoAnimate ? "已开启" : "开启自动动画"}
-                {editor.autoAnimate && <Check size={14} />}
-              </button>
             </div>
           </>
         )}
