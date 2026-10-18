@@ -296,17 +296,6 @@ export default function Panels(props: Props) {
                 配置 {name}
               </button>
             ))}
-            <p className="small-note">
-              开发版可从 PATH 查找引擎。安装包的媒体引擎放在 resources/bin。
-            </p>
-            <h3 className="section-title">TronCut</h3>
-            <p className="small-note">
-              本地工程 · 自由表达
-              <br />
-              Windows
-              原生录屏支持独立鼠标、自动背景与鼠标聚焦缩放；兼容录制的鼠标包含在画面中。TREC
-              和完整 Camtasia 特效兼容仍在开发计划中。
-            </p>
           </>
         )}
       </div>
