@@ -6,6 +6,9 @@ import { findBinary, runProcess } from "./process";
 
 const proxyWidth = 1280;
 const proxyHeight = 720;
+// Version the encoding contract as well as source metadata. Short GOPs bound
+// decode work when cuts jump to a distant sourceIn or the user scrubs.
+const proxyVersion = "seekable-v2";
 const proxyExtensions = new Set([".mp4", ".m4v", ".mov"]);
 
 export function needsPreviewProxy(asset: Asset): boolean {
@@ -71,7 +74,7 @@ export class PreviewProxyService {
     const info = await fs.stat(asset.path);
     const key = createHash("sha256")
       .update(
-        `${asset.path}|${info.size}|${info.mtimeMs}|${proxyWidth}x${proxyHeight}`,
+        `${proxyVersion}|${asset.path}|${info.size}|${info.mtimeMs}|${proxyWidth}x${proxyHeight}`,
       )
       .digest("hex");
     await fs.mkdir(this.cacheDir, { recursive: true });
@@ -92,6 +95,8 @@ export class PreviewProxyService {
             "-hide_banner",
             "-loglevel",
             "error",
+            "-threads",
+            "2",
             ...(asset.animated ? ["-ignore_loop", "1"] : []),
             "-i",
             asset.path,
@@ -122,6 +127,14 @@ export class PreviewProxyService {
                   "veryfast",
                   "-crf",
                   "23",
+                  "-g",
+                  "15",
+                  "-keyint_min",
+                  "15",
+                  "-sc_threshold",
+                  "0",
+                  "-threads",
+                  "2",
                   "-pix_fmt",
                   "yuv420p",
                   "-c:a",

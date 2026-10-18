@@ -177,8 +177,10 @@ try {
     element.scrollTop = element.scrollHeight;
   });
   await checkAligned();
-  // Selecting an off-screen clip also uses the shared vertical position.
-  await page.locator(".timeline-clip").first().click();
+  // Offscreen controls are unmounted. Scrolling the first track into view
+  // restores its controls and selection still uses the shared scroll position.
+  await page.locator(".track-lane").first().scrollIntoViewIfNeeded();
+  await page.locator(".track-lane").first().locator(".timeline-clip").click();
   await checkAligned();
   await expect.poll(async () => (await metrics()).rightTop).toBe(0);
   assert.deepEqual(errors, []);

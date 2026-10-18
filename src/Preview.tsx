@@ -21,7 +21,6 @@ import {
   ChevronRight,
 } from "lucide-react";
 import {
-  type Asset,
   type Clip,
   type Project,
   type Transform,
@@ -80,8 +79,9 @@ import {
 } from "../shared/visual-effect-drag";
 import { transitionTransform } from "../shared/transitions";
 import { projectIndex } from "../shared/project-index";
-import { sourceTimeAt, stitchBoundaries } from "../shared/media-segments";
-import { mediaAssetUrl } from "../shared/media-url";
+import { sourceTimeAt } from "../shared/media-segments";
+import { createPreviewMediaPlan } from "../shared/preview-media-plan";
+import PreviewMedia from "./PreviewMedia";
 import { visualEffectSvg } from "../shared/visual-effect-svg";
 import MatteDefinition from "./MatteDefinition";
 import EffectRegionOverlay from "./EffectRegionOverlay";
@@ -135,133 +135,6 @@ export function timeLabel(t: number): string {
   const seconds = Math.max(0, t);
   return `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(Math.floor(seconds % 60)).padStart(2, "0")}.${String(Math.floor((seconds % 1) * 100)).padStart(2, "0")}`;
 }
-function MediaLayer({
-  clip,
-  asset,
-  localTime,
-  playing,
-  muted,
-  audioOnly = false,
-  previewQuality,
-}: {
-  clip: Clip;
-  asset: Asset;
-  localTime: number;
-  playing: boolean;
-  muted: boolean;
-  audioOnly?: boolean;
-  previewQuality: PreviewQuality;
-}) {
-  const ref = useRef<HTMLVideoElement & HTMLAudioElement>(null);
-  const previousSegment = useRef(-1);
-  const proxyReady = useRef(false);
-  const [previewRevision, setPreviewRevision] = useState(0);
-  useEffect(() => {
-    proxyReady.current = false;
-    if (
-      asset.kind !== "video" ||
-      (previewQuality === "original" && !asset.animated) ||
-      !window.framecraft
-    )
-      return;
-    let active = true;
-    const ready = () => {
-      if (!active || proxyReady.current) return;
-      proxyReady.current = true;
-      setPreviewRevision((value) => value + 1);
-    };
-    const unsubscribe = window.framecraft.onPreviewProxyReady((assetId) => {
-      if (assetId === asset.id) ready();
-    });
-    void window.framecraft
-      .previewProxyAvailable(asset.id)
-      .then((available) => {
-        if (available) ready();
-      })
-      .catch(() => {});
-    return () => {
-      active = false;
-      unsubscribe();
-    };
-  }, [asset.id, asset.kind, asset.animated, previewQuality]);
-  const url = mediaAssetUrl(
-    asset.id,
-    asset.kind === "video" && (previewQuality === "smooth" || !!asset.animated),
-    previewRevision,
-  );
-  useEffect(() => {
-    const media = ref.current;
-    if (!media) return;
-    media.playbackRate = clip.speed;
-    media.preservesPitch = true;
-    media.volume = Math.min(1, clip.volume);
-    media.muted = muted;
-    if (playing) {
-      if (media.paused) void media.play().catch(() => {});
-    } else if (!media.paused) media.pause();
-  }, [playing, clip.speed, clip.volume, muted, url]);
-  useEffect(() => {
-    const media = ref.current;
-    if (!media) return;
-    const absoluteTime = sourceTimeAt(clip, localTime);
-    const segment = clip.stitch
-      ? stitchBoundaries(clip).filter((time) => localTime >= time).length
-      : -1;
-    const crossedStitch = segment !== previousSegment.current;
-    previousSegment.current = segment;
-    const sourceTime =
-      clip.loop && asset.duration > 0
-        ? absoluteTime % asset.duration
-        : absoluteTime;
-    if (
-      Number.isFinite(media.duration) &&
-      (crossedStitch ||
-        Math.abs(media.currentTime - sourceTime) > (playing ? 0.22 : 0.025))
-    )
-      media.currentTime = Math.min(media.duration, sourceTime);
-  }, [
-    localTime,
-    playing,
-    clip.speed,
-    clip.sourceIn,
-    clip.stitch,
-    clip.loop,
-    asset.duration,
-    url,
-  ]);
-  if (asset.missing)
-    return (
-      <div className="offline">
-        素材离线
-        <br />
-        {asset.name}
-      </div>
-    );
-  const syncLoaded = () => {
-    if (ref.current)
-      ref.current.currentTime =
-        clip.loop && asset.duration > 0
-          ? sourceTimeAt(clip, localTime) % asset.duration
-          : sourceTimeAt(clip, localTime);
-  };
-  if (clip.kind === "image")
-    return <img draggable={false} src={url} alt={asset.name} />;
-  if (audioOnly || clip.kind === "audio")
-    return (
-      <audio ref={ref} src={url} onLoadedMetadata={syncLoaded} preload="auto" />
-    );
-  return (
-    <video
-      ref={ref}
-      crossOrigin="anonymous"
-      src={url}
-      onLoadedMetadata={syncLoaded}
-      preload="auto"
-      playsInline
-      loop={clip.loop}
-    />
-  );
-}
 function PreviewLayerImpl({
   clip,
   project,
@@ -277,6 +150,7 @@ function PreviewLayerImpl({
   previewQuality,
   playhead,
   animated,
+  preloading = false,
 }: {
   clip: Clip;
   project: Project;
@@ -292,6 +166,7 @@ function PreviewLayerImpl({
   previewQuality: PreviewQuality;
   playhead: number;
   animated: boolean;
+  preloading?: boolean;
 }) {
   const localTime = Math.max(
     0,
@@ -513,7 +388,12 @@ function PreviewLayerImpl({
       className={`preview-layer ${clip.kind} ${selectedObjectPart ? "selected" : ""} ${editing ? "editing" : ""} ${cropping ? "cropping" : ""} ${effectDrop && selectable ? "effect-drop-target" : ""}`}
       data-clip-id={clip.id}
       data-preview-animated={animated ? "1" : "0"}
-      style={style}
+      data-preview-preloading={preloading ? "1" : undefined}
+      style={
+        preloading
+          ? { ...style, visibility: "hidden", pointerEvents: "none" }
+          : style
+      }
       onDragOver={(event) => {
         if (!interactive) return;
         const behavior = event.dataTransfer.types.includes("troncut-behavior");
@@ -816,7 +696,7 @@ function PreviewLayerImpl({
                 ),
               }}
             >
-              <MediaLayer
+              <PreviewMedia
                 clip={clip}
                 asset={asset}
                 localTime={
@@ -1033,6 +913,7 @@ const PreviewLayer = memo(
     previous.track === next.track &&
     previous.previewQuality === next.previewQuality &&
     previous.animated === next.animated &&
+    previous.preloading === next.preloading &&
     (!next.animated || previous.playhead === next.playhead),
 );
 
@@ -1087,6 +968,10 @@ export function ScenePreview({
       ]),
     );
   }, [project.clips]);
+  const mediaPlan = useMemo(
+    () => createPreviewMediaPlan(project),
+    [project.clips, project.tracks],
+  );
   const activeByTrack = new Map<string, Clip[]>();
   for (const clip of active) {
     const clips = activeByTrack.get(clip.trackId);
@@ -1096,22 +981,28 @@ export function ScenePreview({
   const hasSolo = project.tracks.some((track) => track.solo);
   const definitions: ReactNode[] = [];
   let layers: ReactNode[] = [];
-  // 同轨同素材的媒体片段共用 key：拆分产生新 clip.id 时复用 <video>，预览画面不中断
-  const mediaKeys = new Map<string, number>();
-  const layerKey = (clip: Clip) => {
-    if (!clip.assetId || !["video", "audio", "image"].includes(clip.kind))
-      return clip.id;
-    const base = `media:${clip.trackId}:${clip.assetId}`;
-    const n = mediaKeys.get(base) ?? 0;
-    mediaKeys.set(base, n + 1);
-    return n ? `${base}#${n}` : base;
-  };
+  const activeTracks = new Set(
+    project.tracks
+      .filter((track) => !track.hidden && (!hasSolo || track.solo))
+      .map((track) => track.id),
+  );
+  const upcoming = mediaPlan
+    .upcoming(playhead, new Set(active.map(mediaPlan.key)), activeTracks)
+    .filter((clip) => !assetsById.get(clip.assetId!)?.missing);
+  const preloadingIds = new Set(upcoming.map((clip) => clip.id));
+  for (const clip of upcoming) {
+    const clips = activeByTrack.get(clip.trackId);
+    if (clips) clips.push(clip);
+    else activeByTrack.set(clip.trackId, [clip]);
+  }
   for (const track of [...project.tracks].reverse()) {
     if (track.hidden || (hasSolo && !track.solo)) continue;
     for (const clip of activeByTrack.get(track.id) ?? []) {
       const asset = clip.assetId ? assetsById.get(clip.assetId) : undefined;
       const matteEffect = clip.visualEffects?.["media-matte"];
+      const preloading = preloadingIds.has(clip.id);
       const matte =
+        !preloading &&
         !!matteEffect &&
         effectActive(matteEffect, playhead - clip.start, clip.duration);
       if (matte) {
@@ -1138,7 +1029,7 @@ export function ScenePreview({
       }
       layers.push(
         <PreviewLayer
-          key={layerKey(clip)}
+          key={mediaPlan.key(clip)}
           clip={clip}
           project={project}
           editor={editor}
@@ -1146,17 +1037,19 @@ export function ScenePreview({
           muted={
             !interactive || track.muted || !!editor.narrationRecording?.muted
           }
-          interactive={interactive}
+          interactive={interactive && !preloading}
           cameraScale={camera?.scale ?? 1}
           mode={mode}
           matteSource={matte}
           recording={recordingsByClip.get(clip.id)}
           track={tracksById.get(clip.trackId) ?? track}
           previewQuality={previewQuality}
+          preloading={preloading}
           playhead={playhead}
           animated={
-            selectedIds.has(clip.id) ||
-            clipNeedsPreviewFrameAt(clip, asset, playhead - clip.start)
+            !preloading &&
+            (selectedIds.has(clip.id) ||
+              clipNeedsPreviewFrameAt(clip, asset, playhead - clip.start))
           }
         />,
       );

@@ -654,7 +654,9 @@ function installHandlers() {
   });
   handle("media:url", (id: unknown) => {
     const asset = assetById(id);
-    return mediaAssetUrl(asset.id);
+    // Animated backgrounds may be opened after their ready event was sent.
+    const proxy = !!asset.animated && !!previewProxies.path(asset.id);
+    return mediaAssetUrl(asset.id, proxy, proxy ? 1 : 0);
   });
   handle("media:preview-proxy", (id: unknown) =>
     !!previewProxies.path(assetById(id).id),
@@ -1436,10 +1438,12 @@ app
         id = decodeURIComponent(url.pathname.slice(1)),
         asset = assets.get(id);
       if (!asset) return new Response("素材不存在", { status: 404 });
-      const preview =
-        asset.animated || url.searchParams.get("preview") === "1"
-          ? previewProxies.path(asset.id)
-          : undefined;
+      // revision=0 stays on the original file for its entire lifetime.
+      // Switching the backing file between Range requests corrupts decoding.
+      const useProxy =
+        (asset.animated || url.searchParams.get("preview") === "1") &&
+        Number(url.searchParams.get("revision")) > 0;
+      const preview = useProxy ? previewProxies.path(asset.id) : undefined;
       return serveMediaFile(request, preview ?? asset.path);
     });
     session.defaultSession.setPermissionRequestHandler(

@@ -3942,6 +3942,8 @@ fieldset:disabled {
 }
 .playhead {
   position: absolute;
+  left: 0;
+  will-change: transform;
   top: 36px;
   bottom: 0;
   width: 1px;
@@ -3951,6 +3953,8 @@ fieldset:disabled {
 }
 .ruler-playhead {
   position: absolute;
+  left: 0;
+  will-change: transform;
   top: 0;
   bottom: 0;
   width: 1px;

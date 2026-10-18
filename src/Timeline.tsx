@@ -160,12 +160,13 @@ function TimelinePlayheadCursor({
   placement: "ruler" | "body";
 }) {
   const playhead = useEditorPlayhead(editor);
+  const style = { transform: `translateX(${playhead * zoom}px)` };
   return placement === "ruler" ? (
-    <div className="ruler-playhead" style={{ left: playhead * zoom }}>
+    <div className="ruler-playhead" style={style}>
       <span />
     </div>
   ) : (
-    <div className="playhead" style={{ left: playhead * zoom }}>
+    <div className="playhead" style={style}>
       <i />
     </div>
   );
@@ -586,7 +587,20 @@ export default function Timeline({
     else if (top + height > element.scrollTop + element.clientHeight)
       element.scrollTop = top + height - element.clientHeight;
   }, [selected?.trackId, project.tracks.length, layoutKey, trackHeightDraft]);
-  const [viewport, setViewport] = useState({ left: 0, width: 1600 });
+  const [viewport, setViewport] = useState({
+    left: 0,
+    width: 1600,
+    top: 0,
+    height: 300,
+  });
+  const trackOffsets = useMemo(() => {
+    let top = 36;
+    return trackHeights.map((height) => {
+      const offset = top;
+      top += height;
+      return offset;
+    });
+  }, [layoutKey]);
   const rulerStep = timelineRulerStep(zoom, project.canvas.fps);
   const rulerTicks = useMemo(() => {
     const count = Math.ceil((viewport.width + 400) / zoom / rulerStep) + 1;
@@ -599,19 +613,31 @@ export default function Timeline({
   const visibleClips = useMemo(() => {
     const index = projectIndex(project);
     return new Map(
-      timelineTracks.map((track) => [
-        track.id,
-        index
-          .visible(
-            track.id,
-            (viewport.left - 200) / zoom,
-            (viewport.left + viewport.width + 200) / zoom,
-            drag?.ids,
-          )
-          .filter((clip) => !timeline.hidden.has(clip.id)),
-      ]),
+      timelineTracks.map((track, indexInView) => {
+        // Keep track shells at their real heights so scrolling, selection and
+        // drops retain their geometry, but don't mount offscreen SVG editors.
+        const outside =
+          trackOffsets[indexInView] + trackHeights[indexInView] < viewport.top - 100 ||
+          trackOffsets[indexInView] > viewport.top + viewport.height + 100;
+        const pinned = drag?.ids.some(
+          (id) => index.clipsById.get(id)?.trackId === track.id,
+        );
+        return [
+          track.id,
+          outside && !pinned
+            ? []
+            : index
+                .visible(
+                  track.id,
+                  (viewport.left - 200) / zoom,
+                  (viewport.left + viewport.width + 200) / zoom,
+                  drag?.ids,
+                )
+                .filter((clip) => !timeline.hidden.has(clip.id)),
+        ];
+      }),
     );
-  }, [project.clips, project.tracks, timeline, viewport, zoom, drag?.ids]);
+  }, [project.clips, project.tracks, timeline, viewport, zoom, drag?.ids, trackOffsets]);
   const selectedIdSet = useMemo(
     () => new Set(editor.selectedIds),
     [editor.selectedIds],
@@ -625,7 +651,12 @@ export default function Timeline({
       // Reserve the same space on the labels so both scroll ranges stay equal.
       labels.style.paddingBottom = `${element.offsetHeight - element.clientHeight}px`;
       labels.scrollTop = element.scrollTop;
-      setViewport({ left: element.scrollLeft, width: element.clientWidth });
+      setViewport({
+        left: element.scrollLeft,
+        width: element.clientWidth,
+        top: element.scrollTop,
+        height: element.clientHeight,
+      });
     };
     syncGeometry();
     const observer = new ResizeObserver(syncGeometry);
@@ -1093,6 +1124,8 @@ export default function Timeline({
             setViewport({
               left: event.currentTarget.scrollLeft,
               width: event.currentTarget.clientWidth,
+              top: event.currentTarget.scrollTop,
+              height: event.currentTarget.clientHeight,
             });
             if (headers.current)
               headers.current.scrollTop = event.currentTarget.scrollTop;

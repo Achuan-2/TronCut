@@ -59,6 +59,9 @@ it("同一素材并发登记只生成一次，生成完成后报告当前代理"
 
   await expect(ready).resolves.toBe(asset.id);
   expect(vi.mocked(runProcess)).toHaveBeenCalledTimes(1);
+  const args = vi.mocked(runProcess).mock.calls[0][1];
+  expect(args.slice(args.indexOf("-g"), args.indexOf("-g") + 2)).toEqual(["-g", "15"]);
+  expect(args.slice(args.lastIndexOf("-threads"), args.lastIndexOf("-threads") + 2)).toEqual(["-threads", "2"]);
   expect(service.path(asset.id)).toMatch(/\.mp4$/);
   expect(await fs.readFile(service.path(asset.id)!, "utf8")).toBe("proxy");
   await fs.rm(root, { recursive: true, force: true });

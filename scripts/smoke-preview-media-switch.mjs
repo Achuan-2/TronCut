@@ -74,7 +74,7 @@ try {
   });
   const ruler = page.locator(".ruler");
   const seek = (time) => ruler.click({ position: { x: time * 65, y: 12 } });
-  const video = page.locator(".canvas video");
+  const video = page.locator(".canvas .preview-layer:not([data-preview-preloading]) video");
   const checkFrame = async (id, time, channel) => {
     await expect(page.locator(`.canvas [data-clip-id="${id}"] video`)).toHaveCount(1);
     await expect.poll(() => video.evaluate((node, targetTime) =>
@@ -89,7 +89,7 @@ try {
     });
     expect(pixel[channel]).toBeGreaterThan(200);
     expect(pixel[channel === 0 ? 2 : 0]).toBeLessThan(40);
-    await expect(page.locator(".canvas .offline")).toHaveCount(0);
+    await expect(page.locator(".canvas .preview-layer:not([data-preview-preloading]) .offline")).toHaveCount(0);
   };
   await seek(0.4);
   await checkFrame("red-a", 0.7, 0);
@@ -115,7 +115,7 @@ try {
   expect(await page.evaluate(() => window.previewOfflineFlashes)).toEqual([]);
   expect(await app.evaluate(() => globalThis.previewMediaUrlCalls)).toBe(0);
   await seek(4.4);
-  await expect(page.locator(".canvas .offline")).toContainText("素材离线");
+  await expect(page.locator(".canvas .preview-layer:not([data-preview-preloading]) .offline")).toContainText("素材离线");
   await seek(2.5);
   await checkFrame("blue", 1.2, 2);
   expect(errors).toEqual([]);
