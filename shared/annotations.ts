@@ -4,6 +4,7 @@ import {
   newText,
   textPresets,
   uid,
+  styleSchema,
   type Clip,
 } from "./model";
 import {
@@ -24,6 +25,7 @@ const templateSchema = z.discriminatedUnion("kind", [
       .min(0)
       .max(textPresets.length - 1),
     plain: z.boolean().optional(),
+    style: styleSchema.optional(),
   }),
   z.object({
     kind: z.literal("shape"),
@@ -70,6 +72,8 @@ export function annotationClip(
       template.preset,
       template.plain ? "文本" : undefined,
     );
+    // Embed the style so saved projects and drag payloads are independent of the library.
+    if (template.style) clip.style = structuredClone(template.style);
     return template.plain
       ? { ...clip, style: { ...clip.style!, outlineWidth: 0 } }
       : clip;
@@ -138,7 +142,7 @@ const styled = (
   name: string,
   style: Partial<ShapeStyle> = {},
   fill = "#00b5ef",
-): AnnotationTemplate => ({
+): Extract<AnnotationTemplate, { kind: "shape" }> => ({
   kind: "shape",
   shape,
   name,
@@ -276,15 +280,24 @@ export const sketchPresets: AnnotationPreset[] = [
   template: {
     ...styled(shape as z.infer<typeof annotationShapeSchema>, String(name), {
       stroke: "#ff2020",
-      strokeWidth: ["rough-circle", "rough-rectangle", "check"].includes(String(id)) ? 18 : 9,
+      strokeWidth: ["rough-circle", "rough-rectangle", "check"].includes(
+        String(id),
+      )
+        ? 18
+        : 9,
       fillEnabled: false,
       rough: !!rough,
     }),
     kind: "shape",
     shape: shape as z.infer<typeof annotationShapeSchema>,
-    ...(["ellipse", "rectangle", "check", "cross", "star", "curved-arrow"].includes(
-      String(shape),
-    )
+    ...([
+      "ellipse",
+      "rectangle",
+      "check",
+      "cross",
+      "star",
+      "curved-arrow",
+    ].includes(String(shape))
       ? { size: { width: 300, height: 300 } }
       : {}),
     drawing: drawingSchema.parse({}),

@@ -62,8 +62,33 @@ try {
   const content = page.getByLabel("文本内容", { exact: true });
   await expect(content).toHaveValue("甲乙丙丁");
   const font = page.getByRole("combobox", { name: "字体", exact: true });
-  await expect.poll(() => font.locator("option").count()).toBeGreaterThan(20);
-  const fontCount = await font.locator("option").count();
+  await font.click();
+  await expect(font).toHaveValue("");
+  const fontList = page.getByRole("listbox", { name: "字体列表", exact: true });
+  await expect
+    .poll(() => fontList.getByRole("option").count())
+    .toBeGreaterThan(20);
+  const fontCount = await fontList.getByRole("option").count();
+  await page.screenshot({ path: path.join(root, "font-search.png") });
+  await font.fill("no-such-font-12345");
+  await expect(fontList.getByRole("option")).toHaveCount(0);
+  await font.press("Escape");
+  await expect(font).toHaveValue("Microsoft YaHei");
+  await font.click();
+  await font.fill("Arial");
+  await font.press("ArrowDown");
+  const keyboardFont = await fontList
+    .locator('[aria-selected="true"]')
+    .textContent();
+  await font.press("Enter");
+  await expect(font).toHaveValue(keyboardFont);
+  await page.getByTitle("撤销 Ctrl+Z", { exact: true }).click();
+  await expect(font).toHaveValue("Microsoft YaHei");
+  await font.click();
+  await expect(fontList.getByRole("option")).toHaveCount(fontCount);
+  await font.fill("Arial");
+  await content.click();
+  await expect(font).toHaveValue("Microsoft YaHei");
   await content.focus();
   await content.press("Home");
   await content.press("ArrowRight");
@@ -72,7 +97,15 @@ try {
   await expect(page.locator(".text-selection-status")).toContainText(
     "已选中 2 个字符",
   );
-  await font.selectOption("Arial");
+  await font.click();
+  await font.fill("Arial");
+  await fontList.getByRole("option", { name: "Arial", exact: true }).click();
+  await expect(font).toHaveValue("Arial");
+  await font.click();
+  await expect(font).toHaveValue("");
+  await expect(fontList.getByRole("option")).toHaveCount(fontCount);
+  await font.press("Escape");
+  await expect(font).toHaveValue("Arial");
   await page.getByRole("spinbutton", { name: "字号", exact: true }).fill("80");
   await page
     .getByRole("spinbutton", { name: "描边宽度", exact: true })
@@ -113,8 +146,9 @@ try {
   await expect(page.locator(".text-selection-status")).toContainText(
     "已选中 1 个字符",
   );
-  await font.focus();
-  await font.selectOption("SimSun");
+  await font.click();
+  await font.fill("SimSun");
+  await fontList.getByRole("option", { name: "SimSun", exact: true }).click();
   await expect(glyphs.nth(1)).toHaveCSS("font-family", /SimSun/);
   await page.getByTitle("撤销 Ctrl+Z", { exact: true }).click();
   await expect(glyphs.nth(1)).toHaveCSS("font-family", /Arial/);

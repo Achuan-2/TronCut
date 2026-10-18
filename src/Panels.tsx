@@ -17,7 +17,7 @@ import {
   Star,
   Shapes,
 } from "lucide-react";
-import { type Asset, type Clip, textPresets, defaultTransform } from "../shared/model";
+import { type Asset, type Clip, defaultTransform } from "../shared/model";
 import { createTransformSampler } from "../shared/editor";
 import { dimensionTransform } from "../shared/canvas";
 import type { Capabilities } from "../shared/bridge";
@@ -684,10 +684,16 @@ export function Inspector({ editor }: { editor: Editor }) {
                 <label className="field">
                   花字
                   <select
+                    aria-label="花字模板"
                     value=""
                     onChange={(e) => {
                       if (locked) return;
-                      const { fontFamily, color, outline, outlineWidth } = textPresets[Number(e.target.value)].style;
+                      const preset = editor.presetLibrary.findTextPreset(
+                        e.target.value,
+                      );
+                      if (!preset) return;
+                      const { fontFamily, color, outline, outlineWidth } =
+                        preset.style;
                       const characterPatch = { fontFamily, color, outline, outlineWidth };
                       if (textSelection) {
                         editor.updateCharacterStyle(c.id, characterPatch);
@@ -697,7 +703,7 @@ export function Inspector({ editor }: { editor: Editor }) {
                         c.id,
                         {
                           style: {
-                            ...textPresets[Number(e.target.value)].style,
+                            ...preset.style,
                           },
                         },
                         { preserveFontSize: true, characterPatch },
@@ -707,13 +713,26 @@ export function Inspector({ editor }: { editor: Editor }) {
                     <option value="" disabled>
                       选择模板
                     </option>
-                    {textPresets.map((p, i) => (
-                      <option key={p.name} value={i}>
+                    {editor.presetLibrary.textPresets.map((p) => (
+                      <option key={p.id} value={p.id}>
                         {p.name}
                       </option>
                     ))}
                   </select>
                 </label>
+                <button
+                  type="button"
+                  className="wide-button save-text-preset"
+                  onClick={() => {
+                    if (c.style)
+                      editor.presetLibrary.saveText({
+                        ...c.style,
+                        ...characterStyle,
+                      });
+                  }}
+                >
+                  保存当前预设为模板
+                </button>
                 {numberField(
                   "字号",
                   characterStyle?.fontSize ?? 68,

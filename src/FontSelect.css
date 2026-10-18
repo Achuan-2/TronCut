@@ -1,0 +1,34 @@
+.font-select-list {
+  position: fixed;
+  z-index: 150;
+  overflow-y: auto;
+  padding: 4px;
+  border: 1px solid #59656c;
+  border-radius: 6px;
+  background: #222b30;
+  color: var(--text);
+  box-shadow: 0 8px 24px #0006;
+}
+.font-select-list > button {
+  display: block;
+  width: 100%;
+  min-height: 32px;
+  padding: 6px 9px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+}
+.font-select-list > button[aria-selected="true"],
+.font-select-list > button:hover {
+  background: #354b43;
+}
+.font-select-list > p {
+  margin: 8px;
+  color: #aabdaf;
+  font-size: 12px;
+}

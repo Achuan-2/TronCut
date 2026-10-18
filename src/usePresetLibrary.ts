@@ -1,7 +1,13 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import { behaviorName, type Behavior } from "../shared/behaviors";
+import type { TextStyle } from "../shared/model";
 import {
   captureBehaviorPreset,
+  captureTextPreset,
+  deleteTextPreset,
+  libraryTextPresets,
+  renameTextPreset,
+  restoreDefaultTextPresets,
   deleteBehaviorPreset,
   emptyPresetLibrary,
   favoriteKey,
@@ -35,6 +41,14 @@ export function usePresetLibrary() {
   const [error, setError] = useState(loaded.error);
   const current = useRef(state);
   const behaviors = useMemo(() => libraryBehaviors(state), [state]);
+  const textPresets = useMemo(() => libraryTextPresets(state), [state]);
+  const findTextPreset = useCallback(
+    (id: string) =>
+      libraryTextPresets(current.current, true).find(
+        (preset) => preset.id === id,
+      ),
+    [],
+  );
   const findBehavior = useCallback(
     (id: string) =>
       libraryBehaviors(current.current, true).find(
@@ -50,7 +64,8 @@ export function usePresetLibrary() {
   } | null>(null);
   const [dialog, showDialog] = useState<
     | { mode: "add"; name: string; behavior: Behavior }
-    | { mode: "rename"; name: string; id: string }
+    | { mode: "addText"; name: string; style: TextStyle }
+    | { mode: "rename"; name: string; id: string; kind?: "behavior" | "text" }
     | null
   >(null);
   const update = (
@@ -77,6 +92,8 @@ export function usePresetLibrary() {
     showDialog,
     behaviors,
     findBehavior,
+    textPresets,
+    findTextPreset,
     isFavorite: (kind: PresetKind, id: string) =>
       state.favorites.includes(favoriteKey(kind, id)),
     toggleFavorite: (kind: PresetKind, id: string) =>
@@ -92,6 +109,14 @@ export function usePresetLibrary() {
     deleteBehavior: (id: string) =>
       update((state) => deleteBehaviorPreset(state, id)),
     restoreDefaults: () => update(restoreDefaultBehaviors),
+    deleteText: (id: string) => update((state) => deleteTextPreset(state, id)),
+    restoreDefaultText: () => update(restoreDefaultTextPresets),
+    saveText: (style: TextStyle) =>
+      showDialog({
+        mode: "addText",
+        name: "我的花字",
+        style: structuredClone(style),
+      }),
     saveBehavior: (behavior: Behavior) =>
       showDialog({
         mode: "add",
@@ -110,7 +135,17 @@ export function usePresetLibrary() {
                   captureBehaviorPreset(dialog.behavior, name),
                 ],
               }
-            : renameBehaviorPreset(state, dialog.id, name),
+            : dialog.mode === "addText"
+              ? {
+                  ...state,
+                  customTextPresets: [
+                    ...state.customTextPresets,
+                    captureTextPreset(dialog.style, name),
+                  ],
+                }
+              : dialog.kind === "text"
+                ? renameTextPreset(state, dialog.id, name)
+                : renameBehaviorPreset(state, dialog.id, name),
         )
       )
         showDialog(null);

@@ -8,7 +8,6 @@ import {
   Pencil,
   PenTool,
 } from "lucide-react";
-import { textPresets } from "../shared/model";
 import {
   annotationMime,
   arrowPresets,
@@ -20,6 +19,7 @@ import {
 import AnnotationPresetPreview from "./AnnotationPresetPreview";
 import PenBrushPicker, { penColors } from "./PenBrushPicker";
 import type { Editor } from "./useEditor";
+import TextPresetCard from "./TextPresetCard";
 
 export default function AnnotationsPanel({ editor }: { editor: Editor }) {
   const [category, setCategory] = useState<
@@ -86,7 +86,17 @@ export default function AnnotationsPanel({ editor }: { editor: Editor }) {
               <option value="fancy">花字</option>
             </select>
           </label>
-          <div className="text-presets">
+          <div
+            className="text-presets"
+            onContextMenu={(event) => {
+              event.preventDefault();
+              editor.presetLibrary.showMenu({
+                kind: "text",
+                x: event.clientX,
+                y: event.clientY,
+              });
+            }}
+          >
             {style !== "fancy" && (
               <button
                 className="preset-card"
@@ -106,31 +116,21 @@ export default function AnnotationsPanel({ editor }: { editor: Editor }) {
               </button>
             )}
             {style !== "basic" &&
-              textPresets.map((preset, i) => (
-                <button
-                  key={preset.name}
-                  className="preset-card"
-                  draggable
-                  onDragStart={(event) =>
-                    drag(event, { kind: "text", preset: i })
-                  }
-                  onClick={() =>
-                    editor.addAnnotation({ kind: "text", preset: i })
-                  }
-                >
-                  <span
-                    style={{
-                      color: preset.style.color,
-                      WebkitTextStroke: `${preset.style.outlineWidth / 2}px ${preset.style.outline}`,
-                      paintOrder: "stroke fill",
-                    }}
-                  >
-                    花字
-                  </span>
-                  <small>{preset.name}</small>
-                  <Plus size={14} />
-                </button>
+              editor.presetLibrary.textPresets.map((preset) => (
+                <TextPresetCard
+                  key={preset.id}
+                  preset={preset}
+                  editor={editor}
+                />
               ))}
+            {style !== "basic" && !editor.presetLibrary.textPresets.length && (
+              <button
+                className="wide-button"
+                onClick={() => editor.presetLibrary.restoreDefaultText()}
+              >
+                恢复所有默认花字
+              </button>
+            )}
           </div>
           <p className="small-note">
             双击画布文字编辑，字体、描边和自动字号在文本属性中调整。

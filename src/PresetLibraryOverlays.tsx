@@ -10,7 +10,14 @@ function NameDialog({ library }: { library: PresetLibrary }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const input = useRef<HTMLInputElement>(null);
   const close = () => library.showDialog(null);
-  const title = request.mode === "add" ? "添加行为预设" : "重命名行为预设";
+  const title =
+    request.mode === "addText"
+      ? "保存花字模板"
+      : request.mode === "add"
+        ? "添加行为预设"
+        : request.kind === "text"
+          ? "重命名花字模板"
+          : "重命名行为预设";
   useEffect(() => {
     const previous = document.activeElement as HTMLElement | null;
     const element = dialog.current;
@@ -80,8 +87,13 @@ function LibraryMenu({ library }: { library: PresetLibrary }) {
   const root = useRef<HTMLDivElement>(null);
   const [position, setPosition] = useState({ left: menu.x, top: menu.y });
   const close = () => library.showMenu(null);
-  const preset =
-    menu.kind === "behavior" && menu.id ? library.findBehavior(menu.id) : null;
+  const preset = !menu.id
+    ? null
+    : menu.kind === "behavior"
+      ? library.findBehavior(menu.id)
+      : menu.kind === "text"
+        ? library.findTextPreset(menu.id)
+        : null;
   const favorite = menu.id && library.isFavorite(menu.kind, menu.id);
   useLayoutEffect(() => {
     const bounds = root.current!.getBoundingClientRect();
@@ -156,6 +168,7 @@ function LibraryMenu({ library }: { library: PresetLibrary }) {
                 mode: "rename",
                 id: preset.id,
                 name: preset.name,
+                kind: menu.kind === "text" ? "text" : "behavior",
               })
             }
           >
@@ -163,19 +176,30 @@ function LibraryMenu({ library }: { library: PresetLibrary }) {
           </button>
           <button
             role="menuitem"
-            onClick={() => library.deleteBehavior(preset.id)}
+            onClick={() =>
+              menu.kind === "text"
+                ? library.deleteText(preset.id)
+                : library.deleteBehavior(preset.id)
+            }
           >
-            删除预设
+            {menu.kind === "text" ? "删除模板" : "删除预设"}
           </button>
         </>
       )}
-      {menu.kind === "behavior" && (
+      {(menu.kind === "behavior" || menu.kind === "text") && (
         <>
           {menu.id && (
             <div role="separator" className="preset-menu-separator" />
           )}
-          <button role="menuitem" onClick={() => library.restoreDefaults()}>
-            恢复所有默认行为
+          <button
+            role="menuitem"
+            onClick={() =>
+              menu.kind === "text"
+                ? library.restoreDefaultText()
+                : library.restoreDefaults()
+            }
+          >
+            {menu.kind === "text" ? "恢复所有默认花字" : "恢复所有默认行为"}
           </button>
         </>
       )}
@@ -194,7 +218,11 @@ export default function PresetLibraryOverlays({
       {library.menu && <LibraryMenu library={library} />}
       {library.dialog && (
         <NameDialog
-          key={library.dialog.mode === "add" ? "add" : library.dialog.id}
+          key={
+            library.dialog.mode === "rename"
+              ? `${library.dialog.kind}:${library.dialog.id}`
+              : library.dialog.mode
+          }
           library={library}
         />
       )}

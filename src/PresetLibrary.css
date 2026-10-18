@@ -4,9 +4,25 @@
 }
 .preset-tile > .behavior-card,
 .preset-tile > .animation-card,
+.preset-tile > .preset-card,
 .preset-tile > .visual-effect-card {
   width: 100%;
   height: 100%;
+}
+.text-presets .preset-user-badge {
+  top: auto;
+  bottom: 7px;
+}
+.text-presets .preset-card small {
+  width: 100%;
+  max-width: 100%;
+  padding: 0 20px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.save-text-preset {
+  margin-bottom: 12px;
 }
 .preset-tile .preset-favorite {
   position: absolute;

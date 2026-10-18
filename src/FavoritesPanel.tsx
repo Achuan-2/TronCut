@@ -8,6 +8,7 @@ import type { Editor } from "./useEditor";
 import { BehaviorCard } from "./BehaviorsPanel";
 import AnimationPresetCard from "./AnimationPresetCard";
 import { VisualEffectCard } from "./VisualEffectsPanel";
+import TextPresetCard from "./TextPresetCard";
 
 export default function FavoritesPanel({
   editor,
@@ -18,6 +19,9 @@ export default function FavoritesPanel({
 }) {
   const [filter, setFilter] = useState<PresetKind | "all">("all");
   const library = editor.presetLibrary;
+  const textPresets = library.textPresets.filter((preset) =>
+    library.isFavorite("text", preset.id),
+  );
   const behaviors = library.behaviors.filter((preset) =>
     library.isFavorite("behavior", preset.id),
   );
@@ -28,6 +32,7 @@ export default function FavoritesPanel({
     library.isFavorite("effect", preset.id),
   );
   const groups = [
+    { kind: "text", name: "花字", count: textPresets.length },
     { kind: "behavior", name: "行为", count: behaviors.length },
     { kind: "animation", name: "动画", count: animations.length },
     { kind: "effect", name: "视觉效果", count: effects.length },
@@ -45,6 +50,7 @@ export default function FavoritesPanel({
           onChange={(event) => setFilter(event.target.value as typeof filter)}
         >
           <option value="all">全部</option>
+          <option value="text">花字</option>
           <option value="behavior">行为</option>
           <option value="animation">动画</option>
           <option value="effect">视觉效果</option>
@@ -64,37 +70,47 @@ export default function FavoritesPanel({
           <h3>{group.name}</h3>
           <div
             className={
-              group.kind === "animation"
-                ? "animation-presets"
-                : group.kind === "effect"
-                  ? "visual-effects-grid"
-                  : "behavior-grid"
+              group.kind === "text"
+                ? "text-presets"
+                : group.kind === "animation"
+                  ? "animation-presets"
+                  : group.kind === "effect"
+                    ? "visual-effects-grid"
+                    : "behavior-grid"
             }
           >
-            {group.kind === "behavior"
-              ? behaviors.map((preset) => (
-                  <BehaviorCard
+            {group.kind === "text"
+              ? textPresets.map((preset) => (
+                  <TextPresetCard
                     key={preset.id}
                     preset={preset}
                     editor={editor}
                   />
                 ))
-              : group.kind === "animation"
-                ? animations.map((preset) => (
-                    <AnimationPresetCard
+              : group.kind === "behavior"
+                ? behaviors.map((preset) => (
+                    <BehaviorCard
                       key={preset.id}
                       preset={preset}
                       editor={editor}
-                      toast={toast}
                     />
                   ))
-                : effects.map((preset) => (
-                    <VisualEffectCard
-                      key={preset.id}
-                      preset={preset}
-                      editor={editor}
-                    />
-                  ))}
+                : group.kind === "animation"
+                  ? animations.map((preset) => (
+                      <AnimationPresetCard
+                        key={preset.id}
+                        preset={preset}
+                        editor={editor}
+                        toast={toast}
+                      />
+                    ))
+                  : effects.map((preset) => (
+                      <VisualEffectCard
+                        key={preset.id}
+                        preset={preset}
+                        editor={editor}
+                      />
+                    ))}
           </div>
         </section>
       ))}
