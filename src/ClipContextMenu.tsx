@@ -13,6 +13,7 @@ import {
   type ArrangeDirection,
 } from "../shared/canvas-actions";
 import { editableIds } from "../shared/timeline";
+import { detachableVideos } from "../shared/detach-audio";
 import type { Editor } from "./useEditor";
 import { stitchSelectionError } from "../shared/stitch";
 import { stitchBoundaries } from "../shared/media-segments";
@@ -28,6 +29,7 @@ export type ClipCommand =
   | "rippleDelete"
   | "stitch"
   | "unstitch"
+  | "detachAudio"
   | "group"
   | "ungroup";
 export interface ClipMenuPosition {
@@ -253,6 +255,12 @@ export default function ClipContextMenu({
           )}
           {canUnstitch &&
             item("移除全部拼接", "unstitch", "Ctrl+Shift+\\", false)}
+          {item(
+            "拆分视频和音频",
+            "detachAudio",
+            "",
+            !canEdit || !detachableVideos(project, ids).length,
+          )}
           <hr />
         </>
       )}

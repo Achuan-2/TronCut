@@ -911,6 +911,7 @@ async function renderProject(
     if (
       !still &&
       asset?.hasAudio &&
+      !clip.audioDetached &&
       clip.kind !== "image" &&
       !track.muted &&
       clip.volume > 0

@@ -50,6 +50,25 @@ const state = (): PreviewMediaState => ({
 const controllerFor = (media: Media) =>
   createPreviewMediaController(media as unknown as HTMLMediaElement);
 
+it("拆分后视频即使调整音量仍保持静音，独立音频正常发声", () => {
+  const media = new Media(),
+    controller = controllerFor(media),
+    s = state();
+  controller.update({
+    ...s,
+    muted: false,
+    clip: { ...s.clip, audioDetached: true, volume: 1 },
+  });
+  expect(media.muted).toBe(true);
+  controller.update({
+    ...s,
+    muted: false,
+    clip: { ...s.clip, kind: "audio", audioDetached: undefined, volume: 0.6 },
+  });
+  expect(media.muted).toBe(false);
+  expect(media.volume).toBe(0.6);
+});
+
 it("异步加载使用最新定位，并在解码器繁忙时合并连续 seek", () => {
   const media = new Media(),
     controller = controllerFor(media),

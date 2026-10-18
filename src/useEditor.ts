@@ -44,6 +44,12 @@ import {
   selectionWithGroups,
 } from "../shared/timeline";
 import { recordingMaster } from "../shared/recording-objects";
+import { detachVideoAudio } from "../shared/detach-audio";
+import {
+  deleteTimelineRange,
+  normalizeTimelineRange,
+  type TimelineRange,
+} from "../shared/timeline-range";
 import {
   assetClips,
   updateLibraryAsset as changeLibraryAsset,
@@ -190,6 +196,15 @@ export function useEditor(
     [documentProject, groupScope],
   );
   const [editingTextId, setEditingTextId] = useState<string | null>(null);
+  const [timelineRange, setTimelineRangeState] = useState<TimelineRange | null>(null);
+  const setTimelineRange = useCallback(
+    (range: TimelineRange | null) => {
+      setTimelineRangeState(range
+        ? normalizeTimelineRange(range.start, range.end, project.canvas.fps)
+        : null);
+    },
+    [project.canvas.fps],
+  );
   const [textSelection, setTextSelection] = useState<(TextRange & { clipId: string }) | null>(null);
   const [zoomPanDraft, setZoomPanDraft] = useState<Transform | null>(null);
   const [canvasMode, setCanvasMode] = useState<"select" | "crop" | "draw">(
@@ -436,6 +451,7 @@ export function useEditor(
       setEditingTextId(null);
       setZoomPanDraft(null);
       setTimelineFocus(null);
+      setTimelineRangeState(null);
       setPlaying(false);
       select(null);
       seek(Math.min(
@@ -475,8 +491,38 @@ export function useEditor(
     setDirty(true);
   }, []);
   const [renamingGroup, setRenamingGroup] = useState<string | null>(null);
+  const deleteTimeSelection = useCallback((ripple = false) => {
+    if (!timelineRange) return false;
+    const before = current.current;
+    const next = deleteTimelineRange(before, timelineRange, ripple);
+    setPlaying(false);
+    if (next !== before) {
+      apply(next);
+      if (current.current === before) return true;
+    }
+    setTimelineRangeState(null);
+    select(null);
+    seek(timelineRange.start);
+    setTimelineFocus({ time: timelineRange.start });
+    return true;
+  }, [timelineRange, apply, select, seek, setPlaying]);
+  const detachSelectedAudio = useCallback(() => {
+    const before = current.current;
+    const next = detachVideoAudio(before, selectedIds);
+    if (next === before) return;
+    setPlaying(false);
+    apply(next);
+    if (current.current !== before) {
+      clearKeyframeEdit();
+      const previous = new Set(before.clips.map((clip) => clip.id));
+      selectMany(next.clips
+        .filter((clip) => selectedIds.includes(clip.id) || !previous.has(clip.id))
+        .map((clip) => clip.id));
+    }
+  }, [apply, selectedIds, setPlaying, clearKeyframeEdit]);
   const deleteSelectedClips = useCallback(
     (ripple = false) => {
+      if (deleteTimeSelection(ripple)) return;
       const before = current.current;
       const next = deleteClips(before, selectedIds, ripple);
       if (next === before) return;
@@ -500,7 +546,7 @@ export function useEditor(
         setTimelineFocus({ time });
       }
     },
-    [apply, selectedIds, select, setPlaying, seek],
+    [apply, selectedIds, select, setPlaying, seek, deleteTimeSelection],
   );
   const stitchSelectedClips = useCallback(() => {
     const before = current.current;
@@ -549,6 +595,7 @@ export function useEditor(
     setEditingTextId(null);
     setZoomPanDraft(null);
     setTimelineFocus(null);
+    setTimelineRangeState(null);
     setClipProperties(null);
     setCanvasMode(defaults.current.program.defaultTool);
     select(null);
@@ -1698,6 +1745,10 @@ export function useEditor(
     preferences,
     apply,
     deleteSelectedClips,
+    detachSelectedAudio,
+    timelineRange,
+    setTimelineRange,
+    deleteTimeSelection,
     stitchSelectedClips,
     unstitchSelectedClips,
     timelineFocus,

@@ -254,6 +254,7 @@ export default function App() {
       canRedo: editor.canRedo,
       selected: selected.length,
       editable: editable.length > 0,
+      hasTimeRange: !!editor.timelineRange,
       canGroup: editable.length > 1,
       canUngroup: editable.some((clip) => !!clip.groupId),
       canSplit: editable.some(
@@ -275,6 +276,7 @@ export default function App() {
     menuSelection,
     editor.canUndo,
     editor.canRedo,
+    editor.timelineRange,
     busy,
     mediaImporting,
     recordingModalOpen,
@@ -684,6 +686,7 @@ export default function App() {
       return;
     }
     if (["delete", "rippleDelete"].includes(command)) {
+      if (editor.deleteTimeSelection(command === "rippleDelete")) return;
       if (editor.selectedTransition)
         editor.updateTransition(editor.selectedTransition, null);
       else if (editor.selectedBehavior)
@@ -712,7 +715,10 @@ export default function App() {
         paste: () => void paste(),
         selectAll: () =>
           editor.selectMany(editor.project.clips.map((clip) => clip.id)),
-        deselect: () => editor.select(null),
+        deselect: () => {
+          editor.setTimelineRange(null);
+          editor.select(null);
+        },
         split: () =>
           editor.apply((p) =>
             splitSelection(p, editor.selectedIds, editor.playhead),
@@ -722,6 +728,13 @@ export default function App() {
           if (error) toast(error);
         },
         unstitch: () => editor.unstitchSelectedClips(),
+        detachAudio: () => {
+          try {
+            editor.detachSelectedAudio();
+          } catch (error) {
+            toast(String(error).replace(/^Error: /, ""));
+          }
+        },
         group: () => editor.apply((p) => groupSelection(p, editor.selectedIds)),
         ungroup: () =>
           editor.apply((p) => groupSelection(p, editor.selectedIds, true)),
@@ -766,6 +779,11 @@ export default function App() {
         (t) => t.id === selected?.trackId,
       )?.locked;
     const animation = editor.selectedAnimation;
+    if (editor.timelineRange && ["Delete", "Backspace"].includes(event.key)) {
+      event.preventDefault();
+      editor.deleteTimeSelection(event.shiftKey);
+      return;
+    }
     if (
       (event.ctrlKey || event.metaKey) &&
       ((event.altKey && !event.shiftKey && event.key.toLowerCase() === "i") ||
@@ -844,6 +862,7 @@ export default function App() {
         groupSelection(p, editor.selectedIds, event.shiftKey),
       );
     } else if (event.key === "Escape") {
+      editor.setTimelineRange(null);
       editor.select(null);
     } else if (event.code === "Space") {
       event.preventDefault();

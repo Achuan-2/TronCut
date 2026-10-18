@@ -516,7 +516,7 @@ function installHandlers() {
     const clip = project.clips.find((c) => c.id === clipId);
     if (!clip?.assetId) throw new Error("请选中有声音的媒体片段");
     const asset = assetById(clip.assetId);
-    if (!asset.hasAudio) throw new Error("该素材没有音频");
+    if (!asset.hasAudio || clip.audioDetached) throw new Error("该片段没有音频");
     const folder = path.join(app.getPath("userData"), "audio-preview");
     await fs.mkdir(folder, { recursive: true });
     const file = path.join(folder, `${uid()}.wav`);

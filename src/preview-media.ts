@@ -37,7 +37,8 @@ export function createPreviewMediaController(media: HTMLMediaElement) {
     if (!media.preservesPitch) media.preservesPitch = true;
     const volume = Math.min(1, Math.max(0, clip.volume));
     if (media.volume !== volume) media.volume = volume;
-    if (media.muted !== muted) media.muted = muted;
+    const silent = muted || !!clip.audioDetached;
+    if (media.muted !== silent) media.muted = silent;
     const absolute = sourceTimeAt(clip, localTime);
     const target =
       clip.loop && asset.duration > 0 ? absolute % asset.duration : absolute;

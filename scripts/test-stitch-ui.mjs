@@ -88,7 +88,8 @@ try {
   const seek = async (time) => {
     const pane = await page.locator(".timeline-scroll").boundingBox();
     const ruler = await page.locator(".ruler").boundingBox();
-    await page.mouse.click(pane.x + time * 65, ruler.y + 12);
+    // The top of the ruler now contains draggable range handles.
+    await page.mouse.click(pane.x + time * 65, ruler.y + 29);
     await expect
       .poll(async () => Number(await page.getByLabel("播放进度").inputValue()))
       .toBeCloseTo(time, 1);

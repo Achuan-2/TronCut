@@ -23,6 +23,7 @@ export async function renderTimelineAudio(
       !track.muted &&
       ["audio", "video"].includes(clip.kind) &&
       clip.volume > 0 &&
+      !clip.audioDetached &&
       asset?.hasAudio
       ? [{ clip, asset }]
       : [];

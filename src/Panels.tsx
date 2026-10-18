@@ -848,7 +848,7 @@ export function Inspector({ editor }: { editor: Editor }) {
               aria-labelledby="inspector-audio-tab"
               hidden={activeTab !== "audio"}
             >
-              {c.assetId &&
+              {!c.audioDetached && c.assetId &&
                 editor.project.assets.find((a) => a.id === c.assetId)
                   ?.hasAudio && (
                   <>

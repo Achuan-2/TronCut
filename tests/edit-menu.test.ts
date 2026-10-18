@@ -20,6 +20,12 @@ it("菜单按首页、文本编辑、锁定轨道及撤销状态启用编辑命�
   expect(editCommandEnabled("copy", locked)).toBe(true);
   expect(editCommandEnabled("cut", locked)).toBe(false);
   expect(editCommandEnabled("delete", locked)).toBe(false);
+  const range = { ...state, session: true, hasTimeRange: true };
+  expect(editCommandEnabled("delete", range)).toBe(true);
+  expect(editCommandEnabled("rippleDelete", range)).toBe(true);
+  expect(editCommandEnabled("deselect", range)).toBe(true);
+  expect(editCommandEnabled("cut", range)).toBe(false);
+  expect(editCommandEnabled("duplicate", range)).toBe(false);
   expect(editCommandEnabled("undo", { ...locked, canUndo: true })).toBe(true);
   expect(
     editCommandEnabled("split", { ...locked, editable: true, canSplit: true }),

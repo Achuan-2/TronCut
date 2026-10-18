@@ -224,6 +224,7 @@ export const projectSchema = z.object({
         autoResizeText: z.boolean().optional(),
         lockAspectRatio: z.boolean().optional(),
         volume: finite.min(0).max(4),
+        audioDetached: z.boolean().optional(),
         podcast: z.boolean(),
         shape: annotationShapeSchema.optional(),
         shapeStyle: shapeStyleSchema.optional(),

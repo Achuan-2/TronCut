@@ -19,7 +19,7 @@ export default function PreviewMedia(
   const [revision, setRevision] = useState(0);
   const [failed, setFailed] = useState(false);
   const preview =
-    asset.kind === "video" && (previewQuality === "smooth" || !!asset.animated);
+    clip.kind === "video" && (previewQuality === "smooth" || !!asset.animated);
   useEffect(() => {
     setAvailable(false);
     setRevision(0);

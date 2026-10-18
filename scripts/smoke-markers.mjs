@@ -110,7 +110,7 @@ try {
     .poll(() =>
       page
         .locator(".ruler-playhead")
-        .evaluate((node) => parseFloat(node.style.left)),
+        .evaluate((node) => new DOMMatrix(getComputedStyle(node).transform).m41),
     )
     .toBeCloseTo(2 * zoom);
 
@@ -160,7 +160,7 @@ try {
     .poll(() =>
       page
         .locator(".ruler-playhead")
-        .evaluate((node) => parseFloat(node.style.left)),
+        .evaluate((node) => new DOMMatrix(getComputedStyle(node).transform).m41),
     )
     .toBeCloseTo(2 * zoom);
 

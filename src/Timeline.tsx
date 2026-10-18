@@ -1,5 +1,9 @@
 import { trimClip } from "../shared/clip-trim";
 import {
+  TimelineRangeHandles,
+  TimelineRangeOverlay,
+} from "./TimelineRangeSelection";
+import {
   libraryAssetMime,
   libraryAssetDragSchema,
   type LibraryAssetDrag,
@@ -165,19 +169,13 @@ interface Marquee {
 function TimelinePlayheadCursor({
   editor,
   zoom,
-  placement,
 }: {
   editor: Editor;
   zoom: number;
-  placement: "ruler" | "body";
 }) {
   const playhead = useEditorPlayhead(editor);
   const style = { transform: `translateX(${playhead * zoom}px)` };
-  return placement === "ruler" ? (
-    <div className="ruler-playhead" style={style}>
-      <span />
-    </div>
-  ) : (
+  return (
     <div className="playhead" style={style}>
       <i />
     </div>
@@ -578,6 +576,10 @@ export default function Timeline({
     [project.clips, project.tracks, editor.selectedIds],
   );
   const deleteSelection = (ripple = false) => {
+    if (editor.deleteTimeSelection(ripple)) {
+      setDeleteMenu(false);
+      return;
+    }
     if (editor.selectedTransition) {
       editor.updateTransition(editor.selectedTransition, null);
       setDeleteMenu(false);
@@ -807,8 +809,10 @@ export default function Timeline({
           </button>
           <div className="delete-control" ref={deleteControl}>
             <button
-              title="删除片段（Delete）"
-              disabled={!editableSelection.length}
+              title={editor.timelineRange
+                ? "删除所选范围（Delete）"
+                : "删除片段（Delete）"}
+              disabled={!editableSelection.length && !editor.timelineRange}
               onClick={() => deleteSelection()}
             >
               <Trash2 size={17} />
@@ -819,7 +823,7 @@ export default function Timeline({
               title="删除选项"
               aria-haspopup="menu"
               aria-expanded={deleteMenu}
-              disabled={!editableSelection.length}
+              disabled={!editableSelection.length && !editor.timelineRange}
               onClick={(event) => {
                 const bounds = event.currentTarget.getBoundingClientRect();
                 setDeletePosition({
@@ -846,7 +850,7 @@ export default function Timeline({
                 >
                   <button
                     role="menuitem"
-                    disabled={!editableSelection.length}
+                    disabled={!editableSelection.length && !editor.timelineRange}
                     onClick={() => deleteSelection()}
                   >
                     <Trash2 size={14} />
@@ -854,7 +858,7 @@ export default function Timeline({
                   </button>
                   <button
                     role="menuitem"
-                    disabled={!editableSelection.length}
+                    disabled={!editableSelection.length && !editor.timelineRange}
                     onClick={() => deleteSelection(true)}
                   >
                     <Trash2 size={14} />
@@ -1327,10 +1331,10 @@ export default function Timeline({
                   }}
                 />
               )}
-              <TimelinePlayheadCursor
+              <TimelineRangeHandles
                 editor={editor}
                 zoom={zoom}
-                placement="ruler"
+                maxTime={duration}
               />
             </div>
             {fileDrop && (
@@ -1905,6 +1909,7 @@ export default function Timeline({
                               </div>
                             )}
                             {editor.preferences.program.waveforms &&
+                              !c.audioDetached &&
                               c.assetId &&
                               assetsById.get(c.assetId)?.hasAudio &&
                               (() => {
@@ -2156,8 +2161,8 @@ export default function Timeline({
             <TimelinePlayheadCursor
               editor={editor}
               zoom={zoom}
-              placement="body"
             />
+            <TimelineRangeOverlay editor={editor} zoom={zoom} />
           </div>
         </div>
       </div>
@@ -2168,6 +2173,9 @@ export default function Timeline({
           <span className="separator-dot">·</span>Shift+拖动标尺 区域标记
         </span>
         <span>
+          {editor.timelineRange && (
+            <>范围 {timeLabel(editor.timelineRange.start)} – {timeLabel(editor.timelineRange.end)} · </>
+          )}
           {timeline.clips.length} 个片段 · 已选{" "}
           {
             timeline.clips.filter((clip) =>

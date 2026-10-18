@@ -36,6 +36,7 @@ export const editMenuStateSchema = z.object({
   canRedo: z.boolean(),
   selected: z.number().int().nonnegative(),
   editable: z.boolean(),
+  hasTimeRange: z.boolean().optional(),
   canGroup: z.boolean(),
   canUngroup: z.boolean(),
   canSplit: z.boolean(),
@@ -65,6 +66,9 @@ export function editCommandEnabled(id: EditCommand, state: EditMenuState) {
   if (id === "split") return state.canSplit;
   if (id === "stitch") return !!state.canStitch;
   if (id === "unstitch") return !!state.canUnstitch;
-  if (id === "copy" || id === "deselect") return state.selected > 0;
+  if (id === "delete" || id === "rippleDelete")
+    return state.editable || !!state.hasTimeRange;
+  if (id === "deselect") return state.selected > 0 || !!state.hasTimeRange;
+  if (id === "copy") return state.selected > 0;
   return state.editable;
 }
