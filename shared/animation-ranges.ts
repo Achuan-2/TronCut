@@ -50,6 +50,60 @@ export function sameTransform(
   );
 }
 
+/** Retain animation endpoints, not standalone frames left in static intervals.
+ * Equal endpoints of explicitly added animations are still real boundaries.
+ */
+export function compactAnimationFrames<
+  T extends Pick<Clip, "transform" | "keyframes"> & Partial<Pick<Clip, "rotation">>,
+>(clip: T): T {
+  if (!clip.keyframes.length) return clip;
+  // Recorded paths and zoom/pan carry additional sampled channels. Their
+  // intermediate samples belong to the path, even when object values match.
+  if (
+    clip.keyframes.some(
+      (frame) => frame.recordingZoom || frame.recordingSegment || frame.zoomPan,
+    )
+  )
+    return clip;
+  const frames = [...clip.keyframes].sort((a, b) => a.time - b.time);
+  const points =
+    frames[0].time > 0
+      ? [{ time: 0, value: clip.transform }, ...frames]
+      : frames;
+  const endpoints = new Set<number>();
+  for (let i = 1; i < points.length; i++) {
+    const a = points[i - 1],
+      b = points[i];
+    const unchanged = sameTransform(
+      a.value,
+      b.value,
+      clip.transform.rotation ?? clip.rotation ?? 0,
+      clip.transform,
+    );
+    // Coincident, different states describe a legacy discontinuity, not a hold.
+    if (b.time === a.time && !unchanged) return clip;
+    if (b.time > a.time && (b.animation || !unchanged)) {
+      endpoints.add(i - 1);
+      endpoints.add(i);
+    }
+  }
+  const keyframes = points.filter((_, index) => endpoints.has(index));
+  if (
+    keyframes.length === clip.keyframes.length &&
+    keyframes.every((frame, index) => frame === clip.keyframes[index])
+  )
+    return clip;
+  return {
+    ...clip,
+    // If a redundant first frame supplied the initial state, keep that state
+    // on the clip before removing it. This also preserves trimmed timelines.
+    transform: endpoints.has(0)
+      ? clip.transform
+      : { ...clip.transform, ...points[0].value },
+    keyframes,
+  };
+}
+
 // The start state belongs to the preceding animation's end, including across
 // a hold. With no preceding animation, it belongs to the initial state.
 export function animationEditTarget(

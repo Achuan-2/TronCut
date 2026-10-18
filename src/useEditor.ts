@@ -82,6 +82,7 @@ import { annotationClip, type AnnotationTemplate } from "../shared/annotations";
 import {
   animationEditTarget,
   animationRanges,
+  compactAnimationFrames,
   drawingAnimationRanges,
   type AnimationRange,
 } from "../shared/animation-ranges";
@@ -363,7 +364,12 @@ export function useEditor(
       const before = current.current,
         result = typeof next === "function" ? next(before) : next;
       const tracks = numberTracks(result.tracks);
-      const fittedClips = result.clips.map(fitBehaviorDuration);
+      const previousClips = new Set(before.clips);
+      const fittedClips = result.clips.map((clip) =>
+        fitBehaviorDuration(
+          previousClips.has(clip) ? clip : compactAnimationFrames(clip),
+        ),
+      );
       const clips = fittedClips.some(
         (clip, index) => clip !== result.clips[index],
       )

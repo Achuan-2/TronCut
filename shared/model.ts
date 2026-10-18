@@ -68,7 +68,11 @@ export const cameraSchema = z.object({
   transform: cameraTransformSchema,
   keyframes: z
     .array(
-      z.object({ time: finite.nonnegative(), value: cameraTransformSchema }),
+      z.object({
+        time: finite.nonnegative(),
+        value: cameraTransformSchema,
+        animation: z.literal(true).optional(),
+      }),
     )
     .max(10000),
 });

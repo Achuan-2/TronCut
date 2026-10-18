@@ -6,6 +6,7 @@ import {
 } from "./model";
 import { clampCamera } from "./canvas";
 import { setTransform, transformAt } from "./editor";
+import { compactAnimationFrames } from "./animation-ranges";
 import { isTrackActive } from "./tracks";
 
 export function zoomPanVideos(project: Project, time: number) {
@@ -94,6 +95,9 @@ export function setVideoZoomPan(
           const before = clip.keyframes.find(
             (original) => original.time === frame.time,
           );
+          // Zoom/pan owns a sampled channel. Keep existing object placeholders,
+          // but do not introduce new ones that would survive clearing the view.
+          frame = { ...frame, animation: before?.animation };
           if (
             Math.abs(frame.time - timeInCurve) < 1e-6 ||
             (before && before.value !== frame.value && frame.time > timeInCurve)
@@ -126,7 +130,7 @@ export function clearVideoZoomPan(project: Project): Project {
       )
         return clip;
       const first = [...clip.keyframes].sort((a, b) => a.time - b.time)[0];
-      return {
+      return compactAnimationFrames({
         ...clip,
         transform:
           first?.time === 0
@@ -142,7 +146,7 @@ export function clearVideoZoomPan(project: Project): Project {
             ),
           };
         }),
-      };
+      });
     }),
   };
 }

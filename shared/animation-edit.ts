@@ -2,6 +2,7 @@ import type { Clip, Transform } from "./model";
 import type { AnimationEasing } from "./easing";
 import {
   animationRanges,
+  compactAnimationFrames,
   sameTransform,
   recordingSegments,
   type AnimationRange,
@@ -34,6 +35,7 @@ export function addAnimationKeyframe(
     localTime > clip.duration
   )
     return null;
+  clip = compactAnimationFrames(clip);
   const localEnd =
     localTime < 1 / fps ? Math.min(duration, clip.duration) : localTime;
   const offset = clip.animationOffset ?? 0;
@@ -184,7 +186,7 @@ export function removeAnimation(clip: Clip, range: AnimationRange): Clip {
     held.add(pair.frames[i]);
   // Hold the starting state instead of the removed motion. Updating following
   // hold frames prevents a replacement arrow from appearing in the gap.
-  return {
+  return compactAnimationFrames({
     ...clip,
     keyframes: clip.keyframes.map((frame) =>
       held.has(frame)
@@ -198,7 +200,7 @@ export function removeAnimation(clip: Clip, range: AnimationRange): Clip {
           }
         : frame,
     ),
-  };
+  });
 }
 
 export function pasteAnimation(
@@ -237,6 +239,7 @@ export function pasteAnimation(
     )
   )
     return clip;
+  clip = compactAnimationFrames(clip);
   const offset = clip.animationOffset ?? 0;
   const start = localStart + offset,
     end = localEnd + offset;

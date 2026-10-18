@@ -99,7 +99,9 @@ try {
   await expect.poll(center).toBeCloseTo(original + 100, 0);
   const moved = await center();
   await expect(arrows).toHaveCount(1);
-  await seek(2.45);
+  await expect(arrows).toHaveAttribute("data-start", "1.6");
+  await expect(arrows).toHaveAttribute("data-end", "2.6");
+  await seek(2.1);
   await expect.poll(center).toBeCloseTo((original + moved) / 2, 0);
   for (const time of [2.75, 2.9, 3.5, 4.5]) {
     await seek(time);
@@ -150,6 +152,7 @@ try {
     ),
   );
   const frames = saved.clips[0].keyframes;
+  expect(frames.map((frame) => frame.time)).toEqual([1.6, 2.6]);
   const endpoint = frames.find((frame) => Math.abs(frame.time - 2.6) < 0.001);
   expect(endpoint.value.x).toBeGreaterThan(0.5);
   expect(

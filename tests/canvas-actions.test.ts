@@ -152,7 +152,7 @@ describe("画布右键操作", () => {
     expect(next.style!.color).toBe("#123456");
     expect(next.style).not.toBe(source.style);
     expect(next.transform.scale).toBe(0.7);
-    expect(next.keyframes[0].value.scale).toBe(0.7);
+    expect(next.keyframes).toEqual([]);
     project.tracks.find((track) => track.id === "video")!.locked = true;
     expect(pasteClipProperties(project, [target.id], source)).toBe(project);
     expect(

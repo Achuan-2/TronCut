@@ -114,8 +114,9 @@ describe("明确选择动画关键帧后编辑", () => {
     const moved = setTransform(clip, { x: 0.8, y: 0.6 }, 2.6, true);
     expect(
       animationRanges(moved).map(({ start, end }) => [start, end]),
-    ).toEqual([[2.3, 2.6]]);
-    expect(transformAt(moved, 2.45).x).toBeCloseTo(0.65);
+    ).toEqual([[1.6, 2.6]]);
+    expect(moved.keyframes.map((frame) => frame.time)).toEqual([1.6, 2.6]);
+    expect(transformAt(moved, 2.1).x).toBeCloseTo(0.65);
     for (const time of [2.6, 2.75, 2.9, 3.5, 4.5])
       expect(transformAt(moved, time)).toMatchObject({ x: 0.8, y: 0.6 });
     const adjusted = setTransform(moved, { x: 0.9 }, 2.6, true);
@@ -156,7 +157,11 @@ describe("明确选择动画关键帧后编辑", () => {
       );
       expect(transformAt(moved, 3).x).toBe(0.8);
       expect(transformAt(moved, 3.5).x).toBe(0.8);
-      expect(moved.keyframes.slice(-2)).toEqual(clip.keyframes.slice(-2));
+      expect(moved.keyframes.find((frame) => frame.time === 5)).toEqual(
+        clip.keyframes[2],
+      );
+      if (!placeholder)
+        expect(moved.keyframes.at(-1)).toEqual(clip.keyframes[3]);
       expect(transformAt(moved, 4.5).x).toBeCloseTo(placeholder ? 0.5 : 0.2);
     },
   );

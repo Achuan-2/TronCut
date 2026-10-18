@@ -8,7 +8,10 @@ import {
 } from "../shared/model";
 import { transformAt } from "../shared/editor";
 import { animationRanges } from "../shared/animation-ranges";
-import { removeAnimation } from "../shared/animation-edit";
+import {
+  addAnimationKeyframe,
+  removeAnimation,
+} from "../shared/animation-edit";
 import {
   clearVideoZoomPan,
   setVideoZoomPan,
@@ -94,6 +97,7 @@ describe("缩放与平移创建视频片段动画", () => {
     expect(zoomPanAt({ ...zoomed, clips: [removed] }, 4).scale).toBe(1);
     const cleared = clearVideoZoomPan(zoomed);
     expect(animationRanges(cleared.clips[0])).toHaveLength(0);
+    expect(cleared.clips[0].keyframes).toEqual([]);
     expect(transformAt(cleared.clips[0], 4).x).toBeCloseTo(0.25);
     expect(transformAt(cleared.clips[0], 4).scale).toBeCloseTo(0.4);
     expect(cleared.clips[0].keyframes.every((frame) => !frame.zoomPan)).toBe(
@@ -120,5 +124,16 @@ describe("缩放与平移创建视频片段动画", () => {
     expect(empty).toBe(p);
     p.tracks.find((track) => track.id === "video")!.hidden = true;
     expect(setVideoZoomPan(p, { scale: 2 }, 4)).toBe(p);
+  });
+  it("清除缩放平移时仍保留用户原先明确添加的对象动画", () => {
+    const project = fixture();
+    project.clips[0] = addAnimationKeyframe(project.clips[0], 4, 30)!.clip;
+    const zoomed = setVideoZoomPan(project, { scale: 2 }, 4);
+    const cleared = clearVideoZoomPan(zoomed);
+    expect(
+      animationRanges(cleared.clips[0]).map(({ start, end }) => [start, end]),
+    ).toEqual([[3, 4]]);
+    expect(transformAt(cleared.clips[0], 4).scale).toBeCloseTo(0.4);
+    expect(cleared.clips[0].keyframes.at(-1)?.animation).toBe(true);
   });
 });

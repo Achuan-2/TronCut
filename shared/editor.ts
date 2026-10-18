@@ -11,7 +11,11 @@ import {
   newTrack,
   numberTracks,
 } from "./model";
-import { sameTransform, recordingSegments } from "./animation-ranges";
+import {
+  compactAnimationFrames,
+  sameTransform,
+  recordingSegments,
+} from "./animation-ranges";
 import { easeProgress } from "./easing";
 import {
   normalizeRotationAxes,
@@ -230,26 +234,29 @@ export function setTransform<
   animationDuration = 1,
 ): T {
   if (!auto)
-    return {
+    return compactAnimationFrames({
       ...clip,
       transform: { ...clip.transform, ...patch },
       keyframes: clip.keyframes.map((k) => ({
         ...k,
         value: { ...k.value, ...patch },
       })),
-    };
+    });
+  clip = compactAnimationFrames(clip);
   const local = Math.max(0, Math.min(clip.duration, localTime));
   const time = Math.max(0, local + (clip.animationOffset ?? 0));
   const value = transformAt(clip, local);
+  if (sameTransform(value, { ...value, ...patch }, 0, clip.transform)) return clip;
   const existing = clip.keyframes.find(
     (frame) => Math.abs(frame.time - time) < 1e-6,
   );
-  if (existing) return setKeyframeTransform(clip, patch, existing.time);
+  if (existing)
+    return compactAnimationFrames(setKeyframeTransform(clip, patch, existing.time));
   const keyframes = clip.keyframes.filter(
     (k) => Math.abs(k.time - time) > 0.001,
   );
-  // New automatic animations end at the playhead and last one second. A hold
-  // frame separates them from preceding motion; ongoing motion is not replaced.
+  // New automatic animations end at the playhead. Only actual animation
+  // endpoints constrain their start; redundant static frames have been removed.
   const previous = keyframes
     .filter((frame) => frame.time < time)
     .sort((a, b) => a.time - b.time)
@@ -267,14 +274,20 @@ export function setTransform<
       time: start,
       value: transformAt(clip, start - (clip.animationOffset ?? 0)),
     });
-  keyframes.push({ time, value });
+  keyframes.push({
+    time,
+    value,
+    ...(start < time ? { animation: true as const } : {}),
+  });
   // Insert the sampled state first so endpoint editing can carry the change
   // through subsequent hold frames, stopping at the next actual animation.
   // Leaving those holds unchanged would create an unintended return motion.
-  return setKeyframeTransform(
-    { ...clip, keyframes: keyframes.sort((a, b) => a.time - b.time) },
-    patch,
-    time,
+  return compactAnimationFrames(
+    setKeyframeTransform(
+      { ...clip, keyframes: keyframes.sort((a, b) => a.time - b.time) },
+      patch,
+      time,
+    ),
   );
 }
 // An explicitly selected endpoint edits one existing frame. It must never fall
