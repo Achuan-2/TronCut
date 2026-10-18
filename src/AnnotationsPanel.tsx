@@ -236,11 +236,8 @@ export default function AnnotationsPanel({ editor }: { editor: Editor }) {
             className="wide-button"
             aria-pressed={editor.canvasMode === "draw"}
             onClick={() => {
-              editor.setPlaying(false);
-              if (editor.editingTextId)
-                editor.endTextEdit(editor.editingTextId);
               if (editor.canvasMode === "draw") editor.finishDrawing();
-              else editor.setCanvasMode("draw");
+              else editor.activatePen();
             }}
           >
             {editor.canvasMode === "draw" ? "完成绘制" : "启用涂鸦笔"}

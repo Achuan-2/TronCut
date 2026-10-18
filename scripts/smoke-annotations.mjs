@@ -175,12 +175,18 @@ try {
     { steps: 15 },
   );
   await page.mouse.up();
+  await page
+    .locator(".canvas-drawing-actions")
+    .getByRole("button", { name: "完成绘制", exact: true })
+    .click();
   saved = await save();
   const freehand = saved.clips.find((clip) => clip.shape === "freehand");
-  assert(freehand.drawing.enabled && freehand.drawing.points.length > 15);
+  assert(
+    freehand.drawing.enabled && freehand.drawing.strokes[0].points.length > 15,
+  );
   assert.equal(freehand.shapeStyle.strokeWidth, 7);
   assert(
-    freehand.drawing.points.every(
+    freehand.drawing.strokes[0].points.every(
       (point) => point.x >= 0 && point.x <= freehand.shapeSize.width,
     ),
   );

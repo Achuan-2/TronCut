@@ -111,7 +111,12 @@ import { usePresetLibrary } from "./usePresetLibrary";
 import { animationDropTarget } from "../shared/animation-drag";
 import { shapeSize } from "../shared/annotation-style";
 import type { DrawingStroke } from "../shared/annotation-style";
-import { freehandAnnotation, type PenSettings } from "../shared/freehand";
+import {
+  drawingStrokesToCanvas,
+  fitFreehandStrokes,
+  freehandAnnotation,
+  type PenSettings,
+} from "../shared/freehand";
 import { createPlaybackStore } from "./playback-store";
 import { stitchClips, stitchSelectionError, unstitchClips } from "../shared/stitch";
 import {
@@ -192,10 +197,12 @@ export function useEditor(
     duration: 1,
   });
   const [penDraft, setPenDraft] = useState<DrawingStroke[]>([]);
+  const [penTargetId, setPenTargetId] = useState<string | null>(null);
   const penStart = useRef<number | null>(null);
   useEffect(() => {
     if (canvasMode !== "draw") {
       setPenDraft([]);
+      setPenTargetId(null);
       penStart.current = null;
     }
   }, [canvasMode]);
@@ -1118,21 +1125,70 @@ export function useEditor(
     setPenDraft((strokes) => [...strokes, stroke]);
   };
   const finishDrawing = () => {
-    const result = freehandAnnotation(penDraft, penSettings, project.canvas);
-    if (result)
-      addAnnotation(
-        result.template,
-        penStart.current ?? playback.getSnapshot(),
-        undefined,
-        result.position,
+    const target = penTargetId
+      ? current.current.clips.find((clip) => clip.id === penTargetId)
+      : undefined;
+    if (target && penDraft.length) {
+      const canvas = current.current.canvas;
+      updateClip(target.id, (clip) =>
+        fitFreehandStrokes(
+          clip,
+          penDraft,
+          canvas,
+          Math.max(0, Math.min(clip.duration, playhead - clip.start)),
+          penSettings.width,
+        ),
       );
+    } else {
+      const result = freehandAnnotation(penDraft, penSettings, project.canvas);
+      if (result)
+        addAnnotation(
+          result.template,
+          penStart.current ?? playback.getSnapshot(),
+          undefined,
+          result.position,
+        );
+    }
     setCanvasMode("select");
   };
   const activatePen = () => {
     setPlaying(false);
     if (editingTextId) endTextEdit(editingTextId);
-    setCanvasMode("draw");
     setPenToolRequest((value) => value + 1);
+    if (canvasMode === "draw") return;
+    setCanvasMode("draw");
+    const target = selectedId
+      ? current.current.clips.find((clip) => clip.id === selectedId)
+      : undefined;
+    const track = target
+      ? current.current.tracks.find((item) => item.id === target.trackId)
+      : undefined;
+    if (
+      target?.kind === "shape" &&
+      target.shape === "freehand" &&
+      target.drawing &&
+      !track?.locked &&
+      !track?.hidden
+    ) {
+      const time =
+        playhead >= target.start && playhead < target.start + target.duration
+          ? playhead
+          : target.start;
+      if (time !== playhead) seek(time);
+      setPenDraft(
+        drawingStrokesToCanvas(
+          target,
+          current.current.canvas,
+          Math.max(0, Math.min(target.duration, time - target.start)),
+        ),
+      );
+      setPenTargetId(target.id);
+      penStart.current = null;
+    } else {
+      setPenDraft([]);
+      setPenTargetId(null);
+      penStart.current = null;
+    }
   };
   const addRoundedCorners = useCallback(
     (id?: string) => {
@@ -1641,6 +1697,7 @@ export function useEditor(
     setCanvasMode,
     penSettings,
     penDraft,
+    penTargetId,
     setPenDraft,
     addPenStroke,
     finishDrawing,

@@ -1883,6 +1883,15 @@ fieldset:disabled {
   background: var(--accent);
   color: #14372a;
 }
+.canvas-pen-button {
+  width: 31px;
+  height: 30px;
+  padding: 5px;
+}
+.canvas-pen-button.active {
+  background: var(--accent);
+  color: #14372a;
+}
 .canvas-toolbar select {
   width: 116px;
   height: 29px;

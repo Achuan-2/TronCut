@@ -8,6 +8,8 @@ import {
   shapeStyleSchema,
 } from "../shared/annotation-style";
 import {
+  drawingStrokesToCanvas,
+  fitFreehandStrokes,
   freehandAnnotation,
   penBrushes,
   type PenSettings,
@@ -23,7 +25,11 @@ import {
   setAnimationEasing,
   snapshotAnimation,
 } from "../shared/animation-edit";
-import { createProject, validateProject } from "../shared/model";
+import {
+  createProject,
+  defaultTransform,
+  validateProject,
+} from "../shared/model";
 import { changeSpeed, splitClip, transformAt } from "../shared/editor";
 
 const settings: PenSettings = {
@@ -223,4 +229,80 @@ describe("多笔涂鸦与绘制动画", () => {
     expect(alpha(63, 79)).toBeGreaterThan(0);
     expect(alpha(63, 44)).toBe(0);
   });
+});
+
+it("已有涂鸦进入画笔后追加路径，重新归一化包围框仍保持原有画面位置", () => {
+  const canvas = { width: 640, height: 360 };
+  const style = shapeStyleSchema.parse({
+    stroke: settings.color,
+    strokeWidth: settings.width,
+    brush: settings.brush,
+    fillEnabled: false,
+  });
+  const initial = [
+    {
+      points: [
+        { x: 100, y: 80 },
+        { x: 200, y: 140 },
+      ],
+      style,
+    },
+  ];
+  const result = freehandAnnotation(initial, settings, canvas)!;
+  const clip = {
+    ...annotationClip(result.template, "titles", 0),
+    id: "doodle",
+    duration: 5,
+    transform: {
+      ...defaultTransform,
+      x: result.position.x,
+      y: result.position.y,
+    },
+  };
+  const before = drawingStrokesToCanvas(clip, canvas, 0);
+  for (let index = 0; index < before[0].points.length; index++) {
+    expect(before[0].points[index].x).toBeCloseTo(initial[0].points[index].x);
+    expect(before[0].points[index].y).toBeCloseTo(initial[0].points[index].y);
+  }
+  const transformed = {
+    ...clip,
+    transform: {
+      ...clip.transform,
+      scale: 0.75,
+      rotation: 25,
+      scaleX: 1.2,
+    },
+  };
+  const transformedBefore = drawingStrokesToCanvas(transformed, canvas, 0);
+  const appended = [
+    ...transformedBefore,
+    {
+      points: [
+        { x: 500, y: 300 },
+        { x: 580, y: 100 },
+      ],
+      style,
+    },
+  ];
+  const updated = fitFreehandStrokes(
+    transformed,
+    appended,
+    canvas,
+    0,
+    settings.width,
+  );
+  expect(updated.drawing?.strokes).toHaveLength(2);
+  expect(updated.shapeSize!.width).toBeGreaterThan(clip.shapeSize!.width);
+  expect(updated.shapeSize!.height).toBeGreaterThan(clip.shapeSize!.height);
+
+  const roundTrip = drawingStrokesToCanvas(updated, canvas, 0);
+  for (let stroke = 0; stroke < appended.length; stroke++)
+    for (let point = 0; point < appended[stroke].points.length; point++) {
+      expect(roundTrip[stroke].points[point].x).toBeCloseTo(
+        appended[stroke].points[point].x,
+      );
+      expect(roundTrip[stroke].points[point].y).toBeCloseTo(
+        appended[stroke].points[point].y,
+      );
+    }
 });

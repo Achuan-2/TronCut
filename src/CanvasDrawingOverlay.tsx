@@ -152,7 +152,9 @@ export default function CanvasDrawingOverlay({ editor }: { editor: Editor }) {
         onPointerDown={(event) => event.stopPropagation()}
         onClick={(event) => event.stopPropagation()}
       >
-        <span>已绘制 {editor.penDraft.length} 笔</span>
+        <span>
+          {editor.penTargetId ? "继续编辑" : "已绘制"} {editor.penDraft.length} 笔
+        </span>
         <button
           disabled={!editor.penDraft.length || !!draft.length}
           onClick={() => editor.setPenDraft((strokes) => strokes.slice(0, -1))}

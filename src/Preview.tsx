@@ -190,6 +190,10 @@ function PreviewLayerImpl({
     );
   clip = visualClipAt(clip, transform);
   const editing = interactive && editor.editingTextId === clip.id;
+  const penEditing =
+    interactive &&
+    editor.canvasMode === "draw" &&
+    editor.penTargetId === clip.id;
   useEffect(() => {
     if (
       editing &&
@@ -390,7 +394,7 @@ function PreviewLayerImpl({
       data-preview-animated={animated ? "1" : "0"}
       data-preview-preloading={preloading ? "1" : undefined}
       style={
-        preloading
+        preloading || penEditing
           ? { ...style, visibility: "hidden", pointerEvents: "none" }
           : style
       }
@@ -805,7 +809,10 @@ function PreviewLayerImpl({
             dangerouslySetInnerHTML={{
               __html: annotationSvgBody(
                 clip,
-                selectedObjectPart && !editor.playing && !matteSource
+                selectedObjectPart &&
+                  !editor.playing &&
+                  !matteSource &&
+                  editor.canvasMode === "draw"
                   ? 1
                   : drawingProgress(clip, localTime),
               ),
