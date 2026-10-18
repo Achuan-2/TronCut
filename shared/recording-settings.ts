@@ -76,6 +76,7 @@ export const cameraStyleSchema = z.object({
   maskX: finite.min(0).max(1).default(0.5),
   maskY: finite.min(0).max(1).default(0.5),
   maskSize: finite.min(0.2).max(1).default(0.9),
+  mirror: z.boolean().default(false),
 });
 export type CameraStyle = z.infer<typeof cameraStyleSchema>;
 export const defaultCameraStyle: CameraStyle = cameraStyleSchema.parse({});

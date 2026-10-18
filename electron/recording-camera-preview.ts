@@ -14,7 +14,10 @@ const camera = document.querySelector('#camera');
 const cameraClipPath = ${cameraClipPath.toString()};
 let cameraStyle, cameraUrl;
 const updateMask = () => {
-  if (cameraStyle && camera.naturalWidth) camera.style.clipPath = cameraClipPath(cameraStyle, camera.naturalWidth, camera.naturalHeight);
+  if (cameraStyle && camera.naturalWidth) {
+    camera.style.clipPath = cameraClipPath(cameraStyle, camera.naturalWidth, camera.naturalHeight);
+    camera.style.transform = cameraStyle.mirror ? 'scaleX(-1)' : '';
+  }
 };
 camera.onload = updateMask;
 window.recordingControls.onState(state => { cameraStyle = state.cameraStyle; updateMask(); });

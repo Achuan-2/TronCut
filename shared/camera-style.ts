@@ -24,8 +24,11 @@ export function cameraClipPath(
 ) {
   if (style.preset === "rectangle") return "none";
   const diameter = Math.min(width, height) * style.maskSize;
+  // The media element is mirrored with a CSS transform. Mirror the local
+  // clip coordinates as well so the mask keeps its configured screen position.
+  const maskX = style.mirror ? 1 - style.maskX : style.maskX;
   const mask = {
-    x: style.maskX,
+    x: maskX,
     y: style.maskY,
     width: diameter / width,
     height: diameter / height,

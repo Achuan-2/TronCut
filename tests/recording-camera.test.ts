@@ -8,6 +8,7 @@ import { addRecordedAssets } from "../shared/recording";
 import { createProject, validateProject, type Asset } from "../shared/model";
 import { groupSelection, splitSelection, moveClips } from "../shared/timeline";
 import { trimClip } from "../shared/clip-trim";
+import { visualFilters } from "../shared/effects";
 
 const asset: Asset = {
   id: "screen",
@@ -31,12 +32,14 @@ it("旧录屏配置补上摄像头默认值，预设蒙版保持正圆并可调�
     maskX: 0.5,
     maskY: 0.5,
     maskSize: 0.9,
+    mirror: false,
   });
   const style = {
     preset: "circle" as const,
     maskX: 0.4,
     maskY: 0.6,
     maskSize: 0.8,
+    mirror: false,
   };
   const mask = cameraMask(style, 1920, 1080);
   expect(mask.width * 1920).toBeCloseTo(mask.height * 1080);
@@ -64,6 +67,7 @@ it("摄像头导入为独立图层且保留可编辑蒙版，录屏移动拆分�
           maskX: 0.3,
           maskY: 0.6,
           maskSize: 0.7,
+          mirror: true,
         },
       },
       0,
@@ -76,6 +80,8 @@ it("摄像头导入为独立图层且保留可编辑蒙版，录屏移动拆分�
     x: 0.3,
     y: 0.6,
   });
+  expect(webcam.effects).toMatchObject({ flipX: true });
+  expect(visualFilters(webcam, asset.width, asset.height)).toContain("hflip");
   expect(
     splitSelection(project, [screen.id], 5).clips.filter(
       (clip) => clip.assetId === "camera",

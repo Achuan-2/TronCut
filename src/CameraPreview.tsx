@@ -54,7 +54,10 @@ export default function CameraPreview({
         autoPlay
         muted
         playsInline
-        style={{ clipPath: cameraClipPath(style, size.width, size.height) }}
+        style={{
+          clipPath: cameraClipPath(style, size.width, size.height),
+          transform: style.mirror ? "scaleX(-1)" : undefined,
+        }}
         onLoadedMetadata={(event) =>
           setSize({
             width: event.currentTarget.videoWidth || 1920,

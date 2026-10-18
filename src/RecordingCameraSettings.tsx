@@ -27,6 +27,17 @@ export default function RecordingCameraSettings({
           if (!disabled) onChange({ ...style, maskX, maskY });
         }}
       />
+      <label className="check-field">
+        <input
+          type="checkbox"
+          aria-label="镜像摄像头画面"
+          checked={style.mirror}
+          onChange={(event) =>
+            onChange({ ...style, mirror: event.target.checked })
+          }
+        />
+        镜像画面
+      </label>
       {error && (
         <p className="error-box">
           {error}
@@ -78,7 +89,7 @@ export default function RecordingCameraSettings({
       )}
       <p className="field-help">
         {style.preset !== "rectangle" ? "可在预览中拖动调整蒙版位置。" : ""}
-        摄像头单独保存为独立图层，录制后仍可调整蒙版。
+        摄像头单独保存为独立图层，录制后仍可调整翻转和蒙版。
       </p>
     </fieldset>
   );

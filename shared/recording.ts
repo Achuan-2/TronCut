@@ -8,6 +8,7 @@ import {
 } from "./model";
 import type { RecordingSettings } from "./recording-settings";
 import { cameraMask } from "./camera-style";
+import { defaultEffects } from "./effects";
 import {
   recordingCameraFrames,
   sceneRecordingFrames,
@@ -138,6 +139,9 @@ export function addRecordedAssets(
               mask: cameraMask(settings.cameraStyle, asset.width, asset.height),
             },
           }
+        : {}),
+      ...(kind === "camera" && settings.cameraStyle.mirror
+        ? { effects: { ...defaultEffects, flipX: true } }
         : {}),
     };
     if (kind === "screen" && settings.autoZoom)

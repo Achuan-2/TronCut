@@ -113,6 +113,13 @@ try {
   await page.getByLabel("蒙版垂直位置", { exact: true }).fill("55");
   await page.getByLabel("蒙版大小", { exact: true }).fill("80");
   await expect(preview).toHaveCSS("clip-path", /ellipse.*40% 55%/);
+  const mirror = page.getByLabel("镜像摄像头画面", { exact: true });
+  await expect(mirror).not.toBeChecked();
+  await mirror.check();
+  await expect(preview).toHaveCSS("transform", "matrix(-1, 0, 0, 1, 0, 0)");
+  // The element is transformed, so its local mask moves to 60% to stay at 40%
+  // on screen, matching the fixed mask position used after recording.
+  await expect(preview).toHaveCSS("clip-path", /ellipse.*60% 55%/);
   await page.screenshot({ path: path.join(root, "settings-preview.png") });
   // Closing settings releases the live device, and reopening restores the preset.
   await preview.evaluate((video) => {
@@ -133,6 +140,9 @@ try {
   await expect(page.getByLabel("蒙版水平位置", { exact: true })).toHaveValue(
     "40",
   );
+  await expect(
+    page.getByLabel("镜像摄像头画面", { exact: true }),
+  ).toBeChecked();
   await page
     .locator(`.capture-sources > button[data-source-id="${target}"]`)
     .click();
@@ -203,7 +213,8 @@ try {
   await expect
     .poll(() => camera.evaluate((image) => image.naturalWidth))
     .toBe(320);
-  await expect(camera).toHaveCSS("clip-path", /ellipse.*40% 55%/);
+  await expect(camera).toHaveCSS("clip-path", /ellipse.*60% 55%/);
+  await expect(camera).toHaveCSS("transform", "matrix(-1, 0, 0, 1, 0, 0)");
   const firstFrame = await camera.getAttribute("src");
   await expect.poll(() => camera.getAttribute("src")).not.toBe(firstFrame);
   expect(await page.evaluate(() => window.cameraAcquisitions)).toBe(
@@ -304,6 +315,7 @@ try {
     y: 0.55,
     feather: 0,
   });
+  expect(webcam.effects.flipX).toBe(true);
   expect(
     saved.clips.find((clip) => clip.recordingRole === "screen").groupId,
   ).toBeTruthy();
