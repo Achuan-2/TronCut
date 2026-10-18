@@ -150,7 +150,9 @@ export default function Panels(props: Props) {
                   0,
                   ...project.clips
                     .filter((c) => c.assetId === asset.id)
-                    .map((c) => c.sourceIn + c.duration * c.speed),
+                    .flatMap((c) => c.stitch
+                      ? c.stitch.map((part) => part.sourceIn + part.duration)
+                      : [c.sourceIn + c.duration * c.speed]),
                 );
                 const replacement = await bridge().relinkMedia(asset.id, consumed);
                 if (!replacement) return;

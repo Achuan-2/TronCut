@@ -31,23 +31,26 @@ export const effectPresets = [
 
 export function fadeDurations(clip: Clip) {
   // If fades overlap, reduce both proportionally rather than making a discontinuity.
+  const duration = clip.fadeTiming?.duration ?? clip.duration;
   const incoming = Math.max(0, clip.fadeIn ?? 0),
     outgoing = Math.max(0, clip.fadeOut ?? 0);
   const ratio = Math.min(
     1,
-    clip.duration / Math.max(clip.duration, incoming + outgoing),
+    duration / Math.max(duration, incoming + outgoing),
   );
   return { incoming: incoming * ratio, outgoing: outgoing * ratio };
 }
 
 export function fadeOpacity(clip: Clip, localTime: number): number {
   const { incoming, outgoing } = fadeDurations(clip);
+  localTime += clip.fadeTiming?.offset ?? 0;
+  const duration = clip.fadeTiming?.duration ?? clip.duration;
   return Math.max(
     0,
     Math.min(
       1,
       incoming ? localTime / incoming : 1,
-      outgoing ? (clip.duration - localTime) / outgoing : 1,
+      outgoing ? (duration - localTime) / outgoing : 1,
     ),
   );
 }

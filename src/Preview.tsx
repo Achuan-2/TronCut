@@ -80,6 +80,7 @@ import {
 } from "../shared/visual-effect-drag";
 import { transitionTransform } from "../shared/transitions";
 import { projectIndex } from "../shared/project-index";
+import { sourceTimeAt, stitchBoundaries } from "../shared/media-segments";
 import { mediaAssetUrl } from "../shared/media-url";
 import { visualEffectSvg } from "../shared/visual-effect-svg";
 import MatteDefinition from "./MatteDefinition";
@@ -151,6 +152,7 @@ function MediaLayer({
   previewQuality: PreviewQuality;
 }) {
   const ref = useRef<HTMLVideoElement & HTMLAudioElement>(null);
+  const previousSegment = useRef(-1);
   const proxyReady = useRef(false);
   const [previewRevision, setPreviewRevision] = useState(0);
   useEffect(() => {
@@ -200,14 +202,20 @@ function MediaLayer({
   useEffect(() => {
     const media = ref.current;
     if (!media) return;
-    const absoluteTime = clip.sourceIn + localTime * clip.speed;
+    const absoluteTime = sourceTimeAt(clip, localTime);
+    const segment = clip.stitch
+      ? stitchBoundaries(clip).filter((time) => localTime >= time).length
+      : -1;
+    const crossedStitch = segment !== previousSegment.current;
+    previousSegment.current = segment;
     const sourceTime =
       clip.loop && asset.duration > 0
         ? absoluteTime % asset.duration
         : absoluteTime;
     if (
       Number.isFinite(media.duration) &&
-      Math.abs(media.currentTime - sourceTime) > (playing ? 0.22 : 0.025)
+      (crossedStitch ||
+        Math.abs(media.currentTime - sourceTime) > (playing ? 0.22 : 0.025))
     )
       media.currentTime = Math.min(media.duration, sourceTime);
   }, [
@@ -215,6 +223,7 @@ function MediaLayer({
     playing,
     clip.speed,
     clip.sourceIn,
+    clip.stitch,
     clip.loop,
     asset.duration,
     url,
@@ -231,8 +240,8 @@ function MediaLayer({
     if (ref.current)
       ref.current.currentTime =
         clip.loop && asset.duration > 0
-          ? (clip.sourceIn + localTime * clip.speed) % asset.duration
-          : clip.sourceIn + localTime * clip.speed;
+          ? sourceTimeAt(clip, localTime) % asset.duration
+          : sourceTimeAt(clip, localTime);
   };
   if (clip.kind === "image")
     return <img draggable={false} src={url} alt={asset.name} />;
@@ -400,7 +409,7 @@ function PreviewLayerImpl({
   const crop = drag?.crop ?? clip.crop ?? defaultCrop,
     effects = clip.effects ?? defaultEffects;
   const cursor = asset
-    ? cursorAt(asset, clip, clip.sourceIn + localTime * clip.speed)
+    ? cursorAt(asset, clip, sourceTimeAt(clip, localTime))
     : null;
   const cursorStyle = clip.cursorStyle ?? defaultCursorStyle;
   if (!asset) {

@@ -144,6 +144,14 @@ export const projectSchema = z.object({
         start: finite.nonnegative(),
         duration: finite.positive().max(86400),
         sourceIn: finite.nonnegative(),
+        // Source-time ranges form one virtual media stream. sourceIn addresses
+        // that stream; ranges retain cuts without restoring discarded footage.
+        stitch: z
+          .array(z.object({
+            sourceIn: finite.nonnegative(),
+            duration: finite.positive().max(86400),
+          }))
+          .min(2).max(10000).optional(),
         speed: finite.min(0.25).max(8),
         speedEffect: z.boolean().optional(),
         loop: z.boolean().optional(),
@@ -229,6 +237,7 @@ export const projectSchema = z.object({
           .optional(),
         fadeIn: finite.min(0).max(86400).optional(),
         fadeOut: finite.min(0).max(86400).optional(),
+        fadeTiming: effectOriginSchema.optional(),
         cursorStyle: cursorStyleSchema.optional(),
         mediaFrame: z.object({
           window: effectWindowSchema.optional(),
@@ -429,6 +438,16 @@ export function validateProject(data: unknown): Project {
       throw new Error(`片段 ${clip.name} 引用了不存在的素材`);
     if (["video", "audio", "image"].includes(clip.kind) && !clip.assetId)
       throw new Error(`片段 ${clip.name} 缺少素材`);
+    if (clip.stitch) {
+      const length = clip.stitch.reduce((sum, part) => sum + part.duration, 0);
+      const asset = project.assets.find((item) => item.id === clip.assetId);
+      if (
+        !["video", "audio"].includes(clip.kind) || !asset || clip.loop ||
+        clip.sourceIn + clip.duration * clip.speed > length + 1e-6 ||
+        clip.stitch.some((part) => part.sourceIn + part.duration > asset.duration + 1e-6)
+      )
+        throw new Error(`片段 ${clip.name} 的拼接源区间无效`);
+    }
   }
   return project;
 }

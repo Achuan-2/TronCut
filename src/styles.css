@@ -906,6 +906,35 @@ fieldset:disabled {
   height: 20px;
   top: 0;
 }
+.stitch-waveform-range {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  overflow: hidden;
+}
+.stitch-seam {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  width: 10px;
+  padding: 0;
+  translate: -50% 0;
+  z-index: 5;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  cursor: context-menu;
+}
+.stitch-seam::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 4px;
+  border-left: 2px dashed #b8c8d3;
+  filter: drop-shadow(1px 0 1px #101719);
+}
+.stitch-seam:hover { background: #c4e8ff26; }
 .tool-group {
   flex-shrink: 0;
 }

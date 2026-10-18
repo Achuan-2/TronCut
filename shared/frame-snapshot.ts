@@ -9,6 +9,7 @@ import { freezeVisualEffects } from "./visual-effects";
 import { visualClipAt } from "./visual-state";
 import { effectActive } from "./effect-timing";
 import { drawingProgress } from "./annotation-style";
+import { sourceTimeAt } from "./media-segments";
 
 /** Freeze visible layers at one timeline instant while retaining source timestamps. */
 export function frameSnapshot(
@@ -62,7 +63,8 @@ export function frameSnapshot(
             : undefined,
           start: 0,
           duration: 1 / project.canvas.fps,
-          sourceIn: clip.sourceIn + local * clip.speed,
+          sourceIn: sourceTimeAt(clip, local),
+          stitch: undefined,
           transitions: undefined,
           speed: 1,
           transform: {
@@ -73,6 +75,7 @@ export function frameSnapshot(
           keyframes: [],
           fadeIn: 0,
           fadeOut: 0,
+          fadeTiming: undefined,
           ...(clip.behaviors ? { behaviors: shiftBehaviors(clip, local) } : {}),
         };
       }),

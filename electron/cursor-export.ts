@@ -11,6 +11,7 @@ import {
   type CursorShape,
 } from "../shared/cursor";
 import { loopImageInput } from "./loop-image";
+import { sourceTimeAt } from "../shared/media-segments";
 
 /** sendcmd keeps long mouse paths in a file, avoiding deeply nested FFmpeg expressions. */
 export async function cursorFilters(
@@ -34,7 +35,7 @@ export async function cursorFilters(
   const atlas = shapes.length > 1;
   const cell = Math.ceil(style.size * 4);
   const firstShape =
-    cursorAt(asset, clip, clip.sourceIn)?.cursorType ?? "arrow";
+    cursorAt(asset, clip, sourceTimeAt(clip, 0))?.cursorType ?? "arrow";
   const hotspot = atlas
     ? { x: 0.5, y: 0.5 }
     : cursorAnchor(style.style, shapes[0]);
@@ -101,7 +102,7 @@ export async function cursorFilters(
         p = cursorAt(
           asset,
           clip,
-          clip.sourceIn + (local + 1 / fps) * clip.speed,
+          sourceTimeAt(clip, local + 1 / fps),
         );
       const anchor = cursorWidth * hotspot.x;
       const x = p ? Math.round(p.x * asset.width - anchor) : -10000;
@@ -131,7 +132,7 @@ export async function cursorFilters(
   } finally {
     await file.close();
   }
-  const first = cursorAt(asset, clip, clip.sourceIn);
+  const first = cursorAt(asset, clip, sourceTimeAt(clip, 0));
   const firstX = first
     ? Math.round(first.x * asset.width - cursorWidth * hotspot.x)
     : -10000;

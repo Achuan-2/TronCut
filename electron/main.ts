@@ -30,6 +30,7 @@ import { findBinary, runProcess } from "./process";
 import { openProject, saveProject, renameProjectStorage } from "./project-store";
 import { importCamtasia } from "./camtasia";
 import { audioFilters, exportVideo, exportFrame } from "./export";
+import { stitchInputFilters } from "./stitch-input";
 import { speechEngineSchema, speechOptionsSchema } from "../shared/asr";
 import { transcribeProject, transcribeAsset } from "./transcription";
 import { synthesizeSpeech } from "./synthesis";
@@ -509,21 +510,24 @@ function installHandlers() {
     try {
       const info = await capabilities(process.resourcesPath);
       notify(0, "正在处理试听音频（最多 15 秒）");
+      const previewClip = { ...clip, duration: Math.min(15, clip.duration) };
+      const effects = [...audioFilters(clip, info.rubberband), "alimiter=limit=0.95"].join(",");
       await runProcess(
         findBinary("ffmpeg", process.resourcesPath),
         [
           "-y",
-          "-ss",
-          String(clip.sourceIn),
-          "-t",
-          String(Math.min(15, clip.duration) * clip.speed),
+          ...(clip.stitch ? [] : [
+            "-ss", String(clip.sourceIn),
+            "-t", String(previewClip.duration * clip.speed),
+          ]),
           "-i",
           asset.path,
           "-vn",
-          "-af",
-          [...audioFilters(clip, info.rubberband), "alimiter=limit=0.95"].join(
-            ",",
-          ),
+          ...(clip.stitch ? [
+            "-filter_complex",
+            [...stitchInputFilters(previewClip, "0:a", "stitched", true), `[stitched]${effects}[preview]`].join(";"),
+            "-map", "[preview]", "-t", String(previewClip.duration),
+          ] : ["-af", effects]),
           "-ar",
           "48000",
           "-c:a",

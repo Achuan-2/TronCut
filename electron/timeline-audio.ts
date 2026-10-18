@@ -4,6 +4,7 @@ import { type Project, projectDuration } from "../shared/model";
 import { audioFilters } from "./export";
 import { findBinary, runProcess } from "./process";
 import { isTrackActive } from "../shared/tracks";
+import { stitchInputFilters } from "./stitch-input";
 
 /** Render the same audible tracks as video export, in project time for ASR. */
 export async function renderTimelineAudio(
@@ -51,8 +52,11 @@ export async function renderTimelineAudio(
   for (const [index, { clip, asset }] of clips.entries()) {
     args.push("-i", asset.path);
     const label = `audio${index}`;
+    const source = clip.stitch ? `stitchaudio${index}` : `${index + 1}:a`;
+    if (clip.stitch)
+      filters.push(...stitchInputFilters(clip, `${index + 1}:a`, source, true));
     filters.push(
-      `[${index + 1}:a]atrim=start=${clip.sourceIn}:duration=${clip.duration * clip.speed},` +
+      `[${source}]atrim=start=${clip.stitch ? 0 : clip.sourceIn}:duration=${clip.duration * clip.speed},` +
         `asetpts=PTS-STARTPTS,${audioFilters(clip, rubberband).join(",")},` +
         `atrim=duration=${clip.duration},adelay=${Math.round(clip.start * 1000)}:all=1[${label}]`,
     );

@@ -14,6 +14,8 @@ import {
 } from "../shared/canvas-actions";
 import { editableIds } from "../shared/timeline";
 import type { Editor } from "./useEditor";
+import { stitchSelectionError } from "../shared/stitch";
+import { stitchBoundaries } from "../shared/media-segments";
 import "./CanvasContextMenu.css";
 
 export type ClipCommand =
@@ -23,12 +25,15 @@ export type ClipCommand =
   | "duplicate"
   | "delete"
   | "rippleDelete"
+  | "stitch"
+  | "unstitch"
   | "group"
   | "ungroup";
 export interface ClipMenuPosition {
   x: number;
   y: number;
   clipId: string | null;
+  stitchTime?: number;
 }
 
 export default function ClipContextMenu({
@@ -71,6 +76,8 @@ export default function ClipContextMenu({
       selected.some((clip) => clip.groupId !== selected[0].groupId));
   const canUngroup = canEdit && selected.some((clip) => !!clip.groupId);
   const canFit = canEdit && selected.some((clip) => clip.kind !== "audio");
+  const stitchError = stitchSelectionError(project, ids);
+  const canUnstitch = canEdit && selected.some((clip) => stitchBoundaries(clip).length > 0);
   useEffect(() => {
     if (projectId.current !== project.id) {
       projectId.current = project.id;
@@ -212,6 +219,29 @@ export default function ClipContextMenu({
         buttons[next]?.focus();
       }}
     >
+      {surface === "timeline" && (
+        <>
+          {menu.stitchTime !== undefined && source && (
+            <button
+              role="menuitem"
+              disabled={!canEdit}
+              onClick={() => {
+                editor.unstitchSelectedClips(menu.stitchTime, source.id);
+                onClose();
+              }}
+            >
+              移除拼接
+            </button>
+          )}
+          {menu.stitchTime === undefined && (
+            <div title={stitchError ?? undefined}>
+              {item("拼接所选媒体", "stitch", "Ctrl+Alt+I", !!stitchError)}
+            </div>
+          )}
+          {canUnstitch && item("移除全部拼接", "unstitch", "Ctrl+Shift+\\", false)}
+          <hr />
+        </>
+      )}
       {item("剪切", "cut", "Ctrl+X")}
       {item("复制", "copy", "Ctrl+C", !source)}
       {item("粘贴", "paste", "Ctrl+V", false)}

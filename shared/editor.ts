@@ -20,8 +20,9 @@ import {
   axisScaleKeys,
 } from "./rotation";
 import { visualKeys, visualValues } from "./visual-state";
-import { fitBehaviorDuration } from "./behaviors";
+import { fitBehaviorDuration, shiftBehaviors } from "./behaviors";
 import { markerEnd } from "./markers";
+import { normalizeStitch } from "./media-segments";
 
 export function availableTrack(
   project: Pick<Project, "tracks" | "clips">,
@@ -367,17 +368,38 @@ export function splitClip(
   if (!clip || time <= clip.start || time >= clip.start + clip.duration)
     return project;
   const cut = time - clip.start;
-  const left: Clip = fitBehaviorDuration({
+  const preserveBehaviorClock =
+    !!clip.stitch ||
+    clip.behaviors?.some((behavior) => behavior.preserveTiming);
+  const behaviorClock = (offset: number) =>
+    preserveBehaviorClock
+      ? { behaviors: shiftBehaviors(clip, offset)?.map((behavior) => ({
+          ...behavior, preserveTiming: true,
+        })) }
+      : {};
+  const fadeClock = (offset: number) =>
+    (clip.stitch || clip.fadeTiming) &&
+      ((clip.fadeIn ?? 0) > 0 || (clip.fadeOut ?? 0) > 0)
+      ? { fadeTiming: {
+          offset: (clip.fadeTiming?.offset ?? 0) + offset,
+          duration: clip.fadeTiming?.duration ?? clip.duration,
+        } }
+      : {};
+  const left: Clip = normalizeStitch(fitBehaviorDuration({
     ...clip,
+    ...behaviorClock(0),
+    ...fadeClock(0),
     visualEffects: shiftVisualEffects(clip, 0),
     mediaFrame: shiftMediaFrame(clip, 0),
     duration: cut,
     transitions: clip.transitions
       ? { incoming: clip.transitions.incoming }
       : undefined,
-  });
-  const right: Clip = fitBehaviorDuration({
+  }));
+  const right: Clip = normalizeStitch(fitBehaviorDuration({
     ...clip,
+    ...behaviorClock(cut),
+    ...fadeClock(cut),
     visualEffects: shiftVisualEffects(clip, cut),
     mediaFrame: shiftMediaFrame(clip, cut),
     id: uid(),
@@ -389,7 +411,7 @@ export function splitClip(
     sourceIn: clip.sourceIn + cut * clip.speed,
     // Keep the original curve. Rebuilding a smooth curve at the cut would change its acceleration.
     animationOffset: (clip.animationOffset ?? 0) + cut,
-  });
+  }));
   return {
     ...project,
     clips: project.clips.flatMap((c) =>
@@ -404,6 +426,13 @@ export function changeSpeed(clip: Clip, speed: number): Clip {
     visualEffects: retimeVisualEffects(clip, ratio),
     mediaFrame: retimeMediaFrame(clip, ratio),
     speed,
+    fadeTiming: clip.fadeTiming ? {
+      offset: clip.fadeTiming.offset * ratio,
+      duration: clip.fadeTiming.duration * ratio,
+    } : undefined,
+    behaviors: clip.behaviors?.map((behavior) => behavior.preserveTiming
+      ? { ...behavior, start: behavior.start * ratio, duration: behavior.duration * ratio }
+      : behavior),
     drawing: clip.drawing
       ? { ...clip.drawing, duration: clip.drawing.duration * ratio, delay: clip.drawing.delay * ratio }
       : undefined,

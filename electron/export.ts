@@ -13,6 +13,7 @@ import { defaultCrop, fadeDurations, visualFilters } from "../shared/effects";
 import { cursorFilters } from "./cursor-export";
 import { staticFrameMaskFilters } from "./static-frame-mask";
 import { loopImageInput } from "./loop-image";
+import { stitchInputFilters } from "./stitch-input";
 import { easingExpression } from "../shared/easing";
 import {
   contentFilters,
@@ -208,9 +209,13 @@ export function audioFilters(clip: Clip, rubberband: boolean): string[] {
     );
   filters.push(`volume=${clip.volume}`, "aresample=48000");
   const { incoming, outgoing } = fadeDurations(clip);
+  if (clip.fadeTiming && (incoming || outgoing))
+    filters.push(`asetpts=PTS+${clip.fadeTiming.offset}/TB`);
   if (incoming) filters.push(`afade=t=in:st=0:d=${incoming}`);
   if (outgoing)
-    filters.push(`afade=t=out:st=${clip.duration - outgoing}:d=${outgoing}`);
+    filters.push(`afade=t=out:st=${(clip.fadeTiming?.duration ?? clip.duration) - outgoing}:d=${outgoing}`);
+  if (clip.fadeTiming && (incoming || outgoing))
+    filters.push("asetpts=PTS-STARTPTS");
   return filters;
 }
 let cachedHardwareEncoderName: string | null = null;
@@ -522,8 +527,8 @@ async function renderProject(
     // Input seeking skips discarded media before decoding, and resets both audio
     // and video timestamps. Cursor telemetry still uses the original sourceIn.
     const seekInput =
-      !clip.loop && (clip.kind === "video" || clip.kind === "audio");
-    const sourceIn = still || animatedText || animatedDrawing || seekInput ? 0 : clip.sourceIn;
+      !clip.loop && !clip.stitch && (clip.kind === "video" || clip.kind === "audio");
+    const sourceIn = still || animatedText || animatedDrawing || seekInput || clip.stitch ? 0 : clip.sourceIn;
     let sourceSeek = clip.sourceIn;
     if (clip.loop && asset && asset.duration > 0) sourceSeek %= asset.duration;
     if (
@@ -606,6 +611,9 @@ async function renderProject(
         "-i",
         asset!.path,
       );
+    const videoSource = clip.stitch ? `stitchv${layer}` : `${index}:v`;
+    if (clip.stitch && clip.kind === "video")
+      filters.push(...stitchInputFilters(clip, `${index}:v`, videoSource));
     if (clip.kind !== "audio") {
       const visual = `v${layer}`,
         output = `mix${layer}`;
@@ -640,9 +648,13 @@ async function renderProject(
       // for channels that actually contain object motion.
       const objectMotion = objectBehaviorExpressions(clip, clock("t"));
       const alphaAnimated =
+        !!clip.fadeTiming ||
         objectMotion.opacity !== "1" ||
         clip.keyframes.some((k) => k.value.opacity !== clip.transform.opacity);
       const { incoming, outgoing } = fadeDurations(clip);
+      const fadeStart = clip.start - (clip.fadeTiming?.offset ?? 0);
+      const fadeEnd = fadeStart + (clip.fadeTiming?.duration ?? clip.duration);
+      const fadeWeight = `max(0,min(1,min(${incoming ? `(${clock("T")}-${fadeStart})/${incoming}` : "1"},${outgoing ? `(${fadeEnd}-${clock("T")})/${outgoing}` : "1"})))`;
       let regionOpacity = pose("opacity", "T");
       let alpha: string;
       if (!alphaAnimated) {
@@ -659,21 +671,11 @@ async function renderProject(
           );
         }
         alpha = filters.join(",") || "null";
-        if (incoming || outgoing) {
-          const fade = `min(1,min(${incoming ? `(${clock("T")}-${clip.start})/${incoming}` : "1"},${outgoing ? `(${clip.start + clip.duration}-${clock("T")})/${outgoing}` : "1"}))`;
-          regionOpacity = `(${regionOpacity})*max(0,${fade})`;
-        }
       } else {
-        const fade =
-          incoming || outgoing
-            ? `*max(0,min(1,min(${incoming ? `(${clock("T")}-${clip.start})/${incoming}` : "1"},${outgoing ? `(${clip.start + clip.duration}-${clock("T")})/${outgoing}` : "1"})))`
-            : "";
+        const fade = incoming || outgoing ? `*${fadeWeight}` : "";
         alpha = `geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='alpha(X,Y)*(${pose("opacity", "T")})${fade}'`;
-        if (incoming || outgoing) {
-          const fadeExpr = `min(1,min(${incoming ? `(${clock("T")}-${clip.start})/${incoming}` : "1"},${outgoing ? `(${clip.start + clip.duration}-${clock("T")})/${outgoing}` : "1"}))`;
-          regionOpacity = `(${regionOpacity})*max(0,${fadeExpr})`;
-        }
       }
+      if (incoming || outgoing) regionOpacity = `(${regionOpacity})*(${fadeWeight})`;
       // Keep the spotlight hole opaque; fade its inverted outside mask instead.
       if (clip.annotationEffect?.type === "spotlight") alpha = "null";
       const visualEffects = visualFilters(
@@ -766,7 +768,7 @@ async function renderProject(
         !clip.mediaFrame?.window && !alphaAnimated &&
         clip.transform.opacity === 1 && !incoming && !outgoing &&
         !hasAttachedEffects;
-      let source = `${index}:v`;
+      let source = videoSource;
       if (asset?.cursor) {
         const cursor = await cursorFilters(
           asset,
@@ -796,7 +798,7 @@ async function renderProject(
       const timing =
         animatedDrawing
           ? `fps=${fps},trim=duration=${clip.duration},setpts=PTS-STARTPTS+${clip.start}/TB,`
-          : source === `${index}:v`
+          : source === videoSource
           ? `trim=start=${sourceIn}:duration=${clip.duration * clip.speed},setpts=(PTS-STARTPTS)/${clip.speed}${padding ? "," + padding : `+${clip.start}/TB,`}`
           : padding;
       // An implicit RGBA -> YUVA converter can retain the first frame's size.
@@ -829,7 +831,7 @@ async function renderProject(
       );
       // Unprocessed video retains its native format and alpha. Avoid two
       // full-frame RGB conversions and an identity alpha pass.
-      const directVideo = planarRecording || (clip.kind === "video" && source === `${index}:v` &&
+      const directVideo = planarRecording || (clip.kind === "video" && source === videoSource &&
         !viewportFilters.length && !visualEffects.length && !frameFilters.length &&
         !staticFrame && !rotate.length && !alphaAnimated &&
         clip.transform.opacity === 1 && !incoming && !outgoing &&
@@ -898,8 +900,11 @@ async function renderProject(
       clip.volume > 0
     ) {
       const label = `a${layer}`;
+      const audioSource = clip.stitch ? `stitcha${layer}` : `${index}:a`;
+      if (clip.stitch)
+        filters.push(...stitchInputFilters(clip, `${index}:a`, audioSource, true));
       filters.push(
-        `[${index}:a]atrim=start=${sourceIn}:duration=${clip.duration * clip.speed},asetpts=PTS-STARTPTS,${audioFilters(clip, rubberband).join(",")},adelay=${Math.round(clip.start * 1000)}:all=1[${label}]`,
+        `[${audioSource}]atrim=start=${sourceIn}:duration=${clip.duration * clip.speed},asetpts=PTS-STARTPTS,${audioFilters(clip, rubberband).join(",")},adelay=${Math.round(clip.start * 1000)}:all=1[${label}]`,
       );
       audioLabels.push(`[${label}]`);
     }

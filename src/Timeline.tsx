@@ -51,6 +51,7 @@ import TimelineMarkers from "./TimelineMarkers";
 import MarkerDialog from "./MarkerDialog";
 import { snapTime, splitClip, transformAt } from "../shared/editor";
 import { editableCanvasIds } from "../shared/canvas-actions";
+import { mediaSegments, stitchBoundaries } from "../shared/media-segments";
 import {
   moveClips,
   splitSelection,
@@ -245,6 +246,7 @@ export default function Timeline({
       x: number;
       y: number;
       id: string;
+      stitchTime?: number;
     } | null>(null);
 
   // RAF-throttled drag updates for smooth 60fps performance
@@ -693,6 +695,7 @@ export default function Timeline({
         duration: c.duration - offset,
         sourceIn: Math.max(0, c.sourceIn + offset * c.speed),
         animationOffset: (c.animationOffset ?? 0) + offset,
+        ...(c.fadeTiming ? { fadeTiming: { ...c.fadeTiming, offset: c.fadeTiming.offset + offset } } : {}),
       };
     }
     const wanted = snap
@@ -701,7 +704,7 @@ export default function Timeline({
       : c.duration + d.delta;
     const maxDuration =
       asset && ["video", "audio"].includes(c.kind)
-        ? (asset.duration - c.sourceIn) / c.speed
+        ? ((c.stitch?.reduce((sum, part) => sum + part.duration, 0) ?? asset.duration) - c.sourceIn) / c.speed
         : 86400;
     const duration = Math.max(minimum, Math.min(maxDuration, wanted));
     return { ...c, duration };
@@ -1787,7 +1790,7 @@ export default function Timeline({
                             </div>
                             {c.kind !== "text" && (
                               <div className="clip-detail">
-                                {`${timeLabel(c.duration)}${c.podcast ? " · 播客人声" : ""}`}
+                                {`${timeLabel(c.duration)}${c.stitch ? ` · ${mediaSegments(c).length} 段拼接` : ""}${c.podcast ? " · 播客人声" : ""}`}
                               </div>
                             )}
                             {editor.preferences.program.waveforms &&
@@ -1797,17 +1800,53 @@ export default function Timeline({
                                 const asset = assetsById.get(c.assetId!)!;
                                 return (
                                   <div className="clip-waveform">
-                                    <MediaThumbnail
-                                      asset={asset}
-                                      waveform
-                                      style={{
-                                        width: `${Math.max(c.duration, asset.duration / c.speed) * zoom}px`,
-                                        left: `${(-c.sourceIn / c.speed) * zoom}px`,
-                                      }}
-                                    />
+                                    {mediaSegments(c).map((part, index) => (
+                                      <div
+                                        className="stitch-waveform-range"
+                                        key={index}
+                                        style={{
+                                          left: part.start * zoom,
+                                          width: part.duration / c.speed * zoom,
+                                        }}
+                                      >
+                                        <MediaThumbnail
+                                          asset={asset}
+                                          waveform
+                                          style={{
+                                            width: `${Math.max(c.duration, asset.duration / c.speed) * zoom}px`,
+                                            left: `${(-part.sourceIn / c.speed) * zoom}px`,
+                                          }}
+                                        />
+                                      </div>
+                                    ))}
                                   </div>
                                 );
                               })()}
+                            {stitchBoundaries(c).map((time) => (
+                              <button
+                                key={time}
+                                type="button"
+                                className="stitch-seam"
+                                aria-label={`拼接点 ${timeLabel(c.start + time)}`}
+                                title="拼接点；右键移除这一处拼接"
+                                style={{ left: time * zoom }}
+                                onPointerDown={(event) => {
+                                  event.stopPropagation();
+                                  editor.setPlaying(false);
+                                  select(c.id);
+                                }}
+                                onContextMenu={(event) => {
+                                  event.preventDefault();
+                                  event.stopPropagation();
+                                  editor.setPlaying(false);
+                                  select(c.id);
+                                  setContext({
+                                    x: event.clientX, y: event.clientY,
+                                    id: c.id, stitchTime: time,
+                                  });
+                                }}
+                              />
+                            ))}
                             {(["transform", "drawing"] as const)
                               .filter(
                                 (channel) =>

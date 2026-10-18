@@ -43,6 +43,8 @@ import {
   type EditorPreferences,
 } from "../shared/editor-preferences";
 import { textEditSchema } from "../shared/edit-menu";
+import { stitchSelectionError } from "../shared/stitch";
+import { stitchBoundaries } from "../shared/media-segments";
 import PresetLibraryOverlays from "./PresetLibraryOverlays";
 
 function ProjectTitleInput({
@@ -254,6 +256,8 @@ export default function App() {
           clip.start < editor.playhead &&
           clip.start + clip.duration > editor.playhead,
       ),
+      canStitch: !stitchSelectionError(editor.project, editor.selectedIds),
+      canUnstitch: editable.some((clip) => stitchBoundaries(clip).length > 0),
     };
     const signature = JSON.stringify(state);
     if (nativeEditMenu.current === signature) return;
@@ -581,7 +585,7 @@ export default function App() {
         'input, textarea, [contenteditable="true"]',
       );
     const textCommand = textEditSchema.safeParse(command);
-    if (input && command === "split") return;
+    if (input && ["split", "stitch", "unstitch"].includes(command)) return;
     if (input && textCommand.success) {
       void bridge()
         .editText(textCommand.data)
@@ -692,6 +696,11 @@ export default function App() {
           editor.apply((p) =>
             splitSelection(p, editor.selectedIds, editor.playhead),
           ),
+        stitch: () => {
+          const error = editor.stitchSelectedClips();
+          if (error) toast(error);
+        },
+        unstitch: () => editor.unstitchSelectedClips(),
         group: () => editor.apply((p) => groupSelection(p, editor.selectedIds)),
         ungroup: () =>
           editor.apply((p) => groupSelection(p, editor.selectedIds, true)),
@@ -736,6 +745,15 @@ export default function App() {
         (t) => t.id === selected?.trackId,
       )?.locked;
     const animation = editor.selectedAnimation;
+    if (
+      (event.ctrlKey || event.metaKey) &&
+      ((event.altKey && !event.shiftKey && event.key.toLowerCase() === "i") ||
+        (event.shiftKey && !event.altKey && event.code === "Backslash"))
+    ) {
+      event.preventDefault();
+      commands.current(event.altKey ? "stitch" : "unstitch");
+      return;
+    }
     if (
       (event.ctrlKey || event.metaKey) &&
       ["d", "x", "y"].includes(event.key.toLowerCase())

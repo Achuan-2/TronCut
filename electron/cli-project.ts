@@ -14,6 +14,7 @@ import {
   projectDuration,
 } from "../shared/model";
 import { type Cue } from "../shared/subtitles";
+import { mediaSegments } from "../shared/media-segments";
 import { captionDefaults } from "../shared/captions";
 import { isTrackActive } from "../shared/tracks";
 import {
@@ -68,7 +69,7 @@ export function validateSourceRanges(project: Project) {
     if (
       asset &&
       ["video", "audio"].includes(clip.kind) &&
-      clip.sourceIn + clip.duration * clip.speed > asset.duration + 0.05
+      !clip.stitch && clip.sourceIn + clip.duration * clip.speed > asset.duration + 0.05
     )
       throw new Error(`片段 ${clip.id} 超出了源素材时长`);
     if (asset?.missing) throw new Error(`素材离线：${asset.path}`);
@@ -183,20 +184,20 @@ export function editCliProject(input: Project, edits: Edit[]) {
 }
 
 export function sourceCuesToTimeline(cues: Cue[], clip: Clip): Cue[] {
-  const sourceEnd = clip.sourceIn + clip.duration * clip.speed;
-  return cues.flatMap((cue) => {
-    const start = Math.max(cue.start, clip.sourceIn),
+  return mediaSegments(clip).flatMap((part) => cues.flatMap((cue) => {
+    const sourceEnd = part.sourceIn + part.duration;
+    const start = Math.max(cue.start, part.sourceIn),
       end = Math.min(cue.end, sourceEnd);
     return end > start
       ? [
           {
-            start: clip.start + (start - clip.sourceIn) / clip.speed,
-            end: clip.start + (end - clip.sourceIn) / clip.speed,
+            start: clip.start + part.start + (start - part.sourceIn) / clip.speed,
+            end: clip.start + part.start + (end - part.sourceIn) / clip.speed,
             text: cue.text,
           },
         ]
       : [];
-  });
+  }));
 }
 
 export function addCaptionCues(

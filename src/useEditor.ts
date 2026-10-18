@@ -111,6 +111,7 @@ import { shapeSize } from "../shared/annotation-style";
 import type { DrawingStroke } from "../shared/annotation-style";
 import { freehandAnnotation, type PenSettings } from "../shared/freehand";
 import { createPlaybackStore } from "./playback-store";
+import { stitchClips, stitchSelectionError, unstitchClips } from "../shared/stitch";
 
 export function demoProject(): Project {
   const project = createProject("我的第一个视频");
@@ -367,6 +368,34 @@ export function useEditor(
       }
     },
     [apply, selectedIds, select, setPlaying, seek],
+  );
+  const stitchSelectedClips = useCallback(() => {
+    const before = current.current;
+    const error = stitchSelectionError(before, selectedIds);
+    if (error) return error;
+    const first = before.clips
+      .filter((clip) => selectedIds.includes(clip.id))
+      .sort((a, b) => a.start - b.start)[0];
+    setPlaying(false);
+    apply(stitchClips(before, selectedIds));
+    select(first.id);
+    return null;
+  }, [apply, selectedIds, select, setPlaying]);
+  const unstitchSelectedClips = useCallback(
+    (seam?: number, clipId?: string) => {
+      const before = current.current;
+      const ids = clipId ? [clipId] : selectedIds;
+      const next = unstitchClips(before, ids, seam);
+      if (next === before) return;
+      const previous = new Set(before.clips.map((clip) => clip.id));
+      setPlaying(false);
+      apply(next);
+      select(null);
+      selectMany(next.clips
+        .filter((clip) => ids.includes(clip.id) || !previous.has(clip.id))
+        .map((clip) => clip.id));
+    },
+    [apply, selectedIds, select, setPlaying],
   );
   const replace = useCallback((next: Project, unsaved = false) => {
     next = { ...next, tracks: numberTracks(next.tracks) };
@@ -1385,6 +1414,8 @@ export function useEditor(
     preferences,
     apply,
     deleteSelectedClips,
+    stitchSelectedClips,
+    unstitchSelectedClips,
     timelineFocus,
     replace,
     markSaved,

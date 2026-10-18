@@ -10,6 +10,8 @@ export const editCommands = [
   { id: "delete", label: "删除", shortcut: "Delete", group: 2 },
   { id: "rippleDelete", label: "波纹删除", shortcut: "Shift+Delete", group: 2 },
   { id: "split", label: "在播放头处分割", shortcut: "CmdOrCtrl+K", group: 2 },
+  { id: "stitch", label: "拼接所选媒体", shortcut: "CmdOrCtrl+Alt+I", group: 2 },
+  { id: "unstitch", label: "移除全部拼接", shortcut: "CmdOrCtrl+Shift+\\", group: 2 },
   { id: "group", label: "组合", shortcut: "CmdOrCtrl+G", group: 3 },
   { id: "ungroup", label: "取消组合", shortcut: "CmdOrCtrl+Shift+G", group: 3 },
   { id: "selectAll", label: "全选", shortcut: "CmdOrCtrl+A", group: 4 },
@@ -37,6 +39,8 @@ export const editMenuStateSchema = z.object({
   canGroup: z.boolean(),
   canUngroup: z.boolean(),
   canSplit: z.boolean(),
+  canStitch: z.boolean().optional(),
+  canUnstitch: z.boolean().optional(),
 });
 export type EditMenuState = z.infer<typeof editMenuStateSchema>;
 export function editCommandEnabled(id: EditCommand, state: EditMenuState) {
@@ -59,6 +63,8 @@ export function editCommandEnabled(id: EditCommand, state: EditMenuState) {
   if (id === "group") return state.canGroup;
   if (id === "ungroup") return state.canUngroup;
   if (id === "split") return state.canSplit;
+  if (id === "stitch") return !!state.canStitch;
+  if (id === "unstitch") return !!state.canUnstitch;
   if (id === "copy" || id === "deselect") return state.selected > 0;
   return state.editable;
 }

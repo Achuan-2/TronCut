@@ -76,6 +76,8 @@ export const behaviorSchema = z.object({
   // while retaining the original duration so it captures the current phase.
   start: z.number().finite().min(-86400).max(86400),
   duration: z.number().finite().positive().max(86400),
+  // Released stitched segments retain the phase clock of the whole object.
+  preserveTiming: z.boolean().optional(),
   incoming: behaviorPhaseSchema,
   during: behaviorPhaseSchema,
   outgoing: behaviorPhaseSchema,
@@ -265,17 +267,16 @@ export const shiftBehaviors = (clip: Clip, delta: number) =>
 export function fitBehaviorDuration(clip: Clip): Clip {
   if (
     !clip.behaviors?.some(
-      (behavior) => behavior.start !== 0 || behavior.duration !== clip.duration,
+      (behavior) => !behavior.preserveTiming &&
+        (behavior.start !== 0 || behavior.duration !== clip.duration),
     )
   )
     return clip;
   return {
     ...clip,
-    behaviors: clip.behaviors.map((behavior) => ({
-      ...behavior,
-      start: 0,
-      duration: clip.duration,
-    })),
+    behaviors: clip.behaviors.map((behavior) => behavior.preserveTiming
+      ? behavior
+      : { ...behavior, start: 0, duration: clip.duration }),
   };
 }
 
