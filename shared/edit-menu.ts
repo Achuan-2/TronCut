@@ -9,7 +9,7 @@ export const editCommands = [
   { id: "duplicate", label: "创建副本", shortcut: "CmdOrCtrl+D", group: 1 },
   { id: "delete", label: "删除", shortcut: "Delete", group: 2 },
   { id: "rippleDelete", label: "波纹删除", shortcut: "Shift+Delete", group: 2 },
-  { id: "split", label: "在播放头处分割", shortcut: "S", group: 2 },
+  { id: "split", label: "在播放头处分割", shortcut: "CmdOrCtrl+K", group: 2 },
   { id: "group", label: "组合", shortcut: "CmdOrCtrl+G", group: 3 },
   { id: "ungroup", label: "取消组合", shortcut: "CmdOrCtrl+Shift+G", group: 3 },
   { id: "selectAll", label: "全选", shortcut: "CmdOrCtrl+A", group: 4 },

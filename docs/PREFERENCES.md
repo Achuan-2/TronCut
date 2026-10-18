@@ -10,7 +10,7 @@
 | 剪切 / 复制 / 粘贴 | Ctrl/⌘ + X / C / V |
 | 创建副本 | Ctrl/⌘ + D，在所选片段结束后添加副本 |
 | 删除 / 波纹删除 | Delete / Shift + Delete |
-| 在播放头处分割 | S |
+| 在播放头处分割 | Ctrl/⌘ + K |
 | 组合 / 取消组合 | Ctrl/⌘ + G / Ctrl/⌘ + Shift + G |
 | 全选 / 取消选择 | Ctrl/⌘ + A / Escape |
 

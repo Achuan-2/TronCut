@@ -581,6 +581,7 @@ export default function App() {
         'input, textarea, [contenteditable="true"]',
       );
     const textCommand = textEditSchema.safeParse(command);
+    if (input && command === "split") return;
     if (input && textCommand.success) {
       void bridge()
         .editText(textCommand.data)
@@ -809,16 +810,16 @@ export default function App() {
       event.preventDefault();
       editor.setPlaying(!editor.playing);
     } else if (
-      event.key.toLowerCase() === "s" &&
-      !event.ctrlKey &&
-      !event.metaKey &&
+      event.key.toLowerCase() === "k" &&
+      (event.ctrlKey || event.metaKey) &&
+      !event.shiftKey &&
+      !event.altKey &&
       selected &&
       !locked
-    )
-      editor.apply((p) =>
-        splitSelection(p, editor.selectedIds, editor.playhead),
-      );
-    else if (
+    ) {
+      event.preventDefault();
+      commands.current("split");
+    } else if (
       ["Delete", "Backspace"].includes(event.key) &&
       selected &&
       !locked

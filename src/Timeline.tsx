@@ -738,7 +738,7 @@ export default function Timeline({
           </button>
           <span className="tool-divider" />
           <button
-            title="在播放头处拆分（S）"
+            title="在播放头处拆分（Ctrl/⌘+K）"
             disabled={!selected || !!locked}
             onClick={() =>
               selected &&
@@ -2013,7 +2013,7 @@ export default function Timeline({
       </div>
       <div className="timeline-footer">
         <span>
-          空格 播放 / 暂停<span className="separator-dot">·</span>S 拆分
+          空格 播放 / 暂停<span className="separator-dot">·</span>Ctrl/⌘+K 拆分
           <span className="separator-dot">·</span>右键动画 编辑动画
           <span className="separator-dot">·</span>Shift+拖动标尺 区域标记
         </span>
@@ -2186,6 +2186,7 @@ export default function Timeline({
               >
                 <Scissors size={14} />
                 在播放头拆分
+                <span className="menu-shortcut">Ctrl/⌘+K</span>
               </button>
             </ClipContextMenu>
           );

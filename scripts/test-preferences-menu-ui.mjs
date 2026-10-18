@@ -125,6 +125,18 @@ try {
   await command("group");
   await command("ungroup");
   await page.keyboard.press("ArrowRight");
+  await page.keyboard.press("s");
+  await expect(page.locator(".timeline-clip.text")).toHaveCount(2);
+  expect(
+    await app.evaluate(({ Menu }) =>
+      Menu.getApplicationMenu().getMenuItemById("edit-split").accelerator,
+    ),
+  ).toBe("CmdOrCtrl+K");
+  await expect.poll(() => enabled("split")).toBe(true);
+  await page.keyboard.press("Control+k");
+  await expect(page.locator(".timeline-clip.text")).toHaveCount(4);
+  await command("undo");
+  await expect(page.locator(".timeline-clip.text")).toHaveCount(2);
   await command("split");
   await expect(page.locator(".timeline-clip.text")).toHaveCount(4);
   await command("undo");
@@ -147,6 +159,9 @@ try {
   await lock.click();
   const title = page.getByLabel("工程名称", { exact: true });
   await title.fill("文本复制测试");
+  await page.keyboard.press("Control+k");
+  await expect(title).toHaveValue("文本复制测试");
+  await expect(page.locator(".timeline-clip.text")).toHaveCount(2);
   await command("selectAll");
   await command("copy");
   await expect
@@ -182,6 +197,9 @@ try {
   await page.getByRole("tab", { name: "快捷键", exact: true }).click();
   await page.getByLabel("搜索快捷键", { exact: true }).fill("分割");
   await expect(page.locator(".preferences-shortcuts > div")).toHaveCount(1);
+  await expect(page.locator(".preferences-shortcuts > div")).toContainText(
+    "Ctrl+K",
+  );
   await page.getByRole("button", { name: "取消", exact: true }).click();
   expect(errors).toEqual([]);
   console.log(
