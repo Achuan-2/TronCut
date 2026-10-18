@@ -1,4 +1,5 @@
 import { X } from "lucide-react";
+import { transitionPresets, transitionTypeSchema } from "../shared/transitions";
 import type { Editor } from "./useEditor";
 
 export default function TransitionProperties({ editor }: { editor: Editor }) {
@@ -42,25 +43,33 @@ export default function TransitionProperties({ editor }: { editor: Editor }) {
           类型
           <select
             value={transition.type}
-            onChange={() =>
-              editor.updateTransition(selection, { type: "smooth-slide" })
-            }
-          >
-            <option value="smooth-slide">Smooth Slide</option>
-          </select>
-        </label>
-        <label className="transition-reverse">
-          <input
-            type="checkbox"
-            checked={transition.reverse}
             onChange={(event) =>
               editor.updateTransition(selection, {
-                reverse: event.target.checked,
+                type: transitionTypeSchema.parse(event.target.value),
               })
             }
-          />
-          反转
+          >
+            {transitionPresets.map(({ type, name }) => (
+              <option key={type} value={type}>
+                {name}
+              </option>
+            ))}
+          </select>
         </label>
+        {transition.type !== "fade" && (
+          <label className="transition-reverse">
+            <input
+              type="checkbox"
+              checked={transition.reverse}
+              onChange={(event) =>
+                editor.updateTransition(selection, {
+                  reverse: event.target.checked,
+                })
+              }
+            />
+            反转
+          </label>
+        )}
       </fieldset>
     </aside>
   );

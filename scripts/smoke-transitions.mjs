@@ -66,8 +66,11 @@ try {
   await expect(page.locator(".timeline-clip")).toHaveCount(2);
   await page.getByRole("button", { name: "转换", exact: true }).click();
   await expect(
-    page.getByRole("button", { name: "Smooth Slide", exact: false }),
+    page.getByRole("button", { name: "平滑切换", exact: false }),
   ).toBeVisible();
+  await expect(page.locator(".transition-card")).toHaveCount(4);
+  for (const name of ["放大", "淡入淡出", "横扫"])
+    await expect(page.getByRole("button", { name, exact: true })).toBeVisible();
 
   const transfer = await page.evaluateHandle(() => {
     const data = new DataTransfer();
@@ -100,6 +103,24 @@ try {
   );
   await page.getByLabel("反转").check();
   await page.getByRole("switch", { name: "启用转换" }).click();
+
+  // Type changes update both sides of the junction.
+  for (const [type, name] of [
+    ["zoom", "放大"],
+    ["fade", "淡入淡出"],
+    ["whip-pan", "横扫"],
+  ]) {
+    await page.locator(".transition-fields select").selectOption(type);
+    await expect(red.locator(".timeline-transition.outgoing")).toHaveAttribute(
+      "title",
+      new RegExp(name),
+    );
+    await expect(blue.locator(".timeline-transition.incoming")).toHaveAttribute(
+      "title",
+      new RegExp(name),
+    );
+  }
+  await page.locator(".transition-fields select").selectOption("smooth-slide");
   await expect(red.locator(".timeline-transition.outgoing")).toHaveClass(
     /disabled/,
   );
@@ -113,13 +134,18 @@ try {
   const handle = await marker
     .getByRole("separator", { name: "调整转换时长" })
     .boundingBox();
-  await page.mouse.move(handle.x + handle.width / 2, handle.y + 15);
-  await page.mouse.down();
-  await page.mouse.move(handle.x - 25, handle.y + 15, { steps: 5 });
-  await page.mouse.up();
-  expect((await marker.boundingBox()).width).toBeGreaterThan(
-    initial.width + 10,
+  await page.mouse.move(
+    handle.x + handle.width / 2,
+    handle.y + handle.height / 2,
   );
+  await page.mouse.down();
+  await page.mouse.move(handle.x - 25, handle.y + handle.height / 2, {
+    steps: 5,
+  });
+  await page.mouse.up();
+  await expect
+    .poll(async () => (await marker.boundingBox()).width)
+    .toBeGreaterThan(initial.width + 10);
   await page.screenshot({ path: path.join(root, "junction-added.png") });
 
   await page.getByTitle("保存工程 Ctrl+S").click();
@@ -142,6 +168,70 @@ try {
   await expect(page.locator(".timeline-clip")).toHaveCount(2);
   await page.getByTitle("撤销 Ctrl+Z").click();
   await expect(page.locator(".timeline-transition")).toHaveCount(2);
+
+  // New presets also travel through drag payloads and double-click application.
+  await red
+    .locator(".timeline-transition.outgoing")
+    .click({ position: { x: 10, y: 5 } });
+  await page.getByRole("button", { name: "删除转换" }).click();
+  for (const [type, name] of [
+    ["zoom", "放大"],
+    ["fade", "淡入淡出"],
+    ["whip-pan", "横扫"],
+  ]) {
+    const payload = await page.evaluateHandle((value) => {
+      const data = new DataTransfer();
+      data.setData("troncut-transition", value);
+      return data;
+    }, type);
+    const box = await red.boundingBox();
+    await red.dispatchEvent("drop", {
+      dataTransfer: payload,
+      clientX: box.x + box.width - 2,
+      clientY: box.y + 20,
+    });
+    await expect(page.locator(".transition-fields select")).toHaveValue(type);
+    await expect(blue.locator(".timeline-transition.incoming")).toHaveAttribute(
+      "title",
+      new RegExp(name),
+    );
+    await page.getByLabel("播放进度", { exact: true }).evaluate((el) => {
+      const setValue = Object.getOwnPropertyDescriptor(
+        HTMLInputElement.prototype,
+        "value",
+      ).set;
+      setValue.call(el, "3");
+      el.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    const incomingLayer = page.locator('.preview-layer[data-clip-id="blue"]');
+    await expect(incomingLayer).toBeVisible();
+    await expect
+      .poll(async () =>
+        Number(
+          await incomingLayer.evaluate((el) => getComputedStyle(el).opacity),
+        ),
+      )
+      .toBeCloseTo(type === "whip-pan" ? 1 : 0.5, 1);
+    const matrix = await incomingLayer.evaluate((el) => {
+      const transform = new DOMMatrix(getComputedStyle(el).transform);
+      return { x: transform.a, y: transform.d };
+    });
+    expect(matrix.x / matrix.y).toBeCloseTo(type === "whip-pan" ? 1.16 : 1, 2);
+    expect(matrix.y).toBeCloseTo(type === "zoom" ? 0.86 : 1, 2);
+    await page.screenshot({ path: path.join(root, `preview-${type}.png`) });
+    await page.getByRole("button", { name: "删除转换" }).click();
+    await page.getByRole("button", { name, exact: true }).dblclick();
+    await expect(page.locator(".transition-fields select")).toHaveValue(type);
+    await expect(page.locator(".timeline-transition")).toHaveCount(2);
+    await page.getByRole("button", { name: "删除转换" }).click();
+    // A middle double-click applies independent transitions to both ends.
+    await red
+      .locator(".timeline-transition")
+      .click({ position: { x: 3, y: 15 } });
+    await page.getByRole("button", { name: "删除转换" }).click();
+    await payload.dispose();
+  }
+  await page.screenshot({ path: path.join(root, "transition-presets.png") });
   expect(errors).toEqual([]);
   console.log(`转换桌面交互验证通过：${root}`);
 } finally {

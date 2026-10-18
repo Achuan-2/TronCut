@@ -48,6 +48,7 @@ import {
 import {
   transitionRange,
   transitionOffsetExpression,
+  transitionVisualExpressions,
 } from "../shared/transitions";
 
 // Avoid lookahead buffering in short, delayed overlay graphs. Hardware failure
@@ -634,13 +635,21 @@ async function renderProject(
         (animatedViewport ? 0 : Math.floor(intrinsicHeight * crop.top)) -
         (animatedViewport ? 0 : Math.floor(intrinsicHeight * crop.bottom));
       const range = transitionRange(project, clip);
+      const transitionMotion = transitionVisualExpressions(project, clip);
       // Paired transitions hold boundary poses and source frames outside the clip.
       const clock = (name: string) =>
         range.before || range.after
           ? `clip(${name},${clip.start},${clip.start + clip.duration})`
           : name;
-      const pose = (key: keyof Transform, name = "t") =>
-        expression(clip, key, clock(name));
+      const pose = (key: keyof Transform, name = "t") => {
+        const value = expression(clip, key, clock(name));
+        if (key !== "scale" && key !== "scaleX" && key !== "opacity") return value;
+        const multiplier = transitionVisualExpressions(project, clip, name)[key];
+        if (multiplier === "1") return value;
+        return key === "opacity"
+          ? `((${value})*(${multiplier}))`
+          : `min(8,(${value})*(${multiplier}))`;
+      };
       const scale = `(${pose("scale")})*2000/(2000-clip((${pose("z")}),-10000,1000))`;
       const effectPadding = Math.ceil(visualEffectPadding(clip.visualEffects) / fit);
       const transform = `scale=w='max(2,trunc(${(cropWidth + effectPadding * 2) * fit}*(${scale})*(${pose("scaleX")})/2)*2)':h='max(2,trunc(${(cropHeight + effectPadding * 2) * fit}*(${scale})*(${pose("scaleY")})/2)*2)':eval=frame`;
@@ -648,6 +657,7 @@ async function renderProject(
       // for channels that actually contain object motion.
       const objectMotion = objectBehaviorExpressions(clip, clock("t"));
       const alphaAnimated =
+        transitionMotion.opacity !== "1" ||
         !!clip.fadeTiming ||
         objectMotion.opacity !== "1" ||
         clip.keyframes.some((k) => k.value.opacity !== clip.transform.opacity);
@@ -805,6 +815,8 @@ async function renderProject(
       // Negotiate that conversion on an explicit frame-evaluated scale filter
       // for axis-scaled layers, including later proportional animations.
       const independentScale =
+        transitionMotion.scale !== "1" ||
+        transitionMotion.scaleX !== "1" ||
         clip.keyframes.some(frame => frame.value.scale !== clip.transform.scale) ||
         clip.transform.scaleX !== undefined || clip.transform.scaleY !== undefined ||
         clip.keyframes.some((frame) => frame.value.scaleX !== undefined || frame.value.scaleY !== undefined);
@@ -849,7 +861,11 @@ async function renderProject(
       args.push(...attached.args);
       input += attached.inputCount;
       filters.push(...attached.filters);
-      filters.push(`[${attached.label}]${[transform, "setsar=1", ...rotate, ...(directVideo ? [] : [alpha]), ...outputFormat].join(",")}[${visual}]`);
+      // Evaluate alpha on the fixed source dimensions during transition zooms.
+      // RGB geq after a resizing scale can retain its initial frame dimensions.
+      const alphaBeforeTransform = transitionMotion.scale !== "1" || transitionMotion.scaleX !== "1";
+      const alphaFilters = directVideo ? [] : [alpha];
+      filters.push(`[${attached.label}]${[...(alphaBeforeTransform ? alphaFilters : []), transform, "setsar=1", ...rotate, ...(alphaBeforeTransform ? [] : alphaFilters), ...outputFormat].join(",")}[${visual}]`);
       // Composite text before chroma subsampling so rounded fills and glyphs
       // retain the same pixel position in video and frame captures.
       const matte = clip.visualEffects?.["media-matte"];

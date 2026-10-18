@@ -56,6 +56,7 @@ import {
   type TransitionSelection,
   type TransitionTarget,
   type Transition,
+  type TransitionType,
 } from "../shared/transitions";
 import { setVideoZoomPan } from "../shared/video-zoom-pan";
 import { type ContentTransform } from "../shared/crop";
@@ -1274,12 +1275,13 @@ export function useEditor(
     [select, clearKeyframeEdit, setPlaying],
   );
   const addTransition = useCallback(
-    (target: TransitionTarget) => {
+    (target: TransitionTarget, type: TransitionType = "smooth-slide") => {
       const before = current.current;
       const next = addProjectTransition(
         before,
         target,
         defaults.current.timing.transition,
+        type,
       );
       if (next === before) return;
       apply(next);

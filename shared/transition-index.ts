@@ -9,10 +9,12 @@ type Member = { clip: Clip; side: TransitionSide };
 class TransitionIndex {
   readonly edges = new RustTimelineIndex();
   readonly pairs = new Map<string, Member[]>();
+  readonly positions = new Map<string, number>();
   private readonly tracks = new Map<string, number>();
 
   constructor(readonly clips: Clip[]) {
     clips.forEach((clip, id) => {
+      this.positions.set(clip.id, id);
       for (const side of sides) {
         const pairId = clip.transitions?.[side]?.pairId;
         if (pairId) {

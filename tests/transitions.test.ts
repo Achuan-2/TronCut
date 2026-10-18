@@ -17,9 +17,12 @@ import {
   transitionDropTarget,
   transitionOffset,
   transitionRange,
+  transitionTransform,
+  transitionVisual,
+  transitionPresets,
   updateTransition,
 } from "../shared/transitions";
-import { exportVideo } from "../electron/export";
+import { exportFrame, exportVideo } from "../electron/export";
 import { findBinary, runProcess } from "../electron/process";
 import { openProject, saveProject } from "../electron/project-store";
 
@@ -54,7 +57,226 @@ function adjacentProject() {
   return project;
 }
 
-describe("Smooth Slide 转换", () => {
+describe("转换效果", () => {
+  it.each(transitionPresets)("$name 支持保存、接点同步和禁用", ({ type }) => {
+    let project = addTransition(
+      adjacentProject(),
+      {
+        clipId: "red",
+        side: "outgoing",
+        neighborId: "blue",
+      },
+      0.8,
+      type,
+    );
+    project = validateProject(JSON.parse(JSON.stringify(project)));
+    expect(project.clips[0].transitions?.outgoing?.type).toBe(type);
+    expect(project.clips[1].transitions?.incoming?.type).toBe(type);
+    project = updateTransition(
+      project,
+      { clipId: "red", side: "outgoing" },
+      { type: "fade", enabled: false },
+    );
+    expect(project.clips[1].transitions?.incoming).toMatchObject({
+      type: "fade",
+      enabled: false,
+    });
+    expect(
+      transitionTransform(project, project.clips[1], defaultTransform, 1),
+    ).toEqual(defaultTransform);
+  });
+
+  it.each([false, true])(
+    "叠化按实际图层顺序混合，避免背景变暗，倒序=%s",
+    (reordered) => {
+      let project = adjacentProject();
+      if (reordered) project.clips.reverse();
+      project = addTransition(
+        project,
+        { clipId: "red", side: "outgoing", neighborId: "blue" },
+        1,
+        "fade",
+      );
+      const snapshot = frameSnapshot(project, 1);
+      expect(snapshot.clips.map((clip) => clip.transform.opacity)).toEqual([
+        1, 0.5,
+      ]);
+      // Preview uses derived clip objects rather than the original references.
+      expect(
+        transitionVisual(project, { ...project.clips[1] }, 1).opacity,
+      ).toBe(0.5);
+      expect(snapshot.clips.map((clip) => clip.transform.x)).toEqual([
+        0.5, 0.5,
+      ]);
+    },
+  );
+
+  it("放大叠加原有缩放，横扫快速穿过接点后收稳，反转改变方向", () => {
+    let project = addTransition(
+      adjacentProject(),
+      { clipId: "red", side: "incoming" },
+      0.5,
+      "zoom",
+    );
+    const clip = project.clips[0];
+    const zoomed = transitionTransform(
+      project,
+      clip,
+      { ...defaultTransform, scale: 2 },
+      0.25,
+    );
+    expect(zoomed.scale).toBeCloseTo(1.72);
+    expect(zoomed.opacity).toBe(0.5);
+    project = updateTransition(
+      project,
+      { clipId: "red", side: "incoming" },
+      { reverse: true },
+    );
+    expect(transitionVisual(project, project.clips[0], 0.25).scale).toBeCloseTo(
+      1.14,
+    );
+    project = addTransition(
+      adjacentProject(),
+      { clipId: "red", side: "incoming" },
+      0.5,
+      "whip-pan",
+    );
+    expect(transitionVisual(project, project.clips[0], 0.125)).toMatchObject({
+      x: 0.9375,
+      scaleX: 1.12,
+    });
+    expect(transitionVisual(project, project.clips[0], 0.5)).toEqual({
+      x: 0,
+      scale: 1,
+      scaleX: 1,
+      opacity: 1,
+    });
+    project = updateTransition(
+      project,
+      { clipId: "red", side: "incoming" },
+      { reverse: true },
+    );
+    expect(transitionOffset(project, project.clips[0], 0.125)).toBe(-0.9375);
+  });
+  it.each(
+    transitionPresets.flatMap((preset) =>
+      [false, true].map((reverse) => ({ ...preset, reverse })),
+    ),
+  )(
+    "$name 视频导出与冻结截帧在转场多处一致，反转=$reverse",
+    async ({ type, reverse }) => {
+      const root = path.resolve(
+        `test-output/transition-parity-${type}-${reverse}-${Date.now()}`,
+      );
+      await fs.mkdir(root, { recursive: true });
+      let project = adjacentProject();
+      project.canvas = {
+        width: 160,
+        height: 90,
+        fps: 20,
+        background: "#000000",
+      };
+      project.exportSettings = { encoder: "software" };
+      for (const asset of project.assets) {
+        const image = path.join(root, `${asset.id}.png`);
+        await sharp({
+          create: {
+            width: 160,
+            height: 90,
+            channels: 3,
+            background: asset.id === "red" ? "#f00000" : "#0050f0",
+          },
+        })
+          .composite([
+            {
+              input: Buffer.from(
+                '<svg width="160" height="90"><rect x="50" y="25" width="60" height="40" fill="white"/></svg>',
+              ),
+            },
+          ])
+          .png()
+          .toFile(image);
+        asset.path = path.join(root, `${asset.id}.mp4`);
+        asset.kind = "video";
+        asset.duration = 1;
+        await runProcess(findBinary("ffmpeg"), [
+          "-y",
+          "-loglevel",
+          "error",
+          "-loop",
+          "1",
+          "-i",
+          image,
+          "-t",
+          "1",
+          "-r",
+          "20",
+          "-pix_fmt",
+          "yuv420p",
+          asset.path,
+        ]);
+      }
+      project.clips = project.clips.map((clip) => ({ ...clip, kind: "video" }));
+      project = addTransition(
+        project,
+        { clipId: "red", side: "outgoing", neighborId: "blue" },
+        1,
+        type,
+      );
+      project = updateTransition(
+        project,
+        { clipId: "blue", side: "incoming" },
+        { reverse },
+      );
+      const movie = path.join(root, "transition.mp4");
+      const signal = new AbortController().signal;
+      await exportVideo(
+        project,
+        movie,
+        path.join(root, "render"),
+        false,
+        signal,
+        () => {},
+      );
+      for (const time of [0.6, 0.8, 1, 1.2, 1.4]) {
+        const expected = path.join(root, `expected-${time}.png`);
+        const actual = path.join(root, `actual-${time}.png`);
+        await exportFrame(
+          project,
+          time,
+          expected,
+          path.join(root, `frame-${time}`),
+          signal,
+        );
+        await runProcess(findBinary("ffmpeg"), [
+          "-y",
+          "-loglevel",
+          "error",
+          "-ss",
+          String(time),
+          "-i",
+          movie,
+          "-frames:v",
+          "1",
+          actual,
+        ]);
+        const a = await sharp(actual).removeAlpha().raw().toBuffer();
+        const b = await sharp(expected).removeAlpha().raw().toBuffer();
+        const error =
+          a.reduce((sum, value, index) => sum + Math.abs(value - b[index]), 0) /
+          a.length;
+        expect(error, `${type} reverse=${reverse} t=${time}`).toBeLessThan(12);
+        if (time === 1 && !reverse) {
+          let dark = 0;
+          for (let i = 0; i < a.length; i += 3)
+            if (a[i] < 25 && a[i + 1] < 25 && a[i + 2] < 25) dark++;
+          expect(dark).toBeLessThan(200);
+        }
+      }
+    },
+    30_000,
+  );
+
   it("识别片头、片尾、中部两端和相邻接点放置", () => {
     const project = adjacentProject();
     const red = project.clips[0];

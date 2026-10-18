@@ -91,6 +91,7 @@ import {
   transitionMime,
   transitionDropTarget,
   transitionTargets,
+  transitionTypeSchema,
   type TransitionTarget,
 } from "../shared/transitions";
 import {
@@ -1606,11 +1607,10 @@ export default function Timeline({
                               event.preventDefault();
                               event.stopPropagation();
                               setTransitionDrop(null);
-                              if (
-                                event.dataTransfer.getData(transitionMime) !==
-                                "smooth-slide"
-                              )
-                                return;
+                              const type = transitionTypeSchema.safeParse(
+                                event.dataTransfer.getData(transitionMime),
+                              );
+                              if (!type.success) return;
                               const bounds =
                                 event.currentTarget.getBoundingClientRect();
                               const target = transitionDropTarget(
@@ -1619,7 +1619,7 @@ export default function Timeline({
                                 event.clientX - bounds.left,
                                 bounds.width,
                               );
-                              if (target) editor.addTransition(target);
+                              if (target) editor.addTransition(target, type.data);
                               return;
                             }
                             const behavior =

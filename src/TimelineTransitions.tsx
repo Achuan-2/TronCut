@@ -5,6 +5,7 @@ import {
   transitionDuration,
   transitionMarkerDuration,
   transitionSides,
+  transitionName,
   type TransitionSide,
 } from "../shared/transitions";
 import type { Editor } from "./useEditor";
@@ -43,8 +44,8 @@ function TransitionMarker({
       className={`timeline-transition ${side} ${isSelected ? "selected" : ""} ${transition.enabled ? "" : "disabled"}`}
       role="button"
       tabIndex={0}
-      aria-label={`${side === "incoming" ? "片头" : "片尾"}转换 Smooth Slide`}
-      title={`Smooth Slide · ${transitionDuration(editor.project, clip, side).toFixed(2)}s${pair ? " · 接点" : ""}`}
+      aria-label={`${side === "incoming" ? "片头" : "片尾"}转换 ${transitionName(transition.type)}`}
+      title={`${transitionName(transition.type)} · ${transitionDuration(editor.project, clip, side).toFixed(2)}s${pair ? " · 接点" : ""}`}
       style={{
         width: Math.min((clip.duration * zoom) / 2, Math.max(8, span * zoom)),
       }}
