@@ -11,6 +11,7 @@ import {
   rootGroupId,
   ungroupClips,
 } from "./clip-groups";
+import { constrainTimelineMove } from "./timeline-collision";
 
 export function editableIds(
   project: Project,
@@ -98,7 +99,7 @@ export function moveClips(
   const selected = editableIds(project, ids);
   const clips = project.clips.filter((c) => selected.has(c.id));
   if (!clips.length || !Number.isFinite(delta)) return project;
-  const offset = Math.max(-Math.min(...clips.map((c) => c.start)), delta);
+  const offset = constrainTimelineMove(project, [...selected], delta);
   if (!offset) return project;
   return {
     ...project,
@@ -288,15 +289,27 @@ export function pasteClips(
       parentId: group?.parentId ? groups.get(group.parentId) : undefined,
     };
   });
+  const pasted = {
+    ...project,
+    clips: [...project.clips, ...clips],
+    ...(copiedGroups.length
+      ? { groups: [...(project.groups ?? []), ...copiedGroups] }
+      : {}),
+  };
+  const ids: string[] = clips.map((clip) => clip.id);
+  const delta = constrainTimelineMove(pasted, ids, 0);
   return {
-    project: {
-      ...project,
-      clips: [...project.clips, ...clips],
-      ...(copiedGroups.length
-        ? { groups: [...(project.groups ?? []), ...copiedGroups] }
-        : {}),
-    },
-    ids: clips.map((c) => c.id),
+    project: delta
+      ? {
+          ...pasted,
+          clips: pasted.clips.map((clip) =>
+            ids.includes(clip.id)
+              ? { ...clip, start: clip.start + delta }
+              : clip,
+          ),
+        }
+      : pasted,
+    ids,
   };
 }
 

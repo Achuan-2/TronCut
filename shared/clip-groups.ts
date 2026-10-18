@@ -2,6 +2,7 @@ import { type Clip, type Project, uid } from "./model";
 import { recordingGroups, recordingTimeline } from "./recording-objects";
 
 export type ClipGroup = NonNullable<Project["groups"]>[number];
+type GroupDocument = Pick<Project, "clips" | "groups">;
 export interface GroupScope {
   id: string;
   offset: number;
@@ -9,7 +10,7 @@ export interface GroupScope {
 }
 
 /** Old projects need no migration: a groupId alone still defines a group. */
-export function groupName(project: Project, id: string): string {
+export function groupName(project: GroupDocument, id: string): string {
   const named = project.groups?.find((group) => group.id === id);
   if (named) return named.name;
   const recording = recordingGroups(project).get(id);
@@ -22,7 +23,10 @@ export function groupName(project: Project, id: string): string {
   return `组合 ${Math.max(1, ids.indexOf(id) + 1)}`;
 }
 
-export function rootGroupId(project: Project, id?: string): string | undefined {
+export function rootGroupId(
+  project: Pick<Project, "groups">,
+  id?: string,
+): string | undefined {
   const seen = new Set<string>();
   while (id && !seen.has(id)) {
     seen.add(id);
@@ -33,7 +37,10 @@ export function rootGroupId(project: Project, id?: string): string | undefined {
   return id;
 }
 
-export function descendantGroupIds(project: Project, id: string): Set<string> {
+export function descendantGroupIds(
+  project: Pick<Project, "groups">,
+  id: string,
+): Set<string> {
   const ids = new Set([id]);
   for (let size = 0; size !== ids.size;) {
     size = ids.size;
@@ -43,7 +50,7 @@ export function descendantGroupIds(project: Project, id: string): Set<string> {
   return ids;
 }
 
-export function groupMembers(project: Project, id: string): Clip[] {
+export function groupMembers(project: GroupDocument, id: string): Clip[] {
   const ids = descendantGroupIds(project, id);
   return project.clips.filter((clip) => clip.groupId && ids.has(clip.groupId));
 }
@@ -271,7 +278,9 @@ export interface TimelineGroup {
 }
 
 /** Collapse ordinary groups to one timeline entry while keeping render/export media flat. */
-export function groupedTimeline(project: Project) {
+export function groupedTimeline(
+  project: GroupDocument & Pick<Project, "tracks">,
+) {
   const timeline = recordingTimeline(project);
   const recordings = recordingGroups(project);
   const groups = new Map<string, TimelineGroup>();
@@ -309,13 +318,20 @@ export function groupedTimeline(project: Project) {
   for (const proxy of proxies) hidden.delete(proxy.id);
   const occupied = new Set(clips.map((clip) => clip.trackId));
   const visible = new Set(timeline.tracks.map((track) => track.id));
+  const collapsed = new Set(
+    [...groups.values()].flatMap((group) =>
+      group.members.map((clip) => clip.trackId),
+    ),
+  );
   return {
     ...timeline,
     clips,
     hidden,
     groups,
     tracks: project.tracks.filter(
-      (track) => visible.has(track.id) || occupied.has(track.id),
+      (track) =>
+        (visible.has(track.id) || occupied.has(track.id)) &&
+        (!collapsed.has(track.id) || occupied.has(track.id)),
     ),
   };
 }

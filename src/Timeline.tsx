@@ -128,6 +128,10 @@ import { groupName, groupedTimeline, rootGroupId } from "../shared/clip-groups";
 import GroupTimelineNavigation from "./GroupTimelineNavigation";
 import TimelineGroupClip from "./TimelineGroupClip";
 import {
+  constrainTimelineMove,
+  timelineTrimBounds,
+} from "../shared/timeline-collision";
+import {
   timelineZoomMin,
   timelineZoomMax,
   timelineRulerStep,
@@ -712,26 +716,39 @@ export default function Timeline({
         ...project,
         clips: project.clips.filter((clip) => !d.ids.includes(clip.id)),
       };
+      const wanted = Math.max(
+        c.start - earliest,
+        snap ? snapTime(t, snapProject, c.id, 8 / zoom) : t,
+      );
+      const offset = constrainTimelineMove(
+        project, d.ids, wanted - c.start,
+        d.ids.length === 1 ? d.trackId : undefined,
+      );
       return {
         ...c,
         trackId: d.trackId,
-        start: Math.max(
-          c.start - earliest,
-          snap ? snapTime(t, snapProject, c.id, 8 / zoom) : t,
-        ),
+        start: c.start + offset,
       };
     }
     if (d.mode === "left") {
       const wanted = snap
         ? snapTime(c.start + d.delta, project, c.id, 8 / zoom) - c.start
         : d.delta;
-      return trimClip(c, asset, "left", wanted, project.canvas.fps);
+      return trimClip(
+        c, asset, "left",
+        Math.max(wanted, timelineTrimBounds(project, c.id).start - c.start),
+        project.canvas.fps,
+      );
     }
     const wanted = snap
       ? snapTime(c.start + c.duration + d.delta, project, c.id, 8 / zoom) -
         c.start
       : c.duration + d.delta;
-    return trimClip(c, asset, "right", wanted, project.canvas.fps);
+    return trimClip(
+      c, asset, "right",
+      Math.min(wanted, timelineTrimBounds(project, c.id).end - c.start),
+      project.canvas.fps,
+    );
   }
   const timeFromEvent = (
     event:

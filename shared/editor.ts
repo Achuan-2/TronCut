@@ -23,9 +23,10 @@ import { visualKeys, visualValues } from "./visual-state";
 import { fitBehaviorDuration, shiftBehaviors } from "./behaviors";
 import { markerEnd } from "./markers";
 import { normalizeStitch } from "./media-segments";
+import { timelineTrackIsFree } from "./timeline-collision";
 
 export function availableTrack(
-  project: Pick<Project, "tracks" | "clips">,
+  project: Pick<Project, "tracks" | "clips" | "groups">,
   start: number,
   duration: number,
 ) {
@@ -34,12 +35,7 @@ export function availableTrack(
       !track.locked &&
       !track.hidden &&
       !track.captionTrack &&
-      !project.clips.some(
-        (clip) =>
-          clip.trackId === track.id &&
-          clip.start < start + duration &&
-          clip.start + clip.duration > start,
-      ),
+      timelineTrackIsFree(project, track.id, start, duration),
   );
 }
 
@@ -74,7 +70,9 @@ export function addMediaAssets(
           : undefined
         : options.newTrackForImages && asset.kind === "image"
           ? undefined
-          : availableTrack({ tracks, clips }, start, duration);
+          : availableTrack(
+              { tracks, clips, groups: project.groups }, start, duration,
+            );
       const target = tracks.find(
         (track) =>
           track.id === options.trackId &&
@@ -84,11 +82,8 @@ export function addMediaAssets(
       );
       if (
         target &&
-        !clips.some(
-          (clip) =>
-            clip.trackId === target.id &&
-            clip.start < start + duration &&
-            clip.start + clip.duration > start,
+        timelineTrackIsFree(
+          { tracks, clips, groups: project.groups }, target.id, start, duration,
         )
       )
         track = target;

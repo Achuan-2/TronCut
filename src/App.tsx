@@ -152,6 +152,9 @@ export default function App() {
     clearTimeout(toastTimer.current);
     toastTimer.current = setTimeout(() => setToast(""), 6500);
   }, []);
+  useEffect(() => {
+    if (editor.timelineConflict) toast("同一轨道上的素材不能重叠，请调整位置或使用其他轨道");
+  }, [editor.timelineConflict, toast]);
   const changePreviewQuality = useCallback(
     (previewQuality: EditorPreferences["program"]["previewQuality"]) => {
       const program = { ...editorPreferences.program, previewQuality };

@@ -83,7 +83,7 @@ export function releasedRecordingTracks(
   return tracks;
 }
 
-export function recordingTimeline(project: Project) {
+export function recordingTimeline(project: Pick<Project, "clips" | "tracks">) {
   const groups = recordingGroups(project);
   const hidden = new Set(
     project.clips

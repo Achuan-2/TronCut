@@ -5,6 +5,7 @@ import { type TimelineGroup } from "../shared/clip-groups";
 import { moveClips, selectionWithGroups } from "../shared/timeline";
 import { snapTime } from "../shared/editor";
 import type { Editor } from "./useEditor";
+import { constrainTimelineMove } from "../shared/timeline-collision";
 
 export default function TimelineGroupClip({
   editor,
@@ -85,7 +86,11 @@ export default function TimelineGroupClip({
               8 / zoom,
             )
           : wanted;
-        gesture.delta = Math.max(-earliest, time - clip.start);
+        gesture.delta = constrainTimelineMove(
+          editor.project,
+          gesture.ids,
+          Math.max(-earliest, time - clip.start),
+        );
         setDelta(gesture.delta);
       }}
       onPointerUp={() => {

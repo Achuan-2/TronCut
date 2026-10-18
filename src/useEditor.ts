@@ -122,6 +122,11 @@ import {
   renameClipGroup,
   type GroupScope,
 } from "../shared/clip-groups";
+import {
+  groupExistingTimelineOverlaps,
+  hasProjectTimelineOverlap,
+  timelineLayoutChanged,
+} from "../shared/timeline-collision";
 
 export function demoProject(): Project {
   const project = createProject("我的第一个视频");
@@ -309,6 +314,7 @@ export function useEditor(
     [clearKeyframeEdit],
   );
   const [dirty, setDirty] = useState(false);
+  const [timelineConflict, setTimelineConflict] = useState(0);
   const [autoAnimate, setAutoAnimate] = useState(false);
   const [timelineFocus, setTimelineFocus] = useState<{ time: number } | null>(null);
 
@@ -365,6 +371,13 @@ export function useEditor(
       const documentAfter = scopeRef.current
         ? mergeGroupProject(documentBefore, scopeRef.current, after)
         : after;
+      if (
+        timelineLayoutChanged(documentBefore, documentAfter) &&
+        hasProjectTimelineOverlap(documentAfter)
+      ) {
+        setTimelineConflict((count) => count + 1);
+        return;
+      }
       if (scopeRef.current)
         scopeRef.current.trackIds = [
           ...new Set([
@@ -499,6 +512,9 @@ export function useEditor(
     [apply, selectedIds, select, setPlaying],
   );
   const replace = useCallback((next: Project, unsaved = false) => {
+    const migrated = groupExistingTimelineOverlaps(next);
+    unsaved ||= migrated !== next;
+    next = migrated;
     next = { ...next, tracks: numberTracks(next.tracks) };
     past.current = [];
     future.current = [];
@@ -1570,6 +1586,7 @@ export function useEditor(
   return {
     project,
     documentProject,
+    timelineConflict,
     activeGroupId: groupScope?.id ?? null,
     timelineTabs: openGroups.map((id) => ({
       id,
