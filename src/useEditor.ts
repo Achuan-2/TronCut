@@ -114,6 +114,14 @@ import type { DrawingStroke } from "../shared/annotation-style";
 import { freehandAnnotation, type PenSettings } from "../shared/freehand";
 import { createPlaybackStore } from "./playback-store";
 import { stitchClips, stitchSelectionError, unstitchClips } from "../shared/stitch";
+import {
+  createGroupScope,
+  groupName,
+  mergeGroupProject,
+  projectForGroup,
+  renameClipGroup,
+  type GroupScope,
+} from "../shared/clip-groups";
 
 export function demoProject(): Project {
   const project = createProject("我的第一个视频");
@@ -150,7 +158,20 @@ export function useEditor(
   defaults.current = preferences;
   const playback = useMemo(() => createPlaybackStore(1.2), []);
   const playhead = playback.getSnapshot();
-  const [project, setProject] = useState<Project>(() => createProject());
+  const [documentProject, setDocumentProject] = useState<Project>(() =>
+    createProject(),
+  );
+  const [groupScope, setGroupScope] = useState<GroupScope | null>(null);
+  const scopeRef = useRef(groupScope);
+  scopeRef.current = groupScope;
+  const [openGroups, setOpenGroups] = useState<string[]>([]);
+  const timelinePositions = useRef(new Map<string, number>());
+  const groupScopes = useRef(new Map<string, GroupScope>());
+  // Editing uses a local timeline; saving and exporting use the full document.
+  const project = useMemo(
+    () => projectForGroup(documentProject, groupScope),
+    [documentProject, groupScope],
+  );
   const [editingTextId, setEditingTextId] = useState<string | null>(null);
   const [textSelection, setTextSelection] = useState<(TextRange & { clipId: string }) | null>(null);
   const [zoomPanDraft, setZoomPanDraft] = useState<Transform | null>(null);
@@ -319,7 +340,9 @@ export function useEditor(
 
   const past = useRef<Project[]>([]),
     future = useRef<Project[]>([]),
+    documentCurrent = useRef(documentProject),
     current = useRef(project);
+  documentCurrent.current = documentProject;
   current.current = project;
   const apply = useCallback(
     (next: Project | ((project: Project) => Project)) => {
@@ -338,14 +361,88 @@ export function useEditor(
           : { ...result, tracks, clips },
       );
       if (after === before) return;
-      past.current = [...past.current.slice(-99), before];
+      const documentBefore = documentCurrent.current;
+      const documentAfter = scopeRef.current
+        ? mergeGroupProject(documentBefore, scopeRef.current, after)
+        : after;
+      if (scopeRef.current)
+        scopeRef.current.trackIds = [
+          ...new Set([
+            ...scopeRef.current.trackIds,
+            ...after.tracks.map((track) => track.id),
+          ]),
+        ];
+      past.current = [...past.current.slice(-99), documentBefore];
       future.current = [];
-      current.current = after;
-      setProject(after);
+      documentCurrent.current = documentAfter;
+      current.current = projectForGroup(documentAfter, scopeRef.current);
+      setDocumentProject(documentAfter);
       setDirty(true);
     },
     [],
   );
+  const switchTimeline = useCallback(
+    (id: string | null) => {
+      const document = documentCurrent.current;
+      const next = id
+        ? createGroupScope(document, id) ?? groupScopes.current.get(id)
+        : null;
+      if (id && !next) return;
+      timelinePositions.current.set(
+        scopeRef.current?.id ?? "main",
+        playback.getSnapshot(),
+      );
+      if (next) {
+        groupScopes.current.set(next.id, next);
+        setOpenGroups((groups) =>
+          groups.includes(next.id) ? groups : [...groups, next.id],
+        );
+      }
+      scopeRef.current = next ?? null;
+      current.current = projectForGroup(document, next ?? null);
+      setGroupScope(next ?? null);
+      setEditingTextId(null);
+      setZoomPanDraft(null);
+      setTimelineFocus(null);
+      setPlaying(false);
+      select(null);
+      seek(Math.min(
+        projectDuration(current.current),
+        timelinePositions.current.get(id ?? "main") ?? 0,
+      ));
+    },
+    [playback, select, seek, setPlaying],
+  );
+  const closeGroup = useCallback(
+    (id: string) => {
+      if (scopeRef.current?.id === id) switchTimeline(null);
+      setOpenGroups((groups) => groups.filter((group) => group !== id));
+      groupScopes.current.delete(id);
+      timelinePositions.current.delete(id);
+    },
+    [switchTimeline],
+  );
+  useEffect(() => {
+    const exists = (id: string) =>
+      documentProject.groups?.some((group) => group.id === id) ||
+      documentProject.clips.some((clip) => clip.groupId === id);
+    if (groupScope && !exists(groupScope.id)) switchTimeline(null);
+    setOpenGroups((groups) =>
+      groups.every(exists) ? groups : groups.filter(exists),
+    );
+  }, [documentProject, groupScope, switchTimeline]);
+  const renameGroup = useCallback((id: string, name: string) => {
+    const before = documentCurrent.current;
+    const after = renameClipGroup(before, id, name);
+    if (before === after) return;
+    past.current = [...past.current.slice(-99), before];
+    future.current = [];
+    documentCurrent.current = after;
+    current.current = projectForGroup(after, scopeRef.current);
+    setDocumentProject(after);
+    setDirty(true);
+  }, []);
+  const [renamingGroup, setRenamingGroup] = useState<string | null>(null);
   const deleteSelectedClips = useCallback(
     (ripple = false) => {
       const before = current.current;
@@ -406,7 +503,14 @@ export function useEditor(
     past.current = [];
     future.current = [];
     current.current = next;
-    setProject(next);
+    documentCurrent.current = next;
+    setDocumentProject(next);
+    scopeRef.current = null;
+    setGroupScope(null);
+    setOpenGroups([]);
+    setRenamingGroup(null);
+    groupScopes.current.clear();
+    timelinePositions.current.clear();
     setEditingTextId(null);
     setZoomPanDraft(null);
     setTimelineFocus(null);
@@ -418,25 +522,44 @@ export function useEditor(
     setDirty(unsaved);
   }, []);
   const markSaved = useCallback((saved: Project) => {
-    current.current = saved;
-    setProject(saved);
+    documentCurrent.current = saved;
+    current.current = projectForGroup(saved, scopeRef.current);
+    setDocumentProject(saved);
     setDirty(false);
   }, []);
   const undo = useCallback(() => {
     const previous = past.current.pop();
     if (previous) {
-      future.current.push(current.current);
-      current.current = previous;
-      setProject(previous);
+      future.current.push(documentCurrent.current);
+      documentCurrent.current = previous;
+      if (scopeRef.current) {
+        // History can restore a group moved on the main timeline. Rebase its
+        // local origin before projecting, so earlier media is never clamped away.
+        const scope = createGroupScope(previous, scopeRef.current.id);
+        if (scope) {
+          scopeRef.current = scope;
+          setGroupScope(scope);
+        }
+      }
+      current.current = projectForGroup(previous, scopeRef.current);
+      setDocumentProject(previous);
       setDirty(true);
     }
   }, []);
   const redo = useCallback(() => {
     const next = future.current.pop();
     if (next) {
-      past.current.push(current.current);
-      current.current = next;
-      setProject(next);
+      past.current.push(documentCurrent.current);
+      documentCurrent.current = next;
+      if (scopeRef.current) {
+        const scope = createGroupScope(next, scopeRef.current.id);
+        if (scope) {
+          scopeRef.current = scope;
+          setGroupScope(scope);
+        }
+      }
+      current.current = projectForGroup(next, scopeRef.current);
+      setDocumentProject(next);
       setDirty(true);
     }
   }, []);
@@ -1446,6 +1569,17 @@ export function useEditor(
   }, [keyframeSelection, selectedKeyframe, clearKeyframeEdit]);
   return {
     project,
+    documentProject,
+    activeGroupId: groupScope?.id ?? null,
+    timelineTabs: openGroups.map((id) => ({
+      id,
+      name: groupName(documentProject, id),
+    })),
+    switchTimeline,
+    closeGroup,
+    renameGroup,
+    renamingGroup,
+    setRenamingGroup,
     presetLibrary,
     preferences,
     apply,

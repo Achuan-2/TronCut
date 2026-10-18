@@ -98,11 +98,28 @@ export const textRunSchema = z.object({
   end: z.number().int().min(1).max(10000),
   style: characterStyleSchema,
 }).refine((run) => run.end > run.start);
+const markerSchema = z.object({
+  id: identifier,
+  time: finite.nonnegative(),
+  label: z.string(),
+  duration: finite.min(0).max(86400).optional(),
+  comments: z.string().max(10000).optional(),
+  color: z.string().regex(/^#[\da-f]{6}$/i).optional(),
+});
 export const projectSchema = z.object({
   format: z.enum(["troncut", "framecraft"]),
   version: z.literal(1),
   id: identifier,
   name: z.string().min(1).max(200),
+  groups: z
+    .array(z.object({
+      id: identifier,
+      name: z.string().trim().min(1).max(100),
+      parentId: identifier.optional(),
+      markers: z.array(markerSchema).optional(),
+    }))
+    .max(10000)
+    .optional(),
   canvas: z.object({
     width: z.number().int().min(16).max(7680),
     height: z.number().int().min(16).max(4320),
@@ -267,16 +284,7 @@ export const projectSchema = z.object({
       }),
     )
     .max(100000),
-  markers: z.array(
-    z.object({
-      id: identifier,
-      time: finite.nonnegative(),
-      label: z.string(),
-      duration: finite.min(0).max(86400).optional(),
-      comments: z.string().max(10000).optional(),
-      color: z.string().regex(/^#[\da-f]{6}$/i).optional(),
-    }),
-  ),
+  markers: z.array(markerSchema),
   exportSettings: exportSettingsSchema.optional(),
   importReport: z.array(z.string()).optional(),
   camtasiaOriginal: z.unknown().optional(),

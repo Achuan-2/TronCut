@@ -1,0 +1,76 @@
+.timeline-tabs {
+  display: flex;
+  gap: 4px;
+  min-height: 28px;
+  padding: 0 12px;
+  overflow-x: auto;
+  flex-shrink: 0;
+  border-bottom: 1px solid #354138;
+}
+.timeline-tab {
+  display: flex;
+  flex-shrink: 0;
+  max-width: 240px;
+  align-items: center;
+  background: #242c2e;
+  border-radius: 6px 6px 0 0;
+}
+.timeline-tab.active {
+  background: #34443b;
+  box-shadow: inset 0 -2px #9be0b2;
+}
+.timeline-tab > button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 5px 10px;
+  border: 0;
+  background: transparent;
+  color: #c4d0c9;
+  font-size: 12px;
+}
+.timeline-tab.active > button {
+  color: #b7edc7;
+}
+.timeline-tab > button > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.timeline-tab > .timeline-tab-close {
+  padding: 5px;
+  margin-right: 3px;
+}
+.timeline-tab > .timeline-tab-close:hover {
+  background: #53655a;
+  border-radius: 3px;
+}
+.timeline-clip.clip-group {
+  background: #364750;
+  border-color: #708a98;
+}
+.timeline-clip.clip-group.selected {
+  border-color: #9fe5b6;
+}
+.clip-group-label {
+  display: flex;
+  gap: 7px;
+  align-items: center;
+  height: 100%;
+  padding: 0 10px;
+  min-width: 0;
+}
+.clip-group-label > svg {
+  flex-shrink: 0;
+}
+.clip-group-label > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.clip-group-count {
+  color: #acc0cb;
+  font-size: 10px;
+  flex-shrink: 0;
+}

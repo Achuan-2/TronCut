@@ -25,6 +25,7 @@ import {
 import { useEditor } from "./useEditor";
 import Preview from "./Preview";
 import Timeline from "./Timeline";
+import { GroupRenameDialog } from "./GroupTimelineNavigation";
 import type { AnimationRange } from "../shared/animation-ranges";
 import Panels, { Inspector, type Tab } from "./Panels";
 import Recorder from "./Recorder";
@@ -346,7 +347,7 @@ export default function App() {
   }, [editor.dirty]);
   const save = (saveAs = false) =>
     run(async () => {
-      const result = await bridge().saveProject(editor.project, saveAs);
+      const result = await bridge().saveProject(editor.documentProject, saveAs);
       if (result) {
         editor.markSaved(result.project);
         setFile(result.file);
@@ -363,7 +364,7 @@ export default function App() {
     }
     let success = false;
     await run(async () => {
-      const result = await bridge().renameProject(editor.project, trimmed);
+      const result = await bridge().renameProject(editor.documentProject, trimmed);
       if (result) {
         editor.markSaved(result.project);
         setFile(result.file);
@@ -555,7 +556,7 @@ export default function App() {
   const startExport = async (request: VideoExportRequest) => {
     setBusy(true);
     try {
-      const result = await bridge().exportVideo(editor.project, request);
+      const result = await bridge().exportVideo(editor.documentProject, request);
       if (result) {
         if (
           JSON.stringify(editor.project.exportSettings) !==
@@ -886,11 +887,11 @@ export default function App() {
         editor.dirty &&
         editorPreferences.program.autoRecovery
       )
-        void window.framecraft.writeRecovery(editor.project).catch(() => {});
+        void window.framecraft.writeRecovery(editor.documentProject).catch(() => {});
     }, editorPreferences.program.recoveryDelay * 1000);
     return () => clearTimeout(timer);
   }, [
-    editor.project,
+    editor.documentProject,
     editor.dirty,
     hasSession,
     editorPreferences.program.autoRecovery,
@@ -1208,6 +1209,7 @@ export default function App() {
             <Inspector editor={editor} />
           </div>
           <Timeline
+            key={`${editor.documentProject.id}:${editor.activeGroupId ?? "main"}`}
             editor={editor}
             onCommand={(command) => commands.current(command)}
             onCopyAnimation={copyAnimation}
@@ -1230,6 +1232,7 @@ export default function App() {
         />
       )}
       <PresetLibraryOverlays library={editor.presetLibrary} />
+      <GroupRenameDialog editor={editor} />
       {toastMessage && (
         <div className="toast" role="status">
           <Check size={17} />
@@ -1260,7 +1263,7 @@ export default function App() {
       )}
       {exportOpen && (
         <ExportDialog
-          project={editor.project}
+          project={editor.documentProject}
           busy={busy}
           onClose={() => setExportOpen(false)}
           onExport={startExport}

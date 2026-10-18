@@ -3,6 +3,14 @@ import { splitClip } from "./editor";
 import { markerEnd } from "./markers";
 import { recordingGroups, releasedRecordingTracks } from "./recording-objects";
 import { isTrackActive } from "./tracks";
+import {
+  createClipGroup,
+  descendantGroupIds,
+  groupMembers,
+  groupName,
+  rootGroupId,
+  ungroupClips,
+} from "./clip-groups";
 
 export function editableIds(
   project: Project,
@@ -13,11 +21,9 @@ export function editableIds(
   );
   const objects = recordingGroups(project);
   const blocked = new Set(
-    [...objects.keys()].filter((id) =>
-      project.clips.some(
-        (clip) => clip.groupId === id && locked.has(clip.trackId),
-      ),
-    ),
+    project.clips
+      .filter((clip) => clip.groupId && locked.has(clip.trackId))
+      .map((clip) => rootGroupId(project, clip.groupId)),
   );
   const recordingIds = new Set(
     project.clips
@@ -33,7 +39,7 @@ export function editableIds(
         (c) =>
           (ids.includes(c.id) || (c.groupId && recordingIds.has(c.groupId))) &&
           !locked.has(c.trackId) &&
-          (!c.groupId || !blocked.has(c.groupId)),
+          (!c.groupId || !blocked.has(rootGroupId(project, c.groupId))),
       )
       .map((c) => c.id),
   );
@@ -46,10 +52,14 @@ export function selectionWithGroups(
   const groups = new Set(
     project.clips
       .filter((c) => ids.includes(c.id) && c.groupId)
-      .map((c) => c.groupId),
+      .map((c) => rootGroupId(project, c.groupId)),
   );
   return project.clips
-    .filter((c) => ids.includes(c.id) || (c.groupId && groups.has(c.groupId)))
+    .filter(
+      (c) =>
+        ids.includes(c.id) ||
+        (c.groupId && groups.has(rootGroupId(project, c.groupId))),
+    )
     .map((c) => c.id);
 }
 
@@ -171,21 +181,44 @@ export function splitSelection(
   ids: readonly string[],
   time: number,
 ): Project {
-  const selected = editableIds(project, ids);
+  const selected = editableIds(project, selectionWithGroups(project, ids));
   const groups = new Set(
-    [...recordingGroups(project).values()]
-      .filter(
-        (clip) =>
-          selected.has(clip.id) &&
-          clip.start < time &&
-          clip.start + clip.duration > time,
-      )
-      .map((clip) => clip.groupId!),
+    project.clips
+      .filter((clip) => selected.has(clip.id) && clip.groupId)
+      .map((clip) => rootGroupId(project, clip.groupId)!),
   );
   const next = [...selected].reduce((p, id) => splitClip(p, id, time), project);
-  const rightGroups = new Map([...groups].map((id) => [id, uid()]));
+  const rightGroups = new Map<string, string>();
+  for (const id of groups) {
+    const members = groupMembers(project, id);
+    if (
+      !members.some((clip) => clip.start < time) ||
+      !members.some((clip) => clip.start + clip.duration > time)
+    )
+      continue;
+    for (const groupId of descendantGroupIds(project, id))
+      rightGroups.set(groupId, uid());
+  }
   return {
     ...next,
+    ...(rightGroups.size
+      ? {
+          groups: [
+            ...(next.groups ?? []),
+            ...[...rightGroups].map(([id, copyId]) => {
+              const group = project.groups?.find((entry) => entry.id === id);
+              return {
+                ...group,
+                id: copyId,
+                name: groupName(project, id),
+                parentId: group?.parentId
+                  ? rightGroups.get(group.parentId)
+                  : undefined,
+              };
+            }),
+          ],
+        }
+      : {}),
     clips: next.clips.map((clip) =>
       clip.groupId && rightGroups.has(clip.groupId) && clip.start >= time
         ? { ...clip, groupId: rightGroups.get(clip.groupId) }
@@ -199,24 +232,19 @@ export function groupSelection(
   ids: readonly string[],
   ungroup = false,
 ): Project {
-  const selected = editableIds(project, ids);
+  const selected = editableIds(project, selectionWithGroups(project, ids));
   if (!selected.size || (!ungroup && selected.size < 2)) return project;
-  const groupId = ungroup ? undefined : uid();
-  return {
-    ...project,
-    tracks: ungroup ? releasedRecordingTracks(project, selected) : project.tracks,
-    clips: project.clips.map((c) =>
-      selected.has(c.id)
-        ? {
-            ...c,
-            groupId,
-            ...(ungroup
-              ? { recording: undefined, recordingRole: undefined }
-              : {}),
-          }
-        : c,
-    ),
-  };
+  // A locked member must not leave a partially regrouped object behind.
+  if (
+    selectionWithGroups(project, [...selected]).some((id) => !selected.has(id))
+  )
+    return project;
+  return ungroup
+    ? {
+        ...ungroupClips(project, selected),
+        tracks: releasedRecordingTracks(project, selected),
+      }
+    : createClipGroup(project, selected);
 }
 
 export function pasteClips(
@@ -241,8 +269,33 @@ export function pasteClips(
       groupId: c.groupId ? groups.get(c.groupId) : undefined,
     };
   });
+  // Copy names and nested membership along with the media, using fresh IDs.
+  for (const clip of valid) {
+    let id = clip.groupId;
+    const seen = new Set<string>();
+    while (id && !seen.has(id)) {
+      seen.add(id);
+      if (!groups.has(id)) groups.set(id, uid());
+      id = project.groups?.find((group) => group.id === id)?.parentId;
+    }
+  }
+  const copiedGroups = [...groups].map(([id, nextId]) => {
+    const group = project.groups?.find((group) => group.id === id);
+    return {
+      ...group,
+      id: nextId,
+      name: group?.name ?? "组合",
+      parentId: group?.parentId ? groups.get(group.parentId) : undefined,
+    };
+  });
   return {
-    project: { ...project, clips: [...project.clips, ...clips] },
+    project: {
+      ...project,
+      clips: [...project.clips, ...clips],
+      ...(copiedGroups.length
+        ? { groups: [...(project.groups ?? []), ...copiedGroups] }
+        : {}),
+    },
     ids: clips.map((c) => c.id),
   };
 }
@@ -277,4 +330,3 @@ export function findClipAtPlayhead(
   }
   return undefined;
 }
-

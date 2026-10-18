@@ -17,6 +17,7 @@ import type { Editor } from "./useEditor";
 import { stitchSelectionError } from "../shared/stitch";
 import { stitchBoundaries } from "../shared/media-segments";
 import "./CanvasContextMenu.css";
+import { groupMembers, rootGroupId } from "../shared/clip-groups";
 
 export type ClipCommand =
   | "cut"
@@ -73,11 +74,23 @@ export default function ClipContextMenu({
     canEdit &&
     selected.length > 1 &&
     (!selected[0].groupId ||
-      selected.some((clip) => clip.groupId !== selected[0].groupId));
+      selected.some(
+        (clip) =>
+          rootGroupId(project, clip.groupId) !==
+          rootGroupId(project, selected[0].groupId),
+      ));
+  const groupId = rootGroupId(project, source?.groupId);
+  const canRenameGroup =
+    groupId &&
+    groupMembers(project, groupId).every(
+      (clip) =>
+        !project.tracks.find((track) => track.id === clip.trackId)?.locked,
+    );
   const canUngroup = canEdit && selected.some((clip) => !!clip.groupId);
   const canFit = canEdit && selected.some((clip) => clip.kind !== "audio");
   const stitchError = stitchSelectionError(project, ids);
-  const canUnstitch = canEdit && selected.some((clip) => stitchBoundaries(clip).length > 0);
+  const canUnstitch =
+    canEdit && selected.some((clip) => stitchBoundaries(clip).length > 0);
   useEffect(() => {
     if (projectId.current !== project.id) {
       projectId.current = project.id;
@@ -238,7 +251,8 @@ export default function ClipContextMenu({
               {item("拼接所选媒体", "stitch", "Ctrl+Alt+I", !!stitchError)}
             </div>
           )}
-          {canUnstitch && item("移除全部拼接", "unstitch", "Ctrl+Shift+\\", false)}
+          {canUnstitch &&
+            item("移除全部拼接", "unstitch", "Ctrl+Shift+\\", false)}
           <hr />
         </>
       )}
@@ -288,6 +302,29 @@ export default function ClipContextMenu({
           <hr />
           {item("组合", "group", "", !canGroup)}
           {item("取消组合", "ungroup", "", !canUngroup)}
+          {groupId && (
+            <>
+              <button
+                role="menuitem"
+                onClick={() => {
+                  editor.switchTimeline(groupId);
+                  onClose();
+                }}
+              >
+                打开组
+              </button>
+              <button
+                role="menuitem"
+                disabled={!canRenameGroup}
+                onClick={() => {
+                  editor.setRenamingGroup(groupId);
+                  onClose();
+                }}
+              >
+                重命名组
+              </button>
+            </>
+          )}
         </>
       )}
       {children && (

@@ -122,9 +122,11 @@ import {
 import { projectIndex } from "../shared/project-index";
 import {
   recordingGroups,
-  recordingTimeline,
   trimRecordingObject,
 } from "../shared/recording-objects";
+import { groupName, groupedTimeline, rootGroupId } from "../shared/clip-groups";
+import GroupTimelineNavigation from "./GroupTimelineNavigation";
+import TimelineGroupClip from "./TimelineGroupClip";
 import {
   timelineZoomMin,
   timelineZoomMax,
@@ -229,8 +231,8 @@ export default function Timeline({
 
   const { project, apply, seek, selected, selectedId, select } = editor;
   const timeline = useMemo(
-    () => recordingTimeline(project),
-    [project.clips, project.tracks],
+    () => groupedTimeline(project),
+    [project.clips, project.tracks, project.groups],
   );
   const timelineTracks = timeline.tracks;
   const recordingObjects = useMemo(
@@ -421,7 +423,8 @@ export default function Timeline({
   } | null>(null);
   const trackLayouts = useMemo(() => {
     const rows = new Map<string, number>();
-    for (const clip of project.clips) {
+    for (const clip of timeline.clips) {
+      if (timeline.groups.has(clip.id)) continue;
       if (expandedEffects[clip.id]) {
         const count =
           Number(hasClipSpeed(clip)) +
@@ -453,6 +456,7 @@ export default function Timeline({
     project.id,
     project.clips,
     project.tracks,
+    timeline,
     timelineTracks,
     expandedEffects,
     trackHeightDraft,
@@ -574,19 +578,24 @@ export default function Timeline({
     editor.deleteSelectedClips(ripple);
     setDeleteMenu(false);
   };
+  const selectedTrackId = selected && (
+    timeline.clips.find((clip) =>
+      timeline.groups.get(clip.id)?.members.some((member) => member.id === selected.id),
+    )?.trackId ?? selected.trackId
+  );
   useEffect(() => {
     if (trackHeightDraft?.projectId === project.id) return;
     const element = scroll.current;
     const index = timelineTracks.findIndex(
-      (track) => track.id === selected?.trackId,
+      (track) => track.id === selectedTrackId,
     );
     if (!element || index < 0) return;
     const height = trackHeights[index];
-    const top = 36 + trackTop(selected!.trackId);
+    const top = 36 + trackTop(selectedTrackId!);
     if (top < element.scrollTop + 36) element.scrollTop = Math.max(0, top - 36);
     else if (top + height > element.scrollTop + element.clientHeight)
       element.scrollTop = top + height - element.clientHeight;
-  }, [selected?.trackId, project.tracks.length, layoutKey, trackHeightDraft]);
+  }, [selectedTrackId, project.tracks.length, layoutKey, trackHeightDraft]);
   const [viewport, setViewport] = useState({
     left: 0,
     width: 1600,
@@ -611,7 +620,7 @@ export default function Timeline({
     return Array.from({ length: count }, (_, i) => (start + i) * rulerStep);
   }, [viewport.left, viewport.width, zoom, rulerStep]);
   const visibleClips = useMemo(() => {
-    const index = projectIndex(project);
+    const index = projectIndex({ clips: timeline.clips });
     return new Map(
       timelineTracks.map((track, indexInView) => {
         // Keep track shells at their real heights so scrolling, selection and
@@ -902,6 +911,7 @@ export default function Timeline({
           </button>
         </div>
       </div>
+      <GroupTimelineNavigation editor={editor} />
       <div className="timeline-body">
         <div
           className="track-headers"
@@ -1383,6 +1393,24 @@ export default function Timeline({
                     track.id,
                   )!
                   .map((original) => {
+                    const group = timeline.groups.get(original.id);
+                    if (group)
+                      return (
+                        <TimelineGroupClip
+                          key={original.id}
+                          editor={editor}
+                          clip={original}
+                          group={group}
+                          zoom={zoom}
+                          snap={snap}
+                          top={trackLayouts[trackIndex].clipInset}
+                          height={trackLayouts[trackIndex].contentHeight}
+                          onContextMenu={(x, y, id) => {
+                            setTrackMenu(null);
+                            setContext({ x, y, id });
+                          }}
+                        />
+                      );
                     const leader = drag ? dragClip(drag) : null;
                     const c =
                       drag?.id === original.id
@@ -1728,6 +1756,13 @@ export default function Timeline({
                           }}
                           onPointerCancel={() => setDrag(null)}
                           onDoubleClick={(event) => {
+                            const groupId = rootGroupId(project, c.groupId);
+                            if (groupId) {
+                              event.stopPropagation();
+                              setDrag(null);
+                              editor.switchTimeline(groupId);
+                              return;
+                            }
                             if (c.kind !== "text" || track.locked) return;
                             event.stopPropagation();
                             setDrag(null);
@@ -1798,17 +1833,18 @@ export default function Timeline({
                               <span
                                 title={
                                   isRecording
-                                    ? `录屏组合 · ${c.name}`
+                                    ? `录屏组合 · ${groupName(project, c.groupId!)}`
                                     : c.kind === "text"
                                       ? c.text
                                       : c.name
                                 }
                               >
                                 {c.groupId && !isRecording ? "▧ " : ""}
-                                {c.kind === "text"
-                                  ? c.text?.replace(/\s+/g, " ").trim() ||
-                                    c.name
-                                  : c.name}
+                                {isRecording
+                                  ? groupName(project, c.groupId!)
+                                  : c.kind === "text"
+                                    ? c.text?.replace(/\s+/g, " ").trim() || c.name
+                                    : c.name}
                               </span>
                               {c.speed !== 1 && (
                                 <b>{Number(c.speed.toFixed(2))}×</b>

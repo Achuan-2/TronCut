@@ -30,7 +30,7 @@ const fixture = appendCaptionCues(project, [
   { start: 1, end: 2, text: "字幕甲" },
   { start: 2, end: 3, text: "字幕乙" },
 ]);
-for (const track of fixture.project.tracks) track.height = 50;
+for (const track of fixture.project.tracks) track.height = 42;
 const file = path.join(root, "fixture.troncut");
 await fs.writeFile(file, JSON.stringify(fixture.project));
 const env = {
