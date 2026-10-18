@@ -1,6 +1,8 @@
 import { _electron as electron, expect } from "@playwright/test";
 import fs from "node:fs/promises";
 import path from "node:path";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 import { recordingControls } from "./recording-controls.mjs";
 
 const root = path.resolve(
@@ -18,22 +20,55 @@ const app = await electron.launch({
   args: ["."],
   env,
 });
+async function floatingPage(title) {
+  const encoded = encodeURIComponent(`<title>${title}</title>`);
+  await expect
+    .poll(() => app.windows().some((page) => page.url().includes(encoded)))
+    .toBe(true);
+  return app.windows().find((page) => page.url().includes(encoded));
+}
+
+const previewDetails = () =>
+  app.evaluate(({ BrowserWindow, screen }) => {
+    const camera = BrowserWindow.getAllWindows().find(
+      (window) => window.getTitle() === "TronCut 摄像头预览",
+    );
+    const controls = BrowserWindow.getAllWindows().find(
+      (window) => window.getTitle() === "TronCut 录制控制",
+    );
+    if (!camera || !controls) return null;
+    return {
+      visible: camera.isVisible(),
+      movable: camera.isMovable(),
+      bounds: camera.getBounds(),
+      controlsBounds: controls.getBounds(),
+      area: screen.getDisplayMatching(controls.getBounds()).workArea,
+      handle:
+        process.platform === "win32"
+          ? camera.getNativeWindowHandle().readBigUInt64LE().toString()
+          : "",
+    };
+  });
 try {
   const page = await app.firstWindow(),
     errors = [];
   page.on("pageerror", (error) => errors.push(error.message));
-  const target = await app.evaluate(async ({ BrowserWindow }) => {
-    const target = new BrowserWindow({
-      width: 480,
-      height: 320,
-      backgroundColor: "#ffffff",
-      skipTaskbar: true,
-    });
-    await target.loadURL(
-      "data:text/html,<title>Camera recording fixture</title><body>Camera recording fixture</body>",
-    );
-    return target.getMediaSourceId();
-  });
+  const target = await app.evaluate(
+    async ({ BrowserWindow, dialog }, filePath) => {
+      dialog.showSaveDialog = async () => ({ canceled: false, filePath });
+      const target = new BrowserWindow({
+        width: 480,
+        height: 320,
+        backgroundColor: "#ffffff",
+        skipTaskbar: true,
+      });
+      await target.loadURL(
+        "data:text/html,<title>Camera recording fixture</title><body>Camera recording fixture</body>",
+      );
+      return target.getMediaSourceId();
+    },
+    path.join(root, "camera.troncut"),
+  );
   await page.evaluate(() => {
     window.cameraAcquisitions = 0;
     const original = navigator.mediaDevices.getUserMedia.bind(
@@ -55,6 +90,7 @@ try {
           context.fillRect((frame++ * 6) % 600, 40, 40, 200);
         }, 33);
         const stream = canvas.captureStream(30);
+        window.currentCameraTracks = stream.getVideoTracks();
         const track = stream.getVideoTracks()[0],
           stop = track.stop.bind(track);
         track.stop = () => {
@@ -106,11 +142,63 @@ try {
   await expect
     .poll(() => preview.evaluate((video) => video.videoWidth))
     .toBeGreaterThan(0);
+  // Both windows and live frames must appear before the countdown ends.
+  await page.getByRole("button", { name: "开始录制", exact: true }).click();
+  const startingControls = await floatingPage("TronCut 录制控制");
+  const startingPreview = await floatingPage("TronCut 摄像头预览");
+  await expect(startingControls.getByRole("status")).toHaveText(
+    "正在启动录制…",
+  );
+  await expect(
+    startingControls.getByRole("button", { name: "暂停录制", exact: true }),
+  ).toBeDisabled();
+  await expect
+    .poll(() =>
+      startingPreview
+        .locator("#camera")
+        .evaluate((image) => image.naturalWidth),
+    )
+    .toBe(320);
+  const beforeCountdownEnd = await previewDetails();
+  expect(beforeCountdownEnd.visible).toBe(true);
+  expect(beforeCountdownEnd.movable).toBe(true);
+  expect(beforeCountdownEnd.bounds.x).toBeGreaterThan(
+    beforeCountdownEnd.controlsBounds.x +
+      beforeCountdownEnd.controlsBounds.width,
+  );
+  // Electron's outer bounds can include a few DIPs of native window padding.
+  const rightGap =
+    beforeCountdownEnd.area.x +
+    beforeCountdownEnd.area.width -
+    beforeCountdownEnd.bounds.x -
+    beforeCountdownEnd.bounds.width;
+  expect(rightGap).toBeGreaterThanOrEqual(16);
+  expect(rightGap).toBeLessThanOrEqual(32);
+  await expect(startingControls.getByRole("status")).toHaveText(
+    "正在启动录制…",
+  );
+  await page.evaluate(() => window.framecraft.cancelRecordingCountdown());
+  await expect(
+    page.getByRole("button", { name: "开始录制", exact: true }),
+  ).toBeEnabled();
+  expect(await previewDetails()).toBeNull();
+  expect(
+    await fs.readdir(path.join(root, "profile", "recordings")).catch(() => []),
+  ).toHaveLength(0);
+  await expect
+    .poll(() =>
+      preview.evaluate(
+        (video) => video.srcObject.getVideoTracks()[0].readyState,
+      ),
+    )
+    .toBe("live");
   const requestsBefore = await page.evaluate(() => window.cameraAcquisitions);
   await page.getByRole("button", { name: "开始录制", exact: true }).click();
   const controls = await recordingControls(app);
   controls.on("pageerror", (error) => errors.push(error.message));
-  const camera = controls.locator("#camera");
+  const previewWindow = await floatingPage("TronCut 摄像头预览");
+  previewWindow.on("pageerror", (error) => errors.push(error.message));
+  const camera = previewWindow.locator("#camera");
   await expect(camera).toBeVisible();
   await expect
     .poll(() => camera.evaluate((image) => image.naturalWidth))
@@ -121,6 +209,73 @@ try {
   expect(await page.evaluate(() => window.cameraAcquisitions)).toBe(
     requestsBefore,
   );
+  if (process.platform === "win32") {
+    const before = await previewDetails();
+    const { stdout } = await promisify(execFile)(
+      "powershell.exe",
+      [
+        "-NoProfile",
+        "-File",
+        path.resolve("scripts/inspect-recording-border.ps1"),
+        "-OverlayHandle",
+        before.handle,
+      ],
+      { windowsHide: true },
+    );
+    const native = JSON.parse(stdout.trim());
+    expect(native.affinity).toBe(0x11);
+    expect(native.topAtCenter).toBe(true);
+    const drag = await promisify(execFile)(
+      "powershell.exe",
+      [
+        "-NoProfile",
+        "-File",
+        path.resolve("scripts/drag-recording-window.ps1"),
+        "-WindowHandle",
+        before.handle,
+      ],
+      { windowsHide: true },
+    );
+    await expect
+      .poll(async () => (await previewDetails()).bounds.x)
+      .toBeLessThan(before.bounds.x - 20);
+    expect((await previewDetails()).controlsBounds).toEqual(
+      before.controlsBounds,
+    );
+    console.log(
+      JSON.stringify({ native, drag: JSON.parse(drag.stdout.trim()) }),
+    );
+  }
+  const movedBounds = (await previewDetails()).bounds;
+  await controls
+    .getByRole("button", { name: "隐藏摄像头预览", exact: true })
+    .click();
+  await expect(
+    controls.getByRole("button", { name: "显示摄像头预览", exact: true }),
+  ).toHaveAttribute("aria-pressed", "false");
+  await expect.poll(async () => (await previewDetails()).visible).toBe(false);
+  const elapsedBefore = await controls.locator("time").textContent();
+  await expect
+    .poll(() => controls.locator("time").textContent())
+    .not.toBe(elapsedBefore);
+  expect((await previewDetails()).visible).toBe(false);
+  expect(
+    await page.evaluate(() =>
+      window.currentCameraTracks.every((track) => track.readyState === "live"),
+    ),
+  ).toBe(true);
+  await controls
+    .getByRole("button", { name: "显示摄像头预览", exact: true })
+    .click();
+  await expect.poll(async () => (await previewDetails()).visible).toBe(true);
+  expect((await previewDetails()).bounds).toEqual(movedBounds);
+  expect(await page.evaluate(() => window.cameraAcquisitions)).toBe(
+    requestsBefore,
+  );
+  await expect.poll(() => camera.getAttribute("src")).not.toBe(firstFrame);
+  await previewWindow.screenshot({
+    path: path.join(root, "floating-camera-preview.png"),
+  });
   await controls.screenshot({ path: path.join(root, "recording-preview.png") });
   await controls.getByRole("button", { name: "暂停录制", exact: true }).click();
   await expect(controls.getByRole("status")).toHaveText("已暂停");
@@ -133,12 +288,7 @@ try {
   await expect(page.locator(".timeline-clip.video")).toHaveCount(2, {
     timeout: 30000,
   });
-  await app.evaluate(
-    ({ dialog }, filePath) => {
-      dialog.showSaveDialog = async () => ({ canceled: false, filePath });
-    },
-    path.join(root, "camera.troncut"),
-  );
+  await expect.poll(previewDetails).toBeNull();
   await page.getByRole("button", { name: "保存", exact: true }).click();
   await expect(page.locator(".toast")).toContainText("工程已保存", {
     timeout: 20000,

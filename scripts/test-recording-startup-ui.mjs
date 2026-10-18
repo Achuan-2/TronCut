@@ -41,6 +41,11 @@ try {
     const spawn = childProcess.spawn;
     globalThis.nativeHelpers = [];
     globalThis.recordingStartupTiming = {};
+    const show = BrowserWindow.prototype.show;
+    BrowserWindow.prototype.show = function (...args) {
+      if (this.getTitle() === "TronCut 录制控制") globalThis.recordingStartupTiming.controlsShown = performance.now();
+      return show.apply(this, args);
+    };
     childProcess.spawn = function (...args) {
       const child = spawn.apply(this, args);
       if (String(args[0]).includes("wgc-capture")) {
@@ -136,7 +141,7 @@ try {
         );
         return (
           !!controls &&
-          !controls.isVisible() &&
+          controls.isVisible() &&
           !controls.webContents.isLoadingMainFrame()
         );
       }),
@@ -155,9 +160,6 @@ try {
       globalThis.recordingStartupTiming.countdownClosed = performance.now();
       void globalThis.startupFixture.webContents.executeJavaScript("document.body.style.background = '#00ff00'");
     });
-    controls.once("show", () => {
-      globalThis.recordingStartupTiming.controlsShown = performance.now();
-    });
   });
   await expect
     .poll(
@@ -175,6 +177,7 @@ try {
   const controls = await recordingControls(app);
   const timing = await app.evaluate(() => globalThis.recordingStartupTiming);
   expect(timing.prepared).toBeLessThan(timing.countdownClosed);
+  expect(timing.controlsShown).toBeLessThan(timing.countdownClosed);
   expect(timing.controlsShown).toBeLessThan(timing.engineReady);
   expect(timing.engineReady - timing.countdownClosed).toBeLessThan(1000);
   console.log(
@@ -205,12 +208,21 @@ try {
   console.log(JSON.stringify({ duration: asset.duration, firstPixel: Array.from(data.subarray(center, center + 3)), cursorSamples: asset.cursor.samples.length }));
   await page.getByRole("button", { name: "录制", exact: true }).click();
   await page.getByLabel("麦克风", { exact: true }).check();
+  await page.getByLabel("原生录制与可编辑鼠标", { exact: true }).uncheck();
   // A device that opens late must still be released if another request fails.
-  await page.getByLabel("摄像头", { exact: true }).check();
   await page.evaluate(() => {
     globalThis.deviceEvents = [];
+    let cameraAttempts = 0;
     navigator.mediaDevices.getUserMedia = (constraints) => {
       const kind = constraints.video ? "camera" : "microphone";
+      if (kind === "camera" && ++cameraAttempts === 1)
+        return Promise.reject(new Error("startup fixture: preview unavailable"));
+      const canvas = document.createElement("canvas");
+      canvas.width = 640;
+      canvas.height = 360;
+      const stream = canvas.captureStream(30);
+      // After startup fails, the settings preview may open a fresh stream.
+      if (kind === "camera" && cameraAttempts > 2) return Promise.resolve(stream);
       globalThis.deviceEvents.push(`open:${kind}`);
       return new Promise((resolve, reject) => {
         setTimeout(
@@ -220,11 +232,10 @@ try {
               reject(new Error("startup fixture: microphone unavailable"));
             } else {
               globalThis.deviceEvents.push("ready:camera");
-              resolve({
-                getTracks: () => [
-                  { stop: () => globalThis.deviceEvents.push("stop:camera") },
-                ],
-              });
+              const track = stream.getVideoTracks()[0], stop = track.stop.bind(track);
+              globalThis.delayedCameraTrack = track;
+              track.stop = () => { globalThis.deviceEvents.push("stop:camera"); stop(); };
+              resolve(stream);
             }
           },
           kind === "microphone" ? 20 : 150,
@@ -232,6 +243,8 @@ try {
       });
     };
   });
+  await page.getByLabel("摄像头", { exact: true }).check();
+  await expect(page.locator(".recording-camera-settings .error-box")).toContainText("preview unavailable");
   await page.getByRole("button", { name: "开始录制", exact: true }).click();
   await expect(page.locator(".recorder-modal .error-box")).toContainText(
     "microphone unavailable",
@@ -243,6 +256,7 @@ try {
     "ready:camera",
     "stop:camera",
   ]);
+  expect(await page.evaluate(() => globalThis.delayedCameraTrack.readyState)).toBe("ended");
   console.log("并行设备准备失败后，延迟打开的摄像头已释放");
 } finally {
   await app.close();

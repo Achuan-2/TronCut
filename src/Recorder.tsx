@@ -221,7 +221,7 @@ export default function Recorder({
         void stopRef.current();
       });
   }, [phase, elapsed, error, camera, settings.cameraStyle]);
-  useCameraFrames(cameraPreview.stream, captureActive);
+  useCameraFrames(cameraPreview.stream, editorAvailable);
   useEffect(
     () =>
       window.framecraft?.onShortcut((command) => {

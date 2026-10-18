@@ -319,25 +319,27 @@ function installHandlers() {
     const native = z.object({
       fps: z.number().int().min(15).max(120), systemAudio: z.boolean(), region: captureRegionSchema.optional(),
     }).optional().parse(nativeOptions);
+    const { recording } = await preferences.get();
     let preparation: NativePreparation | null = null;
     recordingControls.prepare(id, window.getBounds());
+    window.webContents.setBackgroundThrottling(false);
     minimizeForRecording(id);
     try {
       // Warm the encoder while the countdown is visible. The native helper
       // waits for a separate start command before capturing any media.
       const countdown = recordingCountdown.start(id);
-      recordingControls.preload();
+      recordingControls.update({ phase: "starting", elapsed: 0, error: "", ...(recording.camera ? { cameraStyle: recording.cameraStyle } : {}) });
       if (native) preparation = prepareNativeRecording(id, native.fps, native.systemAudio, native.region);
       const success = await (preparation
         ? Promise.race([countdown, preparation.ready.then(() => countdown)])
         : countdown);
       if (success) {
-        recordingControls.update({ phase: "starting", elapsed: 0, error: "" });
         await preparation?.ready;
       }
       else {
         await discardNativePreparation(preparation);
         recordingControls.close();
+        window.webContents.setBackgroundThrottling(true);
         restoreRecordingWindow();
       }
       return success;
@@ -345,6 +347,7 @@ function installHandlers() {
       recordingCountdown.cancel();
       await discardNativePreparation(preparation);
       recordingControls.close();
+      window.webContents.setBackgroundThrottling(true);
       restoreRecordingWindow();
       throw error;
     }
