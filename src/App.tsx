@@ -1196,8 +1196,6 @@ export default function App() {
               importMedia={importMedia}
               run={(fn) => void run(fn)}
               toast={toast}
-              capabilities={caps}
-              refreshCapabilities={refreshCapabilities}
               busy={busy || mediaImporting}
               onPreferences={() => {
                 setPreferencesTab("ai");
@@ -1227,7 +1225,7 @@ export default function App() {
           initialTab={preferencesTab}
           onSaved={(value) => {
             setEditorPreferences(value);
-            void bridge().capabilities().then(setCaps);
+            refreshCapabilities();
           }}
           onClose={() => setPreferencesOpen(false)}
           toast={toast}

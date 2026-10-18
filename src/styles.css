@@ -512,8 +512,7 @@ fieldset:disabled {
   display: flex;
   align-items: center;
 }
-.workspace-status i,
-.engine-status i {
+.workspace-status i {
   display: inline-block;
   width: 5px;
   height: 5px;
@@ -1739,19 +1738,6 @@ fieldset:disabled {
 .shape-presets span {
   font-size: 10px;
   color: #acc7b3;
-}
-.engine-status {
-  font-size: 11px;
-  margin-bottom: 12px;
-  color: #a6b4ad;
-}
-.engine-status i {
-  background: #eaa963;
-  width: 7px;
-  height: 7px;
-}
-.engine-status i.online {
-  background: var(--accent);
 }
 .preview-panel {
   background: #141719;

@@ -20,7 +20,6 @@ import {
 import { type Asset, type Clip, defaultTransform } from "../shared/model";
 import { createTransformSampler } from "../shared/editor";
 import { dimensionTransform } from "../shared/canvas";
-import type { Capabilities } from "../shared/bridge";
 import { useEditorPlayhead, type Editor } from "./useEditor";
 import { timeLabel } from "./Preview";
 import { defaultCrop, defaultEffects } from "../shared/effects";
@@ -84,10 +83,8 @@ interface Props {
   tab: Tab;
   setTab: (tab: Tab) => void;
   importMedia: () => void;
-  capabilities?: Capabilities;
   run: (fn: () => Promise<unknown>) => void;
   toast: (text: string) => void;
-  refreshCapabilities: () => void;
   busy: boolean;
   onPreferences: () => void;
 }
@@ -274,28 +271,6 @@ export default function Panels(props: Props) {
                 <option value="software">CPU · 软件编码</option>
               </select>
             </label>
-            <h3 className="section-title">媒体引擎</h3>
-            <div className="engine-status">
-              <i className={props.capabilities?.ffmpeg ? "online" : ""} />
-              {props.capabilities?.ffmpeg
-                ? "FFmpeg / FFprobe 可用"
-                : "请配置 FFmpeg / FFprobe"}
-            </div>
-            {(["ffmpeg", "ffprobe", "videocaptioner"] as const).map((name) => (
-              <button
-                className="wide-button"
-                key={name}
-                onClick={() =>
-                  run(async () => {
-                    await bridge().selectBinary(name);
-                    props.refreshCapabilities();
-                  })
-                }
-              >
-                <Settings2 size={14} />
-                配置 {name}
-              </button>
-            ))}
           </>
         )}
       </div>
