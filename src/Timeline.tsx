@@ -1058,6 +1058,9 @@ export default function Timeline({
         <div
           className="timeline-scroll"
           ref={scroll}
+          onClick={(event) => {
+            if (event.target === event.currentTarget) select(null);
+          }}
           onDragOver={(event) => {
             if (!event.dataTransfer.types.includes("Files")) return;
             event.preventDefault();
@@ -1159,7 +1162,6 @@ export default function Timeline({
                     : [],
               };
               marqueeMoved.current = false;
-              event.currentTarget.setPointerCapture(event.pointerId);
               setMarquee(next);
             }}
             onPointerMove={(event) => {
@@ -1174,6 +1176,9 @@ export default function Timeline({
                 Math.abs(next.x - next.startX) >= 4 ||
                 Math.abs(next.y - next.startY) >= 4
               ) {
+                // Keep ordinary clicks on their lane; capture only once a
+                // marquee drag starts, otherwise the lane never gets its click.
+                event.currentTarget.setPointerCapture(event.pointerId);
                 marqueeMoved.current = true;
                 editor.selectMany(marqueeSelection(next));
               }
@@ -1181,7 +1186,7 @@ export default function Timeline({
             }}
             onPointerUp={(event) => {
               if (!marquee || marquee.pointerId !== event.pointerId) return;
-              setMarquee(null);
+              scheduleMarqueeUpdate(null);
               if (marqueeMoved.current)
                 window.setTimeout(() => {
                   marqueeMoved.current = false;
@@ -1189,7 +1194,11 @@ export default function Timeline({
             }}
             onPointerCancel={() => {
               marqueeMoved.current = false;
-              setMarquee(null);
+              scheduleMarqueeUpdate(null);
+            }}
+            onPointerLeave={(event) => {
+              if (!event.currentTarget.hasPointerCapture(event.pointerId))
+                scheduleMarqueeUpdate(null);
             }}
           >
             <div
