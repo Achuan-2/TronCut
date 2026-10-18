@@ -240,7 +240,7 @@ export function setTransform<
     };
   const local = Math.max(0, Math.min(clip.duration, localTime));
   const time = Math.max(0, local + (clip.animationOffset ?? 0));
-  const value = { ...transformAt(clip, local), ...patch };
+  const value = transformAt(clip, local);
   const existing = clip.keyframes.find(
     (frame) => Math.abs(frame.time - time) < 1e-6,
   );
@@ -268,7 +268,14 @@ export function setTransform<
       value: transformAt(clip, start - (clip.animationOffset ?? 0)),
     });
   keyframes.push({ time, value });
-  return { ...clip, keyframes: keyframes.sort((a, b) => a.time - b.time) };
+  // Insert the sampled state first so endpoint editing can carry the change
+  // through subsequent hold frames, stopping at the next actual animation.
+  // Leaving those holds unchanged would create an unintended return motion.
+  return setKeyframeTransform(
+    { ...clip, keyframes: keyframes.sort((a, b) => a.time - b.time) },
+    patch,
+    time,
+  );
 }
 // An explicitly selected endpoint edits one existing frame. It must never fall
 // through to setTransform(auto=false), which applies the patch to every frame.
