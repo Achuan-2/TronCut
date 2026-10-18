@@ -45,6 +45,11 @@ import {
 } from "../shared/timeline";
 import { recordingMaster } from "../shared/recording-objects";
 import {
+  assetClips,
+  updateLibraryAsset as changeLibraryAsset,
+  replaceSelectedMedia,
+} from "../shared/media-library";
+import {
   captionTrackSelection,
   updateCaptionAppearance,
   type CaptionAppearance,
@@ -1475,6 +1480,34 @@ export function useEditor(
     },
     [apply, playback],
   );
+  const editLibraryAsset = useCallback((id: string, replacement?: Asset) => {
+    const before = documentCurrent.current;
+    const after = changeLibraryAsset(before, id, replacement);
+    if (after === before) return;
+    past.current = [...past.current.slice(-99), before];
+    future.current = [];
+    documentCurrent.current = after;
+    current.current = projectForGroup(after, scopeRef.current);
+    setDocumentProject(after);
+    setDirty(true);
+    clearKeyframeEdit();
+    setPlaying(false);
+  }, [clearKeyframeEdit, setPlaying]);
+  const replaceMediaSelection = useCallback((asset: Asset) => {
+    apply((project) => replaceSelectedMedia(project, selectedIds, asset));
+    clearKeyframeEdit();
+    setPlaying(false);
+  }, [apply, selectedIds, clearKeyframeEdit, setPlaying]);
+  const selectAssetClips = useCallback((assetId: string) => {
+    const clips = assetClips(documentCurrent.current, assetId);
+    if (!clips.length) return;
+    switchTimeline(null);
+    setPlaying(false);
+    const time = clips.reduce((time, clip) => Math.min(time, clip.start), Infinity);
+    seek(time);
+    selectMany(clips.map((clip) => clip.id));
+    setTimelineFocus({ time });
+  }, [switchTimeline, setPlaying, seek]);
   const beginTextEdit = useCallback(
     (id: string) => {
       const project = current.current;
@@ -1773,6 +1806,9 @@ export function useEditor(
     changeSpeedDuration,
     removeSpeedEffect,
     addAssets,
+    editLibraryAsset,
+    replaceMediaSelection,
+    selectAssetClips,
     editingTextId,
     textSelection,
     setTextSelection,

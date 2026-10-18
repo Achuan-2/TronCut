@@ -45,6 +45,7 @@ const bridge: FrameCraftBridge = {
   importClipboardMedia: () => ipcRenderer.invoke("media:clipboard"),
   relinkMedia: (id, duration) =>
     ipcRenderer.invoke("media:relink", id, duration),
+  updateMedia: (id, duration) => ipcRenderer.invoke("media:update", id, duration),
   mediaThumbnail: (id, waveform) =>
     ipcRenderer.invoke("media:thumbnail", id, waveform),
   mediaUrl: (id) => ipcRenderer.invoke("media:url", id),

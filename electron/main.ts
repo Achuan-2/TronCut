@@ -672,21 +672,35 @@ function installHandlers() {
       process.resourcesPath,
     ),
   );
-  handle("media:relink", async (id: unknown, requiredDuration: unknown) => {
+  const chooseReplacementMedia = async (
+    id: unknown,
+    requiredDuration: unknown,
+    relink: boolean,
+  ) => {
     const original = assetById(id);
-    const file = await chooseFile(`重新链接：${original.name}`, ["*"]);
+    const file = await chooseFile(
+      `${relink ? "重新链接" : "更新素材"}：${original.name}`,
+      ["*"],
+    );
     if (!file) return null;
     const replacement = await probeMedia(file, process.resourcesPath);
     if (replacement.kind !== original.kind)
       throw new Error("替换素材的类型必须与原素材一致");
     if (
       replacement.kind !== "image" &&
-      replacement.duration + 0.05 <
+      replacement.duration + (relink ? 0.05 : 1e-6) <
         z.number().finite().nonnegative().parse(requiredDuration)
     )
       throw new Error("替换素材短于工程使用的源区间，请选择完整素材");
-    return register({ ...replacement, id: original.id });
-  });
+    // New IDs keep the old registered source available to undo and redo.
+    return register(relink ? { ...replacement, id: original.id } : replacement);
+  };
+  handle("media:relink", (id: unknown, duration: unknown) =>
+    chooseReplacementMedia(id, duration, true),
+  );
+  handle("media:update", (id: unknown, duration: unknown) =>
+    chooseReplacementMedia(id, duration, false),
+  );
   handle("project:open", async () => {
     const file = await chooseFile("打开 TronCut 工程", [
       "troncut",

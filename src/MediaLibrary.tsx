@@ -1,4 +1,4 @@
-import { memo, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ChevronDown,
   Film,
@@ -13,6 +13,10 @@ import {
 import type { Asset } from "../shared/model";
 import { MediaThumbnail } from "./MediaThumbnail";
 import { timeLabel } from "./Preview";
+import MediaContextMenu, {
+  type MediaCommand,
+  type MediaMenuPosition,
+} from "./MediaContextMenu";
 
 const categories = [
   { kind: "video", label: "视频", icon: Film },
@@ -95,13 +99,19 @@ export default function MediaLibrary({
   onQueryChange,
   onActivate,
   onImport,
+  onCommand,
+  unavailable,
 }: {
   assets: Asset[];
   query: string;
   onQueryChange: (query: string) => void;
   onActivate: (asset: Asset) => void;
   onImport: () => void;
+  onCommand: (asset: Asset, command: MediaCommand) => void;
+  unavailable: (asset: Asset) => Partial<Record<MediaCommand, string>>;
 }) {
+  const [menu, setMenu] = useState<MediaMenuPosition | null>(null);
+  const closeMenu = useCallback(() => setMenu(null), []);
   const [preferences, setPreferences] = useState(readPreferences);
   const [category, setCategory] = useState<Category>("all");
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -121,6 +131,7 @@ export default function MediaLibrary({
     () => new Map(assets.map((asset) => [asset.id, asset])),
     [assets],
   );
+  const menuAsset = menu && assetsById.get(menu.assetId);
   const { filtered, groups, counts } = useMemo(() => {
     const needle = query.trim().toLocaleLowerCase();
     const counts = { video: 0, audio: 0, image: 0 };
@@ -190,6 +201,19 @@ export default function MediaLibrary({
       <div
         ref={items}
         className={`media-browser-items media-view-${preferences.view}`}
+        onContextMenu={(event) => {
+          event.preventDefault();
+          const card = (event.target as HTMLElement).closest<HTMLButtonElement>(
+            ".asset-card",
+          );
+          if (!card) {
+            closeMenu();
+            return;
+          }
+          const assetId = card.dataset.assetId!;
+          setSelectedId(assetId);
+          setMenu({ assetId, x: event.clientX, y: event.clientY });
+        }}
         onClick={(event) => {
           const card = (event.target as HTMLElement).closest<HTMLButtonElement>(
             ".asset-card",
@@ -312,6 +336,14 @@ export default function MediaLibrary({
           ))}
         </div>
       </div>
+      {menu && menuAsset && (
+        <MediaContextMenu
+          menu={menu}
+          onClose={closeMenu}
+          unavailable={unavailable(menuAsset)}
+          onCommand={(command) => onCommand(menuAsset, command)}
+        />
+      )}
     </div>
   );
 }

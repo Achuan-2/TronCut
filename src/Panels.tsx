@@ -25,6 +25,11 @@ import { timeLabel } from "./Preview";
 import { defaultCrop, defaultEffects } from "../shared/effects";
 import { textBoxFor } from "./text";
 import MediaLibrary from "./MediaLibrary";
+import {
+  assetClips,
+  mediaReplacementError,
+  requiredMediaDuration,
+} from "../shared/media-library";
 import { defaultCursorStyle } from "../shared/cursor";
 import CursorStyleSelect from "./CursorStyleSelect";
 import NumberInput from "./NumberInput";
@@ -140,6 +145,38 @@ export default function Panels(props: Props) {
             query={query}
             onQueryChange={setQuery}
             onImport={props.importMedia}
+            unavailable={(asset) => ({
+              ...(asset.missing ? { add: "请先更新离线素材" } : {}),
+              replace:
+                mediaReplacementError(project, editor.selectedIds, asset) ?? undefined,
+              ...(!assetClips(editor.documentProject, asset.id).length
+                ? { select: "该素材尚未添加到时间线" } : {}),
+            })}
+            onCommand={(asset, command) => run(async () => {
+              if (command === "add") {
+                editor.setPlaying(false);
+                editor.addAssets([asset], true, {
+                  time: editor.playback.getSnapshot(),
+                });
+              } else if (command === "replace") {
+                editor.replaceMediaSelection(asset);
+                toast("已替换所选片段的媒体，时间与效果保持不变");
+              } else if (command === "select") {
+                editor.selectAssetClips(asset.id);
+              } else if (command === "delete") {
+                editor.editLibraryAsset(asset.id);
+                toast("已从工程移除素材及引用片段，可撤销");
+              } else {
+                const consumed = requiredMediaDuration(
+                  assetClips(editor.documentProject, asset.id),
+                );
+                const replacement = await bridge().updateMedia(asset.id, consumed);
+                if (replacement) {
+                  editor.editLibraryAsset(asset.id, replacement);
+                  toast("素材已更新，全部引用片段保持时间与效果");
+                }
+              }
+            })}
             onActivate={(asset: Asset) => {
               if (!asset.missing) {
                 editor.addAssets([asset], true);

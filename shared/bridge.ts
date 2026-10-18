@@ -83,6 +83,7 @@ export interface FrameCraftBridge {
     clipToken: string | null;
   }>;
   relinkMedia(assetId: string, requiredDuration: number): Promise<Asset | null>;
+  updateMedia(assetId: string, requiredDuration: number): Promise<Asset | null>;
   mediaThumbnail(assetId: string, waveform: boolean): Promise<string | null>;
   mediaUrl(assetId: string): Promise<string>;
   previewProxyAvailable(assetId: string): Promise<boolean>;
