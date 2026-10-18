@@ -1,11 +1,7 @@
 import { useMemo } from "react";
 import type { Clip } from "../shared/model";
-import {
-  clipsBehaviorText,
-  glyphMotion,
-  layoutGlyphs,
-} from "../shared/behaviors";
-import { textFrameSize } from "../shared/text";
+import { clipsBehaviorText, glyphMotion } from "../shared/behaviors";
+import { styledTextLayout, textBoxFor } from "./text";
 
 export default function BehaviorText({
   clip,
@@ -18,15 +14,9 @@ export default function BehaviorText({
 }) {
   const fontSize = clip.style?.fontSize ?? 68;
   const layout = useMemo(() => {
-    const context = document.createElement("canvas").getContext("2d")!;
-    context.font = `700 ${fontSize}px "${(clip.style?.fontFamily ?? "Microsoft YaHei").replace(/["\\]/g, "")}", "PingFang SC", sans-serif`;
-    return layoutGlyphs(
-      clip.text ?? "",
-      fontSize,
-      (text) => context.measureText(text).width,
-    );
-  }, [clip.text, clip.style?.fontFamily, fontSize]);
-  const box = textFrameSize(clip, layout.width);
+    return styledTextLayout(clip);
+  }, [clip.text, clip.textRuns, clip.style]);
+  const box = textBoxFor(clip);
   return (
     <span
       className="behavior-text-layout"
@@ -51,6 +41,10 @@ export default function BehaviorText({
             key={glyph.index}
             style={{
               position: "absolute",
+              fontFamily: `"${glyph.style.fontFamily.replace(/["\\]/g, "")}", "PingFang SC", sans-serif`,
+              fontSize: glyph.style.fontSize * scale,
+              color: glyph.style.color,
+              WebkitTextStroke: `${glyph.style.outlineWidth * scale}px ${glyph.style.outline}`,
               left: (glyph.x + motion.x * fontSize) * scale,
               top: (glyph.y + motion.y * fontSize) * scale,
               opacity: motion.opacity,

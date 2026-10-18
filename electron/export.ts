@@ -468,13 +468,13 @@ async function renderProject(
     if (clip.kind === "text" || clip.kind === "shape") {
       const animatedText =
         clip.kind === "text" &&
-        !!clip.behaviors?.some(
+        (!!clip.textRuns?.length || !!clip.behaviors?.some(
           (behavior) =>
             behavior.enabled &&
             [behavior.incoming, behavior.during, behavior.outgoing].some(
               (phase) => phase.type !== "whole" && phase.style !== "none",
             ),
-        );
+        ));
       const animatedDrawing =
         !still && clip.kind === "shape" && !!clip.drawing?.enabled;
       const targetLayer = l;
@@ -516,13 +516,13 @@ async function renderProject(
     // inputs start at zero; their source timestamp only matters to cursor data.
     const animatedText =
       clip.kind === "text" &&
-      !!clip.behaviors?.some(
+      (!!clip.textRuns?.length || !!clip.behaviors?.some(
         (behavior) =>
           behavior.enabled &&
           [behavior.incoming, behavior.during, behavior.outgoing].some(
             (phase) => phase.type !== "whole" && phase.style !== "none",
           ),
-      );
+      ));
     const animatedDrawing = !still && clip.kind === "shape" && !!clip.drawing?.enabled;
     // Input seeking skips discarded media before decoding, and resets both audio
     // and video timestamps. Cursor telemetry still uses the original sourceIn.

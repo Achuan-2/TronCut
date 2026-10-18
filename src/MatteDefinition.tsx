@@ -9,13 +9,12 @@ import { depthScale } from "../shared/rotation";
 import { contentLayout, defaultContentTransform } from "../shared/crop";
 import { mediaFrameRadii, roundedRectanglePath } from "../shared/media-frame";
 import { visualClipAt } from "../shared/visual-state";
-import { textBoxFor } from "./text";
+import { textBoxFor, styledTextLayout } from "./text";
 import { annotationSvgBody, drawingProgress, shapeSize } from "../shared/annotation-style";
 import { textLineHeight, textFillCss, textFillGeometry } from "../shared/text";
 import {
   behaviorTransform,
   glyphMotion,
-  layoutGlyphs,
   clipsBehaviorText,
 } from "../shared/behaviors";
 
@@ -115,17 +114,11 @@ export default function MatteDefinition({
   const box = clip.kind === "text" ? textBoxFor(clip) : null;
   const glyphs = useMemo(() => {
     if (original.kind !== "text") return null;
-    const context = document.createElement("canvas").getContext("2d")!;
-    const font = original.style?.fontSize ?? 68;
-    context.font = `700 ${font}px "${(original.style?.fontFamily ?? "Microsoft YaHei").replace(/["\\]/g, "")}", "PingFang SC", sans-serif`;
-    return layoutGlyphs(
-      original.text ?? "",
-      font,
-      (text) => context.measureText(text).width,
-    );
+    return styledTextLayout(original);
   }, [
     original.kind,
     original.text,
+    original.textRuns,
     original.style?.fontSize,
     original.style?.fontFamily,
   ]);
@@ -273,7 +266,7 @@ export default function MatteDefinition({
                     paintOrder="stroke fill"
                     textAnchor="middle"
                   >
-                    {glyphs && clip.behaviors?.length ? (
+                    {glyphs && (clip.behaviors?.length || clip.textRuns?.length) ? (
                       <g
                         clipPath={
                           clipsBehaviorText(clip, local, glyphs.count)
@@ -292,6 +285,11 @@ export default function MatteDefinition({
                           return (
                             <text
                               key={glyph.index}
+                              fontFamily={glyph.style.fontFamily}
+                              fontSize={glyph.style.fontSize * scale}
+                              fill={glyph.style.color}
+                              stroke={glyph.style.outline}
+                              strokeWidth={glyph.style.outlineWidth * scale}
                               dominantBaseline="central"
                               opacity={motion.opacity}
                               style={{

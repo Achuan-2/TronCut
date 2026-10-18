@@ -88,6 +88,7 @@ import EffectRegionOverlay from "./EffectRegionOverlay";
 import type { Region } from "../shared/visual-effects";
 import { effectActive } from "../shared/effect-timing";
 import BehaviorText from "./BehaviorText";
+import RichTextEditor from "./RichTextEditor";
 import {
   annotationSvgBody,
   drawingProgress,
@@ -314,13 +315,6 @@ function PreviewLayerImpl({
     );
   clip = visualClipAt(clip, transform);
   const editing = interactive && editor.editingTextId === clip.id;
-  const textInput = useRef<HTMLTextAreaElement>(null);
-  useEffect(() => {
-    if (editing) {
-      textInput.current?.focus();
-      textInput.current?.select();
-    }
-  }, [editing]);
   useEffect(() => {
     if (
       editing &&
@@ -891,35 +885,21 @@ function PreviewLayerImpl({
             }}
           >
             {editing ? (
-              <textarea
-                ref={textInput}
-                className="preview-text-editor"
-                aria-label="画布文本内容"
-                value={clip.text ?? ""}
-                rows={1}
-                wrap="off"
-                maxLength={10000}
-                spellCheck={false}
-                onChange={(event) =>
+              <RichTextEditor
+                clip={clip}
+                scale={scale}
+                onChange={(text) =>
                   editor.updateClip(clip.id, {
-                    text: event.target.value,
-                    name: event.target.value.slice(0, 24) || "文本",
+                    text,
+                    name: text.slice(0, 24) || "文本",
                   })
                 }
-                onBlur={() => editor.endTextEdit(clip.id)}
-                onKeyDown={(event) => {
-                  if (event.nativeEvent.isComposing) return;
-                  if (
-                    event.key === "Escape" ||
-                    (event.key === "Enter" && (event.ctrlKey || event.metaKey))
-                  ) {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    editor.endTextEdit(clip.id);
-                  }
-                }}
+                onSelection={(range) => editor.setTextSelection(range ? { ...range, clipId: clip.id } : null)}
+                onEnd={() => editor.endTextEdit(clip.id)}
+                onUndo={editor.undo}
+                onRedo={editor.redo}
               />
-            ) : clip.behaviors?.length ? (
+            ) : clip.behaviors?.length || clip.textRuns?.length ? (
               <BehaviorText clip={clip} time={localTime} scale={scale} />
             ) : (
               clip.text || " "

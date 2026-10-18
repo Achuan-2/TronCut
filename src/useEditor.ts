@@ -26,6 +26,7 @@ import {
   defaultTransform,
   type Asset,
   type Transform,
+  type CharacterStyle,
   newTrack,
   numberTracks,
   projectDuration,
@@ -61,6 +62,7 @@ import { type ContentTransform } from "../shared/crop";
 import { animateContent, animateCrop } from "../shared/crop-animation";
 import type { Crop } from "../shared/crop";
 import { fitUpdatedText, textBoxFor } from "./text";
+import { applyCharacterStyle, reconcileTextRuns, type TextRange } from "../shared/rich-text";
 import {
   editableCanvasIds,
   fitFrameTransform,
@@ -150,6 +152,7 @@ export function useEditor(
   const playhead = playback.getSnapshot();
   const [project, setProject] = useState<Project>(() => createProject());
   const [editingTextId, setEditingTextId] = useState<string | null>(null);
+  const [textSelection, setTextSelection] = useState<(TextRange & { clipId: string }) | null>(null);
   const [zoomPanDraft, setZoomPanDraft] = useState<Transform | null>(null);
   const [canvasMode, setCanvasMode] = useState<"select" | "crop" | "draw">(
     "select",
@@ -237,6 +240,7 @@ export function useEditor(
   );
   const select = useCallback(
     (id: string | null, additive = false) => {
+      setTextSelection((selection) => selection?.clipId === id ? selection : null);
       setBehaviorSelection(null);
       setTransitionSelection(null);
       if (id && !additive && keyframeRef.current?.clipId === id) return;
@@ -450,9 +454,10 @@ export function useEditor(
           c.id === id
             ? fitUpdatedText(
                 c,
-                typeof updater === "function"
-                  ? updater(c)
-                  : { ...c, ...updater },
+                reconcileTextRuns(
+                  c,
+                  typeof updater === "function" ? updater(c) : { ...c, ...updater },
+                ),
               )
             : c,
         ),
@@ -464,7 +469,7 @@ export function useEditor(
     (
       id: string,
       patch: CaptionAppearance,
-      options: { preserveFontSize?: boolean } = {},
+      options: { preserveFontSize?: boolean; characterPatch?: CharacterStyle } = {},
     ) => {
       apply((project) => {
         const target = project.clips.find((clip) => clip.id === id);
@@ -493,7 +498,12 @@ export function useEditor(
           clips: next.clips.map((clip, index) => {
             const before = project.clips[index];
             if (clip === before) return clip;
-            const fitted = fitUpdatedText(before, clip);
+            const fitted = fitUpdatedText(
+              before,
+              options.characterPatch
+                ? applyCharacterStyle(clip, null, options.characterPatch)
+                : clip,
+            );
             return options.preserveFontSize && before.style && fitted.style
               ? {
                   ...fitted,
@@ -505,6 +515,30 @@ export function useEditor(
       });
     },
     [apply, editAllCaptions],
+  );
+  const updateCharacterStyle = useCallback(
+    (id: string, patch: CharacterStyle) => {
+      const target = current.current.clips.find((clip) => clip.id === id);
+      if (!target) return;
+      const range = textSelection?.clipId === id && textSelection.end > textSelection.start
+        ? textSelection : null;
+      if (range) {
+        // A local geometry edit must not refit and resize the unselected text.
+        const changesMetrics = patch.fontSize !== undefined ||
+          patch.fontFamily !== undefined || patch.outlineWidth !== undefined;
+        updateClip(id, (clip) => ({
+          ...applyCharacterStyle(clip, range, patch),
+          ...(changesMetrics ? { autoResizeText: false } : {}),
+        }));
+      } else {
+        updateTextAppearance(
+          id,
+          { style: { ...target.style!, ...patch } },
+          { characterPatch: patch },
+        );
+      }
+    },
+    [textSelection, updateClip, updateTextAppearance],
   );
   const selectCaptionTrack = useCallback(
     (trackId: string, time?: number) => {
@@ -1524,6 +1558,9 @@ export function useEditor(
     removeSpeedEffect,
     addAssets,
     editingTextId,
+    textSelection,
+    setTextSelection,
+    updateCharacterStyle,
     beginTextEdit,
     endTextEdit,
     zoomPanDraft,

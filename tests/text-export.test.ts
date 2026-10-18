@@ -7,6 +7,7 @@ import { exportFrame, exportVideo } from "../electron/export";
 import { createBehavior } from "../shared/behaviors";
 import { saveProject, openProject } from "../electron/project-store";
 import { findBinary, runProcess } from "../electron/process";
+import { applyCharacterStyle } from "../shared/rich-text";
 
 it("文本框调整后的实际字号可保存重开，并按字号导出", async () => {
   const root = path.resolve(`test-output/text-export-${Date.now()}`);
@@ -70,6 +71,49 @@ it("文本框调整后的实际字号可保存重开，并按字号导出", asyn
     widths.push(Math.max(...xs) - Math.min(...xs));
   }
   expect(widths[1]).toBeGreaterThan(widths[0] * 1.8);
+}, 30000);
+
+it("局部字号、字体、颜色和描边保存重开后，在静态及逐字行为导出中保留", async () => {
+  const root = path.resolve(`test-output/rich-text-export-${Date.now()}`);
+  const project = createProject("局部样式导出");
+  project.canvas = { width: 320, height: 180, fps: 10, background: "#000000" };
+  project.exportSettings = { encoder: "software" };
+  const original = newText("titles", 0, 0, "MM");
+  original.duration = 1;
+  original.style = { ...original.style!, fontSize: 24, fontFamily: "Arial", color: "#00ff00", outlineWidth: 0 };
+  const styled = applyCharacterStyle(original, { start: 1, end: 2 }, { fontSize: 48, fontFamily: "Arial", color: "#ff0000", outline: "#0000ff", outlineWidth: 2 });
+  for (const animated of [false, true]) {
+    const clip = structuredClone(styled);
+    if (animated) {
+      const behavior = createBehavior("type-reveal", 1)!;
+      behavior.incoming.offset = 0;
+      behavior.outgoing.style = "none";
+      clip.behaviors = [behavior];
+    }
+    project.clips = [clip];
+    const file = path.join(root, `${animated}.troncut`);
+    await saveProject(project, file);
+    const reopened = await openProject(file);
+    expect(reopened.clips[0].textRuns).toEqual(styled.textRuns);
+    const image = path.join(root, `${animated}.png`);
+    await exportFrame(reopened, 0.7, image, path.join(root, `${animated}`), AbortSignal.timeout(20000));
+    // Exercise the concat stream over a full clip, then inspect the encoded frame.
+    const video = path.join(root, `${animated}.mp4`);
+    await exportVideo(reopened, video, path.join(root, `video-${animated}`), false, AbortSignal.timeout(20000), () => {});
+    await runProcess(findBinary("ffmpeg"), ["-y", "-ss", "0.7", "-i", video, "-frames:v", "1", image]);
+    const { data, info } = await sharp(image).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+    const bounds = [[], [], []] as number[][];
+    const heights = [[], []] as number[][];
+    for (let y = 0; y < info.height; y++) for (let x = 0; x < info.width; x++) {
+      const [r, g, b] = data.subarray((y * info.width + x) * info.channels, (y * info.width + x) * info.channels + 3);
+      if (r > 150 && g < 50 && b < 50) { bounds[0].push(x); heights[0].push(y); }
+      if (g > 150 && r < 50 && b < 50) { bounds[1].push(x); heights[1].push(y); }
+      if (b > 120 && r < 70 && g < 70) bounds[2].push(x);
+    }
+    for (const channel of bounds) expect(channel.length).toBeGreaterThan(15);
+    expect(Math.min(...bounds[0])).toBeGreaterThan(Math.max(...bounds[1]));
+    expect(Math.max(...heights[0]) - Math.min(...heights[0])).toBeGreaterThan((Math.max(...heights[1]) - Math.min(...heights[1])) * 1.7);
+  }
 }, 30000);
 
 it("文本、字幕和逐字行为导出独立填充，颜色透明度可保存重开且不削弱文字", async () => {

@@ -44,6 +44,8 @@ import { hasBehaviors } from "../shared/behaviors";
 import BehaviorsPanel from "./BehaviorsPanel";
 import BehaviorProperties from "./BehaviorProperties";
 import TextFillFields from "./TextFillFields";
+import FontSelect from "./FontSelect";
+import { characterStyleAt } from "../shared/rich-text";
 import TransitionsPanel from "./TransitionsPanel";
 import TransitionProperties from "./TransitionProperties";
 import CaptionsPanel from "./CaptionsPanel";
@@ -394,6 +396,8 @@ export function Inspector({ editor }: { editor: Editor }) {
     return <TransitionProperties editor={editor} />;
   const hasCursor = c?.kind === "video" && !!selectedAsset?.cursor;
   const hasText = c?.kind === "text";
+  const textSelection = editor.textSelection?.clipId === c?.id ? editor.textSelection : null;
+  const characterStyle = c && textSelection ? characterStyleAt(c, textSelection.start) : c?.style;
   const hasAnnotation = c?.kind === "shape";
   const tabs = [
     ...(isRecording ? [{ name: "recording", label: "录屏", icon: MonitorDot }] : []),
@@ -661,6 +665,11 @@ export function Inspector({ editor }: { editor: Editor }) {
                 <textarea
                   aria-label="文本内容"
                   value={c.text ?? ""}
+                  maxLength={10000}
+                  onSelect={(event) => {
+                    const { selectionStart: start, selectionEnd: end } = event.currentTarget;
+                    editor.setTextSelection(end > start ? { clipId: c.id, start, end } : null);
+                  }}
                   onChange={(e) =>
                     update({
                       text: e.target.value,
@@ -668,12 +677,22 @@ export function Inspector({ editor }: { editor: Editor }) {
                     })
                   }
                 />
+                <p className="field-help text-selection-status">
+                  {textSelection ? `已选中 ${Array.from((c.text ?? "").slice(textSelection.start, textSelection.end)).length} 个字符，样式仅应用于选中文字。` : "选中部分文字可单独修改样式，未选择时应用于整段。"}
+                  {textSelection && <button type="button" onClick={() => editor.setTextSelection(null)}>应用整段</button>}
+                </p>
                 <label className="field">
                   花字
                   <select
                     value=""
                     onChange={(e) => {
                       if (locked) return;
+                      const { fontFamily, color, outline, outlineWidth } = textPresets[Number(e.target.value)].style;
+                      const characterPatch = { fontFamily, color, outline, outlineWidth };
+                      if (textSelection) {
+                        editor.updateCharacterStyle(c.id, characterPatch);
+                        return;
+                      }
                       editor.updateTextAppearance(
                         c.id,
                         {
@@ -681,7 +700,7 @@ export function Inspector({ editor }: { editor: Editor }) {
                             ...textPresets[Number(e.target.value)].style,
                           },
                         },
-                        { preserveFontSize: true },
+                        { preserveFontSize: true, characterPatch },
                       );
                     }}
                   >
@@ -697,22 +716,20 @@ export function Inspector({ editor }: { editor: Editor }) {
                 </label>
                 {numberField(
                   "字号",
-                  c.style?.fontSize ?? 68,
-                  (fontSize) => update({ style: { ...c.style!, fontSize } }),
+                  characterStyle?.fontSize ?? 68,
+                  (fontSize) => editor.updateCharacterStyle(c.id, { fontSize }),
                   8,
                   300,
                   1,
-                  !!c.autoResizeText,
+                  !!c.autoResizeText && !textSelection,
                 )}
                 <label className="field">
                   文字颜色
                   <input
                     type="color"
-                    value={c.style?.color ?? "#ffffff"}
+                    value={characterStyle?.color ?? "#ffffff"}
                     onChange={(e) =>
-                      update({
-                        style: { ...c.style!, color: e.target.value },
-                      })
+                      editor.updateCharacterStyle(c.id, { color: e.target.value })
                     }
                   />
                 </label>
@@ -720,33 +737,21 @@ export function Inspector({ editor }: { editor: Editor }) {
                   描边颜色
                   <input
                     type="color"
-                    value={c.style?.outline ?? "#111111"}
+                    value={characterStyle?.outline ?? "#111111"}
                     onChange={(e) =>
-                      update({
-                        style: { ...c.style!, outline: e.target.value },
-                      })
+                      editor.updateCharacterStyle(c.id, { outline: e.target.value })
                     }
                   />
                 </label>
                 {numberField(
                   "描边宽度",
-                  c.style?.outlineWidth ?? 4,
+                  characterStyle?.outlineWidth ?? 4,
                   (outlineWidth) =>
-                    update({ style: { ...c.style!, outlineWidth } }),
+                    editor.updateCharacterStyle(c.id, { outlineWidth }),
                   0,
                   20,
                 )}
-                <label className="field">
-                  字体
-                  <input
-                    value={c.style?.fontFamily ?? "Microsoft YaHei"}
-                    onChange={(e) =>
-                      update({
-                        style: { ...c.style!, fontFamily: e.target.value },
-                      })
-                    }
-                  />
-                </label>
+                <FontSelect value={characterStyle?.fontFamily ?? "Microsoft YaHei"} onChange={(fontFamily) => editor.updateCharacterStyle(c.id, { fontFamily })} />
                 <label className="check-field">
                   <input
                     type="checkbox"

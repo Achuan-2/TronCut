@@ -1438,8 +1438,11 @@ app
       (contents, permission, callback) =>
         callback(
           contents === window?.webContents &&
-            ["media", "display-capture", "fullscreen"].includes(permission),
+            ["media", "display-capture", "fullscreen", "local-fonts"].includes(permission),
         ),
+    );
+    session.defaultSession.setPermissionCheckHandler((contents, permission) =>
+      contents === window?.webContents && ["media", "display-capture", "fullscreen", "local-fonts"].includes(permission),
     );
     session.defaultSession.setDisplayMediaRequestHandler(
       async (_request, callback) => {

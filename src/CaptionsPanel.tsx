@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import FontSelect from "./FontSelect";
 import {
   AudioLines,
   Download,
@@ -698,26 +699,18 @@ export default function CaptionsPanel({
 
             {dialog === "style" && (
               <>
-                <label className="field">
-                  字体
-                  <select
+                <FontSelect
                     value={style.text.fontFamily}
-                    onChange={(event) =>
+                    onChange={(fontFamily) =>
                       setStyle((value) => ({
                         ...value,
                         text: {
                           ...value.text,
-                          fontFamily: event.target.value,
+                          fontFamily,
                         },
                       }))
                     }
-                  >
-                    <option>Microsoft YaHei</option>
-                    <option>Arial</option>
-                    <option>SimHei</option>
-                    <option>SimSun</option>
-                  </select>
-                </label>
+                />
                 <label className="field">
                   字号
                   <input

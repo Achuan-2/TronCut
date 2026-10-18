@@ -1,17 +1,16 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import sharp from "sharp";
-import type { Clip } from "../shared/model";
+import type { Clip, TextStyle } from "../shared/model";
 import {
   clipsBehaviorText,
   glyphMotion,
-  layoutGlyphs,
-  textGlyphs,
 } from "../shared/behaviors";
 import { rotationMatrix } from "../shared/rotation";
 import { textFrameSize, textFillGeometry } from "../shared/text";
 import { textFillRectangle } from "./text-fill";
 import { outlinedText } from "./text-outline";
+import { layoutStyledText } from "../shared/rich-text";
 
 const xml = (text: string) =>
   text.replace(
@@ -42,11 +41,11 @@ export async function rasterizeBehaviorText(
   const checkCancelled = () => {
     if (signal.aborted) throw new Error("任务已取消");
   };
-  const textBuffer = (text: string, resolution = 1) =>
+  const textBuffer = (text: string, glyphStyle: TextStyle, resolution = 1) =>
     sharp({
       text: {
         text: xml(text),
-        font: `${style.fontFamily} Bold ${fontSize * resolution}`,
+        font: `${glyphStyle.fontFamily} Bold ${glyphStyle.fontSize * resolution}`,
         rgba: true,
         dpi: 72,
       },
@@ -54,34 +53,28 @@ export async function rasterizeBehaviorText(
       .png()
       .toBuffer();
   const widths = new Map<string, number>();
-  const sentinel = (await sharp(await textBuffer("|")).metadata()).width!;
-  const measure = async (text: string) => {
-    if (widths.has(text)) return;
+  const fontKey = (style: TextStyle) => JSON.stringify([style.fontFamily, style.fontSize]);
+  const measureKey = (text: string, style: TextStyle) => JSON.stringify([text, fontKey(style)]);
+  const sentinels = new Map<string, number>();
+  const measure = async (text: string, style: TextStyle) => {
+    const key = measureKey(text, style);
+    if (widths.has(key)) return;
     checkCancelled();
+    if (!sentinels.has(fontKey(style))) sentinels.set(fontKey(style), (await sharp(await textBuffer("|", style)).metadata()).width!);
     widths.set(
-      text,
+      key,
       Math.max(
         0,
-        (await sharp(await textBuffer(text + "|")).metadata()).width! -
-          sentinel,
+        (await sharp(await textBuffer(text + "|", style)).metadata()).width! -
+          sentinels.get(fontKey(style))!,
       ),
     );
   };
-  await measure("");
-  for (const line of (clip.text ?? "").split("\n")) {
-    await measure(line);
-    let prefix = "";
-    for (const glyph of textGlyphs(line)) {
-      await measure(prefix);
-      await measure(glyph);
-      prefix += glyph;
-    }
-  }
-  const layout = layoutGlyphs(
-    clip.text ?? "",
-    fontSize,
-    (text) => widths.get(text) ?? 0,
-  );
+  const measurements = new Map<string, { text: string; style: TextStyle }>();
+  layoutStyledText(clip, (text, style) => { measurements.set(measureKey(text, style), { text, style }); return 0; });
+  for (const { text, style } of measurements.values()) await measure(text, style);
+  const layout = layoutStyledText(clip, (text, style) => widths.get(measureKey(text, style)) ?? 0);
+  const glyphKey = (glyph: (typeof layout.glyphs)[number]) => JSON.stringify([glyph.text, glyph.style]);
   const images = new Map<
     string,
     { width: number; height: number; data: string }
@@ -98,28 +91,30 @@ export async function rasterizeBehaviorText(
     ? 4
     : 1;
   for (const glyph of layout.glyphs) {
-    if (images.has(glyph.text) || !glyph.text.trim()) continue;
+    if (images.has(glyphKey(glyph)) || !glyph.text.trim()) continue;
     checkCancelled();
-    const mask = await textBuffer(glyph.text, resolution),
+    const mask = await textBuffer(glyph.text, glyph.style, resolution),
       info = await sharp(mask).metadata();
-    const margin = Math.ceil(style.outlineWidth * resolution) + 2;
+    const margin = Math.ceil(glyph.style.outlineWidth * resolution) + 2;
     const width = info.width! + margin * 2,
       height = info.height! + margin * 2;
     const png = await outlinedText(
       mask,
-      style.color,
-      style.outline,
-      style.outlineWidth * resolution,
+      glyph.style.color,
+      glyph.style.outline,
+      glyph.style.outlineWidth * resolution,
       margin,
     );
-    images.set(glyph.text, {
+    images.set(glyphKey(glyph), {
       width: width / resolution,
       height: height / resolution,
       data: png.toString("base64"),
     });
   }
-  const padding = Math.ceil(fontSize * 6 + style.outlineWidth * 2 + 12);
-  const box = textFrameSize(clip, layout.width);
+  const maxFont = Math.max(fontSize, ...layout.glyphs.map((glyph) => glyph.style.fontSize));
+  const maxOutline = Math.max(style.outlineWidth, ...layout.glyphs.map((glyph) => glyph.style.outlineWidth));
+  const padding = Math.ceil(maxFont * (clip.behaviors?.some((behavior) => behavior.enabled) ? 6 : 0) + maxOutline * 2 + 12);
+  const box = clip.textRuns?.length && !clip.textBox ? { width: layout.width + maxOutline * 2, height: layout.height + maxOutline * 2 } : textFrameSize(clip, layout.width);
   const background = textFillGeometry(style, box);
   const width = Math.ceil(
       Math.max(layout.width, background.width) + padding * 2,
@@ -145,7 +140,7 @@ export async function rasterizeBehaviorText(
       file = `${cache.size}.png`;
       const body = layout.glyphs
         .map((glyph, index) => {
-          const image = images.get(glyph.text),
+          const image = images.get(glyphKey(glyph)),
             motion = motions[index];
           if (!image || motion.opacity <= 0) return "";
           const { a, b, c, d } = rotationMatrix(motion);

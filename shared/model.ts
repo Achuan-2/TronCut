@@ -88,6 +88,16 @@ export const styleSchema = z.object({
   fillPaddingY: finite.min(0).max(200).optional(),
   fillRadius: finite.min(0).max(200).optional(),
 });
+export const characterStyleSchema = styleSchema.pick({
+  fontSize: true, fontFamily: true, color: true, outline: true, outlineWidth: true,
+}).partial();
+export type CharacterStyle = z.infer<typeof characterStyleSchema>;
+export const textRunSchema = z.object({
+  // Offsets use UTF-16, matching DOM selections and JavaScript strings.
+  start: z.number().int().min(0).max(10000),
+  end: z.number().int().min(1).max(10000),
+  style: characterStyleSchema,
+}).refine((run) => run.end > run.start);
 export const projectSchema = z.object({
   format: z.enum(["troncut", "framecraft"]),
   version: z.literal(1),
@@ -180,6 +190,7 @@ export const projectSchema = z.object({
           )
           .max(10000),
         text: z.string().max(10000).optional(),
+        textRuns: z.array(textRunSchema).max(10000).optional(),
         caption: z.boolean().optional(),
         style: styleSchema.optional(),
         textBox: z
@@ -432,6 +443,12 @@ export function validateProject(data: unknown): Project {
       throw new Error(`${name} ID 重复`);
   }
   for (const clip of project.clips) {
+    let textEnd = 0;
+    for (const run of clip.textRuns ?? []) {
+      if (clip.kind !== "text" || run.start < textEnd || run.end > (clip.text ?? "").length)
+        throw new Error(`片段 ${clip.name} 的局部文字样式范围无效`);
+      textEnd = run.end;
+    }
     if (!project.tracks.some((t) => t.id === clip.trackId))
       throw new Error(`片段 ${clip.name} 引用了不存在的轨道`);
     if (clip.assetId && !project.assets.some((a) => a.id === clip.assetId))
