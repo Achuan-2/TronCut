@@ -116,26 +116,6 @@ export default function AnnotationProperties({
             />
           )}
           <label className="field">
-            填充
-            <input
-              type="color"
-              aria-label="标注填充颜色"
-              value={clip.fill ?? "#00b5ef"}
-              disabled={!style.fillEnabled}
-              onChange={(event) => change({ fill: event.target.value })}
-            />
-          </label>
-          <label className="check-field">
-            <input
-              type="checkbox"
-              checked={style.fillEnabled}
-              onChange={(event) =>
-                styleChange({ fillEnabled: event.target.checked })
-              }
-            />
-            启用填充
-          </label>
-          <label className="field">
             描边颜色
             <input
               type="color"
@@ -187,6 +167,26 @@ export default function AnnotationProperties({
                 </select>
               </label>
             ))}
+          <label className="check-field">
+            <input
+              type="checkbox"
+              checked={style.fillEnabled}
+              onChange={(event) =>
+                styleChange({ fillEnabled: event.target.checked })
+              }
+            />
+            启用填充
+          </label>
+          <label className="field">
+            填充颜色
+            <input
+              type="color"
+              aria-label="标注填充颜色"
+              value={clip.fill ?? "#00b5ef"}
+              disabled={!style.fillEnabled}
+              onChange={(event) => change({ fill: event.target.value })}
+            />
+          </label>
         </>
       )}
       {drawing && (
