@@ -79,12 +79,12 @@ const tabs = [
   { id: "favorites", name: "收藏夹", icon: Star },
   { id: "media", name: "媒体", icon: FolderOpen },
   { id: "annotations", name: "标注", icon: Type },
-  { id: "captions", name: "字幕", icon: Captions },
   { id: "animations", name: "动画", icon: Sparkles },
   { id: "behaviors", name: "行为", icon: Paintbrush },
   { id: "transitions", name: "转换", icon: ArrowRightLeft },
   { id: "effects", name: "视觉效果", icon: WandSparkles },
   { id: "narration", name: "旁白", icon: Mic },
+  { id: "captions", name: "字幕", icon: Captions },
   { id: "settings", name: "设置", icon: Settings2 },
 ] as const;
 interface Props {
