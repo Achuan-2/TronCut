@@ -26,6 +26,7 @@ app.process().stderr.on("data", (data) => process.stderr.write(data));
 app.process().stdout.on("data", (data) => process.stdout.write(data));
 const errors = [];
 try {
+  await app.evaluate(({ app }, folder) => app.setPath("documents", folder), root);
   const page = await app.firstWindow();
   page.on("console", (message) => {
     if (message.type() === "error") console.error(message.text());
@@ -33,6 +34,18 @@ try {
   page.on("pageerror", (err) => errors.push(err.message));
   await page.getByRole("button", { name: "新建项目", exact: true }).click();
   await page.getByLabel("工程名称").fill("我的第一个视频");
+  await page.getByLabel("工程名称").blur();
+  const projectFile = path.join(
+    root,
+    "TronCut",
+    "Projects",
+    "我的第一个视频",
+    "我的第一个视频.troncut",
+  );
+  await expect.poll(async () => {
+    const projects = await page.evaluate(() => window.framecraft.recentProjects());
+    return projects[0]?.file;
+  }).toBe(projectFile);
   // Create the two editable text fixtures explicitly; launch now opens Home.
   await page.getByRole("button", { name: "添加文本", exact: true }).click();
   await page.getByLabel("文本内容").fill("把想法，变成作品。");
@@ -197,24 +210,11 @@ try {
     page.locator(".asset-thumbnail img.thumbnail-image"),
   ).toHaveCount(1, { timeout: 20000 });
   await page.getByRole("button", { name: "媒体", exact: true }).click();
-  await app.evaluate(({ dialog }, folder) => {
-    dialog.showSaveDialog = async () => ({
-      canceled: false,
-      filePath: `${folder}/我的第一个视频.troncut`,
-    });
-  }, root);
   await page.getByRole("button", { name: "保存", exact: true }).click();
   await expect(
     page.getByText("工程已保存，工程文件和素材已归档到工程文件夹", { exact: true }),
   ).toBeVisible({ timeout: 20000 });
-  const folders = await fs.readdir(root);
-  const projectFolder = folders.find((f) => f.startsWith("我的第一个视频"));
-  const saved = JSON.parse(
-    await fs.readFile(
-      path.join(root, projectFolder, "我的第一个视频.troncut"),
-      "utf8",
-    ),
-  );
+  const saved = JSON.parse(await fs.readFile(projectFile, "utf8"));
   if (saved.clips.length !== 4 || !saved.assets[0].path.startsWith("media/"))
     throw new Error("工程收集素材验证失败");
   await page.getByRole("button", { name: "导出视频", exact: true }).click();
@@ -281,17 +281,12 @@ try {
       await expect(page.getByRole("status")).toContainText("工程已保存", {
         timeout: 20000,
       });
-      const disk = JSON.parse(
-        await fs.readFile(
-          path.join(root, projectFolder, "我的第一个视频.troncut"),
-          "utf8",
-        ),
-      );
+      const disk = JSON.parse(await fs.readFile(projectFile, "utf8"));
       const cursor = disk.assets.find((a) => a.cursorPath);
       if (!cursor) throw new Error("原生录屏没有持久化鼠标数据");
       const sidecar = JSON.parse(
         await fs.readFile(
-          path.join(root, projectFolder, cursor.cursorPath),
+          path.join(path.dirname(projectFile), cursor.cursorPath),
           "utf8",
         ),
       );
