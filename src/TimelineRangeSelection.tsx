@@ -95,56 +95,58 @@ export function TimelineRangeHandles({
           }}
         />
       )}
-      {(["start", "end"] as const).map((part) => {
-        // Each endpoint folds independently when it meets the playhead.
-        const collapsed = Math.abs(range[part] - playhead) * zoom < 0.5;
-        return (
-          <button
-            key={part}
-            role="slider"
-            aria-label={part === "start" ? "范围起点" : "范围终点"}
-            aria-valuemin={0}
-            aria-valuemax={maxTime}
-            aria-valuenow={range[part]}
-            aria-valuetext={timeLabel(range[part])}
-            title={`${part === "start" ? "起点" : "终点"} ${timeLabel(range[part])} · 拖动选择范围`}
-            className={`timeline-range-handle ${part} ${collapsed ? "collapsed" : "expanded"}`}
-            style={{
-              left:
-                part === "start"
-                  ? Math.max(collapsed ? 19 : 12, range.start * zoom)
-                  : range.end * zoom +
-                    (collapsed && playhead * zoom < 19 ? 12 : 0),
-            }}
-            {...pointerProps(part)}
-            onKeyDown={(event) => {
-              if (
-                !["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)
-              )
-                return;
-              event.preventDefault();
-              event.stopPropagation();
-              editor.setPlaying(false);
-              editor.select(null);
-              const step =
-                (event.shiftKey ? 10 : 1) / editor.project.canvas.fps;
-              const time =
-                event.key === "Home"
-                  ? 0
-                  : event.key === "End"
-                    ? maxTime
-                    : range[part] + (event.key === "ArrowLeft" ? -step : step);
-              update(part, time, range);
-            }}
-          >
-            <span />
-          </button>
-        );
-      })}
+      {/* Keep the cursor and its handles in one transformed coordinate space. */}
       <div
         className="ruler-playhead"
         style={{ transform: `translateX(${playhead * zoom}px)` }}
       >
+        {(["start", "end"] as const).map((part) => {
+          // Each endpoint folds independently when it meets the playhead.
+          const collapsed = Math.abs(range[part] - playhead) * zoom < 0.5;
+          return (
+            <button
+              key={part}
+              role="slider"
+              aria-label={part === "start" ? "范围起点" : "范围终点"}
+              aria-valuemin={0}
+              aria-valuemax={maxTime}
+              aria-valuenow={range[part]}
+              aria-valuetext={timeLabel(range[part])}
+              title={`${part === "start" ? "起点" : "终点"} ${timeLabel(range[part])} · 拖动选择范围`}
+              className={`timeline-range-handle ${part} ${collapsed ? "collapsed" : "expanded"}`}
+              style={{
+                left:
+                  (part === "start"
+                    ? Math.max(collapsed ? 19 : 12, range.start * zoom)
+                    : range.end * zoom +
+                      (collapsed && playhead * zoom < 19 ? 12 : 0)) -
+                  playhead * zoom,
+              }}
+              {...pointerProps(part)}
+              onKeyDown={(event) => {
+                if (
+                  !["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)
+                )
+                  return;
+                event.preventDefault();
+                event.stopPropagation();
+                editor.setPlaying(false);
+                editor.select(null);
+                const step =
+                  (event.shiftKey ? 10 : 1) / editor.project.canvas.fps;
+                const time =
+                  event.key === "Home"
+                    ? 0
+                    : event.key === "End"
+                      ? maxTime
+                      : range[part] + (event.key === "ArrowLeft" ? -step : step);
+                update(part, time, range);
+              }}
+            >
+              <span />
+            </button>
+          );
+        })}
         <button
           aria-label="播放头"
           title="拖动定位；双击收起范围"

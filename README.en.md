@@ -10,7 +10,7 @@
     <img src="https://img.shields.io/badge/status-release-71b896" alt="Release" />
   </p>
   <p><a href="README.md">简体中文</a> · <strong>English</strong></p>
-  <p><a href="https://github.com/Achuan-2/TronCut/releases/tag/v0.5.7">Download</a> · <a href="#highlights">Highlights</a> · <a href="docs/FEATURES.md">Roadmap</a> · <a href="#buy-me-a-coffee">Buy me a coffee</a> · <a href="https://github.com/Achuan-2/TronCut/issues">Report an issue</a></p>
+  <p><a href="https://github.com/Achuan-2/TronCut/releases/tag/v0.5.7">Download</a> · <a href="#highlights">Highlights</a> · <a href="docs/FEATURES.md">Roadmap</a> · <a href="https://github.com/Achuan-2/TronCut/issues">Report an issue</a></p>
 </div>
 
 ![TronCut Windows editor — Chinese UI](docs/images/editor.png)
@@ -102,18 +102,6 @@ pnpm test:smoke     # Electron desktop regression; run build and test first
 - [Contribution guide](CONTRIBUTING.md) · [Open an issue](https://github.com/Achuan-2/TronCut/issues/new/choose)
 
 Reproducible bugs, compatibility samples, test results, and code improvements are welcome. Remove private media and sensitive information before sharing projects or logs. Detailed engineering documents are currently primarily in Chinese.
-
-<a id="buy-me-a-coffee"></a>
-
-## Buy me a coffee
-
-If you find TronCut helpful, feel free to support its continuous development! ☕
-
-Non-Chinese users can use this link to [buy me a coffee](https://pancake.waffo.ai/store/achuan-2-fdbho4ye/product/PROD_3F7Aa7c2NQlz9KmxcgxjQ7?type=onetime&currency=USD).
-
-WeChat users can also scan the QR code below:
-
-<img width="300" alt="WeChat Pay" src="docs/images/wechat-sponsor.png" />
 
 ## License and acknowledgements
 

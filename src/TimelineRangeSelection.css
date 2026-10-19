@@ -26,6 +26,7 @@
   border-radius: 0;
   cursor: default;
   touch-action: none;
+  pointer-events: auto;
 }
 .timeline-range-handle.start {
   margin-left: -12px;
@@ -58,6 +59,7 @@
 }
 .timeline-playhead-handle {
   position: absolute;
+  z-index: 6;
   left: -7px;
   top: 0;
   width: 14px;

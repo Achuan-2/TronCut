@@ -10,7 +10,7 @@
     <img src="https://img.shields.io/badge/status-release-71b896" alt="Release" />
   </p>
   <p><strong>简体中文</strong> · <a href="README.en.md">English</a></p>
-  <p><a href="https://github.com/Achuan-2/TronCut/releases/tag/v0.5.7">下载安装</a> · <a href="#亮点">功能亮点</a> · <a href="docs/FEATURES.md">开发进度</a> · <a href="#buy-me-a-coffee">赞助支持</a> · <a href="https://github.com/Achuan-2/TronCut/issues">反馈问题</a></p>
+  <p><a href="https://github.com/Achuan-2/TronCut/releases/tag/v0.5.7">下载安装</a> · <a href="#亮点">功能亮点</a> · <a href="docs/FEATURES.md">开发进度</a> · <a href="https://github.com/Achuan-2/TronCut/issues">反馈问题</a></p>
 </div>
 
 ![TronCut Windows 编辑器](docs/images/editor.png)
@@ -105,16 +105,6 @@ pnpm test:smoke     # Electron 桌面回归，先执行 build 和 test
 - [贡献指南](CONTRIBUTING.md) · [提交问题](https://github.com/Achuan-2/TronCut/issues/new/choose)
 
 欢迎提供可复现的问题、兼容样本、测试结果和改进代码。提交工程或日志前，请移除私人素材与敏感信息。
-
-<a id="buy-me-a-coffee"></a>
-
-## 赞助与支持 / Buy Me a Coffee
-
-如果您觉得 TronCut 对您有所帮助，欢迎支持项目的持续开发与维护！☕
-
-<img width="300" alt="微信赞赏码" src="docs/images/wechat-sponsor.png" />
-
-Non-Chinese users can use this link to [buy me a coffee](https://pancake.waffo.ai/store/achuan-2-fdbho4ye/product/PROD_3F7Aa7c2NQlz9KmxcgxjQ7?type=onetime&currency=USD).
 
 ## 许可与致谢
 
