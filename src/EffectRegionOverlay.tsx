@@ -54,6 +54,7 @@ export default function EffectRegionOverlay({
   return (
     <div
       className={`effect-region-outline${moveHandleOnly ? " handle-move-only" : ""}`}
+      data-region-move-only={moveHandleOnly || undefined}
       role="group"
       tabIndex={0}
       aria-label={`${name}编辑区域`}
@@ -71,6 +72,7 @@ export default function EffectRegionOverlay({
         const control = (event.target as Element).closest<HTMLElement>(
           "[data-region-handle], [data-region-move]",
         );
+        // Let the material distinguish a region-body click from a material drag.
         if (moveHandleOnly && !control) return;
         onSelect?.();
         event.preventDefault();

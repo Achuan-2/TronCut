@@ -87,6 +87,7 @@ try {
     await expect
       .poll(async () => (await fs.stat(file)).mtimeMs)
       .toBeGreaterThan(before);
+    await expect(page.locator(".busy-overlay")).toHaveCount(0);
     await expect(page.locator(".project-save-state")).not.toContainText("*");
     return JSON.parse(await fs.readFile(file, "utf8"));
   };
@@ -116,6 +117,26 @@ try {
     name: "移动遮罩区域",
     exact: true,
   });
+  await expect(moveHandle).toHaveCount(0);
+  const selectMaterial = () =>
+    page.locator(".timeline-clip.image").click({ position: { x: 35, y: 18 } });
+  const originalClip = (await save()).clips[0];
+  // Plain clicks must select the mask without resizing it or changing the project.
+  for (const part of ["body", "border", "caption"]) {
+    await selectMaterial();
+    await expect(moveHandle).toHaveCount(0);
+    const box = await (
+      part === "caption" ? region.locator(".effect-region-caption") : region
+    ).boundingBox();
+    await page.mouse.click(
+      box.x + box.width * 0.25,
+      box.y + (part === "border" ? 0.5 : box.height * 0.25),
+    );
+    await expect(moveHandle).toBeVisible();
+    await expect(page.locator(".project-save-state")).not.toContainText("*");
+    expect((await save()).clips[0]).toEqual(originalClip);
+  }
+  await selectMaterial();
   await expect(moveHandle).toHaveCount(0);
   const maskHeading = page
     .getByRole("region", { name: "遮罩属性", exact: true })
@@ -313,7 +334,7 @@ try {
     JSON.stringify({
       root,
       checks:
-        "控制点按遮罩选择显隐、中央控制点移动遮罩、区域及边框拖动素材、八点缩放、自动动画、滑动显示像素、起止端点、撤销、时长拖动、取消、保存重开",
+        "单击遮罩区域/边框/标签立即显示控制点且不修改工程、控制点按选择显隐、中央控制点移动遮罩、区域及边框拖动素材、八点缩放、自动动画、滑动显示像素、起止端点、撤销、时长拖动、取消、保存重开",
       rendererErrors: errors,
     }),
   );

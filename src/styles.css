@@ -1974,7 +1974,8 @@ fieldset:disabled {
 }
 .effect-region-caption { position: absolute; left: 0; top: -20px; color: #ffdf87; font-size: 11px; white-space: nowrap; pointer-events: none; }
 /* Keep mask handles above material handles when their boundaries coincide. */
-.effect-region-outline.handle-move-only { z-index: 21; pointer-events: none; cursor: default; }
+.effect-region-outline.handle-move-only { z-index: 21; cursor: inherit; }
+.effect-region-outline.handle-move-only .effect-region-caption { pointer-events: auto; cursor: pointer; }
 .effect-region-outline.handle-move-only .effect-region-resize { pointer-events: auto; }
 .effect-region-move {
   position: absolute;

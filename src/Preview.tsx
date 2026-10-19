@@ -249,6 +249,7 @@ function PreviewLayerImpl({
     axis?: DragAxis | null;
     moved?: boolean;
     toggleSelectionOnClick?: boolean;
+    selectMaskOnClick?: boolean;
   } | null>(null);
   const dragRef = useRef<typeof drag>(null);
   if (drag?.line) {
@@ -523,6 +524,13 @@ function PreviewLayerImpl({
           value: transform,
           originalContent: clip.contentTransform ?? defaultContentTransform,
           toggleSelectionOnClick,
+          selectMaskOnClick:
+            mode === "select" &&
+            regionId === "mask" &&
+            !event.ctrlKey &&
+            !event.metaKey &&
+            !event.shiftKey &&
+            !!(event.target as Element).closest("[data-region-move-only]"),
         });
       }}
       onPointerMove={(event) => {
@@ -701,6 +709,11 @@ function PreviewLayerImpl({
         }
         if (drag?.toggleSelectionOnClick && !drag.moved) {
           editor.select(clip.id, true);
+          setGesture(null);
+          return;
+        }
+        if (drag?.selectMaskOnClick && !drag.moved) {
+          editor.setSelectedVisualEffect({ clipId: clip.id, id: "mask" });
           setGesture(null);
           return;
         }
