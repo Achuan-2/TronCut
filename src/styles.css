@@ -2911,6 +2911,55 @@ fieldset:disabled {
 .property-slider-control .transform-number > span { right: 7px; font-size: 10px; }
 .property-reset { width: 18px; height: 24px; padding: 1px; color: #aeb9bd; }
 .property-reset-spacer { width: 17px; }
+.visual-effect-fields {
+  --effect-label-width: 76px;
+  display: grid;
+  gap: 8px;
+}
+.visual-effect-fields .field,
+.visual-effect-fields .property-slider-row {
+  display: grid;
+  grid-template-columns: var(--effect-label-width) minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  min-height: 28px;
+  margin: 0;
+  color: #b9c4c7;
+  font-size: 11px;
+}
+.visual-effect-fields .field > span,
+.visual-effect-fields .property-slider-row > span:first-child {
+  text-align: left;
+}
+#inspector-video .visual-effect-fields .field {
+  margin: 0;
+}
+.visual-effect-fields .field > input:not([type="checkbox"]):not([type="color"]),
+.visual-effect-fields .field > select,
+.visual-effect-fields .property-slider-control .transform-number input {
+  width: 100%;
+  height: 28px;
+  border: 1px solid #35393d;
+  border-radius: 5px;
+  background: #151719;
+  font-size: 11px;
+}
+.visual-effect-fields .field > input[type="checkbox"] {
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  justify-self: start;
+}
+.visual-effect-fields .property-slider-control,
+.visual-effect-fields .property-slider-control .transform-number {
+  height: 28px;
+}
+.visual-effect-fields .property-reset-spacer {
+  display: none;
+}
+.visual-effect-fields .field-help {
+  margin: 0 0 4px;
+}
 .frame-transform-properties { color: #d3dce0; padding-top: 10px; }
 .frame-transform-properties .transform-scale > span { width: auto; }
 .frame-transform-properties .transform-scale input[type="range"] { width: 100%; min-width: 0; }

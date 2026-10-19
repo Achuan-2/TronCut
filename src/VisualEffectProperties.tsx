@@ -173,7 +173,7 @@ export default function VisualEffectProperties({
           }));
         }}
       >
-        <fieldset disabled={!settings.enabled}>
+        <fieldset className="visual-effect-fields" disabled={!settings.enabled}>
           {id === "mask" && (
             <p className="field-help">
               拖动画布上的遮罩边框或八个控制点调整区域。开启自动动画后修改位置、大小，或选择时间轴动画的起点、终点编辑，可制作滑动显示效果。
@@ -255,11 +255,8 @@ export default function VisualEffectProperties({
               );
             }
             return (
-              <label
-                className={field.type === "check" ? "check-field" : "field"}
-                key={field.key}
-              >
-                {field.type !== "check" && field.label}
+              <label className="field" key={field.key}>
+                <span>{field.label}</span>
                 {field.options ? (
                   <select
                     aria-label={label}
@@ -301,7 +298,6 @@ export default function VisualEffectProperties({
                     }
                   />
                 )}
-                {field.type === "check" && field.label}
               </label>
             );
           })}
