@@ -412,12 +412,11 @@ function installHandlers() {
   // receive the same exit confirmation as the system close button.
   handle("window:close", () => window.close());
   handle("window:menu", (input: unknown, inputX: unknown, inputY: unknown) => {
-    const name = z.enum(["edit", "view"]).parse(input);
+    z.literal("edit").parse(input);
     const bounds = window.getContentBounds();
     const x = Math.round(Math.min(bounds.width, Math.max(0, z.number().finite().parse(inputX))));
     const y = Math.round(Math.min(bounds.height, Math.max(0, z.number().finite().parse(inputY))));
-    const label = name === "edit" ? "编辑" : "视图";
-    Menu.getApplicationMenu()?.items.find((item) => item.label === label)?.submenu?.popup({ window, x, y });
+    Menu.getApplicationMenu()?.items.find((item) => item.label === "编辑")?.submenu?.popup({ window, x, y });
   });
   handle("window:edit-menu", (input: unknown) => {
     const state = editMenuStateSchema.parse(input);
@@ -1506,10 +1505,6 @@ async function createWindow() {
             click: () => shortcut(command.id),
           },
         ]),
-      },
-      {
-        label: "视图",
-        submenu: [{ role: "togglefullscreen" }],
       },
     ]),
   );

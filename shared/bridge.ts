@@ -72,7 +72,7 @@ export interface FrameCraftBridge {
   minimizeWindow(): Promise<void>;
   toggleMaximizeWindow(): Promise<void>;
   closeWindow(): Promise<void>;
-  showWindowMenu(menu: "edit" | "view", x: number, y: number): Promise<void>;
+  showWindowMenu(menu: "edit", x: number, y: number): Promise<void>;
   updateEditMenu(state: EditMenuState): Promise<void>;
   editText(command: z.infer<typeof textEditSchema>): Promise<void>;
   onWindowState(callback: (state: WindowState) => void): () => void;

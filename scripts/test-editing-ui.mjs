@@ -215,16 +215,15 @@ try {
   await page.getByRole("button", { name: "工程", exact: true }).click();
   await app.evaluate(({ Menu }) => {
     globalThis.windowMenuRequests = [];
-    for (const label of ["编辑", "视图"])
-      Menu.getApplicationMenu().items.find(
-        (item) => item.label === label,
-      ).submenu.popup = ({ x, y }) =>
-        globalThis.windowMenuRequests.push({ label, x, y });
+    Menu.getApplicationMenu().items.find(
+      (item) => item.label === "编辑",
+    ).submenu.popup = ({ x, y }) =>
+      globalThis.windowMenuRequests.push({ label: "编辑", x, y });
   });
   await page.getByRole("button", { name: "编辑", exact: true }).click();
-  await page.getByRole("button", { name: "视图", exact: true }).click();
+  await expect(page.getByRole("button", { name: "视图", exact: true })).toHaveCount(0);
   const menus = await app.evaluate(() => globalThis.windowMenuRequests);
-  expect(menus.map((menu) => menu.label)).toEqual(["编辑", "视图"]);
+  expect(menus.map((menu) => menu.label)).toEqual(["编辑"]);
   expect(menus.every((menu) => menu.y <= 44)).toBe(true);
   expect(
     await page.getByLabel("关闭窗口", { exact: true }).evaluate((button) => {

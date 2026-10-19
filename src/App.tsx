@@ -332,7 +332,7 @@ export default function App() {
     void refreshHome().catch((error) => toast(String(error)));
   };
   const showWindowMenu = (
-    name: "edit" | "view",
+    name: "edit",
     element: HTMLButtonElement,
   ) => {
     const bounds = element.getBoundingClientRect();
@@ -1076,21 +1076,13 @@ export default function App() {
             <ChevronDown size={11} />
           </button>
           {window.framecraft && (
-            <>
-              <button
-                disabled={actionsBlocked}
-                onMouseDown={(event) => event.preventDefault()}
-                onClick={(event) => showWindowMenu("edit", event.currentTarget)}
-              >
-                编辑
-              </button>
-              <button
-                disabled={actionsBlocked}
-                onClick={(event) => showWindowMenu("view", event.currentTarget)}
-              >
-                视图
-              </button>
-            </>
+            <button
+              disabled={actionsBlocked}
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={(event) => showWindowMenu("edit", event.currentTarget)}
+            >
+              编辑
+            </button>
           )}
           {menu && !actionsBlocked && (
             <div className="project-menu" onClick={() => setMenu(false)}>
