@@ -87,10 +87,7 @@ import {
 } from "../shared/visual-effect-drag";
 import TimelineSpeedEffect from "./TimelineSpeedEffect";
 import TimelineVisualEffect from "./TimelineVisualEffect";
-import {
-  visualEffectEntries,
-  type RangedVisualEffectId,
-} from "../shared/visual-effect-range";
+import { visualEffectEntries } from "../shared/visual-effect-range";
 import TimelineBehaviorEffect from "./TimelineBehaviorEffect";
 import BehaviorContextMenu from "./BehaviorContextMenu";
 import { hasBehaviors, supportsBehaviors } from "../shared/behaviors";
@@ -393,10 +390,7 @@ export default function Timeline({
   >({});
   const [speedDraft, setSpeedDraft] = useState<Clip | null>(null);
   const [visualDraft, setVisualDraft] = useState<Clip | null>(null);
-  const [activeVisual, setActiveVisual] = useState<{
-    clipId: string;
-    id: RangedVisualEffectId;
-  } | null>(null);
+  const activeVisual = editor.selectedVisualEffect;
   const [activeSpeed, setActiveSpeed] = useState<string | null>(null);
   const [effectDrop, setEffectDrop] = useState<string | null>(null);
   const [animationDrop, setAnimationDrop] = useState<{
@@ -560,7 +554,7 @@ export default function Timeline({
     editor.clearKeyframeEdit();
     editor.setPlaying(false);
     select(id);
-    setActiveVisual(null);
+    editor.setSelectedVisualEffect(null);
     setActiveSpeed(id);
   };
   useEffect(() => {
@@ -1750,6 +1744,7 @@ export default function Timeline({
                             if (event.button !== 0 || track.locked) return;
                             event.stopPropagation();
                             editor.clearKeyframeEdit();
+                            editor.setSelectedVisualEffect(null);
                             if (
                               editor.selectedBehavior?.clipId === c.id ||
                               editor.selectedTransition?.clipId === c.id
@@ -2159,7 +2154,10 @@ export default function Timeline({
                                     editor.clearKeyframeEdit();
                                     editor.setPlaying(false);
                                     setActiveSpeed(null);
-                                    setActiveVisual({ clipId: c.id, id });
+                                    editor.setSelectedVisualEffect({
+                                      clipId: c.id,
+                                      id,
+                                    });
                                   }}
                                   preview={setVisualDraft}
                                   commit={(next) =>

@@ -405,13 +405,21 @@ function PreviewLayerImpl({
       regionDraft,
     ],
   );
-  const regionId = Object.keys(clip.visualEffects ?? {})
-    .reverse()
-    .find(
-      (id) =>
-        (id === "mask" || id === "blur-region") &&
-        clip.visualEffects?.[id]?.enabled,
-    ) as "mask" | "blur-region" | undefined;
+  const selectedRegion =
+    editor.selectedVisualEffect?.clipId === clip.id
+      ? editor.selectedVisualEffect.id
+      : undefined;
+  const regionId =
+    (selectedRegion === "mask" || selectedRegion === "blur-region") &&
+    clip.visualEffects?.[selectedRegion]?.enabled
+      ? selectedRegion
+      : (Object.keys(clip.visualEffects ?? {})
+          .reverse()
+          .find(
+            (id) =>
+              (id === "mask" || id === "blur-region") &&
+              clip.visualEffects?.[id]?.enabled,
+          ) as "mask" | "blur-region" | undefined);
   return (
     <div
       className={`preview-layer ${clip.kind} ${selectedObjectPart ? "selected" : ""} ${editing ? "editing" : ""} ${cropping ? "cropping" : ""} ${lineEditable && interactive ? "line-editable" : ""} ${effectDrop && selectable ? "effect-drop-target" : ""}`}
@@ -1008,6 +1016,14 @@ function PreviewLayerImpl({
           <EffectRegionOverlay
             key={`${clip.id}-${regionId}`}
             name={regionId === "mask" ? "遮罩" : "模糊区域"}
+            moveHandleOnly={regionId === "mask"}
+            showMoveHandle={
+              editor.selectedVisualEffect?.clipId === clip.id &&
+              editor.selectedVisualEffect.id === regionId
+            }
+            onSelect={() =>
+              editor.setSelectedVisualEffect({ clipId: clip.id, id: regionId })
+            }
             region={clip.visualEffects![regionId]!}
             width={Number(style.width) || 1}
             height={Number(style.height) || 1}

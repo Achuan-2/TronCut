@@ -1979,6 +1979,30 @@ fieldset:disabled {
   cursor: move;
 }
 .effect-region-caption { position: absolute; left: 0; top: -20px; color: #ffdf87; font-size: 11px; white-space: nowrap; pointer-events: none; }
+/* Keep mask handles above material handles when their boundaries coincide. */
+.effect-region-outline.handle-move-only { z-index: 21; pointer-events: none; cursor: default; }
+.effect-region-outline.handle-move-only .effect-region-resize { pointer-events: auto; }
+.effect-region-move {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  min-width: 0;
+  padding: 0;
+  transform: translate(-50%, -50%);
+  border: 1px solid #ffdf87;
+  border-radius: 50%;
+  background: #352b15;
+  color: #ffdf87;
+  pointer-events: auto;
+  touch-action: none;
+  cursor: move;
+}
+.effect-region-move:hover { background: #594923; }
+.effect-region-move:focus-visible { outline: 2px solid #ffdf87; outline-offset: 2px; }
 .effect-region-resize { position: absolute; right: -4px; bottom: -4px; width: 8px; height: 8px; min-width: 0; padding: 0; background: #ffdf87; border: 1px solid #352b15; border-radius: 0; cursor: nwse-resize; }
 .resize-handle {
   position: absolute;

@@ -153,6 +153,7 @@ export default function VisualEffectProperties({
       <EffectSection
         key={`${clip.id}-${id}`}
         title={name}
+        onSelect={() => editor.setSelectedVisualEffect({ clipId: clip.id, id })}
         enabled={settings.enabled}
         onToggle={(enabled) => update({ enabled })}
         onReset={() =>

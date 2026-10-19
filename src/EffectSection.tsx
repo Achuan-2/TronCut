@@ -9,6 +9,7 @@ export default function EffectSection({
   onReset,
   onRemove,
   defaultExpanded = true,
+  onSelect,
 }: {
   title: string;
   children: ReactNode;
@@ -17,10 +18,16 @@ export default function EffectSection({
   onReset?: () => void;
   onRemove?: () => void;
   defaultExpanded?: boolean;
+  onSelect?: () => void;
 }) {
   const [expanded, setExpanded] = useState(defaultExpanded);
   return (
-    <section className="visual-effect-properties" aria-label={`${title}属性`}>
+    <section
+      className="visual-effect-properties"
+      aria-label={`${title}属性`}
+      onPointerDownCapture={onSelect}
+      onFocusCapture={onSelect}
+    >
       <header className="effect-section-heading">
         <button
           className="effect-section-toggle"

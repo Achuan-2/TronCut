@@ -1,8 +1,10 @@
 import { useRef, useState } from "react";
+import { Move } from "lucide-react";
 import type { Transform } from "../shared/model";
 import type { Region } from "../shared/visual-effects";
 import { localDelta } from "../shared/rotation";
 import { resizeHandles } from "../shared/canvas";
+import { selectionControlScale } from "./CanvasSelection";
 
 type Geometry = Pick<Region, "x" | "y" | "width" | "height">;
 const clamp = (value: number, min: number, max: number) =>
@@ -16,6 +18,9 @@ export default function EffectRegionOverlay({
   pose,
   cameraScale,
   canvasScale = 1,
+  moveHandleOnly = false,
+  showMoveHandle = true,
+  onSelect,
   onDraft,
   onCommit,
 }: {
@@ -26,6 +31,9 @@ export default function EffectRegionOverlay({
   pose: Transform;
   cameraScale: number;
   canvasScale?: number;
+  moveHandleOnly?: boolean;
+  showMoveHandle?: boolean;
+  onSelect?: () => void;
   onDraft: (geometry: Geometry | null) => void;
   onCommit: (geometry: Geometry) => void;
 }) {
@@ -45,7 +53,7 @@ export default function EffectRegionOverlay({
   };
   return (
     <div
-      className="effect-region-outline"
+      className={`effect-region-outline${moveHandleOnly ? " handle-move-only" : ""}`}
       role="group"
       tabIndex={0}
       aria-label={`${name}编辑区域`}
@@ -60,6 +68,11 @@ export default function EffectRegionOverlay({
       }}
       onPointerDown={(event) => {
         if (event.button !== 0) return;
+        const control = (event.target as Element).closest<HTMLElement>(
+          "[data-region-handle], [data-region-move]",
+        );
+        if (moveHandleOnly && !control) return;
+        onSelect?.();
         event.preventDefault();
         event.stopPropagation();
         event.currentTarget.focus({ preventScroll: true });
@@ -74,9 +87,7 @@ export default function EffectRegionOverlay({
           x: event.clientX,
           y: event.clientY,
           handle: resizeHandles.find(
-            (handle) =>
-              handle.name ===
-              (event.target as HTMLElement).dataset.regionHandle,
+            (handle) => handle.name === control?.dataset.regionHandle,
           ),
           original,
           value: original,
@@ -199,6 +210,20 @@ export default function EffectRegionOverlay({
       }}
     >
       <span className="effect-region-caption">{name}</span>
+      {moveHandleOnly && showMoveHandle && (
+        <button
+          type="button"
+          className="effect-region-move"
+          data-region-move
+          aria-label={`移动${name}区域`}
+          title={`拖动此控制点移动${name}`}
+          style={{
+            transform: `translate(-50%, -50%) ${selectionControlScale(pose, cameraScale)}`,
+          }}
+        >
+          <Move size={14} aria-hidden="true" />
+        </button>
+      )}
       {resizeHandles.map((handle) => (
         <button
           key={handle.name}

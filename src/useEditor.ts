@@ -7,6 +7,7 @@ import {
   isAdditionalVisualEffect,
 } from "../shared/visual-effects";
 import type { VisualEffectId } from "../shared/visual-effect-drag";
+import type { RangedVisualEffectId } from "../shared/visual-effect-range";
 import { animateMask } from "../shared/mask-animation";
 import type { MaskGeometry } from "../shared/mask-state";
 import {
@@ -233,6 +234,10 @@ export function useEditor(
     }
   }, [canvasMode]);
   const [clipProperties, setClipProperties] = useState<Clip | null>(null);
+  const [selectedVisualEffect, setSelectedVisualEffect] = useState<{
+    clipId: string;
+    id: RangedVisualEffectId;
+  } | null>(null);
   type KeyframeSelection = {
     clipId: string;
     time: number;
@@ -299,6 +304,7 @@ export function useEditor(
   );
   const select = useCallback(
     (id: string | null, additive = false) => {
+      setSelectedVisualEffect(null);
       setTextSelection((selection) => selection?.clipId === id ? selection : null);
       setBehaviorSelection(null);
       setTransitionSelection(null);
@@ -1794,6 +1800,8 @@ export function useEditor(
     selectedId,
     selectedIds,
     editAllCaptions,
+    selectedVisualEffect,
+    setSelectedVisualEffect,
     setEditAllCaptions,
     selectMany,
     select,

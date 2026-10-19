@@ -82,7 +82,11 @@ try {
       .toBeCloseTo(time, 4);
   };
   const save = async () => {
-    await page.getByTitle("保存工程 Ctrl+S", { exact: true }).click();
+    const before = (await fs.stat(file)).mtimeMs;
+    await page.getByRole("button", { name: "保存", exact: true }).click();
+    await expect
+      .poll(async () => (await fs.stat(file)).mtimeMs)
+      .toBeGreaterThan(before);
     await expect(page.locator(".project-save-state")).not.toContainText("*");
     return JSON.parse(await fs.readFile(file, "utf8"));
   };
@@ -94,8 +98,9 @@ try {
       .removeAlpha()
       .raw()
       .toBuffer({ resolveWithObject: true });
+    // Sample above the center so the editing control cannot cover the pixel.
     const offset =
-      (Math.floor(info.height * 0.5) * info.width +
+      (Math.floor(info.height * 0.35) * info.width +
         Math.floor(info.width * x)) *
       3;
     return [...data.subarray(offset, offset + 3)];
@@ -103,6 +108,87 @@ try {
   await expect(page.locator(".timeline-clip.image")).toBeVisible();
   await page.locator(".timeline-clip.image").click();
   await expect(page.locator(".effect-region-resize")).toHaveCount(8);
+  const region = page.getByRole("group", {
+    name: "遮罩编辑区域",
+    exact: true,
+  });
+  const moveHandle = page.getByRole("button", {
+    name: "移动遮罩区域",
+    exact: true,
+  });
+  await expect(moveHandle).toHaveCount(0);
+  const maskHeading = page
+    .getByRole("region", { name: "遮罩属性", exact: true })
+    .getByRole("heading", { name: "遮罩", exact: true });
+  await maskHeading.click();
+  await expect(moveHandle).toBeVisible();
+  await maskHeading.click();
+  const selectMask = () =>
+    page.getByRole("button", { name: "视觉效果 遮罩", exact: true }).click();
+  const undo = () => page.getByTitle("撤销 Ctrl+Z", { exact: true }).click();
+  const dragFrom = async (x, y, dx, dy) => {
+    await page.mouse.move(x, y);
+    await page.mouse.down();
+    await page.mouse.move(x + dx, y + dy, { steps: 8 });
+    await page.mouse.up();
+  };
+  // The region body and its dashed border must pass dragging to the material.
+  for (const part of ["body", "center", "border"]) {
+    const box = await region.boundingBox();
+    await dragFrom(
+      box.x + box.width * (part === "center" ? 0.5 : 0.25),
+      box.y +
+        (part === "border"
+          ? 0.5
+          : box.height * (part === "center" ? 0.5 : 0.25)),
+      35,
+      15,
+    );
+    const moved = (await save()).clips[0];
+    expect(moved.transform.x).toBeGreaterThan(project.clips[0].transform.x);
+    expect(moved.transform.y).toBeGreaterThan(project.clips[0].transform.y);
+    expect(moved.visualEffects.mask).toEqual(
+      project.clips[0].visualEffects.mask,
+    );
+    await expect(moveHandle).toHaveCount(0);
+    await undo();
+    expect((await save()).clips[0].transform).toEqual(
+      project.clips[0].transform,
+    );
+  }
+  // The center icon (including its SVG child) moves only the mask.
+  await selectMask();
+  await expect(moveHandle).toBeVisible();
+  const center = await moveHandle.boundingBox();
+  await dragFrom(
+    center.x + center.width / 2,
+    center.y + center.height / 2,
+    40,
+    18,
+  );
+  const movedMask = (await save()).clips[0];
+  expect(movedMask.transform).toEqual(project.clips[0].transform);
+  expect(movedMask.visualEffects.mask.x).toBeGreaterThan(
+    project.clips[0].visualEffects.mask.x,
+  );
+  expect(movedMask.visualEffects.mask.y).toBeGreaterThan(
+    project.clips[0].visualEffects.mask.y,
+  );
+  expect(movedMask.visualEffects.mask.width).toBe(
+    project.clips[0].visualEffects.mask.width,
+  );
+  expect(movedMask.visualEffects.mask.height).toBe(
+    project.clips[0].visualEffects.mask.height,
+  );
+  await page.screenshot({ path: path.join(root, "mask-move-control.png") });
+  await undo();
+  expect((await save()).clips[0].visualEffects.mask).toEqual(
+    project.clips[0].visualEffects.mask,
+  );
+  await page
+    .locator(".timeline-clip.image")
+    .click({ position: { x: 35, y: 18 } });
+  await expect(moveHandle).toHaveCount(0);
   await seek(2);
   await page.getByRole("button", { name: "自动动画", exact: true }).click();
   const source = page.locator('.canvas .preview-layer[data-clip-id="source"]');
@@ -118,6 +204,7 @@ try {
   await page.mouse.down();
   await page.mouse.move(bounds.x + bounds.width, y, { steps: 8 });
   await page.mouse.up();
+  await expect(moveHandle).toBeVisible();
   await expect(page.locator(".clip-animation")).toHaveCount(1);
   let saved = await save();
   const clip = saved.clips[0];
@@ -197,18 +284,17 @@ try {
   );
   await page.getByTitle("撤销 Ctrl+Z", { exact: true }).click();
   await seek(1.5);
+  await selectMask();
   const beforeCancel = (await save()).clips[0].keyframes;
-  const region = await page
-    .getByRole("group", { name: "遮罩编辑区域", exact: true })
-    .boundingBox();
+  const cancelHandle = await moveHandle.boundingBox();
   await page.mouse.move(
-    region.x + region.width / 2,
-    region.y + region.height / 2,
+    cancelHandle.x + cancelHandle.width / 2,
+    cancelHandle.y + cancelHandle.height / 2,
   );
   await page.mouse.down();
   await page.mouse.move(
-    region.x + region.width / 2 + 40,
-    region.y + region.height / 2,
+    cancelHandle.x + cancelHandle.width / 2 + 40,
+    cancelHandle.y + cancelHandle.height / 2,
     { steps: 3 },
   );
   await page.keyboard.press("Escape");
@@ -227,7 +313,7 @@ try {
     JSON.stringify({
       root,
       checks:
-        "八个控制点、固定对边缩放、自动动画、滑动显示像素、起止端点、撤销、时长拖动、取消、保存重开",
+        "控制点按遮罩选择显隐、中央控制点移动遮罩、区域及边框拖动素材、八点缩放、自动动画、滑动显示像素、起止端点、撤销、时长拖动、取消、保存重开",
       rendererErrors: errors,
     }),
   );

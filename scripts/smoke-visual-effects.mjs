@@ -112,7 +112,11 @@ try {
       expect(Math.abs(channel - expected[i])).toBeLessThan(tolerance),
     );
   const save = async () => {
-    await page.getByTitle("保存工程 Ctrl+S", { exact: true }).click();
+    const before = (await fs.stat(file)).mtimeMs;
+    await page.getByRole("button", { name: "保存", exact: true }).click();
+    await expect
+      .poll(async () => (await fs.stat(file)).mtimeMs)
+      .toBeGreaterThan(before);
     await expect(page.locator(".project-save-state")).not.toContainText("*");
     return JSON.parse(await fs.readFile(file, "utf8"));
   };
@@ -134,11 +138,19 @@ try {
         .enabled,
     ).toBe(true);
     if (id === "mask" || id === "blur-region") {
+      if (id === "mask")
+        await page
+          .getByRole("button", { name: `视觉效果 ${name}`, exact: true })
+          .click();
       const region = page.getByRole("group", {
         name: `${name}编辑区域`,
         exact: true,
       });
-      const bounds = await region.boundingBox();
+      const bounds = await (
+        id === "mask"
+          ? region.getByRole("button", { name: `移动${name}区域`, exact: true })
+          : region
+      ).boundingBox();
       await page.mouse.move(
         bounds.x + bounds.width * 0.3,
         bounds.y + bounds.height * 0.5,
@@ -369,7 +381,7 @@ try {
     const failed = await app.firstWindow();
     await failed
       .screenshot({ path: path.join(root, "failure.png") })
-      .catch(() => { });
+      .catch(() => {});
     console.error(
       await failed.evaluate(() => ({
         videos: [...document.querySelectorAll("video")].map((video) => {
