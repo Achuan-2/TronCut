@@ -1164,11 +1164,17 @@ export function useEditor(
       position?: { x: number; y: number },
     ) => {
       const p = current.current;
+      const drawing = template.kind === "shape" ? template.drawing : undefined;
+      const drawingEnd = drawing?.enabled ? drawing.delay + drawing.duration : 0;
+      const previewTime = drawing?.enabled &&
+        template.kind === "shape" && template.shape !== "freehand"
+        ? Math.ceil((time + drawingEnd) * p.canvas.fps - 1e-7) / p.canvas.fps
+        : null;
       const duration = Math.max(
         defaults.current.timing.annotation,
-        template.kind === "shape" && template.drawing?.enabled
-          ? template.drawing.delay + template.drawing.duration
-          : 0,
+        drawingEnd,
+        // Keep the completed frame inside the clip even with a short default.
+        previewTime === null ? 0 : previewTime - time + 1 / p.canvas.fps,
       );
       const preferred = trackId
         ? p.tracks.filter(
@@ -1201,8 +1207,9 @@ export function useEditor(
       setPlaying(false);
       select(clip.id);
       if (clip.shape !== "freehand") setCanvasMode("select");
+      if (previewTime !== null) seek(previewTime);
     },
-    [apply, playback, select, setPlaying],
+    [apply, playback, select, setPlaying, seek],
   );
   const addPenStroke = (stroke: DrawingStroke) => {
     penStart.current ??= playback.getSnapshot();
