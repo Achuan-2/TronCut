@@ -135,6 +135,7 @@ export default function App() {
   const [preferencesTab, setPreferencesTab] = useState("program");
   const [editingInput, setEditingInput] = useState(false);
   const nativeEditMenu = useRef("");
+  const editingSurface = useRef<"canvas" | "timeline">("timeline");
   const [exportOpen, setExportOpen] = useState(false);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
       undefined,
@@ -431,7 +432,7 @@ export default function App() {
       .catch((error) => toast(String(error)));
     toast(cut ? "已剪切动画" : "已复制动画");
   };
-  const paste = () =>
+  const paste = (pasteToTop = editingSurface.current === "canvas") =>
     importMediaInput(async () => {
       const result = window.framecraft
         ? await window.framecraft.importClipboardMedia()
@@ -470,12 +471,15 @@ export default function App() {
           const pasted = pasteClips(
             project,
             clipClipboard.current,
-            editor.playhead,
+            pasteToTop
+              ? Math.min(...clipClipboard.current.map((clip) => clip.start))
+              : editor.playback.getSnapshot(),
+            { pasteToTop },
           );
           ids = pasted.ids;
           return pasted.project;
         });
-        editor.selectMany(ids);
+        if (ids.length) editor.selectMany(ids);
       } else {
         toast("剪贴板中没有可粘贴的图片、视频或片段");
       }
@@ -756,17 +760,21 @@ export default function App() {
             editor.selectedIds.includes(clip.id),
           );
           if (!selected.length) return;
+          const pasteToTop = editingSurface.current === "canvas";
           let ids: string[] = [];
           editor.apply((p) => {
             const result = pasteClips(
               p,
               selected,
-              Math.max(...selected.map((clip) => clip.start + clip.duration)),
+              pasteToTop
+                ? Math.min(...selected.map((clip) => clip.start))
+                : Math.max(...selected.map((clip) => clip.start + clip.duration)),
+              { pasteToTop },
             );
             ids = result.ids;
             return result.project;
           });
-          editor.selectMany(ids);
+          if (ids.length) editor.selectMany(ids);
         },
       }) as Record<string, () => void>
     )[command]?.();
@@ -1044,7 +1052,16 @@ export default function App() {
     return warning;
   };
   return (
-    <main className="app-shell" onClick={() => menu && setMenu(false)}>
+    <main
+      className="app-shell"
+      onClick={() => menu && setMenu(false)}
+      onPointerDownCapture={(event) => {
+        const target = event.target as HTMLElement;
+        if (target.closest(".canvas-holder")) editingSurface.current = "canvas";
+        else if (target.closest(".timeline-scroll, .track-headers"))
+          editingSurface.current = "timeline";
+      }}
+    >
       <header className="app-header">
         <div className="brand">
           <div className="brand-mark">

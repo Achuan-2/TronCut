@@ -1,4 +1,4 @@
-import { type Clip, type Project, uid } from "./model";
+import { type Clip, type Project, uid, newTrack, numberTracks } from "./model";
 import { splitClip } from "./editor";
 import { markerEnd } from "./markers";
 import { recordingGroups, releasedRecordingTracks } from "./recording-objects";
@@ -11,7 +11,7 @@ import {
   rootGroupId,
   ungroupClips,
 } from "./clip-groups";
-import { constrainTimelineMove } from "./timeline-collision";
+import { constrainTimelineMove, timelineTrackIsFree } from "./timeline-collision";
 
 export function editableIds(
   project: Project,
@@ -252,6 +252,7 @@ export function pasteClips(
   project: Project,
   copied: Clip[],
   time: number,
+  options: { pasteToTop?: boolean } = {},
 ): { project: Project; ids: string[] } {
   const valid = copied.filter(
     (c) =>
@@ -261,7 +262,7 @@ export function pasteClips(
   if (!valid.length) return { project, ids: [] };
   const origin = Math.min(...valid.map((c) => c.start));
   const groups = new Map<string, string>();
-  const clips = valid.map((c) => {
+  let clips = valid.map((c) => {
     if (c.groupId && !groups.has(c.groupId)) groups.set(c.groupId, uid());
     return {
       ...structuredClone(c),
@@ -289,14 +290,52 @@ export function pasteClips(
       parentId: group?.parentId ? groups.get(group.parentId) : undefined,
     };
   });
+  let tracks = project.tracks;
+  if (options.pasteToTop) {
+    tracks = [...tracks];
+    const sourceTracks = project.tracks.filter((track) =>
+      valid.some((clip) => clip.trackId === track.id),
+    );
+    const destinations = new Map<string, string>();
+    // Reserve separate tracks from bottom to top to retain visual stacking.
+    // Only the lowest copied layer may reuse the original top track.
+    for (let i = sourceTracks.length - 1; i >= 0; i--) {
+      const source = sourceTracks[i];
+      const top = tracks[0];
+      const canReuse =
+        i === sourceTracks.length - 1 && top &&
+        !top.locked && !top.hidden &&
+        Boolean(top.captionTrack) === Boolean(source.captionTrack) &&
+        clips.filter((clip) => clip.trackId === source.id).every((clip) =>
+          timelineTrackIsFree(project, top.id, clip.start, clip.duration),
+        );
+      let destination = canReuse ? top : undefined;
+      if (!destination) {
+        if (tracks.length >= 128) return { project, ids: [] };
+        destination = {
+          ...newTrack(tracks.length),
+          ...(source.captionTrack ? { captionTrack: true } : {}),
+        };
+        tracks.unshift(destination);
+      }
+      destinations.set(source.id, destination.id);
+    }
+    clips = clips.map((clip) => ({
+      ...clip,
+      trackId: destinations.get(clip.trackId)!,
+    }));
+    tracks = numberTracks(tracks);
+  }
   const pasted = {
     ...project,
+    tracks,
     clips: [...project.clips, ...clips],
     ...(copiedGroups.length
       ? { groups: [...(project.groups ?? []), ...copiedGroups] }
       : {}),
   };
   const ids: string[] = clips.map((clip) => clip.id);
+  if (options.pasteToTop) return { project: pasted, ids };
   const delta = constrainTimelineMove(pasted, ids, 0);
   return {
     project: delta

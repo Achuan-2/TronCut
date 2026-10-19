@@ -142,6 +142,12 @@ try {
     saved.clips.filter((clip) => clip.text === source.text).length,
     2,
   );
+  if (!timelineMode) {
+    const copy = saved.clips.find((clip) => clip.text === source.text && clip.id !== source.id);
+    assert.equal(copy.start, source.start);
+    assert.equal(copy.trackId, saved.tracks[0].id);
+    assert.deepEqual(copy.keyframes, source.keyframes);
+  }
   await undo();
   await expect(page.locator(".timeline-clip")).toHaveCount(4);
 
@@ -164,10 +170,42 @@ try {
             clip.id !== source.id &&
             clip.text === source.text &&
             clip.duration === source.duration &&
-            clip.start >= source.duration,
+            (timelineMode ? clip.start >= source.duration : clip.start === source.start),
         ),
       );
     else assert(!saved.clips.some((clip) => clip.id === source.id));
+    await undo();
+    await expect(page.locator(".timeline-clip")).toHaveCount(4);
+  }
+
+  if (!timelineMode) {
+    // Native shortcuts must use the same placement as the canvas context menu.
+    for (const shortcut of ["Control+d", "Control+c"]) {
+      await open();
+      await page.keyboard.press("Escape");
+      await page.keyboard.press(shortcut);
+      if (shortcut === "Control+c") await page.keyboard.press("Control+v");
+      await expect(page.locator(".timeline-clip")).toHaveCount(5);
+      saved = await save();
+      const copy = saved.clips.find((clip) => clip.text === source.text && clip.id !== source.id);
+      assert.equal(copy.start, source.start);
+      assert.equal(copy.trackId, saved.tracks[0].id);
+      await undo();
+      await expect(page.locator(".timeline-clip")).toHaveCount(4);
+    }
+    // Free the top track's first interval; its later clip must stay in place.
+    await open();
+    await action("删除").click();
+    await expect(page.locator(".timeline-clip")).toHaveCount(3);
+    await open(target.id);
+    await action("拷贝").click();
+    saved = await save();
+    const copy = saved.clips.find((clip) => clip.text === target.text && clip.id !== target.id);
+    assert.equal(saved.tracks.length, project.tracks.length);
+    assert.equal(copy.trackId, saved.tracks[0].id);
+    assert.equal(copy.start, target.start);
+    assert.equal(saved.clips.find((clip) => clip.id === sameTrack.id).start, sameTrack.start);
+    await undo();
     await undo();
     await expect(page.locator(".timeline-clip")).toHaveCount(4);
   }
