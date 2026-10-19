@@ -19,6 +19,17 @@ import { stitchSelectionError } from "../shared/stitch";
 import { stitchBoundaries } from "../shared/media-segments";
 import "./CanvasContextMenu.css";
 import { groupMembers, rootGroupId } from "../shared/clip-groups";
+import { canvasAlignmentTargets } from "../shared/canvas-alignment";
+
+const alignments = [
+  ["left", "左对齐"],
+  ["center", "水平居中"],
+  ["right", "右对齐"],
+  ["top", "顶端对齐"],
+  ["middle", "垂直居中"],
+  ["bottom", "底端对齐"],
+] as const;
+type SubmenuKind = "arrange" | "align";
 
 export type ClipCommand =
   | "cut"
@@ -58,9 +69,14 @@ export default function ClipContextMenu({
 }) {
   const root = useRef<HTMLDivElement>(null);
   const arrangeButton = useRef<HTMLButtonElement>(null);
+  const alignButton = useRef<HTMLButtonElement>(null);
   const submenuRoot = useRef<HTMLDivElement>(null);
   const [position, setPosition] = useState({ x: 0, y: 0 });
-  const [submenu, setSubmenu] = useState<{ x: number; y: number } | null>(null);
+  const [submenu, setSubmenu] = useState<{
+    kind: SubmenuKind;
+    x: number;
+    y: number;
+  } | null>(null);
   const { project } = editor;
   const projectId = useRef(project.id);
   const source = menu?.clipId
@@ -90,6 +106,8 @@ export default function ClipContextMenu({
     );
   const canUngroup = canEdit && selected.some((clip) => !!clip.groupId);
   const canFit = canEdit && selected.some((clip) => clip.kind !== "audio");
+  const canAlign =
+    canEdit && canvasAlignmentTargets(project, ids, editor.playhead).length > 1;
   const stitchError = stitchSelectionError(project, ids);
   const canUnstitch =
     canEdit && selected.some((clip) => stitchBoundaries(clip).length > 0);
@@ -132,15 +150,23 @@ export default function ClipContextMenu({
       window.removeEventListener("blur", close);
     };
   }, [menu, onClose]);
-  const openSubmenu = (focus = false) => {
-    const bounds = arrangeButton.current?.getBoundingClientRect();
-    if (!bounds || !canEdit) return;
+  const openSubmenu = (kind: SubmenuKind, focus = false) => {
+    const button = kind === "arrange" ? arrangeButton : alignButton;
+    const bounds = button.current?.getBoundingClientRect();
+    if (!bounds || (kind === "arrange" ? !canEdit : !canAlign)) return;
     setSubmenu({
+      kind,
       x:
         bounds.right + 180 < window.innerWidth
           ? bounds.right
           : bounds.left - 180,
-      y: Math.max(8, Math.min(bounds.top, window.innerHeight - 180)),
+      y: Math.max(
+        8,
+        Math.min(
+          bounds.top,
+          window.innerHeight - (kind === "align" ? 240 : 180),
+        ),
+      ),
     });
     if (focus)
       requestAnimationFrame(() =>
@@ -197,16 +223,25 @@ export default function ClipContextMenu({
         }
         if (
           event.key === "ArrowRight" &&
-          document.activeElement === arrangeButton.current
+          (document.activeElement === arrangeButton.current ||
+            document.activeElement === alignButton.current)
         ) {
           event.preventDefault();
-          openSubmenu(true);
+          openSubmenu(
+            document.activeElement === alignButton.current
+              ? "align"
+              : "arrange",
+            true,
+          );
           return;
         }
         if (event.key === "ArrowLeft" && submenu) {
           event.preventDefault();
           setSubmenu(null);
-          arrangeButton.current?.focus();
+          (submenu.kind === "align"
+            ? alignButton
+            : arrangeButton
+          ).current?.focus();
           return;
         }
         if (!["ArrowUp", "ArrowDown", "Home", "End"].includes(event.key))
@@ -341,44 +376,73 @@ export default function ClipContextMenu({
         </div>
       )}
       {surface === "canvas" && (
-        <button
-          ref={arrangeButton}
-          role="menuitem"
-          aria-haspopup="menu"
-          aria-expanded={!!submenu}
-          disabled={!canEdit}
-          onPointerEnter={() => openSubmenu()}
-          onClick={() => openSubmenu(true)}
-        >
-          排列
-          <ChevronRight size={14} className="canvas-menu-arrow" />
-        </button>
+        <>
+          <button
+            ref={alignButton}
+            role="menuitem"
+            aria-haspopup="menu"
+            aria-expanded={submenu?.kind === "align"}
+            disabled={!canAlign}
+            title="以所选对象的整体边界为参照对齐"
+            onPointerEnter={() => openSubmenu("align")}
+            onClick={() => openSubmenu("align", true)}
+          >
+            对齐
+            <ChevronRight size={14} className="canvas-menu-arrow" />
+          </button>
+          <button
+            ref={arrangeButton}
+            role="menuitem"
+            aria-haspopup="menu"
+            aria-expanded={submenu?.kind === "arrange"}
+            disabled={!canEdit}
+            onPointerEnter={() => openSubmenu("arrange")}
+            onClick={() => openSubmenu("arrange", true)}
+          >
+            排列
+            <ChevronRight size={14} className="canvas-menu-arrow" />
+          </button>
+        </>
       )}
       {submenu && (
         <div
           ref={submenuRoot}
           role="menu"
-          aria-label="排列"
+          aria-label={submenu.kind === "align" ? "对齐" : "排列"}
           className="context-menu canvas-context-submenu"
           style={{ left: submenu.x, top: submenu.y }}
         >
-          {(
-            [
-              ["top", "置于顶层"],
-              ["up", "上移一层"],
-              ["down", "下移一层"],
-              ["bottom", "置于底层"],
-            ] as const
-          ).map(([direction, label]) => (
-            <button
-              key={direction}
-              role="menuitem"
-              disabled={!canArrangeClips(project, ids, direction)}
-              onClick={() => arrange(direction)}
-            >
-              {label}
-            </button>
-          ))}
+          {submenu.kind === "align"
+            ? alignments.map(([alignment, label]) => (
+                <button
+                  key={alignment}
+                  role="menuitem"
+                  disabled={!canAlign}
+                  onClick={() => {
+                    editor.alignClips(ids, alignment);
+                    onClose();
+                  }}
+                >
+                  {label}
+                </button>
+              ))
+            : (
+                [
+                  ["top", "置于顶层"],
+                  ["up", "上移一层"],
+                  ["down", "下移一层"],
+                  ["bottom", "置于底层"],
+                ] as const
+              ).map(([direction, label]) => (
+                <button
+                  key={direction}
+                  role="menuitem"
+                  disabled={!canArrangeClips(project, ids, direction)}
+                  onClick={() => arrange(direction)}
+                >
+                  {label}
+                </button>
+              ))}
         </div>
       )}
     </div>,

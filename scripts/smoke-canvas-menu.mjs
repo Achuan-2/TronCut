@@ -12,7 +12,8 @@ const root = path.resolve(
 await fs.mkdir(root, { recursive: true });
 const bundle = await build({
   stdin: {
-    contents: 'export { createProject, newText, validateProject } from "./shared/model";',
+    contents:
+      'export { createProject, newText, validateProject } from "./shared/model";',
     resolveDir: process.cwd(),
   },
   bundle: true,
@@ -100,6 +101,7 @@ try {
     await expect(action(name)).toBeVisible();
   await expect(action("粘贴属性")).toBeDisabled();
   if (!timelineMode) {
+    await expect(action("对齐")).toBeDisabled();
     await action("排列").hover();
     for (const name of ["置于顶层", "上移一层", "下移一层", "置于底层"])
       await expect(action(name)).toBeVisible();
@@ -124,7 +126,7 @@ try {
     "拷贝",
     "删除",
     "自适应缩放",
-    ...(timelineMode ? ["组合", "取消组合"] : ["排列"]),
+    ...(timelineMode ? ["组合", "取消组合"] : ["排列", "对齐"]),
   ])
     await expect(action(name)).toBeDisabled();
   await expect(action("复制")).toBeEnabled();
@@ -158,7 +160,11 @@ try {
     if (name === "拷贝")
       assert(
         saved.clips.some(
-          (clip) => clip.text === source.text && clip.start === source.duration,
+          (clip) =>
+            clip.id !== source.id &&
+            clip.text === source.text &&
+            clip.duration === source.duration &&
+            clip.start >= source.duration,
         ),
       );
     else assert(!saved.clips.some((clip) => clip.id === source.id));
@@ -180,6 +186,112 @@ try {
     );
     assert.equal(moved.start, source.start);
     await undo();
+  }
+
+  if (!timelineMode) {
+    const bounds = async () =>
+      Promise.all([
+        canvasLayer(source.id).boundingBox(),
+        canvasLayer(target.id).boundingBox(),
+      ]);
+    const edge = (box, alignment) =>
+      ({
+        left: box.x,
+        center: box.x + box.width / 2,
+        right: box.x + box.width,
+        top: box.y,
+        middle: box.y + box.height / 2,
+        bottom: box.y + box.height,
+      })[alignment];
+    for (const [alignment, label] of [
+      ["left", "左对齐"],
+      ["center", "水平居中"],
+      ["right", "右对齐"],
+      ["top", "顶端对齐"],
+      ["middle", "垂直居中"],
+      ["bottom", "底端对齐"],
+    ]) {
+      await layer(source.id).click();
+      await layer(target.id).click({ modifiers: ["Shift"] });
+      const before = await bounds();
+      await open();
+      await expect(action("对齐")).toBeEnabled();
+      await action("对齐").hover();
+      const alignmentMenu = page.getByRole("menu", {
+        name: "对齐",
+        exact: true,
+      });
+      await expect(alignmentMenu).toBeVisible();
+      if (alignment === "left") {
+        await action("对齐").focus();
+        await page.keyboard.press("ArrowRight");
+        await expect(action("左对齐")).toBeFocused();
+        await page.keyboard.press("ArrowLeft");
+        await expect(action("对齐")).toBeFocused();
+        await page.keyboard.press("ArrowRight");
+        await page.screenshot({ path: path.join(root, "alignment-menu.png") });
+      }
+      await action(label).click();
+      await expect(menu).toHaveCount(0);
+      await expect
+        .poll(async () => {
+          const boxes = await bounds();
+          return Math.abs(
+            edge(boxes[0], alignment) - edge(boxes[1], alignment),
+          );
+        })
+        .toBeLessThan(1);
+      const after = await bounds();
+      const horizontal = ["left", "center", "right"].includes(alignment);
+      for (const index of [0, 1])
+        assert(
+          Math.abs(
+            edge(after[index], horizontal ? "middle" : "center") -
+              edge(before[index], horizontal ? "middle" : "center"),
+          ) < 1,
+        );
+      saved = await save();
+      assert.deepEqual(
+        saved.clips.find((clip) => clip.id === locked.id).transform,
+        locked.transform,
+      );
+      assert.deepEqual(
+        saved.clips.find((clip) => clip.id === sameTrack.id).transform,
+        sameTrack.transform,
+      );
+      await undo();
+      await expect
+        .poll(async () => {
+          const boxes = await bounds();
+          return Math.max(
+            ...boxes.map(
+              (box, index) =>
+                Math.abs(box.x - before[index].x) +
+                Math.abs(box.y - before[index].y),
+            ),
+          );
+        })
+        .toBeLessThan(1);
+      await page.getByTitle("重做 Ctrl+Shift+Z", { exact: true }).click();
+      await expect
+        .poll(async () => {
+          const boxes = await bounds();
+          return Math.abs(
+            edge(boxes[0], alignment) - edge(boxes[1], alignment),
+          );
+        })
+        .toBeLessThan(1);
+      await undo();
+    }
+    // The blank canvas also retains the selected objects for context actions.
+    await layer(source.id).click();
+    await layer(target.id).click({ modifiers: ["Shift"] });
+    await page
+      .locator(".canvas-holder .canvas")
+      .click({ button: "right", position: { x: 5, y: 5 } });
+    await expect(page.locator(".timeline-clip.selected")).toHaveCount(2);
+    await expect(action("对齐")).toBeEnabled();
+    await page.keyboard.press("Escape");
   }
 
   // Right click preserves a multi-selection, and one undo restores all objects.
@@ -287,7 +399,7 @@ try {
     await expect(action("排列")).toBeFocused();
   } else {
     await expect(
-      menu.getByRole("button", { name: "在播放头拆分", exact: true }),
+      menu.getByRole("button", { name: /^在播放头拆分/ }),
     ).not.toBeFocused();
     await page.keyboard.press("Home");
     await expect(action("剪切")).toBeFocused();
@@ -339,7 +451,7 @@ try {
     JSON.stringify({ root, errors }, null, 2),
   );
   console.log(
-    `${surface}右键菜单、剪贴板、拷贝、属性、自适应、${timelineMode ? "组合、跨区域属性" : "排列"}、多选、锁定、撤销和保存验证通过：${root}`,
+    `${surface}右键菜单、剪贴板、拷贝、属性、自适应、${timelineMode ? "组合、跨区域属性" : "六向对齐、排列"}、多选、锁定、撤销和保存验证通过：${root}`,
   );
 } finally {
   await app.close();

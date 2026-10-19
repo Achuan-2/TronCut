@@ -74,6 +74,10 @@ import { type ContentTransform } from "../shared/crop";
 import { animateContent, animateCrop } from "../shared/crop-animation";
 import type { Crop } from "../shared/crop";
 import { fitUpdatedText, textBoxFor } from "./text";
+import {
+  alignCanvasClips,
+  type CanvasAlignment,
+} from "../shared/canvas-alignment";
 import { applyCharacterStyle, reconcileTextRuns, type TextRange } from "../shared/rich-text";
 import {
   editableCanvasIds,
@@ -1035,6 +1039,23 @@ export function useEditor(
     },
     [apply, playback, autoAnimate],
   );
+  const alignClips = useCallback(
+    (ids: readonly string[], alignment: CanvasAlignment) => {
+      setPlaying(false);
+      apply((project) =>
+        alignCanvasClips(
+          project,
+          ids,
+          alignment,
+          playback.getSnapshot(),
+          textBoxFor,
+          autoAnimate,
+          defaults.current.timing.animation,
+        ),
+      );
+    },
+    [apply, playback, autoAnimate, setPlaying],
+  );
   const addCustomAnimation = useCallback(
     (clipId: string, time = playback.getSnapshot()) => {
       const project = current.current;
@@ -1876,6 +1897,7 @@ export function useEditor(
     stepFrame,
     jumpMedia,
     autoAnimate,
+    alignClips,
     setAutoAnimate,
   };
 }

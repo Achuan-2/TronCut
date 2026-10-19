@@ -1288,9 +1288,15 @@ export default function Preview({
           editor.setPlaying(false);
           if (editor.editingTextId) editor.endTextEdit(editor.editingTextId);
           const previous = editor.selectedIds;
-          editor.select(id);
-          if (id && previous.includes(id)) editor.selectMany(previous);
-          setContextMenu({ x: event.clientX, y: event.clientY, clipId: id });
+          if (id || previous.length < 2) {
+            editor.select(id);
+            if (id && previous.includes(id)) editor.selectMany(previous);
+          }
+          setContextMenu({
+            x: event.clientX,
+            y: event.clientY,
+            clipId: id ?? (previous.length > 1 ? previous.at(-1)! : null),
+          });
         }}
         onClick={() => {
           if (!fullscreen) editor.select(null);
