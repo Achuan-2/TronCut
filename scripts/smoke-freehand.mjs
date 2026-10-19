@@ -1,4 +1,5 @@
 import { _electron as electron, expect } from "@playwright/test";
+import { timelineZoom } from "./timeline-zoom.mjs";
 import { build } from "esbuild";
 import assert from "node:assert/strict";
 import fs from "node:fs/promises";
@@ -87,7 +88,7 @@ try {
   await expect(page.locator(".annotations-panel .pen-brush-card")).toHaveCount(
     5,
   );
-  const zoom = Number(await page.getByLabel("时间线缩放").inputValue());
+  const zoom = await timelineZoom(page);
   await page.locator(".ruler").click({ position: { x: zoom, y: 12 } });
   const time = () => page.getByLabel("播放进度", { exact: true }).inputValue();
   const start = await time();

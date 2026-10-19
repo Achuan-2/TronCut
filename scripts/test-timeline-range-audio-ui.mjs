@@ -1,4 +1,5 @@
 import { _electron as electron, expect } from "@playwright/test";
+import { setTimelineZoom } from "./timeline-zoom.mjs";
 import { build } from "esbuild";
 import fs from "node:fs/promises";
 import path from "node:path";
@@ -85,7 +86,7 @@ try {
     });
   }, root);
   await page.getByRole("button", { name: "恢复编辑", exact: true }).click();
-  await page.getByLabel("时间线缩放").fill("60");
+  await setTimelineZoom(page, 60);
   const scroll = page.locator(".timeline-scroll");
   await scroll.evaluate((element) => {
     element.scrollLeft = 0;

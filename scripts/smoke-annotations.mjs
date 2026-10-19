@@ -1,4 +1,5 @@
 import { _electron as electron, expect } from "@playwright/test";
+import { timelineZoom } from "./timeline-zoom.mjs";
 import { build } from "esbuild";
 import fs from "node:fs/promises";
 import path from "node:path";
@@ -101,9 +102,7 @@ try {
     await expect(page.locator(".timeline-clip")).toHaveCount(1);
   };
   const seek = async (time) => {
-    const zoom = Number(
-      await page.getByLabel("时间线缩放", { exact: true }).inputValue(),
-    );
+    const zoom = await timelineZoom(page);
     await page.locator(".ruler").click({ position: { x: time * zoom, y: 12 } });
   };
   await page.getByRole("tab", { name: "箭头标注", exact: true }).click();

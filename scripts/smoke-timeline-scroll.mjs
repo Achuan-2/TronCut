@@ -1,4 +1,5 @@
 import { _electron as electron, expect } from "@playwright/test";
+import { setTimelineZoom, timelineZoom } from "./timeline-zoom.mjs";
 import { build } from "esbuild";
 import assert from "node:assert/strict";
 import fs from "node:fs/promises";
@@ -135,28 +136,26 @@ try {
     .toBeGreaterThan(middle.rightTop + 30);
   await checkAligned();
   // Fit the horizontal content, then restore horizontal overflow and resize the window.
-  await page.getByLabel("时间线缩放").fill("15");
+  await page.getByLabel("时间线缩放").fill("0");
   await checkAligned();
-  await page.getByLabel("时间线缩放").fill("100");
+  await setTimelineZoom(page, 100);
   await checkAligned();
-  const anchorTime = await page
-    .locator(".timeline-scroll")
-    .evaluate(
-      (element) => (element.scrollLeft + element.clientWidth / 2) / 100,
-    );
-  await page.getByLabel("时间线缩放").fill("2400");
+  await page.getByLabel("播放进度", { exact: true }).fill("10");
+  const anchorX = await page.locator(".timeline-scroll")
+    .evaluate((element) => 10 * 100 - element.scrollLeft);
+  await setTimelineZoom(page, 2400);
   await checkAligned();
   await expect
     .poll(() =>
       page
         .locator(".timeline-scroll")
         .evaluate(
-          (element) => (element.scrollLeft + element.clientWidth / 2) / 2400,
+          (element) => 10 * 2400 - element.scrollLeft,
         ),
     )
-    .toBeCloseTo(anchorTime, 2);
+    .toBeCloseTo(anchorX, 0);
   await page.getByTitle("放大时间线", { exact: true }).click();
-  await expect(page.getByLabel("时间线缩放")).toHaveValue("2400");
+  await expect.poll(() => timelineZoom(page)).toBeCloseTo(2400, 6);
   await expect(page.locator(".ruler > span").first()).toHaveText(
     /^\d+:\d{2}:\d{2}$/,
   );
@@ -169,7 +168,7 @@ try {
     );
   expect(tickSpacing).toBeCloseTo(80);
   await page.screenshot({ path: path.join(root, "frame-zoom.png") });
-  await page.getByLabel("时间线缩放").fill("100");
+  await setTimelineZoom(page, 100);
   await app.evaluate(({ BrowserWindow }) => {
     BrowserWindow.getAllWindows()[0].setSize(1280, 760);
   });

@@ -1,4 +1,5 @@
 import { _electron as electron, expect } from "@playwright/test";
+import { timelineZoom } from "./timeline-zoom.mjs";
 import fs from "node:fs/promises";
 import path from "node:path";
 import sharp from "sharp";
@@ -146,9 +147,7 @@ try {
 
   await page.getByLabel("绘制动画时长", { exact: true }).fill("2");
   const seek = async (time) => {
-    const zoom = Number(
-      await page.getByLabel("时间线缩放", { exact: true }).inputValue(),
-    );
+    const zoom = await timelineZoom(page);
     await page.locator(".ruler").click({ position: { x: time * zoom, y: 12 } });
   };
   const previewPath = page.locator(".preview-layer.shape svg path").first();

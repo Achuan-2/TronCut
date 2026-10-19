@@ -1,4 +1,5 @@
 import { _electron as electron, expect } from "@playwright/test";
+import { timelineZoom as pixelsPerSecond, setTimelineZoom } from "./timeline-zoom.mjs";
 import { build } from "esbuild";
 import sharp from "sharp";
 import { execFile } from "node:child_process";
@@ -131,10 +132,11 @@ try {
   const timeline = page.locator(".timeline-scroll");
   const numeric = async (locator) => Number(await locator.inputValue());
   await canvasZoom.selectOption("0.25");
+  await canvasZoom.focus();
   await holder.hover();
   await page.keyboard.press("Control+Equal");
   await expect.poll(() => numeric(canvasZoom)).toBeCloseTo(0.325, 6);
-  await expect(timelineZoom).toHaveValue("65");
+  await expect.poll(() => pixelsPerSecond(page)).toBeCloseTo(65, 6);
   await page.keyboard.press("Control+Minus");
   await expect.poll(() => numeric(canvasZoom)).toBeCloseTo(0.25, 6);
   await page.keyboard.press("Control+Shift+Equal");
@@ -171,30 +173,44 @@ try {
   await page.locator(".timeline-toolbar").click({ position: { x: 2, y: 2 } });
   await timeline.hover();
   await page.keyboard.press("Control+Equal");
-  await expect.poll(() => numeric(timelineZoom)).toBeCloseTo(84.5, 4);
+  await expect.poll(() => pixelsPerSecond(page)).toBeCloseTo(84.5, 4);
   await expect(canvasZoom).toHaveValue("0.25");
   await page.keyboard.press("Control+Minus");
-  await expect.poll(() => numeric(timelineZoom)).toBeCloseTo(65, 4);
-  await timelineZoom.fill("100");
+  await expect.poll(() => pixelsPerSecond(page)).toBeCloseTo(65, 4);
+  await setTimelineZoom(page, 100);
+  await page.getByLabel("播放进度", { exact: true }).fill("12");
   await timeline.evaluate((element) => {
     element.scrollLeft = 1000;
     element.scrollTop = 80;
   });
   const trackBounds = await timeline.boundingBox();
   const trackPoint = { x: trackBounds.x + 180, y: trackBounds.y + 70 };
-  const timelineTime = async () =>
-    ((await timeline.evaluate((element) => element.scrollLeft)) + 180) /
-    (await numeric(timelineZoom));
-  const time = await timelineTime();
+  const playheadPosition = async () =>
+    12 * await pixelsPerSecond(page) -
+    await timeline.evaluate((element) => element.scrollLeft);
+  const anchorX = await playheadPosition();
   await page.mouse.move(trackPoint.x, trackPoint.y);
   await page.keyboard.down("Control");
   await page.mouse.wheel(0, -120);
   await page.keyboard.up("Control");
-  await expect.poll(() => numeric(timelineZoom)).toBeCloseTo(130, 4);
+  await expect.poll(() => pixelsPerSecond(page)).toBeCloseTo(130, 4);
   assert.ok(
-    Math.abs((await timelineTime()) - time) < 0.02,
-    "Timeline wheel anchor moved",
+    Math.abs((await playheadPosition()) - anchorX) < 1,
+    "Timeline wheel moved the playhead anchor",
   );
+  await page.getByTitle("放大时间线", { exact: true }).click();
+  await expect.poll(() => pixelsPerSecond(page)).toBeCloseTo(169, 4);
+  expect(await playheadPosition()).toBeCloseTo(anchorX, 0);
+  await page.getByTitle("缩小时间线", { exact: true }).click();
+  await setTimelineZoom(page, 200);
+  expect(await playheadPosition()).toBeCloseTo(anchorX, 0);
+  await timeline.hover();
+  await page.keyboard.press("Control+Equal");
+  await expect.poll(() => pixelsPerSecond(page)).toBeCloseTo(260, 4);
+  expect(await playheadPosition()).toBeCloseTo(anchorX, 0);
+  await page.keyboard.press("Control+Minus");
+  await expect.poll(() => pixelsPerSecond(page)).toBeCloseTo(200, 4);
+  expect(await playheadPosition()).toBeCloseTo(anchorX, 0);
   assert.equal(await timeline.evaluate((element) => element.scrollTop), 80);
   await page.mouse.wheel(0, 120);
   await expect
@@ -250,9 +266,15 @@ try {
     ),
     1,
   );
-  // A one-hour project fits at the new minimum, with readable ruler spacing.
-  await timelineZoom.fill("0.1");
-  await expect(timelineZoom).toHaveValue("0.1");
+  // The minimum is computed from this project's full duration and viewport.
+  await timelineZoom.fill("0");
+  await expect(timelineZoom).toHaveValue("0");
+  const minimum = await pixelsPerSecond(page);
+  expect(minimum * 3635).toBeCloseTo(
+    await timeline.evaluate((element) => element.clientWidth - 24), 0,
+  );
+  expect(await timeline.evaluate((element) => element.scrollWidth - element.clientWidth))
+    .toBeLessThanOrEqual(1);
   await expect(
     page.locator(".timeline-clip.text").filter({ hasText: "一小时后的片段" }),
   ).toBeInViewport();
@@ -265,20 +287,34 @@ try {
     );
   expect(spacing).toBeGreaterThanOrEqual(75);
   await page.getByTitle("缩小时间线", { exact: true }).click();
-  await expect(timelineZoom).toHaveValue("0.1");
+  await expect(timelineZoom).toHaveValue("0");
   await timeline.hover();
   await page.keyboard.press("Control+Minus");
-  await expect(timelineZoom).toHaveValue("0.1");
+  await expect(timelineZoom).toHaveValue("0");
   await page.keyboard.press("Control+Equal");
-  await expect.poll(() => numeric(timelineZoom)).toBeCloseTo(0.13, 6);
+  await expect.poll(() => pixelsPerSecond(page)).toBeCloseTo(minimum * 1.3, 6);
   await page.keyboard.down("Control");
   await page.mouse.wheel(0, 120);
   await page.keyboard.up("Control");
-  await expect.poll(() => numeric(timelineZoom)).toBeCloseTo(0.1, 6);
+  await expect.poll(() => pixelsPerSecond(page)).toBeCloseTo(minimum, 6);
+  // Percentage positions allocate comparable proportional changes at all levels.
+  await timelineZoom.fill("25");
+  const quarter = await pixelsPerSecond(page);
+  await timelineZoom.fill("50");
+  const half = await pixelsPerSecond(page);
+  await timelineZoom.fill("75");
+  const threeQuarters = await pixelsPerSecond(page);
+  expect(half / quarter).toBeCloseTo(threeQuarters / half, 6);
+  // An offscreen playhead is brought back into view on the next zoom gesture.
+  await timeline.evaluate((element) => { element.scrollLeft = 100000; });
+  await page.getByTitle("放大时间线", { exact: true }).click();
+  await expect(page.getByRole("button", { name: "播放头", exact: true }))
+    .toBeInViewport();
+  await timelineZoom.fill("0");
   await page.screenshot({ path: path.join(root, "minimum-timeline-zoom.png") });
   assert.deepEqual(errors, []);
   console.log(
-    `一小时时间轴缩小、刻度间距、缩放下限；画布/轨道快捷键、鼠标锚点及普通滚动通过：${root}`,
+    `按总时长缩放、完整时间轴、播放头锚点、画布鼠标锚点、快捷键及普通滚动通过：${root}`,
   );
 } finally {
   await app.close();

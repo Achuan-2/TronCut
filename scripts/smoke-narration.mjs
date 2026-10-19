@@ -1,4 +1,5 @@
 import { _electron as electron, expect } from "@playwright/test";
+import { timelineZoom } from "./timeline-zoom.mjs";
 import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import path from "node:path";
@@ -135,7 +136,7 @@ try {
       return stream;
     };
   });
-  const zoom = Number(await page.getByLabel("时间线缩放").inputValue());
+  const zoom = await timelineZoom(page);
   await page.locator(".ruler").click({ position: { x: 2 * zoom, y: 12 } });
   await page.getByRole("button", { name: "开始录音", exact: true }).click();
   const stop = page.getByRole("button", { name: /^停止录音/ });

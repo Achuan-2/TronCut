@@ -121,7 +121,7 @@ import {
 import TrackResizeHandle from "./TrackResizeHandle";
 import TrackContextMenu, { type TrackMenuPosition } from "./TrackContextMenu";
 import ClipContextMenu, { type ClipCommand } from "./ClipContextMenu";
-import { useViewportZoom, type ZoomPoint } from "./useViewportZoom";
+import { useViewportZoom } from "./useViewportZoom";
 import { useRAFThrottle } from "./hooks/useRAFThrottle";
 import { usePerformanceMonitor } from "./hooks/usePerformanceMonitor";
 import {
@@ -142,8 +142,11 @@ import {
   timelineTrimBounds,
 } from "../shared/timeline-collision";
 import {
-  timelineZoomMin,
   timelineZoomMax,
+  timelineFitZoom,
+  timelineZoomFromPercent,
+  timelineZoomPercent,
+  timelineZoomScroll,
   timelineRulerStep,
   timelineRulerLabel,
 } from "../shared/timeline-scale";
@@ -274,7 +277,13 @@ export default function Timeline({
     () => setSnap(editor.preferences.program.snapping),
     [editor.preferences.program.snapping, project.id],
   );
-  const zoomAnchor = useRef<{ time: number; x: number } | null>(null);
+  const zoomAnchor = useRef<number | null>(null);
+  const [viewport, setViewport] = useState({
+    left: 0,
+    width: 0,
+    top: 0,
+    height: 300,
+  });
   const scroll = useRef<HTMLDivElement>(null),
     duration = useMemo(
       () =>
@@ -285,27 +294,34 @@ export default function Timeline({
       [project.clips, project.markers],
     ),
     width = duration * zoom;
-  const changeZoom = (next: number, point?: ZoomPoint) => {
+  const minimumZoom = timelineFitZoom(duration, viewport.width);
+  const maximumZoom = Math.max(minimumZoom, timelineZoomMax);
+  const changeZoom = useCallback((next: number) => {
     const element = scroll.current;
-    next = Math.max(timelineZoomMin, Math.min(timelineZoomMax, next));
+    next = Math.max(minimumZoom, Math.min(maximumZoom, next));
     if (next === zoom) return;
     if (element) {
-      const bounds = element.getBoundingClientRect();
-      const x = point
-        ? Math.max(0, Math.min(element.clientWidth, point.x - bounds.left))
-        : element.clientWidth / 2;
-      zoomAnchor.current = { time: (element.scrollLeft + x) / zoom, x };
+      zoomAnchor.current = timelineZoomScroll(
+        editor.playback.getSnapshot(),
+        zoom,
+        next,
+        element.scrollLeft,
+        element.clientWidth,
+      );
     }
     setZoom(next);
-  };
-  useViewportZoom(panel, (factor, point) => changeZoom(zoom * factor, point));
+  }, [minimumZoom, maximumZoom, zoom, editor.playback]);
+  useViewportZoom(panel, (factor) => changeZoom(zoom * factor));
   useLayoutEffect(() => {
     const anchor = zoomAnchor.current;
-    if (scroll.current && anchor) {
-      scroll.current.scrollLeft = anchor.time * zoom - anchor.x;
+    if (scroll.current && anchor !== null) {
+      scroll.current.scrollLeft = anchor;
       zoomAnchor.current = null;
     }
   }, [zoom]);
+  useLayoutEffect(() => {
+    if (zoom < minimumZoom || zoom > maximumZoom) changeZoom(zoom);
+  }, [minimumZoom, maximumZoom, zoom, changeZoom]);
   useLayoutEffect(() => {
     const element = scroll.current;
     if (element && editor.timelineFocus) {
@@ -614,12 +630,6 @@ export default function Timeline({
     else if (top + height > element.scrollTop + element.clientHeight)
       element.scrollTop = top + height - element.clientHeight;
   }, [selectedTrackId, project.tracks.length, layoutKey, trackHeightDraft]);
-  const [viewport, setViewport] = useState({
-    left: 0,
-    width: 1600,
-    top: 0,
-    height: 300,
-  });
   const trackOffsets = useMemo(() => {
     let top = 36;
     return trackHeights.map((height) => {
@@ -635,8 +645,9 @@ export default function Timeline({
       0,
       Math.floor((viewport.left - 200) / zoom / rulerStep),
     );
-    return Array.from({ length: count }, (_, i) => (start + i) * rulerStep);
-  }, [viewport.left, viewport.width, zoom, rulerStep]);
+    return Array.from({ length: count }, (_, i) => (start + i) * rulerStep)
+      .filter((time) => time * zoom < Math.max(viewport.width, width) - 60);
+  }, [viewport.left, viewport.width, zoom, rulerStep, width]);
   const visibleClips = useMemo(() => {
     const index = projectIndex({ clips: timeline.clips });
     return new Map(
@@ -931,13 +942,18 @@ export default function Timeline({
           </button>
           <input
             aria-label="时间线缩放"
-            title="时间线缩放：Ctrl/⌘ + 加减号，或 Ctrl/⌘ + 滚轮"
+            title="以播放头为中心缩放：Ctrl/⌘ + 加减号，或 Ctrl/⌘ + 滚轮；最小档显示完整时间轴"
+            aria-valuetext={`显示完整时间轴的 ${Number(Math.min(100, minimumZoom / zoom * 100).toFixed(2))}%`}
+            data-pixels-per-second={zoom}
+            data-min-zoom={minimumZoom}
             type="range"
-            min={timelineZoomMin}
-            max={timelineZoomMax}
+            min={0}
+            max={100}
             step="any"
-            value={zoom}
-            onChange={(e) => changeZoom(Number(e.target.value))}
+            value={timelineZoomPercent(zoom, minimumZoom)}
+            onChange={(e) => changeZoom(
+              timelineZoomFromPercent(Number(e.target.value), minimumZoom),
+            )}
           />
           <button title="放大时间线" onClick={() => changeZoom(zoom * 1.3)}>
             <ZoomIn size={16} />

@@ -1,4 +1,5 @@
 import { _electron as electron, expect } from "@playwright/test";
+import { setTimelineZoom } from "./timeline-zoom.mjs";
 import { build } from "esbuild";
 import assert from "node:assert/strict";
 import fs from "node:fs/promises";
@@ -47,7 +48,7 @@ try {
   const clips = page.locator(".timeline-clip:not(.caption)");
   const selected = page.locator(".timeline-clip.selected");
   await expect(clips).toHaveCount(2);
-  await page.getByLabel("时间线缩放").fill("80");
+  await setTimelineZoom(page, 80);
   await page.locator(".timeline-scroll").evaluate((element) => {
     element.scrollLeft = 0;
   });

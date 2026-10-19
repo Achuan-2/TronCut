@@ -1,4 +1,5 @@
 import { _electron as electron, expect } from "@playwright/test";
+import { timelineZoom } from "./timeline-zoom.mjs";
 import { build } from "esbuild";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
@@ -103,7 +104,7 @@ try {
   await expect(autoAnimate).toBeChecked();
   await autoAnimate.uncheck();
   await expect(page.getByLabel("画布取景预览")).toBeVisible();
-  const zoom = Number(await page.getByLabel("时间线缩放").inputValue());
+  const zoom = await timelineZoom(page);
   await page.locator(".ruler").click({ position: { x: 2 * zoom, y: 12 } });
   await page.getByLabel("画布缩放百分比", { exact: true }).fill("200");
   await expect(page.locator(".timeline-clip .clip-animation")).toHaveCount(1);
