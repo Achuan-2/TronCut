@@ -93,6 +93,10 @@ project.clips.push({
   ...newText(project.tracks[2].id, 0, 0, "缩放边界"),
   duration: 40,
 });
+project.clips.push({
+  ...newText(project.tracks[2].id, 3600, 0, "一小时后的片段"),
+  duration: 30,
+});
 const profile = path.join(root, "profile");
 validateProject(project);
 await fs.mkdir(profile);
@@ -246,9 +250,35 @@ try {
     ),
     1,
   );
+  // A one-hour project fits at the new minimum, with readable ruler spacing.
+  await timelineZoom.fill("0.1");
+  await expect(timelineZoom).toHaveValue("0.1");
+  await expect(
+    page.locator(".timeline-clip.text").filter({ hasText: "一小时后的片段" }),
+  ).toBeInViewport();
+  const spacing = await page
+    .locator(".ruler > span")
+    .evaluateAll(
+      (labels) =>
+        labels[1].getBoundingClientRect().left -
+        labels[0].getBoundingClientRect().left,
+    );
+  expect(spacing).toBeGreaterThanOrEqual(75);
+  await page.getByTitle("缩小时间线", { exact: true }).click();
+  await expect(timelineZoom).toHaveValue("0.1");
+  await timeline.hover();
+  await page.keyboard.press("Control+Minus");
+  await expect(timelineZoom).toHaveValue("0.1");
+  await page.keyboard.press("Control+Equal");
+  await expect.poll(() => numeric(timelineZoom)).toBeCloseTo(0.13, 6);
+  await page.keyboard.down("Control");
+  await page.mouse.wheel(0, 120);
+  await page.keyboard.up("Control");
+  await expect.poll(() => numeric(timelineZoom)).toBeCloseTo(0.1, 6);
+  await page.screenshot({ path: path.join(root, "minimum-timeline-zoom.png") });
   assert.deepEqual(errors, []);
   console.log(
-    `画布/轨道快捷键、鼠标锚点、普通滚动、输入边界及越界图片/视频显示与拖动通过：${root}`,
+    `一小时时间轴缩小、刻度间距、缩放下限；画布/轨道快捷键、鼠标锚点及普通滚动通过：${root}`,
   );
 } finally {
   await app.close();

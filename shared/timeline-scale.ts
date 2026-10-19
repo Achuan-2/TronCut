@@ -1,4 +1,4 @@
-export const timelineZoomMin = 15;
+export const timelineZoomMin = 0.1;
 export const timelineZoomMax = 2400;
 
 /** Keep labels readable, and align subsecond divisions to actual video frames. */
@@ -6,9 +6,9 @@ export function timelineRulerStep(zoom: number, fps: number) {
   const frames = [
     ...new Set([
       ...[1, 2, 5, 10].filter((count) => count < fps),
-      ...[0.1, 0.2, 0.5, 1, 2, 5, 10].map((seconds) =>
-        Math.max(1, Math.round(seconds * fps)),
-      ),
+      ...[
+        0.1, 0.2, 0.5, 1, 2, 5, 10, 15, 30, 60, 120, 300, 600, 900, 1800, 3600,
+      ].map((seconds) => Math.max(1, Math.round(seconds * fps))),
     ]),
   ].sort((a, b) => a - b);
   return (
