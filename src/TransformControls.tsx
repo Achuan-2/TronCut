@@ -192,8 +192,10 @@ function RotationAxis({
 
 export function PropertySlider({
   className = "",
+  title,
   label,
   ariaLabel,
+  sliderAriaLabel,
   value,
   min,
   max,
@@ -205,8 +207,10 @@ export function PropertySlider({
   disabled,
 }: {
   className?: string;
+  title?: string;
   label: string;
   ariaLabel: string;
+  sliderAriaLabel?: string;
   value: number;
   min: number;
   max: number;
@@ -222,12 +226,12 @@ export function PropertySlider({
   };
   const progress = Math.max(0, Math.min(100, ((value - min) / (max - min)) * 100));
   return (
-    <div className={`property-slider-row ${className}`}>
+    <div className={`property-slider-row ${className}`} title={title}>
       <span>{label}</span>
       <div className="property-slider-control">
         <input
           type="range"
-          aria-label={`${label}滑条`}
+          aria-label={sliderAriaLabel ?? `${label}滑条`}
           min={min}
           max={max}
           step={step}

@@ -105,7 +105,7 @@ try {
   await autoAnimate.uncheck();
   await expect(page.getByLabel("画布取景预览")).toBeVisible();
   const zoom = await timelineZoom(page);
-  await page.locator(".ruler").click({ position: { x: 2 * zoom, y: 12 } });
+  await page.locator(".ruler").click({ position: { x: 2 * zoom, y: 29 } });
   await page.getByLabel("画布缩放百分比", { exact: true }).fill("200");
   await expect(page.locator(".timeline-clip .clip-animation")).toHaveCount(1);
   await page.screenshot({ path: path.join(root, "zoom-pan.png") });
@@ -163,7 +163,7 @@ try {
     await page.mouse.move(x + 0.1, y);
   };
   // A click behaves exactly like Add Animation and keeps earlier zoom frames.
-  await page.locator(".ruler").click({ position: { x: 4 * zoom, y: 12 } });
+  await page.locator(".ruler").click({ position: { x: 4 * zoom, y: 29 } });
   await card.click();
   await expect(arrows).toHaveCount(2);
   await page.screenshot({ path: path.join(root, "presets.png") });
@@ -183,7 +183,7 @@ try {
   assert.deepEqual(buttonAnimation, saved.clips[0].keyframes);
 
   // Timeline hover previews the drop interval, independent of the playhead.
-  await page.locator(".ruler").click({ position: { x: zoom, y: 12 } });
+  await page.locator(".ruler").click({ position: { x: zoom, y: 29 } });
   await startDrag(timelineClip, { x: 5.5 * zoom, y: 12 });
   const ghost = page.locator(".animation-drop-preview");
   await expect(ghost).toHaveAttribute("data-end", "5.5");
@@ -201,7 +201,7 @@ try {
   await expect(arrows).toHaveCount(2);
 
   // Canvas drag hits the visible object and adds at the current playhead.
-  await page.locator(".ruler").click({ position: { x: 5.5 * zoom, y: 12 } });
+  await page.locator(".ruler").click({ position: { x: 5.5 * zoom, y: 29 } });
   await startDrag(layer);
   await expect(layer).toHaveClass(/effect-drop-target/);
   await page.screenshot({ path: path.join(root, "canvas-hover.png") });

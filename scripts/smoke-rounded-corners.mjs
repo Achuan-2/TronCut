@@ -70,7 +70,7 @@ const open = async () => {
 // The preview zoom cancels out in this ratio; transform.scale lives outside the mask.
 const radiusRatio = () =>
   page
-    .locator(".preview-layer.image > div")
+    .locator(".preview-layer.image .preview-effect-content > div")
     .first()
     .evaluate((node) => {
       const css = getComputedStyle(node);

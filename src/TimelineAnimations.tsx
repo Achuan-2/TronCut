@@ -93,7 +93,7 @@ export const TimelineAnimations = memo(function TimelineAnimations({
       : undefined;
   useEffect(() => {
     const point = points.current?.querySelector<HTMLElement>(
-      ".animation-point.end.selected-frame",
+      ".animation-point.end.selected-frame .animation-point-dot",
     );
     if (
       !point ||
@@ -263,7 +263,7 @@ export const TimelineAnimations = memo(function TimelineAnimations({
                     range.motion
                   ]
                 : "动画";
-          // Nearby endpoints also need separate hit targets at the current zoom.
+          // Split nearby hit targets; the visible dots stay at their true times.
           const sharedStart =
             index > 0 && (range.start - ranges[index - 1].end) * zoom < 12;
           const sharedEnd =
@@ -331,7 +331,9 @@ export const TimelineAnimations = memo(function TimelineAnimations({
                     begin(event, range, "start", index)
                   }
                   onClick={(event) => click(event, start, "start")}
-                />
+                >
+                  <span className="animation-point-dot" />
+                </button>
               )}
               {range.hasEnd && (
                 <button
@@ -345,7 +347,9 @@ export const TimelineAnimations = memo(function TimelineAnimations({
                   title={`${channel === "drawing" ? "绘制动画" : "动画"}结束 ${timeLabel(end)}`}
                   onPointerDown={(event) => begin(event, range, "end", index)}
                   onClick={(event) => click(event, end, "end")}
-                />
+                >
+                  <span className="animation-point-dot" />
+                </button>
               )}
             </div>
           );

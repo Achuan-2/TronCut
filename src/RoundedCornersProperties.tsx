@@ -5,7 +5,7 @@ import {
   mediaFrameRadiusPercent,
 } from "../shared/media-frame";
 import EffectSection from "./EffectSection";
-import NumberInput from "./NumberInput";
+import { PropertySlider } from "./TransformControls";
 import type { Editor } from "./useEditor";
 
 export default function RoundedCornersProperties({
@@ -58,31 +58,17 @@ export default function RoundedCornersProperties({
             ))}
           </div>
         </div>
-        <div className="property-slider-row">
-          <span>半径</span>
-          <input
-            aria-label="圆角半径百分比滑条"
-            title="100% 为画面短边的一半"
-            type="range"
-            min={0}
-            max={100}
-            step={1}
-            value={percent}
-            onChange={(event) =>
-              update({ radius: Number(event.target.value), unit: "percent" })
-            }
-          />
-          <NumberInput
-            aria-label="圆角 (%)"
-            title="100% 为画面短边的一半"
-            min={0}
-            max={100}
-            step={1}
-            value={percent}
-            onValueChange={(radius) => update({ radius, unit: "percent" })}
-          />
-          <span>%</span>
-        </div>
+        <PropertySlider
+          label="半径"
+          ariaLabel="圆角 (%)"
+          sliderAriaLabel="圆角半径百分比滑条"
+          title="100% 为画面短边的一半"
+          min={0}
+          max={100}
+          value={percent}
+          unit="%"
+          onChange={(radius) => update({ radius, unit: "percent" })}
+        />
       </fieldset>
     </EffectSection>
   );

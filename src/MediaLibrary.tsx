@@ -369,6 +369,10 @@ export default function MediaLibrary({
       }
     },
   });
+  const isProjectRootDrop = (target: EventTarget) =>
+    !libraryId &&
+    preferences.grouping === "folder" &&
+    !(target as HTMLElement).closest(".library-folder");
   const renderFolder = (folder: LibraryFolder): React.ReactNode => {
     if (!visibleFolders.has(folder.id)) return null;
     const open = !!query.trim() || expanded.has(folder.id);
@@ -476,18 +480,29 @@ export default function MediaLibrary({
           </div>
         )}
       </div>
-      {(libraryId || preferences.grouping === "folder") && (
+      {libraryId && (
         <button
           className={`library-root-drop ${dropTarget === "root" ? "drop-target" : ""}`}
           {...dropHandlers(null)}
           title="将素材拖到这里，移出文件夹"
         >
-          {libraryId ? "库根目录" : "未分组"}
+          库根目录
         </button>
       )}
       <div
         ref={items}
-        className={`media-browser-items media-view-${preferences.view}`}
+        className={`media-browser-items media-view-${preferences.view} ${!libraryId && dropTarget === "root" ? "media-root-drop-target" : ""}`}
+        onDragOver={(event) => {
+          if (isProjectRootDrop(event.target))
+            dropHandlers(null).onDragOver(event);
+        }}
+        onDrop={(event) => {
+          if (isProjectRootDrop(event.target)) dropHandlers(null).onDrop(event);
+        }}
+        onDragLeave={(event) => {
+          if (!event.currentTarget.contains(event.relatedTarget as Node | null))
+            setDropTarget(null);
+        }}
         onContextMenu={(event) => {
           event.preventDefault();
           const card = (event.target as HTMLElement).closest<HTMLButtonElement>(

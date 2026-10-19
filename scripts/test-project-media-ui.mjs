@@ -146,6 +146,9 @@ try {
   await page.getByRole("button", { name: "新建文件夹", exact: true }).click();
   await nameDialog("片头素材");
   await expect(grouping).toHaveValue("folder");
+  const projectRoot = page.locator(".media-browser-items");
+  await expect(page.locator(".library-root-drop")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "未分组", exact: true })).toHaveCount(0);
   let folder = page
     .locator(".library-folder-heading")
     .filter({ hasText: "片头素材" });
@@ -162,6 +165,11 @@ try {
   await expect(page.locator(".library-folder-content .asset-card")).toHaveCount(
     3,
   );
+  await card(2).click();
+  await card(2).dragTo(projectRoot, { targetPosition: { x: 2, y: 2 } });
+  await expect(page.locator(".library-folder-content .asset-card")).toHaveCount(2);
+  await undo();
+  await expect(page.locator(".library-folder-content .asset-card")).toHaveCount(3);
   await card(1).click();
   await card(3).click({ modifiers: ["Shift"] });
   await card(2).click({ button: "right" });
