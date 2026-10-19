@@ -174,11 +174,6 @@ export default function VisualEffectProperties({
         }}
       >
         <fieldset className="visual-effect-fields" disabled={!settings.enabled}>
-          {id === "mask" && (
-            <p className="field-help">
-              拖动画布上的遮罩边框或八个控制点调整区域。开启自动动画后修改位置、大小，或选择时间轴动画的起点、终点编辑，可制作滑动显示效果。
-            </p>
-          )}
           {id === "media-matte" && (
             <p className="field-help">
               以本对象的透明度或亮度控制所有下方轨道；本对象作为哑光源。
