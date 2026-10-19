@@ -1,0 +1,19 @@
+.media-browser.media-file-drop {
+  position: relative;
+  box-shadow: inset 0 0 0 2px var(--accent);
+  background: #76e5b510;
+}
+
+.media-file-drop-hint {
+  position: absolute;
+  inset: 50% 8px auto;
+  z-index: 2;
+  padding: 12px 8px;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  background: #202a25;
+  color: var(--accent);
+  text-align: center;
+  pointer-events: none;
+  transform: translateY(-50%);
+}

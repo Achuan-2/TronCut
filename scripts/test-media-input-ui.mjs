@@ -10,6 +10,7 @@ const root = path.resolve("test-output/media-input", `run-${Date.now()}`),
 await fs.mkdir(profile, { recursive: true });
 const image = path.join(root, "中文 图片.png"),
   video = path.join(root, "外部 视频.mp4"),
+  audio = path.join(root, "外部 音频.wav"),
   broken = path.join(root, "损坏.png"),
   text = path.join(root, "说明.txt");
 await sharp({
@@ -35,6 +36,11 @@ await promisify(execFile)(
     "yuv420p",
     video,
   ],
+  { windowsHide: true },
+);
+await promisify(execFile)(
+  path.resolve("resources/bin/ffmpeg.exe"),
+  ["-y", "-f", "lavfi", "-i", "sine=frequency=440:duration=1", audio],
   { windowsHide: true },
 );
 const project = {
@@ -79,6 +85,62 @@ try {
   await expect(page.locator(".home-page")).toBeVisible();
   await page.getByRole("button", { name: "恢复编辑", exact: true }).click();
   await expect(page.locator(".track-lane")).toHaveCount(2);
+  // A native file input retains real disk paths through the preload bridge.
+  await page.evaluate(() => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.multiple = true;
+    input.id = "external-files";
+    input.hidden = true;
+    document.body.append(input);
+  });
+  const projectMedia = page.locator(".media-browser");
+  const dropIntoProject = async (files, selector = ".library-empty", repeat = 1) => {
+    await page.locator("#external-files").setInputFiles(files);
+    const canceled = await page.locator("#external-files").evaluate((input, selector) => {
+      const data = new DataTransfer();
+      for (const file of input.files) data.items.add(file);
+      return !document.querySelector(selector).dispatchEvent(new DragEvent("dragover", {
+        bubbles: true, cancelable: true, dataTransfer: data,
+      }));
+    }, selector);
+    expect(canceled).toBe(true);
+    await expect(projectMedia).toHaveClass(/media-file-drop/);
+    // Moving between descendants must keep the drop feedback visible.
+    await projectMedia.dispatchEvent("dragleave", {
+      relatedTarget: await page.locator(selector).first().elementHandle(),
+    });
+    await expect(projectMedia).toHaveClass(/media-file-drop/);
+    await page.locator("#external-files").evaluate((input, { selector, repeat }) => {
+      for (let i = 0; i < repeat; i++) {
+        const data = new DataTransfer();
+        for (const file of input.files) data.items.add(file);
+        document.querySelector(selector).dispatchEvent(new DragEvent("drop", {
+          bubbles: true, cancelable: true, dataTransfer: data,
+        }));
+      }
+    }, { selector, repeat });
+    await expect(projectMedia).not.toHaveClass(/media-file-drop/);
+  };
+  const cards = page.locator(".asset-card");
+  await dropIntoProject([image, video, audio, text], ".library-empty", 2);
+  await expect(cards).toHaveCount(3);
+  await expect(page.locator(".timeline-clip")).toHaveCount(0);
+  await expect(page.getByRole("tab", { name: "项目媒体", exact: true })).toHaveAttribute("aria-selected", "true");
+  await page.screenshot({ path: path.join(root, "project-media-drop.png") });
+  await page.getByTitle("撤销 Ctrl+Z", { exact: true }).click();
+  await expect(cards).toHaveCount(0);
+  await page.getByTitle("重做 Ctrl+Shift+Z", { exact: true }).click();
+  await expect(cards).toHaveCount(3);
+  await expect(page.locator(".timeline-clip")).toHaveCount(0);
+  await page.getByTitle("撤销 Ctrl+Z", { exact: true }).click();
+  await expect(cards).toHaveCount(0);
+  await dropIntoProject([text]);
+  await expect(page.getByRole("status")).toContainText("没有可导入");
+  await expect(cards).toHaveCount(0);
+  await dropIntoProject([broken]);
+  await expect(page.getByRole("status")).toContainText("unsupported image format", { timeout: 10000 });
+  await expect(cards).toHaveCount(0);
   // Substitute only native clipboard accessors, preserving the user's actual
   // clipboard. The PNG persistence, probing, registration and renderer IPC run normally.
   await app.evaluate(({ clipboard, nativeImage }, image) => {
@@ -113,14 +175,6 @@ try {
 
   // Populate a real file input so Electron webUtils receives native File paths,
   // rather than invented File.path properties or mocked import results.
-  await page.evaluate(() => {
-    const input = document.createElement("input");
-    input.type = "file";
-    input.multiple = true;
-    input.id = "external-files";
-    input.hidden = true;
-    document.body.append(input);
-  });
   const drop = async (files, lane, time) => {
     await page.locator("#external-files").setInputFiles(files);
     await lane.scrollIntoViewIfNeeded();
@@ -190,9 +244,18 @@ try {
   );
   await expect(page.locator(".timeline-clip")).toHaveCount(2);
   await expect(tools.locator(".selected")).toHaveText("视觉效果");
+  await tools.getByRole("button", { name: "媒体", exact: true }).click();
+  const before = await cards.count();
+  await page.getByRole("button", { name: "列表视图", exact: true }).click();
+  await dropIntoProject([audio], ".asset-card");
+  await expect(cards).toHaveCount(before + 1);
+  await expect(page.locator(".timeline-clip")).toHaveCount(2);
+  await page.getByTitle("撤销 Ctrl+Z", { exact: true }).click();
+  await expect(cards).toHaveCount(before);
+  await expect(page.locator(".timeline-clip")).toHaveCount(2);
   expect(errors).toEqual([]);
   console.log(
-    `剪贴板 PNG 快速导入、防重复及无全屏等待；真实外部文件路径、落点、批量导入、撤销及错误后恢复通过：${root}`,
+    `项目媒体空白/列表拖入、批量音视频图片、撤销重做、防重复及错误恢复；剪贴板与时间线拖入回归通过：${root}`,
   );
 } catch (error) {
   const page = await app.firstWindow();

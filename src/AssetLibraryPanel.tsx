@@ -392,6 +392,8 @@ export default function AssetLibraryPanel(
         <MediaLibrary
           key={tab === "library" ? (library?.id ?? "loading") : "project"}
           {...props}
+          onDropFiles={tab === "project" ? props.onDropFiles : undefined}
+          dropDisabled={disabled}
           assets={visibleAssets}
           libraryId={tab === "library" ? (library?.id ?? "loading") : undefined}
           onSaveToLibrary={

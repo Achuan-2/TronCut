@@ -186,7 +186,7 @@ export default function App() {
     },
     [toast],
   );
-  const importIntoTimeline = async (fn: () => Promise<void>) => {
+  const importMediaInput = async (fn: () => Promise<void>) => {
     if (mediaImportLock.current || busy || recordingModalOpen) return;
     mediaImportLock.current = true;
     setMediaImporting(true);
@@ -432,7 +432,7 @@ export default function App() {
     toast(cut ? "已剪切动画" : "已复制动画");
   };
   const paste = () =>
-    importIntoTimeline(async () => {
+    importMediaInput(async () => {
       const result = window.framecraft
         ? await window.framecraft.importClipboardMedia()
         : {
@@ -480,8 +480,18 @@ export default function App() {
         toast("剪贴板中没有可粘贴的图片、视频或片段");
       }
     });
+  const importDroppedMedia = (files: File[]) =>
+    importMediaInput(async () => {
+      const assets = await bridge().importDroppedMedia(files);
+      if (!assets.length) {
+        toast("没有可导入的图片、视频或音频文件");
+        return;
+      }
+      editor.addAssets(assets);
+      toast(`已导入 ${assets.length} 个素材，双击加入时间线`);
+    });
   const dropFiles = (files: File[], time: number, trackId?: string) =>
-    importIntoTimeline(async () => {
+    importMediaInput(async () => {
       if (editor.project.tracks.find((track) => track.id === trackId)?.locked) {
         toast("轨道已锁定，请拖入其他轨道");
         return;
@@ -500,7 +510,7 @@ export default function App() {
     time: number,
     trackId?: string,
   ) =>
-    importIntoTimeline(async () => {
+    importMediaInput(async () => {
       const track = editor.project.tracks.find((track) => track.id === trackId);
       if (track?.locked || track?.captionTrack) return;
       const asset = await bridge().useLibraryAsset(
@@ -512,7 +522,7 @@ export default function App() {
       toast("已从素材库添加到时间线");
     });
   const captureFrame = () =>
-    importIntoTimeline(async () => {
+    importMediaInput(async () => {
       editor.setPlaying(false);
       const time = editor.playhead;
       const asset = await bridge().captureFrame(
@@ -1254,6 +1264,7 @@ export default function App() {
               tab={tab}
               setTab={setTab}
               importMedia={importMedia}
+              importDroppedMedia={importDroppedMedia}
               run={(fn) => void run(fn)}
               toast={toast}
               busy={busy || mediaImporting}

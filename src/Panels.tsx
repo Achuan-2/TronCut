@@ -89,6 +89,7 @@ interface Props {
   tab: Tab;
   setTab: (tab: Tab) => void;
   importMedia: () => void;
+  importDroppedMedia: (files: File[]) => void;
   run: (fn: () => Promise<unknown>) => void;
   toast: (text: string) => void;
   busy: boolean;
@@ -145,6 +146,7 @@ export default function Panels(props: Props) {
             query={query}
             onQueryChange={setQuery}
             onImport={props.importMedia}
+            onDropFiles={props.importDroppedMedia}
             unavailable={(asset) => ({
               ...(asset.missing ? { add: "请先更新离线素材" } : {}),
               replace:

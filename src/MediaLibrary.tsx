@@ -13,6 +13,7 @@ import {
 import type { Asset } from "../shared/model";
 import { libraryAssetMime } from "../shared/asset-libraries";
 import { MediaThumbnail } from "./MediaThumbnail";
+import "./MediaLibrary.css";
 import { timeLabel } from "./Preview";
 import MediaContextMenu, {
   type MediaCommand,
@@ -107,6 +108,8 @@ export interface MediaLibraryProps {
   onQueryChange: (query: string) => void;
   onActivate: (asset: Asset) => void;
   onImport: () => void;
+  onDropFiles?: (files: File[]) => void;
+  dropDisabled?: boolean;
   onCommand: (asset: Asset, command: MediaCommand) => void;
   unavailable: (asset: Asset) => Partial<Record<MediaCommand, string>>;
   libraryId?: string;
@@ -119,6 +122,8 @@ export default function MediaLibrary({
   onQueryChange,
   onActivate,
   onImport,
+  onDropFiles,
+  dropDisabled = false,
   onCommand,
   unavailable,
   libraryId,
@@ -129,6 +134,10 @@ export default function MediaLibrary({
   const [preferences, setPreferences] = useState(readPreferences);
   const [category, setCategory] = useState<Category>("all");
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [fileDrop, setFileDrop] = useState(false);
+  useEffect(() => {
+    if (dropDisabled) setFileDrop(false);
+  }, [dropDisabled]);
   const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set());
   const items = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -172,7 +181,29 @@ export default function MediaLibrary({
     return { filtered, groups, counts };
   }, [assets, query, category, preferences.grouping]);
   return (
-    <div className="media-browser">
+    <div
+      className={`media-browser ${fileDrop ? "media-file-drop" : ""}`}
+      onDragOver={(event) => {
+        if (!onDropFiles || !event.dataTransfer.types.includes("Files")) return;
+        event.preventDefault();
+        event.stopPropagation();
+        event.dataTransfer.dropEffect = dropDisabled ? "none" : "copy";
+        setFileDrop(!dropDisabled);
+      }}
+      onDragLeave={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null))
+          setFileDrop(false);
+      }}
+      onDrop={(event) => {
+        if (!onDropFiles || !event.dataTransfer.types.includes("Files")) return;
+        event.preventDefault();
+        event.stopPropagation();
+        setFileDrop(false);
+        if (!dropDisabled && event.dataTransfer.files.length)
+          onDropFiles(Array.from(event.dataTransfer.files));
+      }}
+    >
+      {fileDrop && <div className="media-file-drop-hint">松开以导入项目媒体</div>}
       <div className="media-browser-toolbar">
         <div className="media-search">
           <Search size={14} aria-hidden="true" />
