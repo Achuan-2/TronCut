@@ -36,6 +36,7 @@ import {
   type RecordingSettings,
 } from "../shared/recording";
 import Home from "./Home";
+import ProjectContextMenu from "./ProjectContextMenu";
 import type { RecentProject, RecoveryInfo } from "../shared/recent-projects";
 import PreferencesDialog from "./PreferencesDialog";
 import ExportDialog from "./ExportDialog";
@@ -99,6 +100,7 @@ function ProjectTitleInput({
 }
 
 export default function App() {
+  const [projectMenu, setProjectMenu] = useState<{ x: number; y: number } | null>(null);
   const [editorPreferences, setEditorPreferences] = useState<EditorPreferences>(
     defaultEditorPreferences,
   );
@@ -558,14 +560,15 @@ export default function App() {
     if (editor.dirty && !confirm("当前工程有未保存修改，确定新建工程？"))
       return;
     void run(async () => {
-      await window.framecraft?.newProject();
-      editor.replace({
+      const result = await window.framecraft?.newProject();
+      editor.replace(result?.project ?? {
         ...createProject(),
         canvas: { ...editorPreferences.project },
       });
-      setFile("");
+      setFile(result?.file ?? "");
       setRecovery(null);
       enterEditor();
+      void refreshHome().catch(() => {});
       if (record) setRecording(true);
     });
   };
@@ -982,6 +985,20 @@ export default function App() {
       setRecent(await bridge().removeRecentProject(file));
       toast("已从最近项目中移除");
     });
+  const showProjectLocation = (file: string) =>
+    run(() => bridge().showProjectLocation(file));
+  const saveRecentAs = (recentFile: string) => {
+    // Use the live document when the card belongs to the current session so
+    // Save As includes edits that have not been written to disk yet.
+    if (hasSession && recentFile === file) return save(true);
+    return run(async () => {
+      const result = await bridge().saveRecentProjectAs(recentFile);
+      if (result) {
+        await refreshHome();
+        toast("工程副本已保存");
+      }
+    });
+  };
   const recorded = async (
     results: RecordedAsset[],
     settings: RecordingSettings,
@@ -1086,7 +1103,12 @@ export default function App() {
             </div>
           )}
         </nav>
-        <div className="project-title">
+        <div className="project-title" onContextMenu={(event) => {
+          if (screen !== "editor" || actionsBlocked) return;
+          event.preventDefault();
+          setMenu(false);
+          setProjectMenu({ x: event.clientX, y: event.clientY });
+        }}>
           {screen === "home" ? (
             <span>首页</span>
           ) : (
@@ -1219,6 +1241,8 @@ export default function App() {
           onOpen={() => void open()}
           onRecent={(file) => void openRecent(file)}
           onRemoveRecent={(file) => void removeRecent(file)}
+          onSaveAs={(file) => void saveRecentAs(file)}
+          onShowLocation={(file) => void showProjectLocation(file)}
           onRecover={() => void recover()}
           onContinue={hasSession ? enterEditor : undefined}
         />
@@ -1256,6 +1280,17 @@ export default function App() {
             dropDisabled={busy || recordingModalOpen || mediaImporting}
           />
         </>
+      )}
+      {projectMenu && screen === "editor" && !actionsBlocked && (
+        <ProjectContextMenu
+          {...projectMenu}
+          label="项目操作"
+          onClose={() => setProjectMenu(null)}
+          actions={[
+            { label: "另存为…", onSelect: () => void save(true) },
+            ...(file ? [{ label: "打开项目位置", onSelect: () => void showProjectLocation(file) }] : []),
+          ]}
+        />
       )}
       {preferencesOpen && (
         <PreferencesDialog

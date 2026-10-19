@@ -8,8 +8,8 @@ import {
   RotateCcw,
 } from "lucide-react";
 import type { RecentProject, RecoveryInfo } from "../shared/recent-projects";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { createPortal } from "react-dom";
+import { useEffect, useState } from "react";
+import ProjectContextMenu from "./ProjectContextMenu";
 
 const durationLabel = (seconds: number) =>
   `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(Math.floor(seconds % 60)).padStart(2, "0")}`;
@@ -23,6 +23,8 @@ export default function Home({
   onOpen,
   onRecent,
   onRemoveRecent,
+  onSaveAs,
+  onShowLocation,
   onRecover,
   onContinue,
 }: {
@@ -35,6 +37,8 @@ export default function Home({
   onOpen: () => void;
   onRecent: (file: string) => void;
   onRemoveRecent: (file: string) => void;
+  onSaveAs: (file: string) => void;
+  onShowLocation: (file: string) => void;
   onRecover: () => void;
   onContinue?: () => void;
 }) {
@@ -43,39 +47,12 @@ export default function Home({
     x: number;
     y: number;
   } | null>(null);
-  const menuRoot = useRef<HTMLDivElement>(null);
-  useLayoutEffect(() => {
-    if (!menu) return;
-    menuRoot.current?.querySelector("button")?.focus();
-  }, [menu]);
-  useEffect(() => {
-    if (!menu) return;
-    const outside = (event: PointerEvent) => {
-      if (!menuRoot.current?.contains(event.target as Node)) setMenu(null);
-    };
-    const close = () => setMenu(null);
-    const key = (event: KeyboardEvent) => {
-      if (event.key === "Escape") close();
-    };
-    window.addEventListener("pointerdown", outside);
-    window.addEventListener("keydown", key);
-    window.addEventListener("blur", close);
-    window.addEventListener("resize", close);
-    window.addEventListener("scroll", close, true);
-    return () => {
-      window.removeEventListener("pointerdown", outside);
-      window.removeEventListener("keydown", key);
-      window.removeEventListener("blur", close);
-      window.removeEventListener("resize", close);
-      window.removeEventListener("scroll", close, true);
-    };
-  }, [menu]);
   useEffect(() => {
     if (
       disabled ||
       (menu &&
         !recent.some(
-          (project) => project.file === menu.file && project.missing,
+          (project) => project.file === menu.file,
         ))
     )
       setMenu(null);
@@ -169,18 +146,12 @@ export default function Home({
                     if (!project.missing) onRecent(project.file);
                   }}
                   onContextMenu={(event) => {
-                    if (!project.missing || disabled) return;
+                    if (disabled) return;
                     event.preventDefault();
                     setMenu({
                       file: project.file,
-                      x: Math.max(
-                        8,
-                        Math.min(event.clientX, window.innerWidth - 220),
-                      ),
-                      y: Math.max(
-                        8,
-                        Math.min(event.clientY, window.innerHeight - 60),
-                      ),
+                      x: event.clientX,
+                      y: event.clientY,
                     });
                   }}
                   title={project.file}
@@ -207,33 +178,27 @@ export default function Home({
             <div className="home-empty">
               <FolderOpen size={32} />
               <b>还没有最近项目</b>
-              <p>新建并保存项目，或打开已有项目后，它们会显示在这里。</p>
+              <p>新建或打开项目后，它们会显示在这里。</p>
             </div>
           )}
         </section>
       </div>
-      {menu &&
-        createPortal(
-          <div
-            ref={menuRoot}
-            className="context-menu"
-            role="menu"
-            aria-label="最近项目操作"
-            style={{ left: menu.x, top: menu.y }}
-            onContextMenu={(event) => event.preventDefault()}
-          >
-            <button
-              role="menuitem"
-              onClick={() => {
-                onRemoveRecent(menu.file);
-                setMenu(null);
-              }}
-            >
-              从最近项目中移除
-            </button>
-          </div>,
-          document.body,
-        )}
+      {menu && (
+        <ProjectContextMenu
+          {...menu}
+          label="最近项目操作"
+          onClose={() => setMenu(null)}
+          actions={[
+            ...(!recent.find((project) => project.file === menu.file)?.missing
+              ? [
+                  { label: "另存为…", onSelect: () => onSaveAs(menu.file) },
+                  { label: "打开项目位置", onSelect: () => onShowLocation(menu.file) },
+                ]
+              : []),
+            { label: "从最近项目中移除", onSelect: () => onRemoveRecent(menu.file) },
+          ]}
+        />
+      )}
     </div>
   );
 }

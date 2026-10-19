@@ -102,9 +102,11 @@ export interface FrameCraftBridge {
   recentProjects(): Promise<RecentProject[]>;
   removeRecentProject(file: string): Promise<RecentProject[]>;
   openRecentProject(file: string): Promise<{ project: Project; file: string }>;
+  saveRecentProjectAs(file: string): Promise<{ project: Project; file: string } | null>;
+  showProjectLocation(file: string): Promise<void>;
   recoveryInfo(): Promise<RecoveryInfo | null>;
   initialProject(): Promise<{ project: Project; file: string } | null>;
-  newProject(): Promise<void>;
+  newProject(): Promise<{ project: Project; file: string }>;
   markDirty(dirty: boolean): Promise<void>;
   writeRecovery(project: Project): Promise<void>;
   readRecovery(): Promise<{ project: Project; file: string | null } | null>;

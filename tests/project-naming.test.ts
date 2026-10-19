@@ -3,11 +3,50 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { createProject } from "../shared/model";
-import { openProject, saveProject, renameProjectStorage } from "../electron/project-store";
+import { openProject, saveProject, saveProjectInDirectory, renameProjectStorage } from "../electron/project-store";
 import { defaultExportFileName } from "../shared/export-settings";
 import type { Asset } from "../shared/model";
 
 describe("工程命名与保存往返", () => {
+  it("同名项目并发保存时独立归档，另存副本收集素材且保留原工程", async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), "troncut-default-project-"));
+    try {
+      const directory = path.join(root, "Projects");
+      const source = path.join(root, "sample.png");
+      await fs.writeFile(source, "image content");
+      const project = createProject();
+      project.assets = [{
+        id: "sample", name: "sample.png", path: source, kind: "image",
+        duration: 5, width: 320, height: 180, hasAudio: false,
+      }];
+      const results = await Promise.all([
+        saveProjectInDirectory(project, directory),
+        saveProjectInDirectory(project, directory),
+      ]);
+      expect(new Set(results.map((result) => result.project.name))).toEqual(
+        new Set(["未命名工程", "未命名工程-2"]),
+      );
+      for (const result of results) {
+        expect(path.basename(path.dirname(result.file))).toBe(result.project.name);
+        expect(path.basename(result.file)).toBe(`${result.project.name}.troncut`);
+        expect((await openProject(result.file)).assets[0].missing).toBe(false);
+      }
+      const original = results[0];
+      const originalContent = await fs.readFile(original.file, "utf8");
+      const copy = await saveProjectInDirectory(
+        { ...original.project, name: "另存副本" }, path.join(root, "Elsewhere"),
+      );
+      expect(await fs.readFile(original.file, "utf8")).toBe(originalContent);
+      expect(await fs.readFile(copy.project.assets[0].path, "utf8")).toBe("image content");
+      expect(copy.project.assets[0].path).not.toBe(original.project.assets[0].path);
+      const renamed = await renameProjectStorage(original.project, original.file, "新名称");
+      expect(path.basename(path.dirname(renamed.file))).toBe("新名称");
+      expect((await openProject(renamed.file)).assets[0].missing).toBe(false);
+    } finally {
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+
   it("默认未命名工程保存到具体文件名时，自动同步工程名称与导出视频名称", async () => {
     const root = await fs.mkdtemp(path.join(os.tmpdir(), "troncut-name-test-"));
     try {

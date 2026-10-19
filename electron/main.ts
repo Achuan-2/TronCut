@@ -23,11 +23,12 @@ import {
   uid,
   validateProject,
   projectDuration,
+  createProject,
 } from "../shared/model";
 import { parseSrt, toSrt } from "../shared/subtitles";
 import { capabilities, probeMedia } from "./media";
 import { findBinary, runProcess } from "./process";
-import { openProject, saveProject, renameProjectStorage } from "./project-store";
+import { openProject, saveProject, saveProjectInDirectory, renameProjectStorage } from "./project-store";
 import { importCamtasia } from "./camtasia";
 import { audioFilters, exportVideo, exportFrame } from "./export";
 import { stitchInputFilters } from "./stitch-input";
@@ -120,6 +121,10 @@ const windowState = () => ({
   fullscreen: window.isFullScreen(),
 });
 let projectFile: string | null = null;
+const defaultProjectDirectory = () => path.join(app.getPath("documents"), "TronCut", "Projects");
+const projectIcon = () => app.isPackaged
+  ? path.join(process.resourcesPath, "project.ico")
+  : path.resolve("resources/icon.ico");
 const recentProjects = new RecentProjects(path.join(app.getPath("userData"), "recent-projects.json"));
 const preferences = new PreferencesStore(path.join(app.getPath("userData"), "preferences.json"), safeStorage);
 const recordingStyle = new RecordingStyleStore(
@@ -557,10 +562,16 @@ function installHandlers() {
     }
   });
   handle("project:new", async () => {
-    projectFile = null;
+    const project = createProject();
+    project.canvas = { ...(await preferences.get()).project };
+    const result = await saveProjectInDirectory(project, defaultProjectDirectory(), projectIcon());
+    projectFile = result.file;
+    registerProject(result.project);
+    await rememberProject(result.project, result.file);
     await fs.rm(path.join(app.getPath("userData"), "recovery.json"), {
       force: true,
     });
+    return result;
   });
   handle("project:recovery:write", async (input: unknown) => {
     const project = authorizedProject(input);
@@ -623,6 +634,48 @@ function installHandlers() {
     projectFile = file;
     await rememberProject(project, file);
     return { project, file };
+  });
+  const recentProjectFile = async (input: unknown) => {
+    const file = z.string().min(1).max(32768).parse(input);
+    if (!(await recentProjects.list()).some((entry) => entry.file === file))
+      throw new Error("项目不在最近项目列表中，请使用打开项目");
+    return file;
+  };
+  handle("project:show-location", async (input: unknown) => {
+    const file = z.string().min(1).max(32768).parse(input);
+    if (file !== projectFile) await recentProjectFile(file);
+    await fs.access(file);
+    shell.showItemInFolder(file);
+  });
+  const saveProjectAs = async (project: Project, currentFile: string | null) => {
+    const fileName = project.name.replace(/[<>:"/\\|?*\x00-\x1f]/g, "_");
+    const currentDirectory = currentFile ? path.dirname(currentFile) : null;
+    const directory = currentDirectory && currentFile
+      ? path.basename(currentDirectory) === path.basename(currentFile, path.extname(currentFile))
+        ? path.dirname(currentDirectory)
+        : currentDirectory
+      : defaultProjectDirectory();
+    const result = await dialog.showSaveDialog(window, {
+      title: "工程另存为",
+      defaultPath: path.join(directory, `${fileName}.troncut`),
+      filters: [{ name: "TronCut 工程", extensions: ["troncut"] }],
+    });
+    if (result.canceled || !result.filePath) return null;
+    const selected = result.filePath;
+    const isCurrentFile = currentFile && (process.platform === "win32"
+      ? path.resolve(selected).toLowerCase() === path.resolve(currentFile).toLowerCase()
+      : path.resolve(selected) === path.resolve(currentFile));
+    if (isCurrentFile) {
+      return { project: await saveProject(project, currentFile, projectIcon()), file: currentFile };
+    }
+    const name = path.basename(selected, path.extname(selected)).trim();
+    return saveProjectInDirectory({ ...project, name }, path.dirname(selected), projectIcon());
+  };
+  handle("project:recent:save-as", async (input: unknown) => {
+    const file = await recentProjectFile(input);
+    const result = await saveProjectAs(await openProject(file), file);
+    if (result) await rememberProject(result.project, result.file);
+    return result;
   });
   handle("libraries:list", async () => {
     const libraries = await assetLibraries.list();
@@ -767,56 +820,19 @@ function installHandlers() {
   });
   handle("project:save", async (input: unknown, saveAs: unknown) => {
     const project = authorizedProject(input);
-    let file = projectFile;
-    if (!file || saveAs === true) {
-      const fileName = project.name.replace(/[<>:"/\\|?*\x00-\x1f]/g, "_");
-      const result = await dialog.showSaveDialog(window, {
-        title: saveAs === true ? "工程另存为" : "保存工程",
-        defaultPath:
-          file
-            ? path.join(path.dirname(path.dirname(file)), path.basename(file))
-            : path.join(app.getPath("documents"), `${fileName}.troncut`),
-        filters: [{ name: "TronCut 工程", extensions: ["troncut"] }],
-      });
-      if (result.canceled || !result.filePath) return null;
-      const selected = result.filePath;
-      if (file && path.resolve(selected) === path.resolve(file)) {
-        file = selected;
-      } else {
-        const folderName = path.basename(selected, path.extname(selected));
-        const parent = path.dirname(selected);
-        let root = path.join(parent, folderName);
-        let suffix = 2;
-        // Keep existing project folders intact when the chosen name is reused.
-        while (
-          await fs.access(root).then(
-            () => true,
-            () => false,
-          )
-        )
-          root = path.join(parent, `${folderName}-${suffix++}`);
-        file = path.join(root, `${folderName}.troncut`);
-      }
-      const chosenName = path.basename(selected, path.extname(selected)).trim();
-      if (chosenName) {
-        project.name = chosenName;
-      }
-    } else if (file && (!project.name || project.name === "未命名工程")) {
-      const baseName = path.basename(file, path.extname(file)).trim();
-      if (baseName && baseName !== "未命名工程") {
-        project.name = baseName;
-      }
-    }
-    const icon = app.isPackaged
-      ? path.join(process.resourcesPath, "project.ico")
-      : path.resolve("resources/icon.ico");
-    const saved = registerProject(await saveProject(project, file, icon));
-    projectFile = file;
-    await rememberProject(saved, file);
+    const result = saveAs === true
+      ? await saveProjectAs(project, projectFile)
+      : projectFile
+        ? { project: await saveProject(project, projectFile, projectIcon()), file: projectFile }
+        : await saveProjectInDirectory(project, defaultProjectDirectory(), projectIcon());
+    if (!result) return null;
+    const saved = registerProject(result.project);
+    projectFile = result.file;
+    await rememberProject(saved, result.file);
     await fs.rm(path.join(app.getPath("userData"), "recovery.json"), {
       force: true,
     });
-    return { project: saved, file };
+    return { project: saved, file: result.file };
   });
   handle("project:rename", async (input: unknown, nameInput: unknown) => {
     if (!projectFile) throw new Error("工程尚未保存到文件，无法重命名文件夹");

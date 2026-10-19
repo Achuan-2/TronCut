@@ -75,9 +75,9 @@ for (let run = 0; run < 2; run++) {
         .toEqual([existing]);
     }
     await valid.click({ button: "right" });
-    await expect(page.getByRole("menu", { name: "最近项目操作" })).toHaveCount(
-      0,
-    );
+    await expect(page.getByRole("menuitem", { name: "打开项目位置" })).toBeVisible();
+    await expect(page.getByRole("menuitem", { name: "另存为…" })).toBeVisible();
+    await page.keyboard.press("Escape");
     assert.equal(await fs.readFile(existing, "utf8"), "keep this project file");
     await page.screenshot({ path: path.join(root, `after-${run}.png`) });
   } finally {

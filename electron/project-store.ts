@@ -168,6 +168,33 @@ export async function saveProject(
   };
 }
 
+// Reserve a dedicated folder atomically so concurrent saves never share media
+// or overwrite an existing project, even when their names are identical.
+export async function saveProjectInDirectory(
+  project: Project,
+  directory: string,
+  iconPath?: string,
+): Promise<{ project: Project; file: string }> {
+  const name = project.name
+    .replace(/[<>:"/\\|?*\x00-\x1f]/g, "_")
+    .replace(/[. ]+$/, "")
+    .trim() || "未命名工程";
+  await fs.mkdir(directory, { recursive: true });
+  for (let suffix = 1; ; suffix++) {
+    const folderName = suffix === 1 ? name : `${name}-${suffix}`;
+    const root = path.join(directory, folderName);
+    try {
+      await fs.mkdir(root);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "EEXIST") continue;
+      throw error;
+    }
+    const file = path.join(root, `${folderName}.troncut`);
+    const saved = await saveProject({ ...project, name: folderName }, file, iconPath);
+    return { project: saved, file };
+  }
+}
+
 export async function renameProjectStorage(
   project: Project,
   currentFile: string,

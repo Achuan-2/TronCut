@@ -4187,6 +4187,10 @@ fieldset:disabled {
   padding: 9px 12px;
   color: #c1d5c8;
 }
+.project-context-menu {
+  z-index: 180;
+  -webkit-app-region: no-drag;
+}
 .context-menu hr {
   border: 0;
   border-top: 1px solid #3f5044;
