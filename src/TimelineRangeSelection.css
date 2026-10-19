@@ -24,7 +24,7 @@
   padding: 0;
   border: 0;
   border-radius: 0;
-  cursor: ew-resize;
+  cursor: default;
   touch-action: none;
 }
 .timeline-range-handle.start {
@@ -42,12 +42,19 @@
 .timeline-range-handle.end.collapsed {
   margin-left: 7px;
 }
+.timeline-range-handle.collapsed {
+  height: 16px;
+  clip-path: none;
+}
 .timeline-range-handle > span {
   width: 5px;
   height: 9px;
   border-left: 1px solid #ffffff80;
   border-right: 1px solid #ffffff80;
   margin-bottom: 5px;
+}
+.timeline-range-handle.collapsed > span {
+  margin-bottom: 0;
 }
 .timeline-playhead-handle {
   position: absolute;
@@ -61,11 +68,18 @@
   background: #d3dedf;
   clip-path: polygon(0 0, 100% 0, 100% 65%, 50% 100%, 0 65%);
   pointer-events: auto;
-  cursor: ew-resize;
+  cursor: default;
   touch-action: none;
 }
 .ruler .ruler-playhead {
   z-index: 6;
+}
+.timeline-playhead-handle:hover {
+  background: #d3dedf;
+}
+.timeline-range-handle:hover,
+.timeline-playhead-handle:hover {
+  filter: brightness(1.15);
 }
 .timeline-range-handle:focus-visible,
 .timeline-playhead-handle:focus-visible {
