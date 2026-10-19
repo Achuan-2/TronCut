@@ -20,6 +20,27 @@ export const resizeHandles = [
 const clamp = (value: number, min: number, max: number) =>
   Math.max(min, Math.min(max, value));
 
+export type DragAxis = "x" | "y";
+
+/** Use screen pixels for a zoom-independent dead zone; retain the chosen axis
+ * until Shift is released so crossing the diagonal never flips the direction.
+ */
+export function constrainMoveDelta(
+  delta: { x: number; y: number },
+  shift: boolean,
+  axis: DragAxis | null = null,
+): { x: number; y: number; axis: DragAxis | null } {
+  if (!shift) return { ...delta, axis: null };
+  if (!axis && Math.hypot(delta.x, delta.y) < 3)
+    return { x: 0, y: 0, axis: null };
+  axis ??= Math.abs(delta.x) >= Math.abs(delta.y) ? "x" : "y";
+  return {
+    x: axis === "x" ? delta.x : 0,
+    y: axis === "y" ? delta.y : 0,
+    axis,
+  };
+}
+
 export function dimensionTransform(
   value: Transform,
   size: { width: number; height: number },

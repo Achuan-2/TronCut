@@ -7,11 +7,34 @@ import {
 import {
   cameraAt,
   clampCamera,
+  constrainMoveDelta,
   framePosition,
   resizeTransform,
   setCameraTransform,
 } from "../shared/canvas";
 import { projectDelta } from "../shared/rotation";
+
+it("Shift 拖动在起步后锁定主方向，越过对角线不换轴，松开后可自由移动", () => {
+  expect(constrainMoveDelta({ x: 1, y: 1 }, true)).toEqual({
+    x: 0,
+    y: 0,
+    axis: null,
+  });
+  const horizontal = constrainMoveDelta({ x: -20, y: 4 }, true);
+  expect(horizontal).toEqual({ x: -20, y: 0, axis: "x" });
+  expect(constrainMoveDelta({ x: -6, y: 80 }, true, horizontal.axis)).toEqual({
+    x: -6,
+    y: 0,
+    axis: "x",
+  });
+  const released = constrainMoveDelta({ x: -6, y: 80 }, false, horizontal.axis);
+  expect(released).toEqual({ x: -6, y: 80, axis: null });
+  expect(constrainMoveDelta({ x: -6, y: 80 }, true, released.axis)).toEqual({
+    x: 0,
+    y: 80,
+    axis: "y",
+  });
+});
 
 it("九宫格定位让缩放、三轴旋转和倾斜后的外框对齐画布，居中保留深度", () => {
   const canvas = { width: 1000, height: 600 };

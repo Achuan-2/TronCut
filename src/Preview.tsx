@@ -43,7 +43,13 @@ import {
 import { depthScale } from "../shared/rotation";
 import { mediaFrameRadii } from "../shared/media-frame";
 import { recordingGroups, recordingMaster } from "../shared/recording-objects";
-import { cameraAt, resizeHandles, resizeTransform } from "../shared/canvas";
+import {
+  cameraAt,
+  resizeHandles,
+  resizeTransform,
+  constrainMoveDelta,
+  type DragAxis,
+} from "../shared/canvas";
 import { setVideoZoomPan, unzoomVideoPreview } from "../shared/video-zoom-pan";
 import {
   resizeTextBox,
@@ -233,6 +239,9 @@ function PreviewLayerImpl({
     crop?: Crop;
     originalContent?: ContentTransform;
     content?: ContentTransform;
+    axis?: DragAxis | null;
+    moved?: boolean;
+    toggleSelectionOnClick?: boolean;
   } | null>(null);
   const dragRef = useRef<typeof drag>(null);
 
@@ -469,10 +478,15 @@ function PreviewLayerImpl({
         if (!selectable || event.button !== 0) return;
         event.stopPropagation();
         editor.setPlaying(false);
-        editor.select(
-          clip.id,
-          event.ctrlKey || event.metaKey || event.shiftKey,
-        );
+        // Shift-click still toggles selection. Defer removing a selected object
+        // until release so Shift-drag can constrain it without deselecting it.
+        const toggleSelectionOnClick =
+          event.shiftKey && !event.ctrlKey && !event.metaKey && selectedObjectPart;
+        if (!toggleSelectionOnClick)
+          editor.select(
+            clip.id,
+            event.ctrlKey || event.metaKey || event.shiftKey,
+          );
         if (mode === "crop" && !cropping) return;
         event.currentTarget.setPointerCapture(event.pointerId);
         setGesture({
@@ -482,14 +496,27 @@ function PreviewLayerImpl({
           original: transform,
           value: transform,
           originalContent: clip.contentTransform ?? defaultContentTransform,
+          toggleSelectionOnClick,
         });
       }}
       onPointerMove={(event) => {
-        const gesture = dragRef.current;
-        if (!gesture) return;
+        const previous = dragRef.current;
+        if (!previous) return;
+        const screenDelta = {
+          x: event.clientX - previous.x,
+          y: event.clientY - previous.y,
+        };
+        const gesture = {
+          ...previous,
+          moved: previous.moved || Math.hypot(screenDelta.x, screenDelta.y) >= 3,
+        };
+        const constrained =
+          gesture.mode === "move"
+            ? constrainMoveDelta(screenDelta, event.shiftKey, gesture.axis)
+            : { ...screenDelta, axis: null };
         const delta = {
-          x: (event.clientX - gesture.x) / (scale * cameraScale),
-          y: (event.clientY - gesture.y) / (scale * cameraScale),
+          x: constrained.x / (scale * cameraScale),
+          y: constrained.y / (scale * cameraScale),
         };
         if (gesture.mode === "content") {
           setGesture({
@@ -586,10 +613,15 @@ function PreviewLayerImpl({
                   ),
                 ),
               };
-        setGesture({ ...gesture, value });
+        setGesture({ ...gesture, value, axis: constrained.axis });
       }}
       onPointerUp={() => {
         const drag = dragRef.current;
+        if (drag?.toggleSelectionOnClick && !drag.moved) {
+          editor.select(clip.id, true);
+          setGesture(null);
+          return;
+        }
         if (drag?.mode === "content") {
           if (drag.content)
             editor.updateContentTransform(clip.id, drag.content);
@@ -616,8 +648,12 @@ function PreviewLayerImpl({
           editor.updateTransform(
             clip.id,
             {
-              x: drag.value.x,
-              y: drag.value.y,
+              ...(drag.mode !== "move" || drag.original.x !== drag.value.x
+                ? { x: drag.value.x }
+                : {}),
+              ...(drag.mode !== "move" || drag.original.y !== drag.value.y
+                ? { y: drag.value.y }
+                : {}),
               ...(drag.mode === "resize" && !drag.box
                 ? {
                     scale: drag.value.scale,
