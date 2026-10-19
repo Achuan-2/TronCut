@@ -154,6 +154,7 @@ try {
   await expect(
     page.locator(".timeline-clip.selected .clip-animation"),
   ).toHaveCount(1);
+  const animatedClipId = await page.locator(".timeline-clip.selected").getAttribute("data-clip-id");
   await page.locator(".timeline-clip.selected").click({ button: "right" });
   await expect(
     page.getByRole("button", { name: "添加缩放动画", exact: true }),
@@ -162,7 +163,7 @@ try {
   await expect(page.getByRole("menu", { name: "时间轴对象操作", exact: true })).toHaveCount(0);
   await page.mouse.click(ruler.x + 65 * 3, ruler.y + 12);
   await page
-    .locator(".timeline-clip.selected .animation-arrow")
+    .locator(`.timeline-clip[data-clip-id="${animatedClipId}"] .animation-arrow`)
     .click({ button: "right" });
   await page
     .getByRole("menuitem", { name: "启用缓冲", exact: true })
