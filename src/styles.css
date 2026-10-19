@@ -2769,26 +2769,22 @@ fieldset:disabled {
 }
 .annotation-categories {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 4px;
   padding: 4px;
   border-bottom: 1px solid var(--line);
-  margin-bottom: 16px;
+  margin-bottom: 12px;
 }
 .annotation-categories > button {
   width: 100%;
   min-width: 0;
-  min-height: 62px;
-  flex-direction: column;
-  gap: 5px;
+  min-height: 36px;
   border-radius: 5px;
   border-bottom: 2px solid transparent;
   color: var(--muted);
-  font-size: 11px;
-  padding: 9px 2px;
+  padding: 7px 2px;
 }
 .annotation-categories > button svg { flex-shrink: 0; }
-.annotation-categories > button span { line-height: 16px; }
 .canvas-drawing-overlay {
   position: absolute;
   inset: 0;

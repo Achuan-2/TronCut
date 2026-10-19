@@ -64,11 +64,11 @@ export default function AnnotationsPanel({ editor }: { editor: Editor }) {
             key={id}
             role="tab"
             aria-label={name}
+            title={label}
             aria-selected={category === id}
             onClick={() => setCategory(id as typeof category)}
           >
-            <Icon size={19} />
-            <span>{label}</span>
+            <Icon size={19} aria-hidden="true" />
           </button>
         ))}
       </div>
