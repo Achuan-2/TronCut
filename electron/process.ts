@@ -21,6 +21,8 @@ export function runProcess(
   options: {
     signal?: AbortSignal;
     onLine?: (line: string) => void;
+    /** Consume binary output without buffering or decoding it as text. */
+    onStdout?: (chunk: Buffer) => void;
     cwd?: string;
     timeout?: number;
     env?: NodeJS.ProcessEnv;
@@ -42,6 +44,7 @@ export function runProcess(
       error = "",
       pending = "";
     let timedOut = false;
+    let streamError: Error | undefined;
     const stop = () => {
       if (!child.pid || child.exitCode !== null) return;
       if (process.platform === "win32") {
@@ -75,6 +78,17 @@ export function runProcess(
         }, options.timeout)
       : undefined;
     child.stdout.on("data", (chunk) => {
+      if (options.onStdout) {
+        if (streamError) return;
+        try {
+          options.onStdout(chunk);
+        } catch (error) {
+          streamError =
+            error instanceof Error ? error : new Error(String(error));
+          stop();
+        }
+        return;
+      }
       output = (output + chunk).slice(-2_000_000);
       pending += chunk;
       const lines = pending.split(/\r?\n/);
@@ -91,6 +105,10 @@ export function runProcess(
     child.once("close", (code) => {
       clean();
       if (pending) options.onLine?.(pending);
+      if (streamError) {
+        reject(streamError);
+        return;
+      }
       code === 0 && !options.signal?.aborted && !timedOut
         ? resolve(output)
         : reject(

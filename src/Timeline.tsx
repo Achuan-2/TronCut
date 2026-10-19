@@ -69,7 +69,7 @@ import {
   clipsInTimelineRange,
   editableIds,
 } from "../shared/timeline";
-import { MediaThumbnail } from "./MediaThumbnail";
+import TimelineWaveform from "./TimelineWaveform";
 import { TimelineAnimations } from "./TimelineAnimations";
 import {
   animationRanges,
@@ -1952,27 +1952,13 @@ export default function Timeline({
                               (() => {
                                 const asset = assetsById.get(c.assetId!)!;
                                 return (
-                                  <div className="clip-waveform">
-                                    {mediaSegments(c).map((part, index) => (
-                                      <div
-                                        className="stitch-waveform-range"
-                                        key={index}
-                                        style={{
-                                          left: part.start * zoom,
-                                          width: part.duration / c.speed * zoom,
-                                        }}
-                                      >
-                                        <MediaThumbnail
-                                          asset={asset}
-                                          waveform
-                                          style={{
-                                            width: `${Math.max(c.duration, asset.duration / c.speed) * zoom}px`,
-                                            left: `${(-part.sourceIn / c.speed) * zoom}px`,
-                                          }}
-                                        />
-                                      </div>
-                                    ))}
-                                  </div>
+                                  <TimelineWaveform
+                                    asset={asset}
+                                    clip={c}
+                                    zoom={zoom}
+                                    viewportLeft={viewport.left}
+                                    viewportWidth={viewport.width}
+                                  />
                                 );
                               })()}
                             {stitchBoundaries(c).map((time) => (

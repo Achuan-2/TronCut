@@ -43,7 +43,7 @@ import { downloadOnnxModel } from "./onnx";
 import { closeOnnxSessions } from "./onnx-session";
 import { ClonedVoices, validateVoiceReference } from "./cloned-voices";
 import { createClonedVoiceSchema } from "../shared/cloned-voices";
-import { mediaThumbnail } from "./thumbnails";
+import { mediaThumbnail, mediaWaveform } from "./thumbnails";
 import { serveMediaFile } from "./media-protocol";
 import { mediaAssetUrl } from "../shared/media-url";
 import { PreviewProxyService } from "./preview-proxies";
@@ -804,6 +804,13 @@ function installHandlers() {
     mediaThumbnail(
       assetById(id),
       z.boolean().parse(waveform),
+      path.join(app.getPath("userData"), "thumbnails"),
+      process.resourcesPath,
+    ),
+  );
+  handle("media:waveform", (id: unknown) =>
+    mediaWaveform(
+      assetById(id),
       path.join(app.getPath("userData"), "thumbnails"),
       process.resourcesPath,
     ),

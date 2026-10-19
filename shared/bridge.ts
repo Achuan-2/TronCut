@@ -1,4 +1,5 @@
 import type { Asset, Project } from "./model";
+import type { AudioWaveform } from "./audio-waveform";
 import type { AssetLibrary } from "./asset-libraries";
 import type { Cue } from "./subtitles";
 import type { SpeechEngine, SpeechOptions } from "./asr";
@@ -119,6 +120,7 @@ export interface FrameCraftBridge {
   relinkMedia(assetId: string, requiredDuration: number): Promise<Asset | null>;
   updateMedia(assetId: string, requiredDuration: number): Promise<Asset | null>;
   mediaThumbnail(assetId: string, waveform: boolean): Promise<string | null>;
+  mediaWaveform(assetId: string): Promise<AudioWaveform | null>;
   mediaUrl(assetId: string): Promise<string>;
   previewProxyAvailable(assetId: string): Promise<boolean>;
   onPreviewProxyReady(callback: (assetId: string) => void): () => void;

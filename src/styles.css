@@ -898,16 +898,10 @@ fieldset:disabled {
   opacity: 0.5;
   pointer-events: none;
 }
-.clip-waveform .waveform-image {
+.timeline-waveform {
   position: absolute;
   height: 20px;
   top: 0;
-}
-.stitch-waveform-range {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  overflow: hidden;
 }
 .stitch-seam {
   position: absolute;
