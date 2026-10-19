@@ -48,6 +48,7 @@ import { hasBehaviors } from "../shared/behaviors";
 import BehaviorsPanel from "./BehaviorsPanel";
 import BehaviorProperties from "./BehaviorProperties";
 import TextFillFields from "./TextFillFields";
+import TextFormatFields from "./TextFormatFields";
 import FontSelect from "./FontSelect";
 import TextPresetPicker from "./TextPresetPicker";
 import { characterStyleAt } from "../shared/rich-text";
@@ -690,13 +691,18 @@ export function Inspector({ editor }: { editor: Editor }) {
                   disabled={locked}
                   onSelect={(preset) => {
                     if (locked) return;
-                    const { fontFamily, color, outline, outlineWidth } =
-                      preset.style;
+                    const {
+                      fontFamily, color, outline, outlineWidth,
+                      bold, italic, underline,
+                    } = preset.style;
                     const characterPatch = {
                       fontFamily,
                       color,
                       outline,
                       outlineWidth,
+                      bold: bold !== false,
+                      italic: !!italic,
+                      underline: !!underline,
                     };
                     if (textSelection) {
                       editor.updateCharacterStyle(c.id, characterPatch);
@@ -760,6 +766,11 @@ export function Inspector({ editor }: { editor: Editor }) {
                   20,
                 )}
                 <FontSelect value={characterStyle?.fontFamily ?? "Microsoft YaHei"} onChange={(fontFamily) => editor.updateCharacterStyle(c.id, { fontFamily })} />
+                <TextFormatFields
+                  style={characterStyle}
+                  disabled={locked}
+                  onChange={(patch) => editor.updateCharacterStyle(c.id, patch)}
+                />
                 <label className="check-field">
                   <input
                     type="checkbox"

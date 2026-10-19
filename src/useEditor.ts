@@ -729,8 +729,12 @@ export function useEditor(
         ? textSelection : null;
       if (range) {
         // A local geometry edit must not refit and resize the unselected text.
-        const changesMetrics = patch.fontSize !== undefined ||
-          patch.fontFamily !== undefined || patch.outlineWidth !== undefined;
+        const changesMetrics =
+          patch.fontSize !== undefined ||
+          patch.fontFamily !== undefined ||
+          patch.outlineWidth !== undefined ||
+          patch.bold !== undefined ||
+          patch.italic !== undefined;
         updateClip(id, (clip) => ({
           ...applyCharacterStyle(clip, range, patch),
           ...(changesMetrics ? { autoResizeText: false } : {}),

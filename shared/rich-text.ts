@@ -6,6 +6,9 @@ type TextRun = NonNullable<Clip["textRuns"]>[number];
 export const characterStyleKeys = [
   "fontFamily",
   "fontSize",
+  "bold",
+  "italic",
+  "underline",
   "color",
   "outline",
   "outlineWidth",

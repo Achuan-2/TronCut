@@ -55,6 +55,10 @@ delete env.ELECTRON_RUN_AS_NODE;
 const app = await electron.launch({ args: ["."], env });
 try {
   const page = await app.firstWindow();
+  await app.evaluate(({ BrowserWindow }) =>
+    BrowserWindow.getAllWindows()[0].focus(),
+  );
+  await page.bringToFront();
   const errors = [];
   page.on("pageerror", (error) => errors.push(error.message));
   await page.getByRole("button", { name: "恢复编辑", exact: true }).click();
@@ -195,14 +199,107 @@ try {
   await page.locator(".timeline-clip.text").click();
   await expect(content).toHaveValue("\nX😀甲乙丙丁");
   await expect(glyphs.nth(3)).toHaveCSS("font-family", /SimSun/);
+  // Formatting applies only to the actual textarea selection and survives
+  // switching to the canvas editor without losing that selection on a click.
+  await content.focus();
+  await content.press("Control+End");
+  await content.press("Shift+ArrowLeft");
+  await content.press("Shift+ArrowLeft");
+  const bold = page.getByRole("button", { name: "加粗", exact: true });
+  const italic = page.getByRole("button", { name: "斜体", exact: true });
+  const underline = page.getByRole("button", { name: "下划线", exact: true });
+  await expect(bold).toHaveAttribute("aria-pressed", "true");
+  await bold.click();
+  await italic.click();
+  await underline.click();
+  for (const index of [4, 5]) {
+    await expect(glyphs.nth(index)).toHaveCSS("font-weight", "400");
+    await expect(glyphs.nth(index)).toHaveCSS("font-style", "italic");
+    await expect(glyphs.nth(index)).toHaveCSS(
+      "text-decoration-line",
+      "underline",
+    );
+  }
+  await expect(glyphs.nth(3)).toHaveCSS("font-weight", "700");
+  await expect(glyphs.nth(3)).toHaveCSS("text-decoration-line", "none");
+  await page.locator(".preview-layer.text").dblclick();
+  await expect(canvas).toBeVisible();
+  await canvas.press("Control+End");
+  await canvas.press("Shift+ArrowLeft");
+  await expect(page.locator(".text-selection-status")).toContainText(
+    "已选中 1 个字符",
+  );
+  await underline.click();
+  await italic.click();
+  await expect(canvas).toBeFocused();
+  await expect(canvas.locator("span").last()).toHaveCSS(
+    "text-decoration-line",
+    "none",
+  );
+  await expect(canvas.locator("span").last()).toHaveCSS("font-style", "normal");
+  await canvas.press("Control+Enter");
+  await expect(glyphs.nth(4)).toHaveCSS("text-decoration-line", "underline");
+  await expect(glyphs.nth(5)).toHaveCSS("text-decoration-line", "none");
+  await page.getByTitle("撤销 Ctrl+Z", { exact: true }).click();
+  await expect(glyphs.nth(5)).toHaveCSS("font-style", "italic");
+  await page.getByTitle("重做 Ctrl+Shift+Z", { exact: true }).click();
+  await expect(glyphs.nth(5)).toHaveCSS("font-style", "normal");
+  await page.getByRole("button", { name: "保存", exact: true }).click();
+  await expect
+    .poll(
+      async () =>
+        JSON.parse(await fs.readFile(file, "utf8")).clips[0].textRuns.at(-1)
+          .style,
+    )
+    .toEqual({ bold: false, italic: false, underline: false });
+  await page.getByRole("button", { name: "返回首页", exact: true }).click();
+  await page.locator(".recent-project").first().click();
+  await page.locator(".timeline-clip.text").click();
+  await expect(glyphs.nth(4)).toHaveCSS("text-decoration-line", "underline");
+  await expect(glyphs.nth(5)).toHaveCSS("font-weight", "400");
+  await expect(glyphs.nth(5)).toHaveCSS("text-decoration-line", "none");
+  await content.focus();
+  await content.press("Control+End");
+  await expect(page.locator(".text-selection-status")).toContainText(
+    "未选择时应用于整段",
+  );
+  await underline.click();
+  await expect(glyphs.nth(5)).toHaveCSS("text-decoration-line", "underline");
+  await page.locator(".preview-layer.text").dblclick();
+  await canvas.press("Control+End");
+  await canvas.press("Shift+ArrowLeft");
+  await underline.click();
+  await expect(canvas.locator("span").last()).toHaveCSS(
+    "text-decoration-line",
+    "none",
+  );
+  await canvas.press("Control+Enter");
+  await expect(glyphs.nth(4)).toHaveCSS("text-decoration-line", "underline");
+  await expect(glyphs.nth(5)).toHaveCSS("text-decoration-line", "none");
+  await page.getByRole("button", { name: "保存", exact: true }).click();
+  await expect(page.locator(".busy-overlay")).toHaveCount(0);
+  await page
+    .getByRole("group", { name: "文字格式", exact: true })
+    .scrollIntoViewIfNeeded();
+  await page.screenshot({ path: path.join(root, "text-format.png") });
+  const formatted = JSON.parse(await fs.readFile(file, "utf8"));
+  expect(formatted.clips[0].style.underline).toBe(true);
+  expect(formatted.clips[0].textRuns.at(-1).style.underline).toBe(false);
   expect(errors).toEqual([]);
   console.log(
     JSON.stringify(
-      { root, fontCount, textRuns: saved.clips[0].textRuns, errors },
+      { root, fontCount, textRuns: formatted.clips[0].textRuns, errors },
       null,
       2,
     ),
   );
+} catch (error) {
+  const page = await app.firstWindow();
+  await page
+    .screenshot({ path: path.join(root, "failure.png") })
+    .catch(() => {});
+  console.error(await page.locator(".font-select-error").allTextContents());
+  throw error;
 } finally {
   await app.close();
 }

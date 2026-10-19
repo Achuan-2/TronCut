@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { Check, ChevronDown } from "lucide-react";
 import type { TextStyle } from "../shared/model";
+import { textFormatCss } from "../shared/text-format";
 import type { TextPreset } from "../shared/preset-library";
 
 function matchesPreset(style: TextStyle | undefined, preset: TextPreset) {
@@ -9,13 +10,17 @@ function matchesPreset(style: TextStyle | undefined, preset: TextPreset) {
     style.fontFamily === preset.style.fontFamily &&
     style.color.toLowerCase() === preset.style.color.toLowerCase() &&
     style.outline.toLowerCase() === preset.style.outline.toLowerCase() &&
-    style.outlineWidth === preset.style.outlineWidth
+    style.outlineWidth === preset.style.outlineWidth &&
+    (style.bold !== false) === (preset.style.bold !== false) &&
+    !!style.italic === !!preset.style.italic &&
+    !!style.underline === !!preset.style.underline
   );
 }
 
 function sampleStyle(style: TextStyle): CSSProperties {
   const fontFamily = style.fontFamily.replace(/["\\]/g, "");
   return {
+    ...textFormatCss(style),
     color: style.color,
     fontFamily: `"${fontFamily}", "Microsoft YaHei", sans-serif`,
     WebkitTextStroke: `${Math.min(1.8, style.outlineWidth * 0.3)}px ${style.outline}`,

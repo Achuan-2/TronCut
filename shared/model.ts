@@ -82,6 +82,10 @@ export const styleSchema = z.object({
   outline: z.string().regex(/^#[\da-f]{6}$/i),
   outlineWidth: finite.min(0).max(20),
   fontFamily: z.string().max(100),
+  // Missing bold retains the appearance of projects created before formatting controls.
+  bold: z.boolean().optional(),
+  italic: z.boolean().optional(),
+  underline: z.boolean().optional(),
   fill: z
     .string()
     .regex(/^#[\da-f]{6}$/i)
@@ -92,9 +96,18 @@ export const styleSchema = z.object({
   fillPaddingY: finite.min(0).max(200).optional(),
   fillRadius: finite.min(0).max(200).optional(),
 });
-export const characterStyleSchema = styleSchema.pick({
-  fontSize: true, fontFamily: true, color: true, outline: true, outlineWidth: true,
-}).partial();
+export const characterStyleSchema = styleSchema
+  .pick({
+    fontSize: true,
+    fontFamily: true,
+    color: true,
+    outline: true,
+    outlineWidth: true,
+    bold: true,
+    italic: true,
+    underline: true,
+  })
+  .partial();
 export type CharacterStyle = z.infer<typeof characterStyleSchema>;
 export const textRunSchema = z.object({
   // Offsets use UTF-16, matching DOM selections and JavaScript strings.

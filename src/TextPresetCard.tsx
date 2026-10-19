@@ -3,6 +3,7 @@ import { annotationMime, type AnnotationTemplate } from "../shared/annotations";
 import type { TextPreset } from "../shared/preset-library";
 import type { Editor } from "./useEditor";
 import PresetTile from "./PresetTile";
+import { textFormatCss } from "../shared/text-format";
 
 export default function TextPresetCard({
   preset,
@@ -37,6 +38,7 @@ export default function TextPresetCard({
       >
         <span
           style={{
+            ...textFormatCss(preset.style),
             color: preset.style.color,
             fontFamily: preset.style.fontFamily,
             WebkitTextStroke: `${preset.style.outlineWidth / 2}px ${preset.style.outline}`,

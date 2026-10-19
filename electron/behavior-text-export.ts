@@ -11,19 +11,8 @@ import { textFrameSize, textFillGeometry } from "../shared/text";
 import { textFillRectangle } from "./text-fill";
 import { outlinedText } from "./text-outline";
 import { layoutStyledText } from "../shared/rich-text";
+import { textPangoFont, textPangoMarkup } from "../shared/text-format";
 
-const xml = (text: string) =>
-  text.replace(
-    /[&<>"']/g,
-    (value) =>
-      ({
-        "&": "&amp;",
-        "<": "&lt;",
-        ">": "&gt;",
-        '"': "&quot;",
-        "'": "&apos;",
-      })[value]!,
-  );
 /** Rasterize only changing glyph poses. Long stationary sections share one PNG
  * in the concat input rather than producing thousands of identical frames. */
 export async function rasterizeBehaviorText(
@@ -44,8 +33,10 @@ export async function rasterizeBehaviorText(
   const textBuffer = (text: string, glyphStyle: TextStyle, resolution = 1) =>
     sharp({
       text: {
-        text: xml(text),
-        font: `${glyphStyle.fontFamily} Bold ${glyphStyle.fontSize * resolution}`,
+        // Draw decorations in line coordinates below; a whitespace-only Pango
+        // mask has no ascent and would otherwise centre its underline vertically.
+        text: textPangoMarkup(text, { ...glyphStyle, underline: false }),
+        font: textPangoFont(glyphStyle, resolution),
         rgba: true,
         dpi: 72,
       },
@@ -53,19 +44,25 @@ export async function rasterizeBehaviorText(
       .png()
       .toBuffer();
   const widths = new Map<string, number>();
-  const fontKey = (style: TextStyle) => JSON.stringify([style.fontFamily, style.fontSize]);
+  const fontKey = (style: TextStyle) =>
+    JSON.stringify([style.fontFamily, style.fontSize, style.bold !== false, !!style.italic]);
   const measureKey = (text: string, style: TextStyle) => JSON.stringify([text, fontKey(style)]);
   const sentinels = new Map<string, number>();
   const measure = async (text: string, style: TextStyle) => {
     const key = measureKey(text, style);
     if (widths.has(key)) return;
     checkCancelled();
-    if (!sentinels.has(fontKey(style))) sentinels.set(fontKey(style), (await sharp(await textBuffer("|", style)).metadata()).width!);
+    // Enclose both sides so Pango's ink crop retains leading/trailing spaces.
+    if (!sentinels.has(fontKey(style)))
+      sentinels.set(
+        fontKey(style),
+        (await sharp(await textBuffer("||", style)).metadata()).width!,
+      );
     widths.set(
       key,
       Math.max(
         0,
-        (await sharp(await textBuffer(text + "|", style)).metadata()).width! -
+        (await sharp(await textBuffer("|" + text + "|", style)).metadata()).width! -
           sentinels.get(fontKey(style))!,
       ),
     );
@@ -142,9 +139,15 @@ export async function rasterizeBehaviorText(
         .map((glyph, index) => {
           const image = images.get(glyphKey(glyph)),
             motion = motions[index];
-          if (!image || motion.opacity <= 0) return "";
+          if ((!image && !glyph.style.underline) || motion.opacity <= 0) return "";
           const { a, b, c, d } = rotationMatrix(motion);
-          return `<g opacity="${motion.opacity}" transform="translate(${left + glyph.x + motion.x * fontSize} ${top + glyph.y + motion.y * fontSize}) matrix(${a} ${b} ${c} ${d} 0 0) scale(${motion.scale})"><image x="${-image.width / 2}" y="${-image.height / 2}" width="${image.width}" height="${image.height}" href="data:image/png;base64,${image.data}"/></g>`;
+          const texture = image
+            ? `<image x="${-image.width / 2}" y="${-image.height / 2}" width="${image.width}" height="${image.height}" href="data:image/png;base64,${image.data}"/>`
+            : "";
+          const underline = glyph.style.underline
+            ? `<rect x="${-glyph.width / 2}" y="${glyph.style.fontSize * 0.4}" width="${glyph.width}" height="${Math.max(1, glyph.style.fontSize * 0.06)}" fill="${glyph.style.color}"/>`
+            : "";
+          return `<g opacity="${motion.opacity}" transform="translate(${left + glyph.x + motion.x * fontSize} ${top + glyph.y + motion.y * fontSize}) matrix(${a} ${b} ${c} ${d} 0 0) scale(${motion.scale})">${texture}${underline}</g>`;
         })
         .join("");
       await sharp(

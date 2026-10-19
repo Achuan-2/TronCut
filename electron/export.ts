@@ -33,6 +33,7 @@ import { rasterizeAnnotation, rasterizeDrawing, regionAnnotationFilters } from "
 import { textFillRectangle } from "./text-fill";
 import { outlinedText } from "./text-outline";
 import { textFrameSize, textFillGeometry } from "../shared/text";
+import { textPangoFont, textPangoMarkup } from "../shared/text-format";
 import { isTrackActive } from "../shared/tracks";
 import { visualEffectFilters, effectAmountExpression } from "./visual-effects-export";
 import { visualEffectPadding } from "../shared/visual-effect-svg";
@@ -84,18 +85,6 @@ function softwareEncoder(settings: Required<ExportSettings>) {
   ];
 }
 
-const xml = (s: string) =>
-  s.replace(
-    /[&<>"']/g,
-    (c) =>
-      ({
-        "&": "&amp;",
-        "<": "&lt;",
-        ">": "&gt;",
-        '"': "&quot;",
-        "'": "&apos;",
-      })[c]!,
-  );
 export function expression(
   clip: Pick<
     Clip,
@@ -311,8 +300,8 @@ async function rasterize(
   // Pango measures actual glyphs, so Chinese text does not get clipped by a character-count estimate.
   const text = await sharp({
     text: {
-      text: xml(clip.text ?? "") || " ",
-      font: `${style.fontFamily} Bold ${style.fontSize}`,
+      text: textPangoMarkup(clip.text || " ", style),
+      font: textPangoFont(style),
       rgba: true,
       spacing: 0,
       align: "centre",

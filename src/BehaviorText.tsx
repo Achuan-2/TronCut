@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import type { Clip } from "../shared/model";
+import { textFormatCss } from "../shared/text-format";
 import { clipsBehaviorText, glyphMotion } from "../shared/behaviors";
 import { styledTextLayout, textBoxFor } from "./text";
 
@@ -41,6 +42,7 @@ export default function BehaviorText({
             key={glyph.index}
             style={{
               position: "absolute",
+              ...textFormatCss(glyph.style),
               fontFamily: `"${glyph.style.fontFamily.replace(/["\\]/g, "")}", "PingFang SC", sans-serif`,
               fontSize: glyph.style.fontSize * scale,
               color: glyph.style.color,

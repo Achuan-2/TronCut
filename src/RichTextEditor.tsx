@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef } from "react";
 import type { Clip } from "../shared/model";
+import { textFormatCss } from "../shared/text-format";
 import {
   textSegments,
   characterStyleAt,
@@ -86,6 +87,7 @@ export default function RichTextEditor({
         style = characterStyleAt(clip, run.start);
       span.textContent = (clip.text ?? "").slice(run.start, run.end);
       Object.assign(span.style, {
+        ...textFormatCss(style),
         fontFamily: `"${style.fontFamily.replace(/["\\]/g, "")}", "PingFang SC", sans-serif`,
         fontSize: `${style.fontSize * scale}px`,
         color: style.color,

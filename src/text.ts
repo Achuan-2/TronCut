@@ -1,12 +1,13 @@
 import type { Clip, TextStyle } from "../shared/model";
 import { fitTextFont, textFrameSize, type TextBox } from "../shared/text";
 import { layoutStyledText } from "../shared/rich-text";
+import { textCanvasFont } from "../shared/text-format";
 
 let context: CanvasRenderingContext2D | null;
 export function measureStyledText(text: string, style: TextStyle) {
   context ??= document.createElement("canvas").getContext("2d");
   if (!context) throw new Error("无法测量文字尺寸");
-  context.font = `700 ${style.fontSize}px "${style.fontFamily.replace(/["\\]/g, "")}", "PingFang SC", sans-serif`;
+  context.font = textCanvasFont(style);
   return context.measureText(text).width;
 }
 export const styledTextLayout = (clip: Clip) =>
@@ -14,7 +15,7 @@ export const styledTextLayout = (clip: Clip) =>
 function textMeasure(clip: Clip, fontSize: number) {
   context ??= document.createElement("canvas").getContext("2d");
   if (!context) throw new Error("无法测量文字尺寸");
-  context.font = `700 ${fontSize}px "${(clip.style?.fontFamily ?? "Microsoft YaHei").replace(/["\\]/g, "")}", "PingFang SC", sans-serif`;
+  context.font = textCanvasFont({ ...clip.style!, fontSize });
   return (line: string) => context!.measureText(line).width;
 }
 
@@ -79,6 +80,8 @@ export function fitUpdatedText(before: Clip, next: Clip): Clip {
     before.textBox === next.textBox &&
     before.style?.fontFamily === next.style.fontFamily &&
     before.style?.fontSize === next.style.fontSize &&
+    before.style?.bold === next.style.bold &&
+    before.style?.italic === next.style.italic &&
     before.style?.outlineWidth === next.style.outlineWidth
   )
     return next;

@@ -89,6 +89,7 @@ import type { Region } from "../shared/visual-effects";
 import { effectActive } from "../shared/effect-timing";
 import BehaviorText from "./BehaviorText";
 import RichTextEditor from "./RichTextEditor";
+import { textFormatCss } from "../shared/text-format";
 import {
   annotationSvgBody,
   drawingProgress,
@@ -758,7 +759,13 @@ function PreviewLayerImpl({
             className="preview-text-content"
             style={{
               fontFamily: `${clip.style?.fontFamily}, "PingFang SC", sans-serif`,
-              fontWeight: 700,
+              ...textFormatCss(clip.style),
+              // Decorations propagate through descendants and cannot be cancelled
+              // by a run, so styled/editor spans own their underlines.
+              textDecoration:
+                editing || clip.behaviors?.length || clip.textRuns?.length
+                  ? "none"
+                  : textFormatCss(clip.style).textDecoration,
               fontSize: (drag?.fontSize ?? clip.style?.fontSize ?? 68) * scale,
               color: clip.style?.color,
               WebkitTextStroke: `${(clip.style?.outlineWidth ?? 0) * scale}px ${clip.style?.outline}`,

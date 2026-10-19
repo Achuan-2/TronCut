@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import FontSelect from "./FontSelect";
+import TextFormatFields from "./TextFormatFields";
 import {
   AudioLines,
   Download,
@@ -699,6 +700,15 @@ export default function CaptionsPanel({
 
             {dialog === "style" && (
               <>
+                <TextFormatFields
+                  style={style.text}
+                  onChange={(patch) =>
+                    setStyle((value) => ({
+                      ...value,
+                      text: { ...value.text, ...patch },
+                    }))
+                  }
+                />
                 <FontSelect
                     value={style.text.fontFamily}
                     onChange={(fontFamily) =>
