@@ -1,5 +1,5 @@
 import { _electron as electron, expect } from "@playwright/test";
-import { setTimelineZoom } from "./timeline-zoom.mjs";
+import { setTimelineZoom, timelineZoom } from "./timeline-zoom.mjs";
 import { build } from "esbuild";
 import fs from "node:fs/promises";
 import path from "node:path";
@@ -63,9 +63,11 @@ project.clips = [
     duration: 2,
   },
 ];
+const projectFile = path.join(root, "project.troncut");
+await fs.writeFile(projectFile, JSON.stringify(project));
 await fs.writeFile(
   path.join(profile, "recovery.json"),
-  JSON.stringify({ project, file: null }),
+  JSON.stringify({ project, file: projectFile }),
 );
 const env = {
   ...process.env,
@@ -78,13 +80,9 @@ try {
   const page = await app.firstWindow();
   const errors = [];
   page.on("pageerror", (error) => errors.push(error.message));
-  await app.evaluate(({ BrowserWindow, dialog }, root) => {
+  await app.evaluate(({ BrowserWindow }) => {
     BrowserWindow.getAllWindows()[0].setSize(1440, 950);
-    dialog.showSaveDialog = async () => ({
-      canceled: false,
-      filePath: `${root}/edited.troncut`,
-    });
-  }, root);
+  });
   await page.getByRole("button", { name: "恢复编辑", exact: true }).click();
   await setTimelineZoom(page, 60);
   const scroll = page.locator(".timeline-scroll");
@@ -94,8 +92,9 @@ try {
   const save = async () => {
     await page.getByRole("button", { name: "保存", exact: true }).click();
     await expect(page.locator(".busy-overlay")).toHaveCount(0);
+    await expect(page.locator(".project-save-state")).not.toContainText("*");
     return JSON.parse(
-      await fs.readFile(path.join(root, "edited", "edited.troncut"), "utf8"),
+      await fs.readFile(projectFile, "utf8"),
     );
   };
   await page
@@ -131,14 +130,14 @@ try {
   const head = page.getByRole("button", { name: "播放头", exact: true });
   const seek = async (time) => {
     const bounds = await page.locator(".ruler").boundingBox();
-    await page.mouse.click(bounds.x + time * 60, bounds.y + 29);
+    await page.mouse.click(bounds.x + time * await timelineZoom(page), bounds.y + 29);
   };
   const dragEnd = async (seconds) => {
     const bounds = await end.boundingBox();
     await page.mouse.move(bounds.x + bounds.width / 2, bounds.y + 5);
     await page.mouse.down();
     await page.mouse.move(
-      bounds.x + bounds.width / 2 + seconds * 60,
+      bounds.x + bounds.width / 2 + seconds * await timelineZoom(page),
       bounds.y + 5,
       { steps: 12 },
     );
@@ -198,7 +197,7 @@ try {
   const bounds = await start.boundingBox();
   await page.mouse.move(bounds.x + 5, bounds.y + 5);
   await page.mouse.down();
-  await page.mouse.move(bounds.x + 5 - 60, bounds.y + 5, { steps: 8 });
+  await page.mouse.move(bounds.x + 5 - await timelineZoom(page), bounds.y + 5, { steps: 8 });
   await page.mouse.up();
   await expect(overlay).toHaveAttribute("data-start", "2");
   await head.dblclick();

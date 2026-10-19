@@ -293,7 +293,26 @@ export default function Timeline({
         ),
       [project.clips, project.markers],
     ),
-    width = duration * zoom;
+    // The overlay handles no longer extend the scroll pane's intrinsic width.
+    width = duration * zoom + 19;
+  const [rangeHandleContainer, setRangeHandleContainer] =
+    useState<HTMLDivElement | null>(null);
+  const syncRangeHandles = useCallback((element: HTMLDivElement) => {
+    if (!rangeHandleContainer) return;
+    // Match native scrolling immediately; React's viewport update can follow.
+    rangeHandleContainer.style.transform = `translateX(${-element.scrollLeft}px)`;
+    rangeHandleContainer.parentElement!.style.width = `${element.clientWidth}px`;
+  }, [rangeHandleContainer]);
+  const revealRangeTime = useCallback((time: number) => {
+    const element = scroll.current;
+    if (!element) return;
+    const x = time * zoom;
+    if (x - 19 < element.scrollLeft)
+      element.scrollLeft = Math.max(0, x - 19);
+    else if (x + 19 > element.scrollLeft + element.clientWidth)
+      element.scrollLeft = x + 19 - element.clientWidth;
+    syncRangeHandles(element);
+  }, [zoom, syncRangeHandles]);
   const minimumZoom = timelineFitZoom(duration, viewport.width);
   const maximumZoom = Math.max(minimumZoom, timelineZoomMax);
   const changeZoom = useCallback((next: number) => {
@@ -685,6 +704,7 @@ export default function Timeline({
     const labels = headers.current;
     if (!element || !labels) return;
     const syncGeometry = () => {
+      syncRangeHandles(element);
       // The clip pane's horizontal scrollbar shortens its vertical viewport.
       // Reserve the same space on the labels so both scroll ranges stay equal.
       labels.style.paddingBottom = `${element.offsetHeight - element.clientHeight}px`;
@@ -700,7 +720,7 @@ export default function Timeline({
     const observer = new ResizeObserver(syncGeometry);
     observer.observe(element);
     return () => observer.disconnect();
-  }, [layoutKey, width]);
+  }, [layoutKey, width, syncRangeHandles]);
   const locked =
     selected && project.tracks.find((t) => t.id === selected.trackId)?.locked;
   function selectedCaptions(id: string) {
@@ -962,6 +982,9 @@ export default function Timeline({
       </div>
       <GroupTimelineNavigation editor={editor} />
       <div className="timeline-body">
+        <div className="timeline-ruler-overlay">
+          <div className="timeline-range-handle-scroll" ref={setRangeHandleContainer} />
+        </div>
         <div
           className="track-headers"
           ref={headers}
@@ -1201,6 +1224,7 @@ export default function Timeline({
             );
           }}
           onScroll={(event) => {
+            syncRangeHandles(event.currentTarget);
             setViewport({
               left: event.currentTarget.scrollLeft,
               width: event.currentTarget.clientWidth,
@@ -1351,6 +1375,8 @@ export default function Timeline({
                 editor={editor}
                 zoom={zoom}
                 maxTime={duration}
+                handleContainer={rangeHandleContainer}
+                onRevealTime={revealRangeTime}
               />
             </div>
             {fileDrop && (

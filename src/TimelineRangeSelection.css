@@ -73,7 +73,7 @@
   cursor: default;
   touch-action: none;
 }
-.ruler .ruler-playhead {
+.timeline-ruler-overlay .ruler-playhead {
   z-index: 6;
 }
 .timeline-playhead-handle:hover {
@@ -86,4 +86,20 @@
 .timeline-range-handle:focus-visible,
 .timeline-playhead-handle:focus-visible {
   filter: brightness(1.4);
+}
+.timeline-ruler-overlay {
+  position: absolute;
+  z-index: 10;
+  top: 0;
+  left: var(--timeline-header-width);
+  right: 0;
+  height: 36px;
+  /* Leave room for the start handle without covering the track toolbar. */
+  clip-path: inset(0 0 0 -19px);
+  pointer-events: none;
+}
+.timeline-range-handle-scroll {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
 }

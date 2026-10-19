@@ -1,4 +1,5 @@
 import { useRef, type MouseEvent, type PointerEvent } from "react";
+import { createPortal } from "react-dom";
 import { useEditorPlayhead, type Editor } from "./useEditor";
 import { timeLabel } from "./Preview";
 import type { TimelineRange } from "../shared/timeline-range";
@@ -9,10 +10,14 @@ export function TimelineRangeHandles({
   editor,
   zoom,
   maxTime,
+  handleContainer,
+  onRevealTime,
 }: {
   editor: Editor;
   zoom: number;
   maxTime: number;
+  handleContainer: HTMLElement | null;
+  onRevealTime: (time: number) => void;
 }) {
   const playhead = useEditorPlayhead(editor);
   const range = editor.timelineRange ?? { start: playhead, end: playhead };
@@ -40,7 +45,9 @@ export function TimelineRangeHandles({
           : { start: anchor.start, end: Math.max(frame, anchor.start) };
       editor.setTimelineRange(next);
       editor.seek(part === "start" ? next.start : next.end);
+      return next[part];
     }
+    return frame;
   };
   const move = (event: PointerEvent<HTMLButtonElement>) => {
     const active = drag.current;
@@ -95,70 +102,72 @@ export function TimelineRangeHandles({
           }}
         />
       )}
-      {/* Keep the cursor and its handles in one transformed coordinate space. */}
-      <div
-        className="ruler-playhead"
-        style={{ transform: `translateX(${playhead * zoom}px)` }}
-      >
-        {(["start", "end"] as const).map((part) => {
-          // Each endpoint folds independently when it meets the playhead.
-          const collapsed = Math.abs(range[part] - playhead) * zoom < 0.5;
-          return (
+      {/* Keep handles together, outside the scroll pane's left clipping edge. */}
+      {handleContainer &&
+        createPortal(
+          <div
+            className="ruler-playhead"
+            style={{ transform: `translateX(${playhead * zoom}px)` }}
+          >
+            {(["start", "end"] as const).map((part) => {
+              // Each endpoint folds independently when it meets the playhead.
+              const collapsed = Math.abs(range[part] - playhead) * zoom < 0.5;
+              return (
+                <button
+                  key={part}
+                  role="slider"
+                  aria-label={part === "start" ? "范围起点" : "范围终点"}
+                  aria-valuemin={0}
+                  aria-valuemax={maxTime}
+                  aria-valuenow={range[part]}
+                  aria-valuetext={timeLabel(range[part])}
+                  title={`${part === "start" ? "起点" : "终点"} ${timeLabel(range[part])} · 拖动选择范围`}
+                  className={`timeline-range-handle ${part} ${collapsed ? "collapsed" : "expanded"}`}
+                  style={{
+                    left: (range[part] - playhead) * zoom,
+                  }}
+                  {...pointerProps(part)}
+                  onKeyDown={(event) => {
+                    if (
+                      !["ArrowLeft", "ArrowRight", "Home", "End"].includes(
+                        event.key,
+                      )
+                    )
+                      return;
+                    event.preventDefault();
+                    event.stopPropagation();
+                    editor.setPlaying(false);
+                    editor.select(null);
+                    const step =
+                      (event.shiftKey ? 10 : 1) / editor.project.canvas.fps;
+                    const time =
+                      event.key === "Home"
+                        ? 0
+                        : event.key === "End"
+                          ? maxTime
+                          : range[part] +
+                            (event.key === "ArrowLeft" ? -step : step);
+                    onRevealTime(update(part, time, range));
+                  }}
+                >
+                  <span />
+                </button>
+              );
+            })}
             <button
-              key={part}
-              role="slider"
-              aria-label={part === "start" ? "范围起点" : "范围终点"}
-              aria-valuemin={0}
-              aria-valuemax={maxTime}
-              aria-valuenow={range[part]}
-              aria-valuetext={timeLabel(range[part])}
-              title={`${part === "start" ? "起点" : "终点"} ${timeLabel(range[part])} · 拖动选择范围`}
-              className={`timeline-range-handle ${part} ${collapsed ? "collapsed" : "expanded"}`}
-              style={{
-                left:
-                  (part === "start"
-                    ? Math.max(collapsed ? 19 : 12, range.start * zoom)
-                    : range.end * zoom +
-                      (collapsed && playhead * zoom < 19 ? 12 : 0)) -
-                  playhead * zoom,
-              }}
-              {...pointerProps(part)}
-              onKeyDown={(event) => {
-                if (
-                  !["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)
-                )
-                  return;
+              aria-label="播放头"
+              title="拖动定位；双击收起范围"
+              className="timeline-playhead-handle"
+              {...pointerProps("playhead")}
+              onDoubleClick={(event) => {
                 event.preventDefault();
                 event.stopPropagation();
-                editor.setPlaying(false);
-                editor.select(null);
-                const step =
-                  (event.shiftKey ? 10 : 1) / editor.project.canvas.fps;
-                const time =
-                  event.key === "Home"
-                    ? 0
-                    : event.key === "End"
-                      ? maxTime
-                      : range[part] + (event.key === "ArrowLeft" ? -step : step);
-                update(part, time, range);
+                editor.setTimelineRange(null);
               }}
-            >
-              <span />
-            </button>
-          );
-        })}
-        <button
-          aria-label="播放头"
-          title="拖动定位；双击收起范围"
-          className="timeline-playhead-handle"
-          {...pointerProps("playhead")}
-          onDoubleClick={(event) => {
-            event.preventDefault();
-            event.stopPropagation();
-            editor.setTimelineRange(null);
-          }}
-        />
-      </div>
+            />
+          </div>,
+          handleContainer,
+        )}
     </>
   );
 }

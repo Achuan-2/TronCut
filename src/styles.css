@@ -3640,12 +3640,14 @@ fieldset:disabled {
   margin: 0 5px;
 }
 .timeline-body {
+  --timeline-header-width: 170px;
+  position: relative;
   display: flex;
   flex: 1;
   min-height: 0;
 }
 .track-headers {
-  width: 170px;
+  width: var(--timeline-header-width);
   flex-shrink: 0;
   user-select: none;
   border-right: 1px solid #323c34;
@@ -3677,7 +3679,7 @@ fieldset:disabled {
 }
 .track-header-toolbar {
   z-index: 3;
-  padding: 0 8px 0 12px;
+  padding: 0 27px 0 12px;
   gap: 6px;
 }
 .track-header-tools {
