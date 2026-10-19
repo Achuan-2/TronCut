@@ -9,6 +9,8 @@ const root = path.resolve(
 );
 const profile = path.join(root, "profile");
 await fs.mkdir(profile, { recursive: true });
+const documents = path.join(root, "Documents");
+await fs.mkdir(documents, { recursive: true });
 const paths = await Promise.all(
   ["red", "green", "blue"].map(async (color) => {
     const file = path.join(root, `${color}.png`);
@@ -54,6 +56,7 @@ const env = {
 };
 delete env.ELECTRON_RUN_AS_NODE;
 const app = await electron.launch({ args: ["."], env });
+await app.evaluate(({ app }, directory) => app.setPath("documents", directory), documents);
 const page = await app.firstWindow();
 const errors = [];
 page.on("pageerror", (error) => errors.push(error.message));
@@ -66,15 +69,13 @@ const choose = async (id, name) => {
 };
 const clips = page.locator(".timeline-clip.image");
 const save = async () => {
-  await page.getByRole("button", { name: "保存", exact: true }).click();
-  await expect(
-    page.getByRole("heading", { name: "正在处理…", exact: true }),
-  ).toBeHidden();
+  const button = page.getByRole("button", { name: "保存", exact: true });
+  await button.click();
+  await expect(button).toBeEnabled();
+  const file = path.join(documents, "TronCut", "Projects", project.name, `${project.name}.troncut`);
+  await expect.poll(() => fs.access(file).then(() => true, () => false)).toBe(true);
   return JSON.parse(
-    await fs.readFile(
-      path.join(root, project.name, `${project.name}.troncut`),
-      "utf8",
-    ),
+    await fs.readFile(file, "utf8"),
   );
 };
 try {

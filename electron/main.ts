@@ -706,6 +706,38 @@ function installHandlers() {
   handle("libraries:remove-asset", (id: unknown, assetId: unknown) =>
     assetLibraries.removeAsset(z.string().parse(id), z.string().parse(assetId)),
   );
+  handle("libraries:rename-asset", (id: unknown, assetId: unknown, name: unknown) =>
+    assetLibraries.renameAsset(z.string().parse(id), z.string().parse(assetId), libraryNameSchema.parse(name)),
+  );
+  handle("libraries:transfer-asset", (id: unknown, assetId: unknown, targetId: unknown, move: unknown) =>
+    assetLibraries.transferAsset(z.string().parse(id), z.string().parse(assetId), z.string().parse(targetId), z.boolean().parse(move)),
+  );
+  handle("libraries:create-folder", (id: unknown, name: unknown, parentId: unknown) =>
+    assetLibraries.createFolder(z.string().parse(id), libraryNameSchema.parse(name), z.string().optional().parse(parentId)),
+  );
+  handle("libraries:rename-folder", (id: unknown, folderId: unknown, name: unknown) =>
+    assetLibraries.renameFolder(z.string().parse(id), z.string().parse(folderId), libraryNameSchema.parse(name)),
+  );
+  handle("libraries:remove-folder", (id: unknown, folderId: unknown) =>
+    assetLibraries.removeFolder(z.string().parse(id), z.string().parse(folderId)),
+  );
+  handle("libraries:set-folder", (id: unknown, assetId: unknown, folderId: unknown) =>
+    assetLibraries.setAssetFolder(z.string().parse(id), z.string().parse(assetId), z.string().nullable().parse(folderId)),
+  );
+  handle("libraries:export-asset", async (input: unknown, assetInput: unknown) => {
+    const id = z.string().parse(input);
+    const assetId = z.string().parse(assetInput);
+    const asset = (await assetLibraries.list()).find((library) => library.id === id)?.assets.find((asset) => asset.id === assetId);
+    if (!asset) throw new Error("库中素材不存在");
+    const result = await dialog.showSaveDialog(window, {
+      title: "导出资产",
+      defaultPath: `${asset.name.replace(/[<>:"/\\|?*\x00-\x1f]/g, "_")}.zip`,
+      filters: [{ name: "TronCut 资产压缩包", extensions: ["zip"] }],
+    });
+    if (result.canceled || !result.filePath) return false;
+    await assetLibraries.export(id, result.filePath, assetId);
+    return true;
+  });
   handle("libraries:use", async (id: unknown, assetId: unknown) =>
     register(await assetLibraries.materialize(z.string().parse(id), z.string().parse(assetId))),
   );

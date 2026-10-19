@@ -8,6 +8,7 @@ import {
   defaultAssetLibraryId,
   libraryNameSchema,
   type AssetLibrary,
+  type LibraryFolder,
 } from "../shared/asset-libraries";
 import { resolveContained } from "./project-store";
 import { readLibraryArchive, writeLibraryArchive } from "./library-archive";
@@ -41,10 +42,170 @@ export class AssetLibraries {
     }
   }
   private async write(libraries: AssetLibrary[]) {
+    libraries.forEach((library) => this.validateFolders(library));
     await fs.mkdir(this.root, { recursive: true });
     const temporary = path.join(this.root, "libraries.json.tmp");
     await fs.writeFile(temporary, JSON.stringify(libraries));
     await fs.rename(temporary, path.join(this.root, "libraries.json"));
+  }
+  private validateFolders(library: Pick<AssetLibrary, "assets" | "folders">) {
+    const folders = library.folders ?? [];
+    const byId = new Map(folders.map((folder) => [folder.id, folder]));
+    const assets = new Set(library.assets.map((asset) => asset.id));
+    const assigned = new Set<string>();
+    if (byId.size !== folders.length) throw new Error("文件夹 ID 重复");
+    for (const folder of folders) {
+      const visited = new Set([folder.id]);
+      let parent = folder.parentId;
+      while (parent) {
+        if (visited.has(parent) || !byId.has(parent))
+          throw new Error("文件夹层级无效");
+        visited.add(parent);
+        parent = byId.get(parent)!.parentId;
+      }
+      for (const id of folder.assetIds) {
+        if (!assets.has(id) || assigned.has(id))
+          throw new Error("文件夹包含无效或重复的素材");
+        assigned.add(id);
+      }
+    }
+  }
+  private folder(library: AssetLibrary, id: string) {
+    const folder = library.folders?.find((item) => item.id === id);
+    if (!folder) throw new Error("文件夹不存在");
+    return folder;
+  }
+  private folderName(
+    library: AssetLibrary,
+    input: string,
+    parentId?: string,
+    except?: string,
+  ) {
+    const name = libraryNameSchema.parse(input);
+    if (
+      library.folders?.some(
+        (item) =>
+          item.id !== except &&
+          item.parentId === parentId &&
+          item.name.toLocaleLowerCase() === name.toLocaleLowerCase(),
+      )
+    )
+      throw new Error("已存在同名文件夹");
+    return name;
+  }
+  createFolder(id: string, name: string, parentId?: string) {
+    return this.serialize(async () => {
+      const libraries = await this.read();
+      const library = this.find(libraries, id);
+      if (parentId) this.folder(library, parentId);
+      if ((library.folders?.length ?? 0) >= 1000)
+        throw new Error("每个库最多保存 1000 个文件夹");
+      const folder: LibraryFolder = {
+        id: uid(),
+        name: this.folderName(library, name, parentId),
+        parentId,
+        assetIds: [],
+      };
+      (library.folders ??= []).push(folder);
+      await this.write(libraries);
+      return folder.id;
+    });
+  }
+  renameFolder(id: string, folderId: string, name: string) {
+    return this.serialize(async () => {
+      const libraries = await this.read();
+      const library = this.find(libraries, id);
+      const folder = this.folder(library, folderId);
+      folder.name = this.folderName(library, name, folder.parentId, folderId);
+      await this.write(libraries);
+    });
+  }
+  removeFolder(id: string, folderId: string) {
+    return this.serialize(async () => {
+      const libraries = await this.read();
+      const library = this.find(libraries, id);
+      const folder = this.folder(library, folderId);
+      // Removing an organizational folder returns its contents to the library root.
+      for (const child of library.folders ?? []) {
+        if (child.parentId === folderId) {
+          child.parentId = undefined;
+          let name = child.name;
+          for (
+            let suffix = 2;
+            library.folders?.some(
+              (item) =>
+                item.id !== child.id && !item.parentId && item.name === name,
+            );
+            suffix++
+          )
+            name = `${child.name.slice(0, 90)} (${suffix})`;
+          child.name = name;
+        }
+      }
+      library.folders = library.folders?.filter((item) => item.id !== folderId);
+      await this.write(libraries);
+    });
+  }
+  setAssetFolder(id: string, assetId: string, folderId: string | null) {
+    return this.serialize(async () => {
+      const libraries = await this.read();
+      const library = this.find(libraries, id);
+      if (!library.assets.some((asset) => asset.id === assetId))
+        throw new Error("库中素材不存在");
+      const target = folderId ? this.folder(library, folderId) : undefined;
+      for (const folder of library.folders ?? [])
+        folder.assetIds = folder.assetIds.filter((item) => item !== assetId);
+      target?.assetIds.push(assetId);
+      await this.write(libraries);
+    });
+  }
+  renameAsset(id: string, assetId: string, name: string) {
+    return this.serialize(async () => {
+      const libraries = await this.read();
+      const asset = this.find(libraries, id).assets.find(
+        (item) => item.id === assetId,
+      );
+      if (!asset) throw new Error("库中素材不存在");
+      asset.name = libraryNameSchema.parse(name);
+      await this.write(libraries);
+    });
+  }
+  transferAsset(id: string, assetId: string, targetId: string, move: boolean) {
+    return this.serialize(async () => {
+      if (id === targetId) throw new Error("请选择其他素材库");
+      const libraries = await this.read();
+      const sourceLibrary = this.find(libraries, id);
+      const targetLibrary = this.find(libraries, targetId);
+      const asset = sourceLibrary.assets.find((item) => item.id === assetId);
+      if (!asset) throw new Error("库中素材不存在");
+      if (targetLibrary.assets.length >= 10000)
+        throw new Error("目标素材库已满");
+      const source = await this.source(asset);
+      const copyId = uid();
+      const relative = `${targetId}/${copyId}${path.extname(source)}`;
+      const target = resolveContained(this.root, relative);
+      await fs.mkdir(path.dirname(target), { recursive: true });
+      let copied = false;
+      try {
+        await fs.copyFile(source, target, fs.constants.COPYFILE_EXCL);
+        copied = true;
+        targetLibrary.assets.push({ ...asset, id: copyId, path: relative });
+        if (move) {
+          sourceLibrary.assets = sourceLibrary.assets.filter(
+            (item) => item.id !== assetId,
+          );
+          for (const folder of sourceLibrary.folders ?? [])
+            folder.assetIds = folder.assetIds.filter(
+              (item) => item !== assetId,
+            );
+        }
+        await this.write(libraries);
+      } catch (error) {
+        if (copied) await fs.rm(target, { force: true });
+        throw error;
+      }
+      if (move) await fs.rm(source, { force: true });
+    });
   }
   private find(libraries: AssetLibrary[], id: string) {
     const library = libraries.find((item) => item.id === id);
@@ -169,6 +330,8 @@ export class AssetLibraries {
       const asset = library.assets.find((item) => item.id === assetId);
       if (!asset) throw new Error("库中素材不存在");
       library.assets = library.assets.filter((item) => item.id !== assetId);
+      for (const folder of library.folders ?? [])
+        folder.assetIds = folder.assetIds.filter((item) => item !== assetId);
       await this.write(libraries);
       await fs.rm(resolveContained(this.root, asset.path), { force: true });
     });
@@ -197,10 +360,14 @@ export class AssetLibraries {
       };
     });
   }
-  export(id: string, target: string) {
+  export(id: string, target: string, assetId?: string) {
     return this.serialize(async () => {
       const library = this.find(await this.read(), id);
-      const assets = library.assets.map((asset) => ({
+      const selected = assetId
+        ? library.assets.filter((asset) => asset.id === assetId)
+        : library.assets;
+      if (assetId && !selected.length) throw new Error("库中素材不存在");
+      const assets = selected.map((asset) => ({
         ...asset,
         path: `media/${asset.id}${path.extname(asset.path)}`,
         missing: undefined,
@@ -209,11 +376,12 @@ export class AssetLibraries {
       const manifest = {
         format: "troncut-library",
         version: 1,
-        name: library.name,
+        name: assetId ? selected[0].name : library.name,
+        folders: assetId ? undefined : library.folders,
         assets,
       };
       const media = await Promise.all(
-        library.assets.map(async (asset, index) => ({
+        selected.map(async (asset, index) => ({
           name: assets[index].path,
           source: await this.source(asset),
         })),
@@ -239,6 +407,7 @@ export class AssetLibraries {
             await fs.readFile(path.join(staging, "library.json"), "utf8"),
           ),
         );
+        this.validateFolders(manifest);
         const libraries = await this.read();
         let name = manifest.name;
         for (
@@ -253,6 +422,7 @@ export class AssetLibraries {
         const id = uid();
         const folder = resolveContained(this.root, id);
         const assets = [];
+        const assetIds = new Map<string, string>();
         const used = new Set<string>();
         for (const asset of manifest.assets) {
           if (
@@ -263,6 +433,8 @@ export class AssetLibraries {
             throw new Error("素材库清单包含无效或缺失的素材");
           used.add(asset.path);
           const assetId = uid();
+          if (assetIds.has(asset.id)) throw new Error("素材 ID 重复");
+          assetIds.set(asset.id, assetId);
           const name = `${assetId}${path.extname(asset.path)}`;
           await fs.rename(
             resolveContained(staging, asset.path),
@@ -276,11 +448,25 @@ export class AssetLibraries {
             cursorPath: undefined,
           });
         }
-        await fs.rm(path.join(staging, "media"), { recursive: true });
+        await fs.rm(path.join(staging, "media"), {
+          recursive: true,
+          force: true,
+        });
         await fs.rm(path.join(staging, "library.json"));
         await fs.rename(staging, folder);
         committedFolder = folder;
-        libraries.push({ id, name, assets });
+        const folderIds = new Map(
+          manifest.folders?.map((folder) => [folder.id, uid()]),
+        );
+        const folders = manifest.folders?.map((folder) => ({
+          ...folder,
+          id: folderIds.get(folder.id)!,
+          parentId: folder.parentId
+            ? folderIds.get(folder.parentId)
+            : undefined,
+          assetIds: folder.assetIds.map((assetId) => assetIds.get(assetId)!),
+        }));
+        libraries.push({ id, name, assets, folders });
         await this.write(libraries);
         committedFolder = null;
         return id;

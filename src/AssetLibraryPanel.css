@@ -110,3 +110,66 @@
 .asset-library-dialog-actions button {
   padding: 8px 18px;
 }
+.library-folder-heading {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  width: 100%;
+  min-width: 0;
+  gap: 7px;
+  padding: 10px 3px;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  text-align: left;
+  font-size: 12px;
+}
+.library-folder-heading > svg {
+  flex-shrink: 0;
+}
+.library-folder-heading > svg:nth-child(2) {
+  color: #c8d0cc;
+}
+.library-folder-heading[aria-expanded="false"] > svg:first-child {
+  transform: rotate(-90deg);
+}
+.library-folder-heading span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.library-folder-heading small {
+  margin-left: auto;
+  color: var(--muted);
+}
+.library-folder-content {
+  padding: 2px 0 6px 12px;
+  border-left: 1px solid var(--line);
+  margin-left: 8px;
+}
+.library-root-drop {
+  justify-content: flex-start;
+  margin: 0 8px;
+  padding: 7px 4px;
+  color: var(--muted);
+  font-size: 10px;
+}
+.library-folder-heading.drop-target,
+.library-root-drop.drop-target {
+  background: #344b3d;
+  outline: 1px solid var(--accent);
+}
+.media-transfer-item {
+  position: relative;
+}
+.media-context-menu .media-transfer-item > button {
+  justify-content: space-between;
+}
+.media-transfer-menu.context-menu {
+  position: fixed;
+  width: 210px;
+  max-height: min(300px, 40vh);
+  overflow-y: auto;
+}
+.media-transfer-menu button {
+  overflow-wrap: anywhere;
+}

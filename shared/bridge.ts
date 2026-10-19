@@ -83,6 +83,30 @@ export interface FrameCraftBridge {
   deleteAssetLibrary(id: string): Promise<void>;
   addLibraryAssets(id: string, assetIds: string[]): Promise<void>;
   removeLibraryAsset(id: string, assetId: string): Promise<void>;
+  renameLibraryAsset(id: string, assetId: string, name: string): Promise<void>;
+  transferLibraryAsset(
+    id: string,
+    assetId: string,
+    targetId: string,
+    move: boolean,
+  ): Promise<void>;
+  createLibraryFolder(
+    id: string,
+    name: string,
+    parentId?: string,
+  ): Promise<string>;
+  renameLibraryFolder(
+    id: string,
+    folderId: string,
+    name: string,
+  ): Promise<void>;
+  removeLibraryFolder(id: string, folderId: string): Promise<void>;
+  setLibraryAssetFolder(
+    id: string,
+    assetId: string,
+    folderId: string | null,
+  ): Promise<void>;
+  exportLibraryAsset(id: string, assetId: string): Promise<boolean>;
   useLibraryAsset(id: string, assetId: string): Promise<Asset>;
   exportAssetLibrary(id: string): Promise<boolean>;
   importAssetLibrary(): Promise<string | null>;

@@ -771,18 +771,6 @@ fieldset:disabled {
   outline: none;
 }
 .media-search button { padding: 2px; }
-.media-browser-options {
-  display: flex;
-  gap: 6px;
-  margin-top: 8px;
-}
-.media-browser-options select {
-  flex: 1;
-  min-width: 0;
-  padding: 5px 3px;
-  font-size: 10px;
-  background: #252a2d;
-}
 .media-browser-items {
   flex: 1;
   min-height: 0;
@@ -790,17 +778,6 @@ fieldset:disabled {
   scrollbar-gutter: stable;
   padding: 0 8px 12px;
 }
-.asset-group-heading { margin: 0; }
-.asset-group-heading button {
-  width: 100%;
-  padding: 10px 2px 7px;
-  gap: 5px;
-  justify-content: flex-start;
-  font-size: 11px;
-  color: #bfc8c4;
-}
-.asset-group-heading button[aria-expanded="false"] svg { transform: rotate(-90deg); }
-.asset-group-count { margin-left: auto; color: var(--muted); font-size: 10px; }
 .media-browser-footer {
   flex-shrink: 0;
   display: flex;

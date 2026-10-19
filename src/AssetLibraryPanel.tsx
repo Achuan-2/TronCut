@@ -10,8 +10,18 @@ import MediaLibrary, { type MediaLibraryProps } from "./MediaLibrary";
 import "./AssetLibraryPanel.css";
 
 type Request = {
-  kind: "create" | "rename" | "delete" | "save" | "remove";
+  kind:
+    | "create"
+    | "rename"
+    | "delete"
+    | "save"
+    | "remove"
+    | "asset-rename"
+    | "folder-create"
+    | "folder-rename"
+    | "folder-delete";
   asset?: Asset;
+  folderId?: string;
 };
 function desktop() {
   if (!window.framecraft) throw new Error("素材库管理需要运行桌面版");
@@ -47,11 +57,16 @@ function LibraryDialog({
 }) {
   const ref = useRef<HTMLDialogElement>(null);
   const [value, setValue] = useState(
-    request.kind === "rename"
-      ? (library?.name ?? "")
-      : request.kind === "save"
-        ? (library?.id ?? defaultAssetLibraryId)
-        : "",
+    request.kind === "asset-rename"
+      ? (request.asset?.name ?? "")
+      : request.kind === "folder-rename"
+        ? (library?.folders?.find((folder) => folder.id === request.folderId)
+            ?.name ?? "")
+        : request.kind === "rename"
+          ? (library?.name ?? "")
+          : request.kind === "save"
+            ? (library?.id ?? defaultAssetLibraryId)
+            : "",
   );
   const title = {
     create: "创建新库",
@@ -59,8 +74,21 @@ function LibraryDialog({
     delete: "删除库",
     save: "添加到素材库",
     remove: "从素材库移除",
+    "asset-rename": "重命名素材",
+    "folder-create": request.folderId ? "新建子文件夹" : "新建文件夹",
+    "folder-rename": "重命名文件夹",
+    "folder-delete": "删除文件夹",
   }[request.kind];
-  const destructive = request.kind === "delete" || request.kind === "remove";
+  const destructive =
+    request.kind === "delete" ||
+    request.kind === "remove" ||
+    request.kind === "folder-delete";
+  const nameLabel =
+    request.kind === "asset-rename"
+      ? "素材名称"
+      : request.kind.startsWith("folder-")
+        ? "文件夹名称"
+        : "库名称";
   useEffect(() => {
     const previous = document.activeElement as HTMLElement | null;
     const dialog = ref.current;
@@ -103,7 +131,9 @@ function LibraryDialog({
           <p>
             {request.kind === "delete"
               ? `确定删除“${library?.name}”及其中的 ${library?.assets.length ?? 0} 个素材？已加入工程的素材仍会保留。`
-              : `确定从库中移除“${request.asset?.name}”？已加入工程的素材仍会保留。`}
+              : request.kind === "folder-delete"
+                ? "确定删除此文件夹？其中的素材和子文件夹会移回库根目录。"
+                : `确定从库中移除“${request.asset?.name}”？已加入工程的素材仍会保留。`}
           </p>
         ) : request.kind === "save" ? (
           <label className="field">
@@ -122,10 +152,10 @@ function LibraryDialog({
           </label>
         ) : (
           <label className="field">
-            库名称
+            {nameLabel}
             <input
               autoFocus
-              aria-label="库名称"
+              aria-label={nameLabel}
               maxLength={100}
               value={value}
               onChange={(event) => setValue(event.target.value)}
@@ -219,7 +249,10 @@ export default function AssetLibraryPanel(
     void act(async () => {
       if (!library) return;
       if (asset.missing) throw new Error("库中素材文件缺失，请移除后重新导入");
-      props.onActivate(await desktop().useLibraryAsset(library.id, asset.id));
+      props.onCommand(
+        await desktop().useLibraryAsset(library.id, asset.id),
+        "add",
+      );
     });
   const submit = (value: string) =>
     void act(async () => {
@@ -234,6 +267,22 @@ export default function AssetLibraryPanel(
         setSelected(defaultAssetLibraryId);
       } else if (request.kind === "remove" && library && request.asset) {
         await api.removeLibraryAsset(library.id, request.asset.id);
+      } else if (request.kind === "asset-rename" && library && request.asset) {
+        await api.renameLibraryAsset(library.id, request.asset.id, value);
+      } else if (request.kind === "folder-create" && library) {
+        await api.createLibraryFolder(library.id, value, request.folderId);
+      } else if (
+        request.kind === "folder-rename" &&
+        library &&
+        request.folderId
+      ) {
+        await api.renameLibraryFolder(library.id, request.folderId, value);
+      } else if (
+        request.kind === "folder-delete" &&
+        library &&
+        request.folderId
+      ) {
+        await api.removeLibraryFolder(library.id, request.folderId);
       } else if (request.kind === "save" && request.asset) {
         await api.addLibraryAssets(value, [request.asset.id]);
         setSelected(value);
@@ -245,6 +294,31 @@ export default function AssetLibraryPanel(
   const disabled = pending || props.busy;
   const visibleAssets =
     tab === "project" ? props.assets : (library?.assets ?? []);
+  const importToLibrary = () =>
+    void act(async () => {
+      if (!library) return;
+      const assets = await desktop().importMedia();
+      if (!assets.length) return;
+      await desktop().addLibraryAssets(
+        library.id,
+        assets.map((asset) => asset.id),
+      );
+      await refresh();
+      props.toast(`已添加 ${assets.length} 个素材到“${library.name}”`);
+    });
+  const exportLibrary = () =>
+    void act(async () => {
+      if (library && (await desktop().exportAssetLibrary(library.id)))
+        props.toast("素材库已导出，包含全部素材文件");
+    });
+  const importLibrary = () =>
+    void act(async () => {
+      const id = await desktop().importAssetLibrary();
+      if (!id) return;
+      await refresh();
+      setSelected(id);
+      props.toast("素材库已导入");
+    });
   return (
     <>
       <div className="library-heading">
@@ -324,6 +398,13 @@ export default function AssetLibraryPanel(
               </button>
               <button
                 role="menuitem"
+                disabled={disabled || !library}
+                onClick={() => show({ kind: "folder-create" })}
+              >
+                新建文件夹…
+              </button>
+              <button
+                role="menuitem"
                 disabled={
                   disabled || !library || library.id === defaultAssetLibraryId
                 }
@@ -336,13 +417,7 @@ export default function AssetLibraryPanel(
                 disabled={disabled || !library}
                 onClick={() => {
                   menu.current!.open = false;
-                  void act(async () => {
-                    if (
-                      library &&
-                      (await desktop().exportAssetLibrary(library.id))
-                    )
-                      props.toast("素材库已导出，包含全部素材文件");
-                  });
+                  exportLibrary();
                 }}
               >
                 导出库…
@@ -360,13 +435,7 @@ export default function AssetLibraryPanel(
                 disabled={disabled}
                 onClick={() => {
                   menu.current!.open = false;
-                  void act(async () => {
-                    const id = await desktop().importAssetLibrary();
-                    if (!id) return;
-                    await refresh();
-                    setSelected(id);
-                    props.toast("素材库已导入");
-                  });
+                  importLibrary();
                 }}
               >
                 导入压缩库…
@@ -396,6 +465,60 @@ export default function AssetLibraryPanel(
           dropDisabled={disabled}
           assets={visibleAssets}
           libraryId={tab === "library" ? (library?.id ?? "loading") : undefined}
+          folders={tab === "library" ? library?.folders : undefined}
+          destinations={
+            tab === "library"
+              ? libraries.filter((item) => item.id !== library?.id)
+              : undefined
+          }
+          onTransfer={
+            tab === "library"
+              ? (asset, targetId, move) =>
+                  void act(async () => {
+                    if (!library) return;
+                    await desktop().transferLibraryAsset(
+                      library.id,
+                      asset.id,
+                      targetId,
+                      move,
+                    );
+                    await refresh();
+                    props.toast(
+                      `已${move ? "移动" : "复制"}到“${libraries.find((item) => item.id === targetId)?.name}”`,
+                    );
+                  })
+              : undefined
+          }
+          onDropAsset={
+            tab === "library"
+              ? (assetId, folderId) =>
+                  void act(async () => {
+                    if (!library) return;
+                    await desktop().setLibraryAssetFolder(
+                      library.id,
+                      assetId,
+                      folderId,
+                    );
+                    await refresh();
+                  })
+              : undefined
+          }
+          onLibraryCommand={
+            tab === "library"
+              ? (command, folderId) => {
+                  if (disabled) return;
+                  if (command === "new-folder")
+                    show({ kind: "folder-create", folderId });
+                  else if (command === "rename" && folderId)
+                    show({ kind: "folder-rename", folderId });
+                  else if (command === "delete" && folderId)
+                    show({ kind: "folder-delete", folderId });
+                  else if (command === "import") importToLibrary();
+                  else if (command === "export-library") exportLibrary();
+                  else if (command === "import-library") importLibrary();
+                }
+              : undefined
+          }
           onSaveToLibrary={
             tab === "project"
               ? (asset) => show({ kind: "save", asset })
@@ -409,31 +532,37 @@ export default function AssetLibraryPanel(
                   if (command === "add") useAsset(asset);
                   else if (command === "delete")
                     show({ kind: "remove", asset });
+                  else if (command === "rename")
+                    show({ kind: "asset-rename", asset });
+                  else if (command === "export")
+                    void act(async () => {
+                      if (
+                        library &&
+                        (await desktop().exportLibraryAsset(
+                          library.id,
+                          asset.id,
+                        ))
+                      )
+                        props.toast("资产已导出，可通过“导入压缩库”复用");
+                    });
                 }
           }
           unavailable={
             tab === "project"
               ? props.unavailable
-              : (asset) => (asset.missing ? { add: "素材文件缺失" } : {})
+              : (asset) =>
+                  disabled
+                    ? {
+                        add: "正在处理，请稍候",
+                        delete: "正在处理，请稍候",
+                        rename: "正在处理，请稍候",
+                        export: "正在处理，请稍候",
+                      }
+                    : asset.missing
+                      ? { add: "素材文件缺失", export: "素材文件缺失" }
+                      : {}
           }
-          onImport={
-            tab === "project"
-              ? props.onImport
-              : () =>
-                  void act(async () => {
-                    if (!library) return;
-                    const assets = await desktop().importMedia();
-                    if (!assets.length) return;
-                    await desktop().addLibraryAssets(
-                      library.id,
-                      assets.map((asset) => asset.id),
-                    );
-                    await refresh();
-                    props.toast(
-                      `已添加 ${assets.length} 个素材到“${library.name}”`,
-                    );
-                  })
-          }
+          onImport={tab === "project" ? props.onImport : importToLibrary}
         />
       </div>
       {request && (

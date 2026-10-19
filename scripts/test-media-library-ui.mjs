@@ -95,14 +95,6 @@ try {
   );
   await page.getByRole("button", { name: "恢复编辑", exact: true }).click();
   const cards = page.locator(".asset-card");
-  const category = page.getByRole("combobox", {
-    name: "素材类别",
-    exact: true,
-  });
-  const grouping = page.getByRole("combobox", {
-    name: "素材分组",
-    exact: true,
-  });
   const search = page.getByRole("textbox", { name: "搜索素材", exact: true });
   const scroller = page.locator(".media-browser-items");
   const grid = page.getByRole("button", { name: "缩略图视图", exact: true });
@@ -112,7 +104,13 @@ try {
     exact: true,
   });
   await expect(cards).toHaveCount(75);
-  await expect(page.locator(".asset-group-heading")).toHaveCount(3);
+  await expect(
+    page.getByRole("combobox", { name: "素材类别", exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("combobox", { name: "素材分组", exact: true }),
+  ).toHaveCount(0);
+  await expect(page.locator(".asset-group-heading")).toHaveCount(0);
   await expect(grid).toHaveAttribute("aria-pressed", "true");
   await expect(
     page.getByText("保存工程时，素材自动归档", { exact: true }),
@@ -134,7 +132,7 @@ try {
   expect(overflow.y).toBeGreaterThan(1000);
   await page
     .locator(".library")
-    .screenshot({ path: path.join(root, "grouped-thumbnails.png") });
+    .screenshot({ path: path.join(root, "thumbnails.png") });
   await scroller.evaluate((element) => {
     element.scrollTop = element.scrollHeight;
   });
@@ -145,16 +143,6 @@ try {
     footerBefore.y,
   );
 
-  await category.selectOption("video");
-  await expect(cards).toHaveCount(1);
-  await category.selectOption("audio");
-  await expect(cards).toHaveCount(1);
-  await expect(cards.first()).toContainText("背景音乐");
-  await category.selectOption("all");
-  await page.getByRole("button", { name: "折叠图片分组", exact: true }).click();
-  await expect(cards).toHaveCount(2);
-  await page.getByRole("button", { name: "展开图片分组", exact: true }).click();
-  await expect(cards).toHaveCount(75);
   await search.fill("图片-07");
   await expect(cards).toHaveCount(1);
   await search.fill("不存在的文件");
@@ -163,24 +151,22 @@ try {
   await expect(cards).toHaveCount(75);
 
   await list.click();
-  await expect(page.locator(".asset-list")).toHaveCount(3);
+  await expect(page.locator(".asset-list")).toHaveCount(1);
   await expect(list).toHaveAttribute("aria-pressed", "true");
   await scroller.evaluate((element) => {
     element.scrollTop = 0;
   });
   await page
     .locator(".library")
-    .screenshot({ path: path.join(root, "grouped-list.png") });
-  await grouping.selectOption("none");
+    .screenshot({ path: path.join(root, "list.png") });
   await expect(page.locator(".asset-group-heading")).toHaveCount(0);
   await expect(cards).toHaveCount(75);
   await page.reload();
   await page.getByRole("button", { name: "恢复编辑", exact: true }).click();
   await expect(list).toHaveAttribute("aria-pressed", "true");
-  await expect(grouping).toHaveValue("none");
 
   // Adding media still works in list mode, with the original drag payload.
-  await category.selectOption("video");
+  await search.fill("演示录屏");
   await cards.first().click();
   await expect(cards.first()).toHaveAttribute("aria-pressed", "true");
   const dragPayload = await cards.first().evaluate((element) => {
@@ -198,11 +184,14 @@ try {
   await cards.first().press("Enter");
   await expect(page.locator(".timeline-clip.video")).toHaveCount(1);
   await page.getByTitle("撤销 Ctrl+Z", { exact: true }).click();
-  await cards.first().dragTo(page.locator(".track-lane").first(), { targetPosition: { x: 80, y: 20 } });
+  await cards
+    .first()
+    .dragTo(page.locator(".track-lane").first(), {
+      targetPosition: { x: 80, y: 20 },
+    });
   await expect(page.locator(".timeline-clip.video")).toHaveCount(1);
 
   // Offline media remains relinkable rather than being inserted into the timeline.
-  await category.selectOption("image");
   await search.fill("离线图片");
   await expect(cards.first()).toHaveClass(/missing/);
   await app.evaluate(({ dialog }, file) => {
@@ -229,11 +218,13 @@ try {
   await expect(
     page.locator(".asset-name").filter({ hasText: "新增图片.png" }),
   ).toHaveCount(1);
-  await expect(cards).toHaveCount(74);
-  await expect(page.locator(".media-library > .library-heading")).toContainText("76 个素材");
+  await expect(cards).toHaveCount(76);
+  await expect(page.locator(".media-library > .library-heading")).toContainText(
+    "76 个素材",
+  );
   expect(errors).toEqual([]);
   console.log(
-    `素材库 75 项分组、筛选、搜索、折叠、双视图及偏好重开、独立滚动、按需缩略图、双击/键盘添加、拖拽载荷及离线重链接通过：${root}`,
+    `项目媒体移除分类、搜索、双视图及偏好重开、独立滚动、按需缩略图、双击/键盘添加、拖拽载荷及离线重链接通过：${root}`,
   );
 } catch (error) {
   await (

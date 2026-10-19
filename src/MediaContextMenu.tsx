@@ -1,7 +1,18 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
-export type MediaCommand = "add" | "replace" | "update" | "delete" | "select";
+export type MediaCommand =
+  | "add"
+  | "replace"
+  | "update"
+  | "delete"
+  | "select"
+  | "rename"
+  | "export"
+  | "new-folder"
+  | "import"
+  | "export-library"
+  | "import-library";
 export interface MediaMenuPosition {
   assetId: string;
   x: number;
@@ -15,6 +26,8 @@ export default function MediaContextMenu({
   onCommand,
   onSaveToLibrary,
   commands: customCommands,
+  destinations,
+  onTransfer,
 }: {
   menu: MediaMenuPosition;
   unavailable: Partial<Record<MediaCommand, string>>;
@@ -22,9 +35,39 @@ export default function MediaContextMenu({
   onCommand: (command: MediaCommand) => void;
   onSaveToLibrary?: () => void;
   commands?: [MediaCommand, string][];
+  destinations?: { id: string; name: string }[];
+  onTransfer?: (targetId: string, move: boolean) => void;
 }) {
   const root = useRef<HTMLDivElement>(null);
   const [position, setPosition] = useState({ x: menu.x, y: menu.y });
+  const [submenu, setSubmenu] = useState<"copy" | "move" | null>(null);
+  const focusSubmenu = useRef(false);
+  const [submenuPosition, setSubmenuPosition] = useState({ left: 0, top: 0 });
+  useLayoutEffect(() => {
+    if (!submenu) return;
+    const button = root.current?.querySelector<HTMLElement>(
+      `[data-transfer="${submenu}"]`,
+    );
+    const list = root.current?.querySelector<HTMLElement>(
+      "[data-transfer-menu]",
+    );
+    if (!button || !list) return;
+    const bounds = button.getBoundingClientRect();
+    const size = list.getBoundingClientRect();
+    setSubmenuPosition({
+      left: Math.max(
+        8,
+        bounds.right + size.width > innerWidth - 8
+          ? bounds.left - size.width + 2
+          : bounds.right - 2,
+      ),
+      top: Math.max(8, Math.min(bounds.top, innerHeight - size.height - 8)),
+    });
+    if (focusSubmenu.current) {
+      list.querySelector<HTMLButtonElement>("button:not(:disabled)")?.focus();
+      focusSubmenu.current = false;
+    }
+  }, [submenu, position.x, position.y]);
   useLayoutEffect(() => {
     const bounds = root.current!.getBoundingClientRect();
     setPosition({
@@ -70,13 +113,25 @@ export default function MediaContextMenu({
       style={{ left: position.x, top: position.y, width: 280 }}
       onKeyDown={(event) => {
         event.stopPropagation();
+        if (event.key === "ArrowLeft" && submenu) {
+          event.preventDefault();
+          root.current
+            ?.querySelector<HTMLButtonElement>(`[data-transfer="${submenu}"]`)
+            ?.focus();
+          setSubmenu(null);
+          return;
+        }
         if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key))
           return;
         event.preventDefault();
+        const scope =
+          (event.target as HTMLElement).closest("[data-transfer-menu]") ??
+          root.current!;
         const buttons = Array.from(
-          root.current!.querySelectorAll<HTMLButtonElement>(
-            "button:not(:disabled)",
-          ),
+          scope.querySelectorAll<HTMLButtonElement>("button:not(:disabled)"),
+        ).filter(
+          (button) =>
+            scope !== root.current || !button.closest("[data-transfer-menu]"),
         );
         const current = buttons.indexOf(
           document.activeElement as HTMLButtonElement,
@@ -99,6 +154,7 @@ export default function MediaContextMenu({
           role="menuitem"
           disabled={!!unavailable[command]}
           title={unavailable[command]}
+          onMouseEnter={() => setSubmenu(null)}
           onClick={() => {
             onClose();
             onCommand(command);
@@ -107,6 +163,67 @@ export default function MediaContextMenu({
           {label}
         </button>
       ))}
+      {onTransfer &&
+        (["copy", "move"] as const).map((mode) => (
+          <div
+            className="media-transfer-item"
+            key={mode}
+            onMouseEnter={() => setSubmenu(mode)}
+          >
+            <button
+              role="menuitem"
+              data-transfer={mode}
+              aria-haspopup="menu"
+              aria-expanded={submenu === mode}
+              disabled={!!unavailable.export || !destinations?.length}
+              title={
+                unavailable.export ??
+                (!destinations?.length ? "请先创建其他素材库" : undefined)
+              }
+              onClick={() => setSubmenu(submenu === mode ? null : mode)}
+              onKeyDown={(event) => {
+                if (event.key === "ArrowRight") {
+                  event.preventDefault();
+                  if (submenu === mode) {
+                    root.current
+                      ?.querySelector<HTMLButtonElement>(
+                        "[data-transfer-menu] button",
+                      )
+                      ?.focus();
+                  } else {
+                    focusSubmenu.current = true;
+                    setSubmenu(mode);
+                  }
+                }
+              }}
+            >
+              <span>{mode === "copy" ? "复制到" : "移动至"}</span>
+              <span aria-hidden="true">›</span>
+            </button>
+            {submenu === mode && (
+              <div
+                role="menu"
+                data-transfer-menu
+                className="context-menu media-transfer-menu"
+                style={submenuPosition}
+                aria-label={mode === "copy" ? "复制到库" : "移动至库"}
+              >
+                {destinations?.map((library) => (
+                  <button
+                    key={library.id}
+                    role="menuitem"
+                    onClick={() => {
+                      onClose();
+                      onTransfer(library.id, mode === "move");
+                    }}
+                  >
+                    {library.name}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        ))}
       {onSaveToLibrary && (
         <button
           role="menuitem"
