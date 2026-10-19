@@ -169,6 +169,7 @@ export function annotationPaths(
     | "shapeStyle"
     | "drawing"
     | "shapeSize"
+    | "linePoints"
     | "fill"
     | "annotationEffect"
   >,
@@ -247,8 +248,12 @@ export function annotationPaths(
       ];
     case "line":
     case "curved-arrow": {
-      points =
-        clip.shape === "curved-arrow"
+      // Persisted samples are already in object pixels. Legacy presets continue
+      // through the original canonical conversion, preserving their appearance.
+      const convertLine = clip.linePoints ? (p: Point[]) => p : convert;
+      points = clip.linePoints
+        ? clip.linePoints.map((p) => point(p.x * width, p.y * height))
+        : clip.shape === "curved-arrow"
           ? Array.from({ length: 30 }, (_, i) => {
               const t = i / 29;
               return point(
@@ -259,7 +264,7 @@ export function annotationPaths(
           : [point(35, 150), point(565, 150)];
       const paths: ShapePath[] = [
         {
-          points: convert(points),
+          points: convertLine(points),
           stroke: style.stroke,
           width: style.strokeWidth,
         },
@@ -273,7 +278,7 @@ export function annotationPaths(
         const length = Math.max(20, style.strokeWidth * 3);
         if (type === "arrow")
           paths.push({
-            points: convert([
+            points: convertLine([
               point(
                 position.x - length * Math.cos(angle - 0.5),
                 position.y - length * Math.sin(angle - 0.5),
@@ -290,7 +295,7 @@ export function annotationPaths(
           });
         if (type === "dot")
           paths.push({
-            points: convert(
+            points: convertLine(
               Array.from({ length: 24 }, (_, i) =>
                 point(
                   position.x + Math.cos((i * Math.PI) / 12) * style.strokeWidth,

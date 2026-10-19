@@ -48,6 +48,7 @@ import {
   resizeHandles,
   resizeTransform,
   constrainMoveDelta,
+  rotationDragStep,
   type DragAxis,
 } from "../shared/canvas";
 import { setVideoZoomPan, unzoomVideoPreview } from "../shared/video-zoom-pan";
@@ -116,13 +117,18 @@ import {
 } from "../shared/animation-drag";
 import type { EditorPreferences } from "../shared/editor-preferences";
 import { clipNeedsPreviewFrameAt } from "../shared/preview-motion";
+import {
+  editLine,
+  linePointsFor,
+  supportsLineEditing,
+  type LineEdit,
+  type LineHandle,
+} from "../shared/line-edit";
+import { LineSelection, RotationHandle } from "./CanvasSelection";
 
 type PreviewQuality = EditorPreferences["program"]["previewQuality"];
 
-function previewTransform(
-  value: Transform,
-  fallbackRotation = 0,
-): string {
+function previewTransform(value: Transform, fallbackRotation = 0): string {
   const parts = ["translate(-50%, -50%)"];
   const rotation = value.rotation ?? fallbackRotation;
   if (rotation) parts.push(`rotateZ(${rotation}deg)`);
@@ -175,10 +181,7 @@ function PreviewLayerImpl({
   animated: boolean;
   preloading?: boolean;
 }) {
-  const localTime = Math.max(
-    0,
-    Math.min(clip.duration, playhead - clip.start),
-  );
+  const localTime = Math.max(0, Math.min(clip.duration, playhead - clip.start));
   const filterId = `visual-effect-${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
   const [regionDraft, setRegionDraft] = useState<{
     id: "mask" | "blur-region";
@@ -228,7 +231,11 @@ function PreviewLayerImpl({
   const [drag, setDrag] = useState<{
     x: number;
     y: number;
-    mode: "move" | "resize" | "crop" | "content";
+    mode: "move" | "resize" | "crop" | "content" | "rotate" | "line";
+    rotation?: { cx: number; cy: number; angle: number; raw: number };
+    lineHandle?: LineHandle;
+    lineSource?: Clip;
+    line?: LineEdit;
     handle?: { x: number; y: number };
     original: Transform;
     value: Transform;
@@ -244,6 +251,14 @@ function PreviewLayerImpl({
     toggleSelectionOnClick?: boolean;
   } | null>(null);
   const dragRef = useRef<typeof drag>(null);
+  if (drag?.line) {
+    clip = {
+      ...clip,
+      shapeSize: drag.line.shapeSize,
+      linePoints: drag.line.linePoints,
+    };
+  }
+  const lineEditable = supportsLineEditing(clip) && mode === "select";
 
   // RAF-throttled gesture updates for smooth 60fps dragging
   const scheduleDragUpdate = useRAFThrottle<typeof drag>(setDrag);
@@ -399,7 +414,7 @@ function PreviewLayerImpl({
     ) as "mask" | "blur-region" | undefined;
   return (
     <div
-      className={`preview-layer ${clip.kind} ${selectedObjectPart ? "selected" : ""} ${editing ? "editing" : ""} ${cropping ? "cropping" : ""} ${effectDrop && selectable ? "effect-drop-target" : ""}`}
+      className={`preview-layer ${clip.kind} ${selectedObjectPart ? "selected" : ""} ${editing ? "editing" : ""} ${cropping ? "cropping" : ""} ${lineEditable && interactive ? "line-editable" : ""} ${effectDrop && selectable ? "effect-drop-target" : ""}`}
       data-clip-id={clip.id}
       data-preview-animated={animated ? "1" : "0"}
       data-preview-preloading={preloading ? "1" : undefined}
@@ -481,7 +496,10 @@ function PreviewLayerImpl({
         // Shift-click still toggles selection. Defer removing a selected object
         // until release so Shift-drag can constrain it without deselecting it.
         const toggleSelectionOnClick =
-          event.shiftKey && !event.ctrlKey && !event.metaKey && selectedObjectPart;
+          event.shiftKey &&
+          !event.ctrlKey &&
+          !event.metaKey &&
+          selectedObjectPart;
         if (!toggleSelectionOnClick)
           editor.select(
             clip.id,
@@ -508,7 +526,8 @@ function PreviewLayerImpl({
         };
         const gesture = {
           ...previous,
-          moved: previous.moved || Math.hypot(screenDelta.x, screenDelta.y) >= 3,
+          moved:
+            previous.moved || Math.hypot(screenDelta.x, screenDelta.y) >= 3,
         };
         const constrained =
           gesture.mode === "move"
@@ -518,6 +537,39 @@ function PreviewLayerImpl({
           x: constrained.x / (scale * cameraScale),
           y: constrained.y / (scale * cameraScale),
         };
+        if (gesture.mode === "rotate" && gesture.rotation) {
+          const { cx, cy } = gesture.rotation;
+          if (Math.hypot(event.clientX - cx, event.clientY - cy) < 4) return;
+          const angle = Math.atan2(event.clientY - cy, event.clientX - cx);
+          const raw = rotationDragStep(
+            gesture.rotation.raw,
+            gesture.rotation.angle,
+            angle,
+          );
+          setGesture({
+            ...gesture,
+            rotation: { cx, cy, angle, raw },
+            value: {
+              ...gesture.original,
+              rotation: event.shiftKey
+                ? Math.round(raw / 15) * 15
+                : Math.round(raw * 10) / 10,
+            },
+          });
+          return;
+        }
+        if (gesture.mode === "line") {
+          const line = editLine(
+            gesture.lineSource!,
+            gesture.original,
+            gesture.lineHandle!,
+            delta,
+            project.canvas,
+            event.shiftKey,
+          );
+          setGesture({ ...gesture, line, value: line.value });
+          return;
+        }
         if (gesture.mode === "content") {
           setGesture({
             ...gesture,
@@ -617,6 +669,28 @@ function PreviewLayerImpl({
       }}
       onPointerUp={() => {
         const drag = dragRef.current;
+        if (drag?.mode === "rotate") {
+          if (
+            (drag.value.rotation ?? clip.rotation ?? 0) !==
+            (drag.original.rotation ?? clip.rotation ?? 0)
+          )
+            editor.updateTransform(clip.id, { rotation: drag.value.rotation });
+          setGesture(null);
+          return;
+        }
+        if (drag?.mode === "line") {
+          if (drag.moved && drag.line)
+            editor.updateTransform(
+              clip.id,
+              { x: drag.value.x, y: drag.value.y },
+              {
+                shapeSize: drag.line.shapeSize,
+                linePoints: drag.line.linePoints,
+              },
+            );
+          setGesture(null);
+          return;
+        }
         if (drag?.toggleSelectionOnClick && !drag.moved) {
           editor.select(clip.id, true);
           setGesture(null);
@@ -821,7 +895,11 @@ function PreviewLayerImpl({
                     name: text.slice(0, 24) || "文本",
                   })
                 }
-                onSelection={(range) => editor.setTextSelection(range ? { ...range, clipId: clip.id } : null)}
+                onSelection={(range) =>
+                  editor.setTextSelection(
+                    range ? { ...range, clipId: clip.id } : null,
+                  )
+                }
                 onEnd={() => editor.endTextEdit(clip.id)}
                 onUndo={editor.undo}
                 onRedo={editor.redo}
@@ -845,6 +923,7 @@ function PreviewLayerImpl({
           />
         ) : (
           <svg
+            className={lineEditable ? "preview-line-art" : undefined}
             width={shapeSize(clip).width * scale}
             height={shapeSize(clip).height * scale}
             viewBox={`0 0 ${shapeSize(clip).width} ${shapeSize(clip).height}`}
@@ -863,6 +942,63 @@ function PreviewLayerImpl({
           />
         )}
       </div>
+      {lineEditable && selectable && !editing && (
+        <LineSelection
+          points={linePointsFor(clip)}
+          size={shapeSize(clip)}
+          pose={displayed}
+          scale={scale}
+          cameraScale={cameraScale}
+          selected={selectedObjectPart}
+          onHandleDown={(handle, event) => {
+            if (event.button !== 0) return;
+            event.preventDefault();
+            event.stopPropagation();
+            editor.setPlaying(false);
+            event.currentTarget.setPointerCapture(event.pointerId);
+            setGesture({
+              x: event.clientX,
+              y: event.clientY,
+              mode: "line",
+              lineHandle: handle,
+              lineSource: clip,
+              original: transform,
+              value: transform,
+            });
+          }}
+        />
+      )}
+      {selectable && !editing && mode === "select" && selectedObjectPart && (
+        <RotationHandle
+          pose={displayed}
+          cameraScale={cameraScale}
+          angle={drag?.mode === "rotate" ? drag.value.rotation : undefined}
+          onPointerDown={(event) => {
+            if (event.button !== 0) return;
+            event.preventDefault();
+            event.stopPropagation();
+            editor.setPlaying(false);
+            const rect =
+              event.currentTarget.parentElement!.getBoundingClientRect();
+            const cx = rect.x + rect.width / 2,
+              cy = rect.y + rect.height / 2;
+            event.currentTarget.setPointerCapture(event.pointerId);
+            setGesture({
+              x: event.clientX,
+              y: event.clientY,
+              mode: "rotate",
+              original: transform,
+              value: transform,
+              rotation: {
+                cx,
+                cy,
+                angle: Math.atan2(event.clientY - cy, event.clientX - cx),
+                raw: transform.rotation ?? clip.rotation ?? 0,
+              },
+            });
+          }}
+        />
+      )}
       {regionId &&
         selectable &&
         !editing &&
@@ -902,6 +1038,7 @@ function PreviewLayerImpl({
         ((mode === "select" && ["text", "shape"].includes(clip.kind)) ||
           (asset && ["image", "video"].includes(clip.kind))) &&
         selectedObjectPart &&
+        !lineEditable &&
         resizeHandles.map((handle) => (
           <button
             key={handle.name}

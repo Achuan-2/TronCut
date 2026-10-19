@@ -22,6 +22,12 @@ const clamp = (value: number, min: number, max: number) =>
 
 export type DragAxis = "x" | "y";
 
+/** Accumulate successive pointer angles so crossing +/-180 never jumps. */
+export function rotationDragStep(rotation: number, previous: number, angle: number) {
+  const delta = Math.atan2(Math.sin(angle - previous), Math.cos(angle - previous));
+  return clamp(rotation + delta * 180 / Math.PI, -3600, 3600);
+}
+
 /** Use screen pixels for a zoom-independent dead zone; retain the chosen axis
  * until Shift is released so crossing the diagonal never flips the direction.
  */

@@ -1,0 +1,81 @@
+.rotation-handle {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  width: 24px;
+  height: 24px;
+  min-width: 0;
+  padding: 3px;
+  border: 1px solid #26382c;
+  border-radius: 50%;
+  background: #e0ffeb;
+  color: #183d29;
+  z-index: 21;
+  cursor: grab;
+  touch-action: none;
+  transform-origin: center top;
+}
+.rotation-handle::before {
+  content: "";
+  position: absolute;
+  left: calc(50% - 0.5px);
+  top: 100%;
+  height: 18px;
+  border-left: 1px solid var(--accent);
+  pointer-events: none;
+}
+.rotation-handle:hover {
+  background: #76e5b5;
+}
+.rotation-handle:active {
+  cursor: grabbing;
+}
+.rotation-handle svg {
+  display: block;
+}
+.rotation-angle {
+  position: absolute;
+  left: 32px;
+  top: 0;
+  padding: 2px 5px;
+  border-radius: 4px;
+  background: #18221f;
+  color: #e0ffeb;
+  font-size: 12px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.preview-layer.line-editable {
+  pointer-events: none;
+}
+.preview-layer.line-editable.selected::after {
+  display: none;
+}
+.preview-layer.line-editable .preview-line-art path {
+  pointer-events: visiblePainted;
+}
+.preview-layer.line-editable .line-hit-area {
+  position: absolute;
+  inset: 0;
+  overflow: visible;
+  pointer-events: none;
+}
+.line-hit-area path {
+  pointer-events: stroke;
+  cursor: move;
+}
+.line-control,
+.line-editable .rotation-handle {
+  pointer-events: auto;
+}
+.line-control {
+  cursor: crosshair;
+}
+.line-control.bend {
+  background: #76e5b5;
+  border-radius: 2px;
+}
+.preview-panel:fullscreen .rotation-handle,
+.preview-panel:fullscreen .line-control {
+  display: none;
+}

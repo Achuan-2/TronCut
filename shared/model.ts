@@ -242,6 +242,11 @@ export const projectSchema = z.object({
         shape: annotationShapeSchema.optional(),
         shapeStyle: shapeStyleSchema.optional(),
         shapeSize: z.object({ width: finite.min(1).max(32768), height: finite.min(1).max(32768) }).optional(),
+        // Normalized shaft samples keep endpoint/curve edits editable at any size.
+        linePoints: z.array(z.object({
+          x: finite.min(0).max(1),
+          y: finite.min(0).max(1),
+        })).min(2).max(128).optional(),
         drawing: drawingSchema.optional(),
         annotationEffect: annotationEffectSchema.optional(),
         fill: z
