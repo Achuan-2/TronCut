@@ -62,6 +62,7 @@ export default function FrameTransformProperties({
       {editingContent && <p className="field-help">框内画面</p>}
       <ScaleControl
         value={(editingContent ? content.scale : value.scale) * 100}
+        min={editingContent ? 100 : 5}
         onChange={(scale) => onContentOrFrame("scale", scale / 100)}
         disabled={disabled}
       />

@@ -24,7 +24,7 @@ export function setContentTransform(
   const contentTransform = {
     x: clamp(next.x, -4, 4),
     y: clamp(next.y, -4, 4),
-    scale: clamp(next.scale, 0.05, 8),
+    scale: clamp(next.scale, 1, 8),
   };
   if (
     Object.keys(contentTransform).every(

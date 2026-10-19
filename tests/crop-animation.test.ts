@@ -40,6 +40,23 @@ const sample = (source: Clip, time: number) =>
 const size = { width: 400, height: 200 },
   canvas = { width: 1000, height: 500 };
 
+it("框内缩放在静态和动画端点编辑时均不能低于100%，外框缩放保持不变", () => {
+  const source = { ...clip, transform: { ...defaultTransform, scale: 0.55 } };
+  const zoomed = animateContent(source, { scale: 2 }, { time: 0, auto: false });
+  const reset = animateContent(zoomed, { scale: 0.117 }, { time: 0, auto: false });
+  expect(reset.contentTransform?.scale).toBe(1);
+  expect(reset.transform.scale).toBe(0.55);
+
+  const animated = animateContent(source, { scale: 2 }, { time: 2, auto: true });
+  const edited = animateContent(animated, { scale: 0.5 }, {
+    time: 2, auto: false, endpoint: { time: 2, side: "end" },
+  });
+  for (const time of [0, 1, 1.5, 2, 8]) {
+    expect(sample(edited, time).contentTransform?.scale).toBeGreaterThanOrEqual(1);
+    expect(transformAt(edited, time).scale).toBe(0.55);
+  }
+});
+
 it("自动框内缩放/平移创建独立1秒动画，外框不变，静止区间不连箭头", () => {
   const first = animateContent(
     clip,

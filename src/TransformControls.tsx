@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useRef, type CSSProperties } from "react";
 import { RotateCcw, RotateCw } from "lucide-react";
 import type { Transform } from "../shared/model";
 import NumberInput from "./NumberInput";
@@ -38,48 +38,30 @@ export function PropertyResetButton({
 
 export function ScaleControl({
   value,
+  min = 5,
   onChange,
   disabled,
 }: {
   value: number;
+  min?: number;
   onChange: (value: number) => void;
   disabled?: boolean;
 }) {
   return (
-    <div className="transform-scale property-slider-row">
-      <span>缩放</span>
-      <div className="property-slider-control">
-        <input
-          aria-label="缩放滑条"
-          type="range"
-          min={5}
-          max={800}
-          step={0.1}
-          value={value}
-          disabled={disabled}
-          onChange={(event) => onChange(Number(event.target.value))}
-        />
-        <div className="transform-number">
-          <NumberInput
-            aria-label="缩放 (%)"
-            min={5}
-            max={800}
-            step={0.1}
-            value={Number(value.toFixed(3))}
-            disabled={disabled}
-            onValueChange={onChange}
-          />
-          <span>%</span>
-        </div>
-      </div>
-      <PropertyResetButton
-        label="重置缩放"
-        value={value}
-        defaultValue={100}
-        disabled={disabled}
-        onReset={() => onChange(100)}
-      />
-    </div>
+    <PropertySlider
+      className="transform-scale"
+      label="缩放"
+      ariaLabel="缩放 (%)"
+      value={value}
+      min={min}
+      max={800}
+      step={0.1}
+      unit="%"
+      onChange={onChange}
+      defaultValue={100}
+      onReset={() => onChange(100)}
+      disabled={disabled}
+    />
   );
 }
 
@@ -209,6 +191,7 @@ function RotationAxis({
 }
 
 export function PropertySlider({
+  className = "",
   label,
   ariaLabel,
   value,
@@ -221,6 +204,7 @@ export function PropertySlider({
   defaultValue = 0,
   disabled,
 }: {
+  className?: string;
   label: string;
   ariaLabel: string;
   value: number;
@@ -236,8 +220,9 @@ export function PropertySlider({
   const change = (value: number) => {
     if (Number.isFinite(value) && value >= min && value <= max) onChange(value);
   };
+  const progress = Math.max(0, Math.min(100, ((value - min) / (max - min)) * 100));
   return (
-    <div className="property-slider-row">
+    <div className={`property-slider-row ${className}`}>
       <span>{label}</span>
       <div className="property-slider-control">
         <input
@@ -247,6 +232,7 @@ export function PropertySlider({
           max={max}
           step={step}
           value={value}
+          style={{ "--slider-progress": `${progress}%` } as CSSProperties}
           disabled={disabled}
           onChange={(event) => change(Number(event.target.value))}
         />

@@ -73,11 +73,14 @@ const app = await electron.launch({
   env,
 });
 try {
+  await app.evaluate(({ app }, root) => app.setPath("documents", root), root);
   const page = await app.firstWindow(),
     errors = [];
   page.on("pageerror", (error) => errors.push(error.message));
   await page.getByRole("button", { name: "恢复编辑", exact: true }).click();
   await page.locator(".timeline-clip.image").click();
+  await expect(page.getByLabel("缩放 (%)", { exact: true })).toHaveValue("55");
+  await expect(page.getByLabel("缩放 (%)", { exact: true })).toHaveAttribute("min", "5");
   await page.getByRole("button", { name: "裁剪模式", exact: true }).click();
   const layer = page.locator(".preview-panel .preview-layer.image"),
     zoom = page.getByLabel("缩放 (%)", { exact: true }),
@@ -91,6 +94,37 @@ try {
     for (const key of ["x", "y", "width", "height"])
       expect(box[key]).toBeCloseTo(fixed[key], 0);
   };
+  const slider = page.getByRole("slider", { name: "缩放滑条", exact: true });
+  await expect(zoom).toHaveAttribute("min", "100");
+  await expect(slider).toHaveAttribute("min", "100");
+  await zoom.fill("11.7");
+  await zoom.blur();
+  await expect(zoom).toHaveValue("100");
+  await slider.focus();
+  await page.keyboard.press("Home");
+  await page.keyboard.press("ArrowLeft");
+  await expect(zoom).toHaveValue("100");
+  await zoom.fill("243.7");
+  await zoom.blur();
+  await expect(slider).toHaveValue("243.7");
+  await checkFixed();
+  const row = page.locator(".frame-transform-properties .transform-scale");
+  const checkSliderLayout = async () => {
+    const rangeBox = await slider.boundingBox(),
+      numberBox = await zoom.boundingBox(),
+      rowBox = await row.boundingBox(),
+      resetBox = await page.getByRole("button", { name: "重置缩放", exact: true }).boundingBox();
+    expect(rangeBox.width).toBeGreaterThan(45);
+    expect(rangeBox.x + rangeBox.width).toBeLessThan(numberBox.x);
+    expect(numberBox.x + numberBox.width).toBeLessThan(resetBox.x);
+    expect(resetBox.x + resetBox.width).toBeCloseTo(rowBox.x + rowBox.width, 0);
+    await expect(row.locator(".property-slider-control")).toHaveCSS("border-width", "0px");
+  };
+  await checkSliderLayout();
+  await page.locator(".inspector").screenshot({ path: path.join(root, "camtasia-sliders.png") });
+  await page.getByRole("button", { name: "重置缩放", exact: true }).click();
+  await expect(zoom).toHaveValue("100");
+  await checkFixed();
   await seek(2);
   await page.getByRole("button", { name: "自动动画", exact: true }).click();
   await zoom.fill("200");
@@ -152,7 +186,7 @@ try {
   await page.getByRole("button", { name: "自动动画", exact: true }).click();
   await arrows.nth(1).locator(".animation-point.start").click();
   const playhead = page.locator(".ruler-playhead");
-  await expect(playhead).toHaveCSS("left", "260px");
+  await expect(playhead).toHaveCSS("transform", "matrix(1, 0, 0, 1, 260, 0)");
   await expect(page.locator(".keyframe-edit-status")).toContainText(
     "编辑动画终点 · 00:02.00",
   );
@@ -162,22 +196,22 @@ try {
   await expect(zoom).toHaveValue("300");
   await page.getByRole("button", { name: "添加动画", exact: true }).click();
   await expect(arrows).toHaveCount(2);
-  await expect(playhead).toHaveCSS("left", "260px");
+  await expect(playhead).toHaveCSS("transform", "matrix(1, 0, 0, 1, 260, 0)");
   await zoom.fill("350");
-  await expect(playhead).toHaveCSS("left", "260px");
+  await expect(playhead).toHaveCSS("transform", "matrix(1, 0, 0, 1, 260, 0)");
   await expect(zoom).toHaveValue("350");
   await expect(arrows).toHaveCount(2);
   await page.getByTitle("撤销 Ctrl+Z", { exact: true }).click();
   await expect(zoom).toHaveValue("300");
-  await expect(playhead).toHaveCSS("left", "260px");
+  await expect(playhead).toHaveCSS("transform", "matrix(1, 0, 0, 1, 260, 0)");
   await page.getByTitle("重做 Ctrl+Shift+Z", { exact: true }).click();
   await expect(zoom).toHaveValue("350");
-  await expect(playhead).toHaveCSS("left", "260px");
+  await expect(playhead).toHaveCSS("transform", "matrix(1, 0, 0, 1, 260, 0)");
   await seek(3);
   await expect(page.locator(".keyframe-edit-status")).toHaveCount(0);
   await expect(zoom).toHaveValue("350");
   await arrows.nth(1).locator(".animation-point.end").click();
-  await expect(playhead).toHaveCSS("left", "325px");
+  await expect(playhead).toHaveCSS("transform", "matrix(1, 0, 0, 1, 325, 0)");
   await expect(zoom).toHaveValue("200");
   await page.screenshot({ path: path.join(root, "fixed-range-animation.png") });
   const handle = layer.locator(".crop-handle.w");
@@ -207,19 +241,13 @@ try {
   await page.getByTitle("撤销 Ctrl+Z", { exact: true }).click();
   await expect(zoom).toHaveValue("200");
   expect((await layer.boundingBox()).width).toBeCloseTo(cropped.width, 0);
-  await app.evaluate(({ dialog }, root) => {
-    dialog.showOpenDialog = async () => ({
-      canceled: false,
-      filePaths: [root],
-    });
-  }, root);
   await page.getByRole("button", { name: "保存", exact: true }).click();
   await expect(page.locator(".toast")).toContainText("工程已保存", {
     timeout: 20000,
   });
   const saved = JSON.parse(
     await fs.readFile(
-      path.join(root, project.name, `${project.name}.troncut`),
+      path.join(root, "TronCut", "Projects", project.name, `${project.name}.troncut`),
       "utf8",
     ),
   );
@@ -244,6 +272,11 @@ try {
   await seek(2); await expect(zoom).toHaveValue("350"); await checkFixed();
   await seek(5); await expect(zoom).toHaveValue("200");
   expect((await layer.boundingBox()).width).toBeCloseTo(cropped.width, 0);
+  const window = await app.browserWindow(page);
+  await window.evaluate((browserWindow) => browserWindow.setSize(1200, 900));
+  await expect(page.locator(".inspector")).toHaveCSS("width", "235px");
+  await checkSliderLayout();
+  await page.locator(".inspector").screenshot({ path: path.join(root, "camtasia-sliders-narrow.png") });
   expect(errors).toEqual([]);
   console.log(
     `固定外框缩放动画、1秒独立箭头、中间帧、关闭自动后端点编辑、前一个终点编辑、平移、边缘裁剪动画、还原/撤销及保存通过：${root}`,
