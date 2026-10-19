@@ -112,9 +112,9 @@ export function TimelineRangeHandles({
             style={{
               left:
                 part === "start"
-                  ? Math.max(collapsed ? 24 : 17, range.start * zoom)
+                  ? Math.max(collapsed ? 19 : 12, range.start * zoom)
                   : range.end * zoom +
-                    (collapsed && playhead * zoom < 24 ? 17 : 0),
+                    (collapsed && playhead * zoom < 19 ? 12 : 0),
             }}
             {...pointerProps(part)}
             onKeyDown={(event) => {
