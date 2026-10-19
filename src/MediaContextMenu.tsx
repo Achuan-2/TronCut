@@ -28,6 +28,8 @@ export default function MediaContextMenu({
   commands: customCommands,
   destinations,
   onTransfer,
+  folderDestinations,
+  onMoveToFolder,
 }: {
   menu: MediaMenuPosition;
   unavailable: Partial<Record<MediaCommand, string>>;
@@ -37,10 +39,14 @@ export default function MediaContextMenu({
   commands?: [MediaCommand, string][];
   destinations?: { id: string; name: string }[];
   onTransfer?: (targetId: string, move: boolean) => void;
+  folderDestinations?: { id: string; name: string }[];
+  onMoveToFolder?: (folderId: string | null) => void;
 }) {
   const root = useRef<HTMLDivElement>(null);
   const [position, setPosition] = useState({ x: menu.x, y: menu.y });
-  const [submenu, setSubmenu] = useState<"copy" | "move" | null>(null);
+  const [submenu, setSubmenu] = useState<"copy" | "move" | "folder" | null>(
+    null,
+  );
   const focusSubmenu = useRef(false);
   const [submenuPosition, setSubmenuPosition] = useState({ left: 0, top: 0 });
   useLayoutEffect(() => {
@@ -163,8 +169,11 @@ export default function MediaContextMenu({
           {label}
         </button>
       ))}
-      {onTransfer &&
-        (["copy", "move"] as const).map((mode) => (
+      {(onTransfer || onMoveToFolder) &&
+        (onMoveToFolder
+          ? (["folder"] as const)
+          : (["copy", "move"] as const)
+        ).map((mode) => (
           <div
             className="media-transfer-item"
             key={mode}
@@ -175,10 +184,15 @@ export default function MediaContextMenu({
               data-transfer={mode}
               aria-haspopup="menu"
               aria-expanded={submenu === mode}
-              disabled={!!unavailable.export || !destinations?.length}
+              disabled={
+                mode !== "folder" &&
+                (!!unavailable.export || !destinations?.length)
+              }
               title={
-                unavailable.export ??
-                (!destinations?.length ? "请先创建其他素材库" : undefined)
+                mode === "folder"
+                  ? undefined
+                  : (unavailable.export ??
+                    (!destinations?.length ? "请先创建其他素材库" : undefined))
               }
               onClick={() => setSubmenu(submenu === mode ? null : mode)}
               onKeyDown={(event) => {
@@ -197,7 +211,13 @@ export default function MediaContextMenu({
                 }
               }}
             >
-              <span>{mode === "copy" ? "复制到" : "移动至"}</span>
+              <span>
+                {mode === "folder"
+                  ? "移至文件夹"
+                  : mode === "copy"
+                    ? "复制到"
+                    : "移动至"}
+              </span>
               <span aria-hidden="true">›</span>
             </button>
             {submenu === mode && (
@@ -206,15 +226,26 @@ export default function MediaContextMenu({
                 data-transfer-menu
                 className="context-menu media-transfer-menu"
                 style={submenuPosition}
-                aria-label={mode === "copy" ? "复制到库" : "移动至库"}
+                aria-label={
+                  mode === "folder"
+                    ? "移至文件夹"
+                    : mode === "copy"
+                      ? "复制到库"
+                      : "移动至库"
+                }
               >
-                {destinations?.map((library) => (
+                {(mode === "folder"
+                  ? [{ id: "", name: "未分组" }, ...(folderDestinations ?? [])]
+                  : destinations
+                )?.map((library) => (
                   <button
                     key={library.id}
                     role="menuitem"
                     onClick={() => {
                       onClose();
-                      onTransfer(library.id, mode === "move");
+                      if (mode === "folder")
+                        onMoveToFolder?.(library.id || null);
+                      else onTransfer?.(library.id, mode === "move");
                     }}
                   >
                     {library.name}

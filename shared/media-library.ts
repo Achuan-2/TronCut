@@ -1,4 +1,4 @@
-import type { Asset, Clip, Project } from "./model";
+import { uid, type Asset, type Clip, type Project } from "./model";
 import { deleteClips, editableIds } from "./timeline";
 
 export function assetClips(project: Project, assetId: string) {
@@ -96,6 +96,20 @@ export function updateLibraryAsset(
     throw new Error("素材被锁定组合使用，请先解锁轨道");
   return {
     ...removed,
+    ...(project.mediaFolders
+      ? {
+          mediaFolders: project.mediaFolders.map((folder) => ({
+            ...folder,
+            assetIds: folder.assetIds.flatMap((assetId) =>
+              assetId === id
+                ? replacement
+                  ? [replacement.id]
+                  : []
+                : [assetId],
+            ),
+          })),
+        }
+      : {}),
     assets: replacement
       ? project.assets.map((asset) => (asset.id === id ? replacement : asset))
       : project.assets.filter((asset) => asset.id !== id),
@@ -104,5 +118,75 @@ export function updateLibraryAsset(
           clip.assetId === id ? { ...clip, assetId: replacement.id } : clip,
         )
       : removed.clips,
+  };
+}
+
+/** Pure changes are committed together, so a locked reference cancels the whole batch. */
+export function removeLibraryAssets(
+  project: Project,
+  ids: readonly string[],
+): Project {
+  return [...new Set(ids)].reduce(
+    (next, id) => updateLibraryAsset(next, id),
+    project,
+  );
+}
+
+export function moveProjectMedia(
+  project: Project,
+  ids: readonly string[],
+  folderId: string | null,
+): Project {
+  const folders = project.mediaFolders ?? [];
+  if (folderId && !folders.some((folder) => folder.id === folderId))
+    throw new Error("文件夹不存在");
+  const known = new Set(project.assets.map((asset) => asset.id));
+  const moving = new Set(ids.filter((id) => known.has(id)));
+  return {
+    ...project,
+    mediaFolders: folders.map((folder) => ({
+      ...folder,
+      assetIds: [
+        ...folder.assetIds.filter((id) => !moving.has(id)),
+        ...(folder.id === folderId ? moving : []),
+      ],
+    })),
+  };
+}
+
+export function editProjectMediaFolder(
+  project: Project,
+  command: "new-folder" | "rename" | "delete",
+  name: string,
+  folderId?: string,
+): Project {
+  const folders = project.mediaFolders ?? [];
+  if (
+    command !== "new-folder" &&
+    !folders.some((folder) => folder.id === folderId)
+  )
+    throw new Error("文件夹不存在");
+  if (command === "delete")
+    return {
+      ...project,
+      mediaFolders: folders.filter((folder) => folder.id !== folderId),
+    };
+  const trimmed = name.trim();
+  if (!trimmed || trimmed.length > 100)
+    throw new Error("文件夹名称须为 1 至 100 个字符");
+  if (
+    folders.some((folder) => folder.id !== folderId && folder.name === trimmed)
+  )
+    throw new Error("已存在同名文件夹");
+  if (command === "new-folder" && folders.length >= 10000)
+    throw new Error("文件夹数量已达上限");
+  return {
+    ...project,
+    mediaFolders:
+      command === "new-folder"
+        ? [...folders, { id: uid(), name: trimmed, assetIds: [] }]
+        : folders.map((folder) =>
+            folder.id === folderId ? { ...folder, name: trimmed } : folder,
+          ),
   };
 }

@@ -31,16 +31,24 @@ const categories = [
   { kind: "audio", label: "音频", icon: Music2 },
   { kind: "image", label: "图片", icon: Image },
 ] as const;
-type Preferences = { view: "grid" | "list" };
+type Category = Asset["kind"] | "all";
+type Preferences = {
+  view: "grid" | "list";
+  grouping: "type" | "none" | "folder";
+};
 const preferenceKey = "troncut.media-library";
 function readPreferences(): Preferences {
   try {
     const saved = JSON.parse(localStorage.getItem(preferenceKey) ?? "null");
     return {
       view: saved?.view === "list" ? "list" : "grid",
+      grouping:
+        saved?.grouping === "none" || saved?.grouping === "folder"
+          ? saved.grouping
+          : "type",
     };
   } catch {
-    return { view: "grid" };
+    return { view: "grid", grouping: "type" };
   }
 }
 
@@ -123,6 +131,13 @@ export interface MediaLibraryProps {
   onTransfer?: (asset: Asset, targetId: string, move: boolean) => void;
   onLibraryCommand?: (command: MediaCommand, folderId?: string) => void;
   onDropAsset?: (assetId: string, folderId: string | null) => void;
+  onBatchCommand?: (assets: Asset[], command: "add" | "delete") => void;
+  onMoveToFolder?: (assetIds: string[], folderId: string | null) => void;
+  onEditFolder?: (
+    command: "new-folder" | "rename" | "delete",
+    name: string,
+    folderId?: string,
+  ) => void;
 }
 
 export default function MediaLibrary({
@@ -142,13 +157,18 @@ export default function MediaLibrary({
   onTransfer,
   onLibraryCommand,
   onDropAsset,
+  onBatchCommand,
+  onMoveToFolder,
 }: MediaLibraryProps) {
   const [menu, setMenu] = useState<
     (MediaMenuPosition & { folderId?: string }) | null
   >(null);
   const closeMenu = useCallback(() => setMenu(null), []);
   const [preferences, setPreferences] = useState(readPreferences);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
+  const anchor = useRef<string | null>(null);
+  const [category, setCategory] = useState<Category>("all");
+  const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set());
   const [fileDrop, setFileDrop] = useState(false);
   useEffect(() => {
     if (dropDisabled) setFileDrop(false);
@@ -158,8 +178,9 @@ export default function MediaLibrary({
   const items = useRef<HTMLDivElement>(null);
   useEffect(() => {
     closeMenu();
-    setSelectedId(null);
-  }, [libraryId, closeMenu]);
+    setSelectedIds(new Set());
+    anchor.current = null;
+  }, [libraryId, query, category, preferences.grouping, closeMenu]);
   useEffect(() => {
     items.current?.scrollTo({ top: 0 });
   }, [query, preferences.view, libraryId]);
@@ -177,16 +198,18 @@ export default function MediaLibrary({
   const menuAsset = menu && assetsById.get(menu.assetId);
   const { filtered, folderAssets, children, visibleFolders } = useMemo(() => {
     const needle = query.trim().toLocaleLowerCase();
-    const byId = new Map(folders.map((folder) => [folder.id, folder]));
+    const activeFolders =
+      libraryId || preferences.grouping === "folder" ? folders : [];
+    const byId = new Map(activeFolders.map((folder) => [folder.id, folder]));
     const membership = new Map(
-      folders.flatMap((folder) =>
+      activeFolders.flatMap((folder) =>
         folder.assetIds.map((id) => [id, folder.id] as const),
       ),
     );
     const children = new Map<string, LibraryFolder[]>();
     const matched = new Set<string>();
     const visibleFolders = new Set<string>();
-    for (const folder of folders) {
+    for (const folder of activeFolders) {
       const siblings = children.get(folder.parentId ?? "") ?? [];
       siblings.push(folder);
       children.set(folder.parentId ?? "", siblings);
@@ -208,8 +231,9 @@ export default function MediaLibrary({
     matched.forEach(reveal);
     const filtered = assets.filter(
       (asset) =>
-        asset.name.toLocaleLowerCase().includes(needle) ||
-        matched.has(membership.get(asset.id) ?? ""),
+        (libraryId || category === "all" || asset.kind === category) &&
+        (asset.name.toLocaleLowerCase().includes(needle) ||
+          matched.has(membership.get(asset.id) ?? "")),
     );
     const folderAssets = new Map<string, Asset[]>();
     for (const asset of filtered) {
@@ -220,14 +244,81 @@ export default function MediaLibrary({
       reveal(folderId);
     }
     return { filtered, folderAssets, children, visibleFolders };
-  }, [assets, folders, query]);
+  }, [assets, folders, query, category, libraryId, preferences.grouping]);
+  // Range selection and batch insertion follow the rendered group/folder order.
+  const visibleOrder = useMemo(() => {
+    if (libraryId || preferences.grouping === "folder") {
+      const ordered: Asset[] = [];
+      const visit = (parentId: string) => {
+        for (const folder of children.get(parentId) ?? []) {
+          if (
+            visibleFolders.has(folder.id) &&
+            (query.trim() || expanded.has(folder.id))
+          )
+            visit(folder.id);
+        }
+        ordered.push(...(folderAssets.get(parentId) ?? []));
+      };
+      visit("");
+      return ordered.map((asset) => asset.id);
+    }
+    return (
+      preferences.grouping === "none"
+        ? filtered
+        : categories.flatMap(({ kind }) =>
+            collapsed.has(kind)
+              ? []
+              : filtered.filter((asset) => asset.kind === kind),
+          )
+    ).map((asset) => asset.id);
+  }, [
+    libraryId,
+    preferences.grouping,
+    children,
+    visibleFolders,
+    query,
+    expanded,
+    folderAssets,
+    filtered,
+    collapsed,
+  ]);
+  const menuAssets = menuAsset
+    ? selectedIds.has(menuAsset.id)
+      ? visibleOrder
+          .filter((id) => selectedIds.has(id))
+          .map((id) => assetsById.get(id)!)
+          .filter(Boolean)
+      : [menuAsset]
+    : [];
+  const multi = !libraryId && menuAssets.length > 1;
+  const selectCard = (id: string, event: React.MouseEvent) => {
+    const additive = !libraryId && (event.ctrlKey || event.metaKey);
+    const ordered = visibleOrder;
+    const from = anchor.current ? ordered.indexOf(anchor.current) : -1;
+    if (!libraryId && event.shiftKey && from >= 0) {
+      const to = ordered.indexOf(id);
+      const range = ordered.slice(Math.min(from, to), Math.max(from, to) + 1);
+      setSelectedIds(
+        (current) => new Set([...(additive ? current : []), ...range]),
+      );
+    } else {
+      anchor.current = id;
+      setSelectedIds((current) => {
+        if (!additive) return new Set([id]);
+        const next = new Set(current);
+        if (next.has(id)) next.delete(id);
+        else next.add(id);
+        return next;
+      });
+    }
+  };
   const renderAssets = (items: Asset[]) => (
     <div className={preferences.view === "grid" ? "asset-grid" : "asset-list"}>
       {items.map((asset) => (
         <AssetCard
           key={asset.id}
           asset={asset}
-          selected={selectedId === asset.id}
+          selected={selectedIds.has(asset.id)}
           libraryId={libraryId}
         />
       ))}
@@ -235,7 +326,12 @@ export default function MediaLibrary({
   );
   const dropHandlers = (folderId: string | null) => ({
     onDragOver: (event: React.DragEvent) => {
-      if (!event.dataTransfer.types.includes(libraryAssetMime)) return;
+      if (
+        !event.dataTransfer.types.includes(
+          libraryId ? libraryAssetMime : "framecraft-asset",
+        )
+      )
+        return;
       event.preventDefault();
       event.stopPropagation();
       event.dataTransfer.dropEffect = "move";
@@ -243,6 +339,21 @@ export default function MediaLibrary({
     },
     onDragLeave: () => setDropTarget(null),
     onDrop: (event: React.DragEvent) => {
+      if (!libraryId) {
+        const id = event.dataTransfer.getData("framecraft-asset");
+        if (!assetsById.has(id)) return;
+        event.preventDefault();
+        event.stopPropagation();
+        setDropTarget(null);
+        onMoveToFolder?.(
+          selectedIds.has(id)
+            ? visibleOrder.filter((id) => selectedIds.has(id))
+            : [id],
+          folderId,
+        );
+        if (folderId) setExpanded((current) => new Set(current).add(folderId));
+        return;
+      }
       const raw = event.dataTransfer.getData(libraryAssetMime);
       if (!raw) return;
       event.preventDefault();
@@ -333,14 +444,45 @@ export default function MediaLibrary({
             </button>
           )}
         </div>
+        {!libraryId && (
+          <div className="media-browser-options">
+            <select
+              aria-label="素材类别"
+              value={category}
+              onChange={(event) => setCategory(event.target.value as Category)}
+            >
+              <option value="all">全部媒体 ({assets.length})</option>
+              {categories.map(({ kind, label }) => (
+                <option key={kind} value={kind}>
+                  {label} (
+                  {assets.filter((asset) => asset.kind === kind).length})
+                </option>
+              ))}
+            </select>
+            <select
+              aria-label="素材分组"
+              value={preferences.grouping}
+              onChange={(event) =>
+                setPreferences((current) => ({
+                  ...current,
+                  grouping: event.target.value as Preferences["grouping"],
+                }))
+              }
+            >
+              <option value="type">按类别分组</option>
+              <option value="none">不分组</option>
+              <option value="folder">自定义文件夹</option>
+            </select>
+          </div>
+        )}
       </div>
-      {libraryId && (
+      {(libraryId || preferences.grouping === "folder") && (
         <button
           className={`library-root-drop ${dropTarget === "root" ? "drop-target" : ""}`}
           {...dropHandlers(null)}
           title="将素材拖到这里，移出文件夹"
         >
-          库根目录
+          {libraryId ? "库根目录" : "未分组"}
         </button>
       )}
       <div
@@ -355,7 +497,7 @@ export default function MediaLibrary({
             const folder = (event.target as HTMLElement).closest<HTMLElement>(
               "[data-folder-id]",
             );
-            if (libraryId)
+            if (libraryId || preferences.grouping === "folder")
               setMenu({
                 assetId: "",
                 folderId: folder?.dataset.folderId,
@@ -366,14 +508,19 @@ export default function MediaLibrary({
             return;
           }
           const assetId = card.dataset.assetId!;
-          setSelectedId(assetId);
+          if (!selectedIds.has(assetId)) {
+            setSelectedIds(new Set([assetId]));
+            anchor.current = assetId;
+          }
           setMenu({ assetId, x: event.clientX, y: event.clientY });
         }}
         onClick={(event) => {
           const card = (event.target as HTMLElement).closest<HTMLButtonElement>(
             ".asset-card",
           );
-          if (card) setSelectedId(card.dataset.assetId!);
+          if (card) selectCard(card.dataset.assetId!, event);
+          else if (event.target === event.currentTarget)
+            setSelectedIds(new Set());
         }}
         onDoubleClick={(event) => {
           const card = (event.target as HTMLElement).closest<HTMLButtonElement>(
@@ -414,8 +561,46 @@ export default function MediaLibrary({
           </div>
         ) : (
           <>
-            {children.get("")?.map(renderFolder)}
-            {renderAssets(folderAssets.get("") ?? [])}
+            {libraryId || preferences.grouping === "folder" ? (
+              <>
+                {children.get("")?.map(renderFolder)}
+                {renderAssets(folderAssets.get("") ?? [])}
+              </>
+            ) : preferences.grouping === "none" ? (
+              renderAssets(filtered)
+            ) : (
+              categories.map(({ kind, label }) => {
+                const group = filtered.filter((asset) => asset.kind === kind);
+                if (!group.length) return null;
+                return (
+                  <section
+                    className="asset-group"
+                    key={kind}
+                    aria-label={`${label}素材`}
+                  >
+                    <h3 className="asset-group-heading">
+                      <button
+                        aria-expanded={!collapsed.has(kind)}
+                        aria-label={`${collapsed.has(kind) ? "展开" : "折叠"}${label}分组`}
+                        onClick={() =>
+                          setCollapsed((current) => {
+                            const next = new Set(current);
+                            if (next.has(kind)) next.delete(kind);
+                            else next.add(kind);
+                            return next;
+                          })
+                        }
+                      >
+                        <ChevronDown size={13} />
+                        <span>{label}</span>
+                        <small>{group.length}</small>
+                      </button>
+                    </h3>
+                    {!collapsed.has(kind) && renderAssets(group)}
+                  </section>
+                );
+              })
+            )}
           </>
         )}
       </div>
@@ -424,11 +609,18 @@ export default function MediaLibrary({
           <Plus size={16} />
           {libraryId ? "导入到库" : "导入媒体"}
         </button>
-        {libraryId && (
+        {(libraryId || onLibraryCommand) && (
           <button
             aria-label="新建文件夹"
             title="新建文件夹"
-            onClick={() => onLibraryCommand?.("new-folder")}
+            onClick={() => {
+              if (!libraryId)
+                setPreferences((current) => ({
+                  ...current,
+                  grouping: "folder",
+                }));
+              onLibraryCommand?.("new-folder");
+            }}
           >
             <FolderPlus size={16} />
           </button>
@@ -454,49 +646,81 @@ export default function MediaLibrary({
           ))}
         </div>
       </div>
-      {menu && (menuAsset || libraryId) && (
+      {menu && (menuAsset || libraryId || onLibraryCommand) && (
         <MediaContextMenu
           menu={menu}
           onClose={closeMenu}
-          unavailable={menuAsset ? unavailable(menuAsset) : {}}
+          unavailable={
+            multi
+              ? menuAssets.some((asset) => asset.missing)
+                ? { add: "请先更新离线素材" }
+                : {}
+              : menuAsset
+                ? unavailable(menuAsset)
+                : {}
+          }
           onCommand={(command) =>
-            menuAsset
-              ? onCommand(menuAsset, command)
-              : onLibraryCommand?.(command, menu.folderId)
+            multi && (command === "add" || command === "delete")
+              ? onBatchCommand?.(menuAssets, command)
+              : menuAsset
+                ? onCommand(menuAsset, command)
+                : onLibraryCommand?.(command, menu.folderId)
           }
           onSaveToLibrary={
-            onSaveToLibrary && menuAsset
+            onSaveToLibrary && menuAsset && !multi
               ? () => onSaveToLibrary(menuAsset)
               : undefined
           }
           destinations={destinations}
+          folderDestinations={!libraryId ? folders : undefined}
+          onMoveToFolder={
+            !libraryId && menuAsset && onMoveToFolder
+              ? (folderId) =>
+                  onMoveToFolder(
+                    menuAssets.map((asset) => asset.id),
+                    folderId,
+                  )
+              : undefined
+          }
           onTransfer={
             menuAsset && onTransfer
               ? (targetId, move) => onTransfer(menuAsset, targetId, move)
               : undefined
           }
           commands={
-            libraryId
-              ? menuAsset
-                ? [
-                    ["add", "添加到时间轴播放头所处位置"],
-                    ["delete", "删除"],
-                    ["rename", "重命名…"],
-                    ["export", "导出资产…"],
-                  ]
-                : menu.folderId
+            multi
+              ? [
+                  ["add", `添加 ${menuAssets.length} 个素材到时间线`],
+                  ["delete", `删除 ${menuAssets.length} 个素材`],
+                ]
+              : libraryId
+                ? menuAsset
                   ? [
-                      ["new-folder", "新建子文件夹…"],
-                      ["rename", "重命名文件夹…"],
-                      ["delete", "删除文件夹…"],
+                      ["add", "添加到时间轴播放头所处位置"],
+                      ["delete", "删除"],
+                      ["rename", "重命名…"],
+                      ["export", "导出资产…"],
                     ]
-                  : [
-                      ["import", "将媒体导入库…"],
-                      ["new-folder", "新建文件夹…"],
-                      ["export-library", "导出库…"],
-                      ["import-library", "导入压缩库…"],
-                    ]
-              : undefined
+                  : menu.folderId
+                    ? [
+                        ["new-folder", "新建子文件夹…"],
+                        ["rename", "重命名文件夹…"],
+                        ["delete", "删除文件夹…"],
+                      ]
+                    : [
+                        ["import", "将媒体导入库…"],
+                        ["new-folder", "新建文件夹…"],
+                        ["export-library", "导出库…"],
+                        ["import-library", "导入压缩库…"],
+                      ]
+                : !menuAsset
+                  ? menu.folderId
+                    ? [
+                        ["rename", "重命名文件夹…"],
+                        ["delete", "删除文件夹…"],
+                      ]
+                    : [["new-folder", "新建文件夹…"]]
+                  : undefined
           }
         />
       )}

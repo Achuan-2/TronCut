@@ -106,11 +106,24 @@ try {
   await expect(cards).toHaveCount(75);
   await expect(
     page.getByRole("combobox", { name: "素材类别", exact: true }),
-  ).toHaveCount(0);
+  ).toHaveCount(1);
   await expect(
     page.getByRole("combobox", { name: "素材分组", exact: true }),
-  ).toHaveCount(0);
-  await expect(page.locator(".asset-group-heading")).toHaveCount(0);
+  ).toHaveCount(1);
+  await expect(page.locator(".asset-group-heading")).toHaveCount(3);
+  await page
+    .getByRole("combobox", { name: "素材类别", exact: true })
+    .selectOption("video");
+  await expect(cards).toHaveCount(1);
+  await page
+    .getByRole("combobox", { name: "素材类别", exact: true })
+    .selectOption("all");
+  await page.getByRole("button", { name: "折叠图片分组", exact: true }).click();
+  await expect(cards).toHaveCount(2);
+  await page
+    .getByRole("combobox", { name: "素材分组", exact: true })
+    .selectOption("none");
+  await expect(cards).toHaveCount(75);
   await expect(grid).toHaveAttribute("aria-pressed", "true");
   await expect(
     page.getByText("保存工程时，素材自动归档", { exact: true }),
@@ -184,11 +197,9 @@ try {
   await cards.first().press("Enter");
   await expect(page.locator(".timeline-clip.video")).toHaveCount(1);
   await page.getByTitle("撤销 Ctrl+Z", { exact: true }).click();
-  await cards
-    .first()
-    .dragTo(page.locator(".track-lane").first(), {
-      targetPosition: { x: 80, y: 20 },
-    });
+  await cards.first().dragTo(page.locator(".track-lane").first(), {
+    targetPosition: { x: 80, y: 20 },
+  });
   await expect(page.locator(".timeline-clip.video")).toHaveCount(1);
 
   // Offline media remains relinkable rather than being inserted into the timeline.
@@ -224,7 +235,7 @@ try {
   );
   expect(errors).toEqual([]);
   console.log(
-    `项目媒体移除分类、搜索、双视图及偏好重开、独立滚动、按需缩略图、双击/键盘添加、拖拽载荷及离线重链接通过：${root}`,
+    `项目媒体分类分组、搜索、双视图及偏好重开、独立滚动、按需缩略图、双击/键盘添加、拖拽载荷及离线重链接通过：${root}`,
   );
 } catch (error) {
   await (

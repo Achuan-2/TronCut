@@ -10,6 +10,7 @@ import MediaLibrary, { type MediaLibraryProps } from "./MediaLibrary";
 import "./AssetLibraryPanel.css";
 
 type Request = {
+  project?: boolean;
   kind:
     | "create"
     | "rename"
@@ -46,6 +47,7 @@ function LibraryDialog({
   error,
   onClose,
   onSubmit,
+  projectFolders,
 }: {
   request: Request;
   library?: AssetLibrary;
@@ -54,14 +56,16 @@ function LibraryDialog({
   error: string;
   onClose: () => void;
   onSubmit: (value: string) => void;
+  projectFolders?: MediaLibraryProps["folders"];
 }) {
   const ref = useRef<HTMLDialogElement>(null);
   const [value, setValue] = useState(
     request.kind === "asset-rename"
       ? (request.asset?.name ?? "")
       : request.kind === "folder-rename"
-        ? (library?.folders?.find((folder) => folder.id === request.folderId)
-            ?.name ?? "")
+        ? ((request.project ? projectFolders : library?.folders)?.find(
+            (folder) => folder.id === request.folderId,
+          )?.name ?? "")
         : request.kind === "rename"
           ? (library?.name ?? "")
           : request.kind === "save"
@@ -132,7 +136,9 @@ function LibraryDialog({
             {request.kind === "delete"
               ? `确定删除“${library?.name}”及其中的 ${library?.assets.length ?? 0} 个素材？已加入工程的素材仍会保留。`
               : request.kind === "folder-delete"
-                ? "确定删除此文件夹？其中的素材和子文件夹会移回库根目录。"
+                ? request.project
+                  ? "确定删除此文件夹？其中的素材会移回未分组，素材及时间线片段保持不变。"
+                  : "确定删除此文件夹？其中的素材和子文件夹会移回库根目录。"
                 : `确定从库中移除“${request.asset?.name}”？已加入工程的素材仍会保留。`}
           </p>
         ) : request.kind === "save" ? (
@@ -257,6 +263,19 @@ export default function AssetLibraryPanel(
   const submit = (value: string) =>
     void act(async () => {
       if (!request) return;
+      if (request.project) {
+        props.onEditFolder?.(
+          request.kind === "folder-create"
+            ? "new-folder"
+            : request.kind === "folder-rename"
+              ? "rename"
+              : "delete",
+          value,
+          request.folderId,
+        );
+        setRequest(null);
+        return;
+      }
       const api = desktop();
       if (request.kind === "create") {
         setSelected(await api.createAssetLibrary(value));
@@ -465,7 +484,9 @@ export default function AssetLibraryPanel(
           dropDisabled={disabled}
           assets={visibleAssets}
           libraryId={tab === "library" ? (library?.id ?? "loading") : undefined}
-          folders={tab === "library" ? library?.folders : undefined}
+          folders={tab === "library" ? library?.folders : props.folders}
+          onBatchCommand={tab === "project" ? props.onBatchCommand : undefined}
+          onMoveToFolder={tab === "project" ? props.onMoveToFolder : undefined}
           destinations={
             tab === "library"
               ? libraries.filter((item) => item.id !== library?.id)
@@ -501,7 +522,8 @@ export default function AssetLibraryPanel(
                     );
                     await refresh();
                   })
-              : undefined
+              : (assetId, folderId) =>
+                  props.onMoveToFolder?.([assetId], folderId)
           }
           onLibraryCommand={
             tab === "library"
@@ -517,7 +539,15 @@ export default function AssetLibraryPanel(
                   else if (command === "export-library") exportLibrary();
                   else if (command === "import-library") importLibrary();
                 }
-              : undefined
+              : (command, folderId) => {
+                  if (disabled) return;
+                  if (command === "new-folder")
+                    show({ kind: "folder-create", project: true });
+                  else if (command === "rename" && folderId)
+                    show({ kind: "folder-rename", folderId, project: true });
+                  else if (command === "delete" && folderId)
+                    show({ kind: "folder-delete", folderId, project: true });
+                }
           }
           onSaveToLibrary={
             tab === "project"
@@ -568,6 +598,7 @@ export default function AssetLibraryPanel(
       {request && (
         <LibraryDialog
           request={request}
+          projectFolders={props.folders}
           library={library}
           libraries={libraries}
           pending={pending}

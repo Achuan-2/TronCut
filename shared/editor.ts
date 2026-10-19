@@ -53,6 +53,7 @@ export function addMediaAssets(
     pasteToTop?: boolean;
     trackId?: string;
     imageDuration?: number;
+    sequential?: boolean;
   } = {},
 ): Project {
   const tracks = [...project.tracks],
@@ -92,6 +93,7 @@ export function addMediaAssets(
       )
         track = target;
       if (!track) {
+        if (tracks.length >= 128) throw new Error("轨道数量已达上限");
         track = newTrack(tracks.length);
         tracks.unshift(track);
       }
@@ -111,6 +113,7 @@ export function addMediaAssets(
         transform: { ...defaultTransform },
         keyframes: [],
       });
+      if (options.sequential) start += duration;
     }
   const known = new Set(project.assets.map((a) => a.id));
   return {

@@ -29,6 +29,9 @@ import {
   assetClips,
   mediaReplacementError,
   requiredMediaDuration,
+  removeLibraryAssets,
+  moveProjectMedia,
+  editProjectMediaFolder,
 } from "../shared/media-library";
 import { defaultCursorStyle } from "../shared/cursor";
 import CursorStyleSelect from "./CursorStyleSelect";
@@ -140,9 +143,35 @@ export default function Panels(props: Props) {
         {tab === "favorites" && <FavoritesPanel editor={editor} toast={toast} />}
         {tab === "media" && (
           <AssetLibraryPanel
+            key={`media:${editor.documentProject.id}`}
             toast={toast}
             busy={props.busy}
             assets={project.assets}
+            folders={editor.documentProject.mediaFolders}
+            onBatchCommand={(assets, command) => run(async () => {
+              if (command === "add") {
+                if (assets.some((asset) => asset.missing))
+                  throw new Error("请先更新离线素材");
+                editor.setPlaying(false);
+                editor.addAssets(assets, true, {
+                  time: editor.playback.getSnapshot(),
+                  sequential: true,
+                });
+              } else {
+                editor.editProjectMedia((p) =>
+                  removeLibraryAssets(p, assets.map((asset) => asset.id)),
+                );
+                toast(`已从工程移除 ${assets.length} 个素材及引用片段，可撤销`);
+              }
+            })}
+            onMoveToFolder={(ids, folderId) => run(async () => {
+              editor.editProjectMedia((p) => moveProjectMedia(p, ids, folderId));
+            })}
+            onEditFolder={(command, name, folderId) => {
+              editor.editProjectMedia((p) =>
+                editProjectMediaFolder(p, command, name, folderId),
+              );
+            }}
             query={query}
             onQueryChange={setQuery}
             onImport={props.importMedia}

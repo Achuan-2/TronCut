@@ -11,7 +11,11 @@ import {
   replaceSelectedMedia,
   requiredMediaDuration,
   updateLibraryAsset,
+  removeLibraryAssets,
+  moveProjectMedia,
+  editProjectMediaFolder,
 } from "../shared/media-library";
+import { addMediaAssets } from "../shared/editor";
 
 function fixture() {
   const project = createProject();
@@ -58,6 +62,102 @@ function fixture() {
   return { project, source, replacement };
 }
 describe("媒体库操作", () => {
+  it("文件夹创建、重命名与删除保留素材和片段，校验空名称和重名", () => {
+    const { project, source } = fixture();
+    const created = editProjectMediaFolder(project, "new-folder", "  片头  ");
+    const id = created.mediaFolders![0].id;
+    const moved = moveProjectMedia(created, [source.id], id);
+    const renamed = editProjectMediaFolder(moved, "rename", "背景", id);
+    expect(renamed.mediaFolders![0]).toEqual({
+      id,
+      name: "背景",
+      assetIds: [source.id],
+    });
+    const removed = editProjectMediaFolder(renamed, "delete", "", id);
+    expect(removed.assets).toBe(project.assets);
+    expect(removed.clips).toBe(project.clips);
+    expect(removed.mediaFolders).toEqual([]);
+    expect(() => editProjectMediaFolder(created, "new-folder", "片头")).toThrow(
+      "同名",
+    );
+    expect(() => editProjectMediaFolder(created, "new-folder", "  ")).toThrow(
+      "名称",
+    );
+  });
+  it("批量添加按输入顺序依次放置，保留图片默认时长且不改变原工程", () => {
+    const { project, source } = fixture();
+    const image: Asset = {
+      ...source,
+      id: "picture",
+      kind: "image",
+      duration: 0,
+    };
+    const next = addMediaAssets(
+      project,
+      [image, source, { ...source, id: "third" }],
+      30,
+      true,
+      { sequential: true, imageDuration: 3 },
+    );
+    expect(
+      next.clips.slice(-3).map((clip) => [clip.start, clip.duration]),
+    ).toEqual([
+      [30, 3],
+      [33, 20],
+      [53, 20],
+    ]);
+    expect(new Set(next.clips.slice(-3).map((clip) => clip.trackId)).size).toBe(
+      1,
+    );
+    expect(project.clips).toHaveLength(2);
+  });
+  it("批量删除保持原子性，清理文件夹成员并遵守锁定保护", () => {
+    const { project, source, replacement } = fixture();
+    project.mediaFolders = [
+      { id: "folder", name: "片头", assetIds: [source.id, replacement.id] },
+    ];
+    const next = removeLibraryAssets(project, [source.id, replacement.id]);
+    expect(next.assets).toEqual([]);
+    expect(next.clips).toEqual([]);
+    expect(next.mediaFolders![0].assetIds).toEqual([]);
+    project.tracks.find(
+      (track) => track.id === project.clips[0].trackId,
+    )!.locked = true;
+    expect(() =>
+      removeLibraryAssets(project, [replacement.id, source.id]),
+    ).toThrow("锁定");
+    expect(project.assets).toHaveLength(2);
+    expect(project.mediaFolders[0].assetIds).toEqual([
+      source.id,
+      replacement.id,
+    ]);
+  });
+  it("归档、移出和替换保留唯一文件夹归属，工程校验保留元数据", () => {
+    const { project, source, replacement } = fixture();
+    project.mediaFolders = [
+      { id: "a", name: "片头", assetIds: [source.id] },
+      { id: "b", name: "背景", assetIds: [] },
+    ];
+    const moved = moveProjectMedia(
+      project,
+      [source.id, source.id, "unknown"],
+      "b",
+    );
+    expect(validateProject(moved).mediaFolders).toEqual([
+      { id: "a", name: "片头", assetIds: [] },
+      { id: "b", name: "背景", assetIds: [source.id] },
+    ]);
+    expect(
+      updateLibraryAsset(moved, source.id, replacement).mediaFolders![1]
+        .assetIds,
+    ).toEqual([replacement.id]);
+    expect(
+      moveProjectMedia(moved, [source.id], null).mediaFolders![1].assetIds,
+    ).toEqual([]);
+    expect(() => moveProjectMedia(project, [source.id], "missing")).toThrow(
+      "不存在",
+    );
+  });
   it("替换仅影响选中片段的素材和名称，保留剪辑、动画、效果及其他引用", () => {
     const { project, replacement } = fixture();
     const next = replaceSelectedMedia(project, ["selected"], replacement);

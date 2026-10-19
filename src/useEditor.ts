@@ -1535,6 +1535,7 @@ export function useEditor(
         pasteToTop?: boolean;
         trackId?: string;
         time?: number;
+        sequential?: boolean;
       } = {},
     ) => {
       const before = current.current;
@@ -1559,9 +1560,9 @@ export function useEditor(
     },
     [apply, playback],
   );
-  const editLibraryAsset = useCallback((id: string, replacement?: Asset) => {
+  const editProjectMedia = useCallback((change: (project: Project) => Project) => {
     const before = documentCurrent.current;
-    const after = changeLibraryAsset(before, id, replacement);
+    const after = change(before);
     if (after === before) return;
     past.current = [...past.current.slice(-99), before];
     future.current = [];
@@ -1572,6 +1573,9 @@ export function useEditor(
     clearKeyframeEdit();
     setPlaying(false);
   }, [clearKeyframeEdit, setPlaying]);
+  const editLibraryAsset = useCallback((id: string, replacement?: Asset) => {
+    editProjectMedia((project) => changeLibraryAsset(project, id, replacement));
+  }, [editProjectMedia]);
   const replaceMediaSelection = useCallback((asset: Asset) => {
     apply((project) => replaceSelectedMedia(project, selectedIds, asset));
     clearKeyframeEdit();
@@ -1890,6 +1894,7 @@ export function useEditor(
     removeSpeedEffect,
     addAssets,
     editLibraryAsset,
+    editProjectMedia,
     replaceMediaSelection,
     selectAssetClips,
     editingTextId,

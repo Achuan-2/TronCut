@@ -144,6 +144,14 @@ export const projectSchema = z.object({
     background: z.string().regex(/^#[\da-f]{6}$/i),
   }),
   camera: cameraSchema.optional(),
+  mediaFolders: z
+    .array(z.object({
+      id: identifier,
+      name: z.string().trim().min(1).max(100),
+      assetIds: z.array(identifier).max(10000),
+    }))
+    .max(10000)
+    .optional(),
   assets: z
     .array(
       z.object({

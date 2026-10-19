@@ -17,3 +17,37 @@
   pointer-events: none;
   transform: translateY(-50%);
 }
+.media-browser-options {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+.media-browser-options select {
+  flex: 1;
+  width: 0;
+  min-width: 0;
+  padding: 6px;
+}
+.asset-group-heading {
+  margin: 8px 0;
+}
+.asset-group-heading button {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  padding: 6px 0;
+  color: var(--muted);
+  background: transparent;
+  border: 0;
+  text-align: left;
+}
+.asset-group-heading small {
+  margin-left: auto;
+}
+.asset-group-heading button[aria-expanded="false"] svg {
+  transform: rotate(-90deg);
+}
+.media-browser-items {
+  user-select: none;
+}

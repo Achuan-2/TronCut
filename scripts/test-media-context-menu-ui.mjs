@@ -2,6 +2,7 @@ import { _electron as electron, expect } from "@playwright/test";
 import fs from "node:fs/promises";
 import path from "node:path";
 import sharp from "sharp";
+import { setTimelineZoom } from "./timeline-zoom.mjs";
 
 const root = path.resolve(
   "test-output/media-context-menu",
@@ -81,13 +82,14 @@ const save = async () => {
 try {
   await page.getByRole("button", { name: "恢复编辑", exact: true }).click();
   await card("image-0").click({ button: "right" });
-  await expect(menu.getByRole("menuitem")).toHaveCount(6);
+  await expect(menu.getByRole("menuitem")).toHaveCount(7);
   await expect(menu.getByRole("menuitem", { name: "添加到素材库…", exact: true })).toBeEnabled();
   await expect(action("替换时间轴上所选的媒体")).toBeDisabled();
   await expect(action("在时间线上选择")).toBeDisabled();
   await page.keyboard.press("Escape");
   await expect(menu).toHaveCount(0);
-  await page.locator(".ruler").click({ position: { x: 130, y: 15 } });
+  await setTimelineZoom(page, 100);
+  await page.locator(".ruler").click({ position: { x: 200, y: 15 } });
   await choose("image-0", "添加到时间轴播放头所处位置");
   await expect(clips).toHaveCount(1);
   await expect(clips.first()).toHaveClass(/selected/);
@@ -98,7 +100,7 @@ try {
     path.join(root, `${project.name}.troncut`),
   );
   let saved = await save();
-  expect(saved.clips[0].start).toBe(2);
+  expect(saved.clips[0].start).toBeCloseTo(2, 6);
   const initial = saved.clips[0];
   await choose("image-1", "替换时间轴上所选的媒体");
   saved = await save();
@@ -111,9 +113,12 @@ try {
   saved = await save();
   expect(saved.clips[0].assetId).toBe("image-0");
   await page.getByTitle("重做 Ctrl+Shift+Z", { exact: true }).click();
-  await page.locator(".ruler").click({ position: { x: 8 * 65, y: 15 } });
+  await page.locator(".ruler").click({ position: { x: 800, y: 15 } });
   await choose("image-1", "添加到时间轴播放头所处位置");
   await expect(clips).toHaveCount(2);
+  const starts = (await save()).clips.map((clip) => clip.start);
+  expect(starts[0]).toBe(initial.start);
+  expect(starts[1]).toBeCloseTo(8, 6);
   await choose("image-1", "在时间线上选择");
   await expect(page.locator(".timeline-clip.image.selected")).toHaveCount(2);
   await app.evaluate(({ dialog }, file) => {
@@ -130,7 +135,7 @@ try {
   const updated = saved.assets.find((asset) => asset.name === "blue.png");
   expect(updated.id).not.toBe("image-1");
   expect(saved.clips.every((clip) => clip.assetId === updated.id)).toBe(true);
-  expect(saved.clips.map((clip) => clip.start)).toEqual([2, 8]);
+  expect(saved.clips.map((clip) => clip.start)).toEqual(starts);
   await expect(page.locator(".preview-layer.image img").last()).toHaveAttribute(
     "src",
     new RegExp(updated.id),
