@@ -285,7 +285,7 @@ describe("行为的对象与逐字时序", () => {
     expect(next.behaviors![0].duration).toBe(0.2);
     expect(next.behaviors![0].start).toBe(0);
   });
-  it("工程校验保留参数，截帧冻结原行为时间而不重新开始", () => {
+  it("项目校验保留参数，截帧冻结原行为时间而不重新开始", () => {
     const clip = newText("titles", 2, 0, "ABC");
     clip.behaviors = [createBehavior("type-fade", clip.duration)!];
     const project = createProject();

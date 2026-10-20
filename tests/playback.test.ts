@@ -55,7 +55,7 @@ describe("播放条定位", () => {
     expect(mediaBoundaryTime(p, 3, 1)).toBe(4);
     expect(mediaBoundaryTime(p, 3 + 1e-12, 1)).toBe(4);
   });
-  it("忽略隐藏轨道的中间边界，锁定轨道可正常导航，空工程仍可安全定位", () => {
+  it("忽略隐藏轨道的中间边界，锁定轨道可正常导航，空项目仍可安全定位", () => {
     const p = createProject();
     const a = newText("video", 0);
     a.duration = 5;

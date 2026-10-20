@@ -148,8 +148,8 @@ try {
     .toBeGreaterThan(initial.width + 10);
   await page.screenshot({ path: path.join(root, "junction-added.png") });
 
-  await page.getByTitle("保存工程 Ctrl+S").click();
-  await expect(page.locator(".toast")).toContainText("工程已保存");
+  await page.getByTitle("保存项目 Ctrl+S").click();
+  await expect(page.locator(".toast")).toContainText("项目已保存");
   await expect
     .poll(
       async () =>

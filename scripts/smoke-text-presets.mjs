@@ -102,8 +102,8 @@ try {
   // Favorite cards use the same style payload when creating editable text.
   await card(page, "重命名花字").click();
   await expect(page.locator(".timeline-clip.text")).toHaveCount(2);
-  await page.getByTitle("保存工程 Ctrl+S").click();
-  await expect(page.locator(".toast")).toContainText("工程已保存");
+  await page.getByTitle("保存项目 Ctrl+S").click();
+  await expect(page.locator(".toast")).toContainText("项目已保存");
   const saved = JSON.parse(await fs.readFile(file, "utf8"));
   expect(saved.clips[1].style).toEqual(custom.style);
   // A drag payload contains the style, rather than an index into a local library.
@@ -141,8 +141,8 @@ try {
   await expect(
     page.getByRole("spinbutton", { name: "字号", exact: true }),
   ).toHaveValue("42");
-  await page.getByTitle("保存工程 Ctrl+S").click();
-  await expect(page.locator(".toast")).toContainText("工程已保存");
+  await page.getByTitle("保存项目 Ctrl+S").click();
+  await expect(page.locator(".toast")).toContainText("项目已保存");
   await expect
     .poll(async () => {
       const applied = JSON.parse(await fs.readFile(file, "utf8"));

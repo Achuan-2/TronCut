@@ -266,10 +266,10 @@ export default function MediaLibrary({
       preferences.grouping === "none"
         ? filtered
         : categories.flatMap(({ kind }) =>
-            collapsed.has(kind)
-              ? []
-              : filtered.filter((asset) => asset.kind === kind),
-          )
+          collapsed.has(kind)
+            ? []
+            : filtered.filter((asset) => asset.kind === kind),
+        )
     ).map((asset) => asset.id);
   }, [
     libraryId,
@@ -285,9 +285,9 @@ export default function MediaLibrary({
   const menuAssets = menuAsset
     ? selectedIds.has(menuAsset.id)
       ? visibleOrder
-          .filter((id) => selectedIds.has(id))
-          .map((id) => assetsById.get(id)!)
-          .filter(Boolean)
+        .filter((id) => selectedIds.has(id))
+        .map((id) => assetsById.get(id)!)
+        .filter(Boolean)
       : [menuAsset]
     : [];
   const multi = !libraryId && menuAssets.length > 1;
@@ -560,7 +560,7 @@ export default function MediaLibrary({
           <div className="library-empty">
             <Film size={36} />
             <b>
-              {libraryId ? "添加常用素材，跨工程复用" : "导入视频、音频或图片"}
+              {libraryId ? "添加常用素材，跨项目复用" : "导入视频、音频或图片"}
             </b>
             <p>
               {libraryId
@@ -691,10 +691,10 @@ export default function MediaLibrary({
           onMoveToFolder={
             !libraryId && menuAsset && onMoveToFolder
               ? (folderId) =>
-                  onMoveToFolder(
-                    menuAssets.map((asset) => asset.id),
-                    folderId,
-                  )
+                onMoveToFolder(
+                  menuAssets.map((asset) => asset.id),
+                  folderId,
+                )
               : undefined
           }
           onTransfer={
@@ -705,35 +705,35 @@ export default function MediaLibrary({
           commands={
             multi
               ? [
-                  ["add", `添加 ${menuAssets.length} 个素材到时间线`],
-                  ["delete", `删除 ${menuAssets.length} 个素材`],
-                ]
+                ["add", `添加 ${menuAssets.length} 个素材到时间线`],
+                ["delete", `删除 ${menuAssets.length} 个素材`],
+              ]
               : libraryId
                 ? menuAsset
                   ? [
-                      ["add", "添加到时间轴播放头所处位置"],
-                      ["delete", "删除"],
-                      ["rename", "重命名…"],
-                      ["export", "导出资产…"],
-                    ]
+                    ["add", "添加到时间轴播放头所处位置"],
+                    ["delete", "删除"],
+                    ["rename", "重命名…"],
+                    ["export", "导出资产…"],
+                  ]
                   : menu.folderId
                     ? [
-                        ["new-folder", "新建子文件夹…"],
-                        ["rename", "重命名文件夹…"],
-                        ["delete", "删除文件夹…"],
-                      ]
+                      ["new-folder", "新建子文件夹…"],
+                      ["rename", "重命名文件夹…"],
+                      ["delete", "删除文件夹…"],
+                    ]
                     : [
-                        ["import", "将媒体导入库…"],
-                        ["new-folder", "新建文件夹…"],
-                        ["export-library", "导出库…"],
-                        ["import-library", "导入压缩库…"],
-                      ]
+                      ["import", "将媒体导入库…"],
+                      ["new-folder", "新建文件夹…"],
+                      ["export-library", "导出库…"],
+                      ["import-library", "导入压缩库…"],
+                    ]
                 : !menuAsset
                   ? menu.folderId
                     ? [
-                        ["rename", "重命名文件夹…"],
-                        ["delete", "删除文件夹…"],
-                      ]
+                      ["rename", "重命名文件夹…"],
+                      ["delete", "删除文件夹…"],
+                    ]
                     : [["new-folder", "新建文件夹…"]]
                   : undefined
           }

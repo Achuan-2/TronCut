@@ -45,7 +45,7 @@ try {
   };
   const savedClip = async () => {
     await page.getByRole("button", { name: "保存", exact: true }).click();
-    await expect(page.locator(".toast")).toContainText("工程已保存");
+    await expect(page.locator(".toast")).toContainText("项目已保存");
     const saved = JSON.parse(await fs.readFile(file, "utf8"));
     return saved.clips.find((clip) => clip.id !== project.clips[0].id);
   };
@@ -123,7 +123,7 @@ try {
   expect(errors).toEqual([]);
   console.log(`10 个草图拖入、点击、时间轴落点、延迟/非整帧结束定位及完整笔迹、普通形状/手动涂鸦定位通过：${root}`);
 } catch (error) {
-  await (await app.firstWindow()).screenshot({ path: path.join(root, "failure.png") }).catch(() => {});
+  await (await app.firstWindow()).screenshot({ path: path.join(root, "failure.png") }).catch(() => { });
   throw error;
 } finally {
   await app.close();

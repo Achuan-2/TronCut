@@ -87,7 +87,7 @@ try {
   await backgroundToggle.check();
   const save = async () => {
     await page.getByRole("button", { name: "保存", exact: true }).click();
-    await expect(page.getByRole("status")).toContainText("工程已保存");
+    await expect(page.getByRole("status")).toContainText("项目已保存");
     await expect(page.locator(".busy-overlay")).toHaveCount(0);
     return JSON.parse(await fs.readFile(file, "utf8"));
   };

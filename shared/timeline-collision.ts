@@ -198,7 +198,7 @@ function separateGroupTracks(project: Project, id: string): Project {
     for (const clip of members.slice(1)) {
       if (project.tracks.length + created >= 128)
         throw new Error(
-          "重叠素材分轨需要超过 128 条轨道，请先减少工程轨道数量",
+          "重叠素材分轨需要超过 128 条轨道，请先减少项目轨道数量",
         );
       created++;
       const added = { ...track, id: newTrack(tracks.length).id };
@@ -232,7 +232,7 @@ export function groupExistingTimelineOverlaps(project: Project): Project {
   }
   // Each pass merges at least two visible entries; changed group bounds can
   // expose another collision on an anchor track, so continue until stable.
-  for (;;) {
+  for (; ;) {
     const components = overlapComponents(groupedTimeline(next).clips);
     if (!components.length) return next;
     for (const component of components) {

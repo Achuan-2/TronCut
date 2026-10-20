@@ -3,6 +3,8 @@ import { mediaSegments, normalizeStitch, sourceTimeAt } from "./media-segments";
 import { editableIds, selectionWithGroups } from "./timeline";
 import { hasProjectTimelineOverlap } from "./timeline-collision";
 
+export type FrameExtensionPosition = "playhead" | "start" | "end";
+
 export function frameExtensions(clip: Clip) {
   return mediaSegments(clip)
     .filter((part) => part.freeze)
@@ -16,24 +18,54 @@ export function frameExtensionAt(clip: Clip, local: number) {
   );
 }
 
+/** Opening the dialog must also work when the playhead is outside the clip. */
+export function frameExtensionTargetError(
+  project: Project,
+  id: string,
+): string | null {
+  const clip = project.clips.find((clip) => clip.id === id);
+  if (!clip || clip.kind !== "video") return "请选择视频片段";
+  const asset = project.assets.find((asset) => asset.id === clip.assetId);
+  if (!asset || asset.missing || asset.duration <= 0) return "请先更新离线素材";
+  if (!editableIds(project, [id]).has(id)) return "请先解锁片段轨道";
+  if (clip.groupId) return "请先打开组，再编辑组内视频";
+  if (clip.loop) return "请先关闭视频循环";
+  return null;
+}
+
 /** Edit the virtual source stream; no images or temporary media are generated. */
 function extensionResult(
   project: Project,
   id: string,
   local: number,
   seconds: number,
+  position: FrameExtensionPosition,
 ) {
-  const clip = project.clips.find((clip) => clip.id === id);
-  if (!clip || clip.kind !== "video") return { error: "请选择视频片段" };
-  const asset = project.assets.find((asset) => asset.id === clip.assetId);
-  if (!asset || asset.missing || asset.duration <= 0)
-    return { error: "请先更新离线素材" };
-  if (!editableIds(project, [id]).has(id)) return { error: "请先解锁片段轨道" };
-  if (clip.groupId) return { error: "请先打开组，再编辑组内视频" };
-  if (clip.loop) return { error: "请先关闭视频循环" };
-  if (!Number.isFinite(local) || local < 0 || local >= clip.duration)
+  const error = frameExtensionTargetError(project, id);
+  if (error) return { error };
+  const clip = project.clips.find((clip) => clip.id === id)!;
+  const asset = project.assets.find((asset) => asset.id === clip.assetId)!;
+  const target =
+    position === "start" ? 0 : position === "end" ? clip.duration : local;
+  if (
+    !Number.isFinite(target) ||
+    target < 0 ||
+    target > clip.duration ||
+    (target === clip.duration && position !== "end")
+  )
     return { error: "请将播放头移到视频片段内" };
-  const existing = frameExtensionAt(clip, local);
+  const lastFrame = Math.max(
+    0,
+    (Math.ceil(clip.duration * project.canvas.fps) - 1) / project.canvas.fps,
+  );
+  const parts = mediaSegments(clip);
+  const tail = parts.at(-1);
+  const existing =
+    position === "end"
+      ? tail?.freeze
+        ? frameExtensionAt(clip, tail.start)
+        : undefined
+      : frameExtensionAt(clip, target);
   const duration =
     Math.round(seconds * project.canvas.fps) / project.canvas.fps;
   if (
@@ -46,7 +78,6 @@ function extensionResult(
   if (Math.abs(delta) < 1e-8) return { project };
   if (clip.duration + delta > 86400)
     return { error: "片段总时长不能超过 24 小时" };
-  const parts = mediaSegments(clip);
   const ranges: NonNullable<Clip["stitch"]> = [];
   const append = (part: (typeof parts)[number], length: number, offset = 0) => {
     if (length <= 1e-8) return;
@@ -67,16 +98,18 @@ function extensionResult(
   };
   const at =
     existing?.start ??
-    Math.max(
-      0,
-      Math.min(
-        clip.duration - 1 / project.canvas.fps,
-        Math.max(
+    (position === "end"
+      ? clip.duration
+      : Math.max(
           0,
-          Math.round(local * project.canvas.fps) / project.canvas.fps,
-        ),
-      ),
-    );
+          Math.min(
+            clip.duration - 1 / project.canvas.fps,
+            Math.max(
+              0,
+              Math.round(target * project.canvas.fps) / project.canvas.fps,
+            ),
+          ),
+        ));
   for (const part of parts) {
     if (existing && Math.abs(part.start - existing.start) < 1e-8) {
       append(part, duration * clip.speed);
@@ -95,7 +128,16 @@ function extensionResult(
       append(part, part.duration - before, before);
     } else append(part, part.duration);
   }
-  if (ranges.length > 10000) return { error: "片段分段数超出工程限制" };
+  if (position === "end" && !existing) {
+    // Append after the complete clip, holding its last visible frame rather
+    // than inserting before it or sampling beyond the end of the source.
+    ranges.push({
+      sourceIn: Math.min(asset.duration - 1e-6, sourceTimeAt(clip, lastFrame)),
+      duration: duration * clip.speed,
+      freeze: true,
+    });
+  }
+  if (ranges.length > 10000) return { error: "片段分段数超出项目限制" };
   // Preserve any following groups as a whole when making room on this track.
   const following = selectionWithGroups(
     project,
@@ -143,8 +185,9 @@ export function frameExtensionError(
   id: string,
   local: number,
   seconds: number,
+  position: FrameExtensionPosition = "playhead",
 ) {
-  return extensionResult(project, id, local, seconds).error ?? null;
+  return extensionResult(project, id, local, seconds, position).error ?? null;
 }
 
 export function setFrameExtension(
@@ -152,6 +195,9 @@ export function setFrameExtension(
   id: string,
   local: number,
   seconds: number,
+  position: FrameExtensionPosition = "playhead",
 ): Project {
-  return extensionResult(project, id, local, seconds).project ?? project;
+  return (
+    extensionResult(project, id, local, seconds, position).project ?? project
+  );
 }

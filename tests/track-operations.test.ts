@@ -44,7 +44,7 @@ describe("轨道右键操作", () => {
     });
     expect(numberTracks(project.tracks)).toBe(project.tracks);
   });
-  it("字幕重命名覆盖默认显示名称并可随工程保存", () => {
+  it("字幕重命名覆盖默认显示名称并可随项目保存", () => {
     const project = createProject();
     project.tracks[0].captionTrack = true;
     expect(displayTrackName(project.tracks, "titles")).toBe("字幕");

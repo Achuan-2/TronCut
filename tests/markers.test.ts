@@ -134,7 +134,7 @@ it("波纹删除映射区域的两端，只缩短删除区间内的时长", () =
   expect(deleteClips(project, [removed.id]).markers).toBe(project.markers);
 });
 
-it("工程保存重开完整保留点标记、区域、颜色与多行备注", async () => {
+it("项目保存重开完整保留点标记、区域、颜色与多行备注", async () => {
   const root = path.resolve(`test-output/markers-${Date.now()}`);
   await fs.mkdir(root, { recursive: true });
   const project = createProject("标记持久化");

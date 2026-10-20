@@ -138,12 +138,12 @@
     "fileAssociations": [
       {
         "ext": "troncut",
-        "name": "TronCut 工程",
+        "name": "TronCut 项目",
         "role": "Editor"
       },
       {
         "ext": "framecraft",
-        "name": "TronCut 旧版工程",
+        "name": "TronCut 旧版项目",
         "role": "Editor"
       }
     ]

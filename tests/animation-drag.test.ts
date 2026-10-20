@@ -5,7 +5,7 @@ import { createProject, newText } from "../shared/model";
 import { defaultRecordingSettings } from "../shared/recording-settings";
 
 describe("自定义动画拖放", () => {
-  it("只提供自定义动画，落点按工程帧率对齐并作为动画终点", () => {
+  it("只提供自定义动画，落点按项目帧率对齐并作为动画终点", () => {
     expect(animationPresets).toEqual([{ id: "custom", name: "自定义动画" }]);
     const project = createProject();
     project.canvas.fps = 30;

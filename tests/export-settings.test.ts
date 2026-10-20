@@ -23,7 +23,7 @@ import { probeMedia } from "../electron/media";
 import { findBinary, runProcess } from "../electron/process";
 import { saveProject, openProject } from "../electron/project-store";
 
-it("导出保持横屏、竖屏和非标准比例，输出偶数尺寸；兼容旧工程并校验文件名", () => {
+it("导出保持横屏、竖屏和非标准比例，输出偶数尺寸；兼容旧项目并校验文件名", () => {
   expect(resolvedExportSettings({ encoder: "software" })).toEqual({
     ...defaultExportSettings,
     encoder: "software",
@@ -167,7 +167,7 @@ it("四种格式真实输出匹配容器和音视频编码；分辨率与质量�
       path.join(root, format),
       false,
       new AbortController().signal,
-      () => {},
+      () => { },
     );
     const info = JSON.parse(
       await runProcess(findBinary("ffprobe"), [
@@ -209,7 +209,7 @@ it("四种格式真实输出匹配容器和音视频编码；分辨率与质量�
     path.join(root, "compact"),
     false,
     new AbortController().signal,
-    () => {},
+    () => { },
   );
   expect((await fs.stat(compact)).size).toBeLessThan(sizes[0] * 0.9);
   expect(
@@ -259,7 +259,7 @@ it("奇数画布在最终输出补为偶数尺寸，截帧规格不受视频设�
     path.join(root, "render"),
     false,
     new AbortController().signal,
-    () => {},
+    () => { },
   );
   expect(await probeMedia(target)).toMatchObject({ width: 162, height: 92 });
   project.exportSettings.resolution = "720p";

@@ -182,7 +182,7 @@ try {
     });
   }, root);
   await page.getByRole("button", { name: "保存", exact: true }).click();
-  await expect(page.locator(".toast")).toContainText("工程已保存", {
+  await expect(page.locator(".toast")).toContainText("项目已保存", {
     timeout: 20000,
   });
   const saved = JSON.parse(
@@ -221,7 +221,7 @@ try {
     await app.firstWindow()
   )
     .screenshot({ path: path.join(root, "failure.png") })
-    .catch(() => {});
+    .catch(() => { });
   throw error;
 } finally {
   await app.close();

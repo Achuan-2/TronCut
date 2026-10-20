@@ -106,7 +106,7 @@ it("解锁拖动八个手柄保持对侧锚点，倾斜与三轴旋转的坐标�
   );
 });
 
-it("独立缩放关键帧缺省为 1，端点编辑和复制保留动画，旧工程不增加字段", () => {
+it("独立缩放关键帧缺省为 1，端点编辑和复制保留动画，旧项目不增加字段", () => {
   const legacy = newText("titles", 0);
   expect(transformAt(legacy, 0)).toEqual(defaultTransform);
   expect(
@@ -212,7 +212,7 @@ it("独立宽高、裁切和关键帧在保存重开、真实截帧及视频输�
     path.join(root, "video"),
     false,
     AbortSignal.timeout(20000),
-    () => {},
+    () => { },
   );
   const frame = path.join(root, "animated.png");
   await runProcess(findBinary("ffmpeg"), [
@@ -245,7 +245,7 @@ it("独立宽高、裁切和关键帧在保存重开、真实截帧及视频输�
     path.join(root, "locked-video"),
     false,
     AbortSignal.timeout(20000),
-    () => {},
+    () => { },
   );
   const lockedFrame = path.join(root, "locked.png");
   await runProcess(findBinary("ffmpeg"), [

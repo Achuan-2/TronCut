@@ -117,7 +117,7 @@ describe("编辑操作保留素材和动画时间", () => {
     expect(snapTime(4.95, p, c.id)).toBe(4.95);
   });
 });
-describe("字幕与工程校验", () => {
+describe("字幕与项目校验", () => {
   it("中文多行字幕、BOM、CRLF 与小时级时间往返", () => {
     const cues = parseSrt(
       "\uFEFF1\r\n01:02:03,999 --> 01:02:05,001\r\n第一行\r\n第二行\r\n\r\n2\r\n00:00:01,000 --> 00:00:02,000\r\n你好",

@@ -84,7 +84,7 @@ describe("媒体库操作", () => {
       "名称",
     );
   });
-  it("批量添加按输入顺序依次放置，保留图片默认时长且不改变原工程", () => {
+  it("批量添加按输入顺序依次放置，保留图片默认时长且不改变原项目", () => {
     const { project, source } = fixture();
     const image: Asset = {
       ...source,
@@ -132,7 +132,7 @@ describe("媒体库操作", () => {
       replacement.id,
     ]);
   });
-  it("归档、移出和替换保留唯一文件夹归属，工程校验保留元数据", () => {
+  it("归档、移出和替换保留唯一文件夹归属，项目校验保留元数据", () => {
     const { project, source, replacement } = fixture();
     project.mediaFolders = [
       { id: "a", name: "片头", assetIds: [source.id] },

@@ -59,7 +59,7 @@ try {
     page.getByRole("button", { name: "返回首页", exact: true }).click();
 
   await page.getByRole("button", { name: "新建项目", exact: true }).click();
-  await expect(page.getByLabel("工程名称")).toHaveValue("未命名工程");
+  await expect(page.getByLabel("项目名称")).toHaveValue("未命名项目");
   const original = (await recent())[0].file;
   assert.equal(
     original,
@@ -67,8 +67,8 @@ try {
       documents,
       "TronCut",
       "Projects",
-      "未命名工程",
-      "未命名工程.troncut",
+      "未命名项目",
+      "未命名项目.troncut",
     ),
   );
   assert.deepEqual((await saved(original)).canvas, {
@@ -79,12 +79,12 @@ try {
   });
   await page.getByRole("button", { name: "添加文本", exact: true }).click();
   await page.getByRole("button", { name: "保存", exact: true }).click();
-  await expect(page.getByRole("status")).toContainText("工程已保存");
+  await expect(page.getByRole("status")).toContainText("项目已保存");
   assert.equal((await saved(original)).clips.length, 1);
   assert.equal(await app.evaluate(() => globalThis.storageSmoke.dialogs), 0);
 
   await page.getByRole("button", { name: "添加文本", exact: true }).click();
-  await page.getByLabel("工程名称").click({ button: "right" });
+  await page.getByLabel("项目名称").click({ button: "right" });
   await expect(
     page.getByRole("menu", { name: "项目操作", exact: true }),
   ).toBeVisible();
@@ -98,16 +98,16 @@ try {
 
   const selected = path.join(root, "Chosen", "作品副本.troncut");
   await choose(selected);
-  await page.getByLabel("工程名称").click({ button: "right" });
+  await page.getByLabel("项目名称").click({ button: "right" });
   await page.getByRole("menuitem", { name: "另存为…" }).click();
-  await expect(page.getByLabel("工程名称")).toHaveValue("作品副本");
+  await expect(page.getByLabel("项目名称")).toHaveValue("作品副本");
   const copy = (await recent())[0].file;
   assert.equal(copy, path.join(root, "Chosen", "作品副本", "作品副本.troncut"));
   assert.equal((await saved(copy)).clips.length, 2);
   assert.equal((await saved(original)).clips.length, 1);
 
   await home();
-  await card("未命名工程").click({ button: "right" });
+  await card("未命名项目").click({ button: "right" });
   await expect(menu()).toBeVisible();
   await page.getByRole("menuitem", { name: "打开项目位置" }).click();
   await expect
@@ -115,13 +115,13 @@ try {
     .toEqual([original]);
   const originalContent = await fs.readFile(original, "utf8");
   await choose(path.join(root, "Other", "主页副本.troncut"));
-  await card("未命名工程").click({ button: "right" });
+  await card("未命名项目").click({ button: "right" });
   await page.getByRole("menuitem", { name: "另存为…" }).click();
   await expect(card("主页副本")).toBeVisible();
   assert.equal(await fs.readFile(original, "utf8"), originalContent);
   assert.equal((await saved((await recent())[0].file)).clips.length, 1);
   await page.getByRole("button", { name: "继续编辑", exact: true }).click();
-  await expect(page.getByLabel("工程名称")).toHaveValue("作品副本");
+  await expect(page.getByLabel("项目名称")).toHaveValue("作品副本");
 
   await page.getByRole("button", { name: "添加文本", exact: true }).click();
   await home();
@@ -133,9 +133,9 @@ try {
   assert.equal((await saved(copy)).clips.length, 2);
 
   await page.getByRole("button", { name: "新建项目", exact: true }).click();
-  await expect(page.getByLabel("工程名称")).toHaveValue("未命名工程-2");
+  await expect(page.getByLabel("项目名称")).toHaveValue("未命名项目-2");
   await home();
-  await card("未命名工程-2").click({ button: "right" });
+  await card("未命名项目-2").click({ button: "right" });
   await page.keyboard.press("Escape");
   await expect(menu()).toHaveCount(0);
   await page.screenshot({ path: path.join(root, "recent-projects.png") });
@@ -149,7 +149,7 @@ try {
   );
   await page.getByRole("button", { name: "新建录制", exact: true }).click();
   await expect(page.locator(".recorder-modal")).toBeVisible();
-  assert.equal((await recent())[0].name, "未命名工程-3");
+  assert.equal((await recent())[0].name, "未命名项目-3");
   const files = (await recent()).map((entry) => entry.file);
   await app.close();
   app = await electron.launch({ args: ["."], env });
@@ -171,7 +171,7 @@ try {
     await app.firstWindow()
   )
     .screenshot({ path: path.join(root, "failure.png") })
-    .catch(() => {});
+    .catch(() => { });
   throw error;
 } finally {
   await app.close();

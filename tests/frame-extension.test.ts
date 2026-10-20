@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { createProject, newText, validateProject } from "../shared/model";
 import {
   frameExtensionError,
+  frameExtensionTargetError,
   frameExtensions,
   setFrameExtension,
 } from "../shared/frame-extension";
@@ -56,6 +57,59 @@ function fixture() {
 }
 
 describe("可编辑帧定格", () => {
+  it.each(["start", "end"] as const)(
+    "%s 端点独立于播放头，保留完整原片并可调整、移除和保存",
+    (position) => {
+      const project = fixture();
+      expect(frameExtensionTargetError(project, "video")).toBeNull();
+      expect(frameExtensionError(project, "video", 99, 2, position)).toBeNull();
+      const result = setFrameExtension(project, "video", 99, 2, position);
+      const clip = result.clips[0];
+      const at = position === "start" ? 0 : 3;
+      const sourceIn = position === "start" ? 2 : 4.95;
+      expect(frameExtensions(clip)).toEqual([
+        { sourceIn, start: at, duration: 2, freeze: true },
+      ]);
+      expect(sourceTimeAt(clip, at + 1)).toBeCloseTo(sourceIn, 8);
+      const movingTime = position === "start" ? 2 : 0;
+      expect(sourceTimeAt(clip, movingTime)).toBe(2);
+      expect(sourceTimeAt(clip, movingTime + 2.5)).toBe(4.5);
+      expect(result.clips[1].start).toBe(6);
+      expect(
+        validateProject(JSON.parse(JSON.stringify(result))).clips[0].stitch,
+      ).toEqual(clip.stitch);
+      const adjusted = setFrameExtension(result, "video", -1, 3, position);
+      expect(frameExtensions(adjusted.clips[0])).toHaveLength(1);
+      expect(frameExtensions(adjusted.clips[0])[0].duration).toBe(3);
+      expect(adjusted.clips[0].duration).toBe(6);
+      const removed = setFrameExtension(result, "video", at, 0);
+      expect(removed.clips[0].duration).toBe(3);
+      expect(removed.clips[0].stitch).toBeUndefined();
+    },
+  );
+
+  it("末尾定格按当前裁剪、拼接和速度的最后可见帧取样，不读取下一段源画面", () => {
+    const project = fixture();
+    project.clips[0] = {
+      ...project.clips[0],
+      sourceIn: 0,
+      speed: 2,
+      duration: 1.5,
+      stitch: [
+        { sourceIn: 2, duration: 1 },
+        { sourceIn: 0, duration: 2 },
+      ],
+    };
+    const result = setFrameExtension(project, "video", 0, 1, "end");
+    expect(frameExtensions(result.clips[0])[0]).toMatchObject({
+      start: 1.5,
+      duration: 1,
+    });
+    expect(frameExtensions(result.clips[0])[0].sourceIn).toBeCloseTo(1.9, 8);
+    expect(sourceTimeAt(result.clips[0], 1.4)).toBeCloseTo(1.8, 8);
+    expect(() => validateProject(result)).not.toThrow();
+  });
+
   it("在当前帧插入停留，原素材继续接上，当前轨道后续片段顺延，移除还原", () => {
     const project = fixture();
     const original = structuredClone(project);
@@ -153,7 +207,7 @@ describe("可编辑帧定格", () => {
     expect(() => validateProject(project)).not.toThrow();
   });
 
-  it("锁定、循环、离线、播放头越界和无效持续时间均不修改工程", () => {
+  it("锁定、循环、离线、播放头越界和无效持续时间均不修改项目", () => {
     for (const mutate of [
       (p: ReturnType<typeof fixture>) => {
         p.tracks.find((t) => t.id === "video")!.locked = true;

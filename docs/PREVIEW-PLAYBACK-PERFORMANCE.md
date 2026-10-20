@@ -1,6 +1,6 @@
-# 多轨工程预览性能与媒体播放
+# 多轨项目预览性能与媒体播放
 
-2026-10-18，使用 `export/TronCut宣传片-20261017/TronCut宣传片-v12-丝滑版.troncut`（48 秒、160 个片段）验证。本次保留工程格式、素材原文件和时间线编辑能力，不将工程烘焙成单一视频。
+2026-10-18，使用 `export/TronCut宣传片-20261017/TronCut宣传片-v12-丝滑版.troncut`（48 秒、160 个片段）验证。本次保留项目格式、素材原文件和时间线编辑能力，不将项目烘焙成单一视频。
 
 ## 问题与处理
 
@@ -43,4 +43,4 @@ node scripts/test-playback-ui.mjs
 node scripts/smoke-timeline-scroll.mjs
 ```
 
-`smoke-project-playback.mjs` 接受 JSON 工程，记录每个视频片段的连续播放状态，并输出关键时间点截图与 JSON 报告。临时素材、独立测试配置、代理和报告保存在 `test-output`，不改写输入工程。
+`smoke-project-playback.mjs` 接受 JSON 项目，记录每个视频片段的连续播放状态，并输出关键时间点截图与 JSON 报告。临时素材、独立测试配置、代理和报告保存在 `test-output`，不改写输入项目。

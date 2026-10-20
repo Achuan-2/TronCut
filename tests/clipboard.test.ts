@@ -50,7 +50,7 @@ describe("粘贴媒体与内部片段剪贴板", () => {
     });
     expect(mocks.runProcess).not.toHaveBeenCalled();
   });
-  it("截图保存为持久化 PNG，后续保存工程和恢复可读取", async () => {
+  it("截图保存为持久化 PNG，后续保存项目和恢复可读取", async () => {
     const png = Buffer.from([137, 80, 78, 71]);
     mocks.readImage.mockReturnValue({ isEmpty: () => false, toPNG: () => png });
     const result = await importClipboardMedia(storage);

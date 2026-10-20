@@ -233,7 +233,7 @@ try {
     });
   }, root);
   await page.getByRole("button", { name: "保存", exact: true }).click();
-  await expect(page.locator(".toast")).toContainText("工程已保存", {
+  await expect(page.locator(".toast")).toContainText("项目已保存", {
     timeout: 20000,
   });
   const file = path.join(root, "截帧验证", "截帧验证.troncut");
@@ -266,9 +266,9 @@ try {
   const page = app.windows()[0];
   await page
     ?.screenshot({ path: path.join(root, "failure.png") })
-    .catch(() => {});
+    .catch(() => { });
   console.error(`失败截图：${path.join(root, "failure.png")}`);
   throw error;
 } finally {
-  await app.close().catch(() => {});
+  await app.close().catch(() => { });
 }

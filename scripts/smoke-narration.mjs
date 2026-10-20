@@ -41,7 +41,7 @@ try {
   const page = await app.firstWindow();
   page.on("pageerror", (error) => errors.push(error.message));
   await page.getByRole("button", { name: "新建项目", exact: true }).click();
-  await page.getByLabel("工程名称").fill("旁白测试");
+  await page.getByLabel("项目名称").fill("旁白测试");
   await page.getByRole("button", { name: "添加文本", exact: true }).click();
   await page
     .getByLabel("文本内容", { exact: true })
@@ -212,7 +212,7 @@ try {
     });
   }, root);
   await page.getByRole("button", { name: "保存", exact: true }).click();
-  await expect(page.getByRole("status")).toContainText("工程已保存", {
+  await expect(page.getByRole("status")).toContainText("项目已保存", {
     timeout: 20000,
   });
   const projectFile = path.join(root, "旁白测试/旁白测试.troncut");
@@ -237,7 +237,7 @@ try {
   assert.equal(firstClip.start, 2, "录音应插入开始录制时的播放头位置");
   assert.ok(
     project.tracks.every((track) => !track.muted),
-    "静音录制不应修改工程轨道的静音状态",
+    "静音录制不应修改项目轨道的静音状态",
   );
   if (process.env.TRONCUT_TEST_VITS_DIR) {
     const speech = project.assets.find((asset) => asset.narration);
@@ -258,7 +258,7 @@ try {
       2,
     ),
   );
-  console.log(`旁白录音、权限恢复、切换保存、文稿保留与工程归档通过：${root}`);
+  console.log(`旁白录音、权限恢复、切换保存、文稿保留与项目归档通过：${root}`);
 } finally {
   await app.close();
 }

@@ -155,7 +155,7 @@ async function rememberProject(project: Project, file: string) {
   const asset = project.assets.find((asset) => asset.id === clip?.assetId && !asset.missing);
   if (asset) thumbnail = await mediaThumbnail(asset, false, path.join(app.getPath("userData"), "thumbnails"), process.resourcesPath).catch(() => null);
   // Recent-project metadata must not turn a successfully opened/saved project into an error.
-  await recentProjects.remember(project, file, thumbnail ?? undefined).catch(() => {});
+  await recentProjects.remember(project, file, thumbnail ?? undefined).catch(() => { });
 }
 let projectDirty = false;
 let pendingProject =
@@ -210,7 +210,7 @@ function prepareNativeRecording(sourceId: string, fps: number, systemAudio: bool
     return captureBounds;
   })();
   // Cancellation can win the countdown race before initialization rejects.
-  void ready.catch(() => {});
+  void ready.catch(() => { });
   nativePreparation = { sourceId, fps, systemAudio, region, recording, ready };
   return nativePreparation;
 }
@@ -450,9 +450,11 @@ function installHandlers() {
     const background = await recordingStyle.importBackground(file);
     register(background);
     const settings = (await preferences.get()).recording;
-    await preferences.save({ recording: {
-      ...settings, background: true, preset: "custom", customBackground: background,
-    } });
+    await preferences.save({
+      recording: {
+        ...settings, background: true, preset: "custom", customBackground: background,
+      }
+    });
     return background;
   });
   handle("recording:background", async (width: unknown, height: unknown, preset: unknown, customAssetId: unknown) =>
@@ -669,8 +671,10 @@ function installHandlers() {
       const file = await recoveryFile();
       const result = JSON.parse(await fs.readFile(file, "utf8"));
       const project = validateProject(result.project);
-      return { name: project.name, file: typeof result.file === "string" ? result.file : null,
-        modifiedAt: (await fs.stat(file)).mtimeMs, duration: projectDuration(project) };
+      return {
+        name: project.name, file: typeof result.file === "string" ? result.file : null,
+        modifiedAt: (await fs.stat(file)).mtimeMs, duration: projectDuration(project)
+      };
     } catch { return null; }
   });
   handle("project:recent", async () => {
@@ -718,9 +722,9 @@ function installHandlers() {
         : currentDirectory
       : await defaultProjectDirectory();
     const result = await dialog.showSaveDialog(window, {
-      title: "工程另存为",
+      title: "项目另存为",
       defaultPath: path.join(directory, `${fileName}.troncut`),
-      filters: [{ name: "TronCut 工程", extensions: ["troncut"] }],
+      filters: [{ name: "TronCut 项目", extensions: ["troncut"] }],
     });
     if (result.canceled || !result.filePath) return null;
     const selected = result.filePath;
@@ -907,9 +911,9 @@ function installHandlers() {
     if (
       replacement.kind !== "image" &&
       replacement.duration + (relink ? 0.05 : 1e-6) <
-        z.number().finite().nonnegative().parse(requiredDuration)
+      z.number().finite().nonnegative().parse(requiredDuration)
     )
-      throw new Error("替换素材短于工程使用的源区间，请选择完整素材");
+      throw new Error("替换素材短于项目使用的源区间，请选择完整素材");
     // New IDs keep the old registered source available to undo and redo.
     return register(relink ? { ...replacement, id: original.id } : replacement);
   };
@@ -946,7 +950,7 @@ function installHandlers() {
     return { project: saved, file: result.file };
   });
   handle("project:rename", async (input: unknown, nameInput: unknown) => {
-    if (!projectFile) throw new Error("工程尚未保存到文件，无法重命名文件夹");
+    if (!projectFile) throw new Error("项目尚未保存到文件，无法重命名文件夹");
     const project = authorizedProject(input);
     const newName = z.string().min(1).max(180).parse(nameInput);
     const icon = app.isPackaged
@@ -955,7 +959,7 @@ function installHandlers() {
     const oldFile = projectFile;
     const result = await renameProjectStorage(project, oldFile, newName, icon);
 
-    // 移除旧路径的授权，并注册新工程素材
+    // 移除旧路径的授权，并注册新项目素材
     for (const asset of project.assets) {
       approvedPaths.delete(path.resolve(asset.path));
       if (asset.cursorPath) approvedPaths.delete(path.resolve(asset.cursorPath));
@@ -1365,7 +1369,8 @@ function installHandlers() {
           process.resourcesPath, requestRecordingStop,
         );
       }
-      recordings.set(id, { file, handle, bytes: 0, kind: label,
+      recordings.set(id, {
+        file, handle, bytes: 0, kind: label,
         ...(label === "screen" ? { crop: captureSelection?.region, displaySize: captureSelection?.displaySize } : {}),
       });
     } catch (error) {
@@ -1495,7 +1500,7 @@ async function createWindow() {
       message:
         recordings.size || nativeRecording
           ? "录制尚未结束，退出会保留未完成录制文件。"
-          : "请先保存工程。确定退出 TronCut？",
+          : "请先保存项目。确定退出 TronCut？",
     });
     if (choice === 0) event.preventDefault();
   });
@@ -1506,11 +1511,11 @@ async function createWindow() {
     Menu.buildFromTemplate([
       ...(process.platform === "darwin"
         ? [
-            {
-              label: "TronCut",
-              submenu: [{ role: "about" as const }, { role: "quit" as const }],
-            },
-          ]
+          {
+            label: "TronCut",
+            submenu: [{ role: "about" as const }, { role: "quit" as const }],
+          },
+        ]
         : []),
       {
         label: "项目",
@@ -1553,7 +1558,8 @@ async function createWindow() {
         label: "编辑",
         submenu: editCommands.flatMap((command, index) => [
           ...(index && editCommands[index - 1].group !== command.group ? [{ type: "separator" as const }] : []),
-          { id: `edit-${command.id}`, label: command.label,
+          {
+            id: `edit-${command.id}`, label: command.label,
             // Single-key timeline shortcuts must not intercept typing into text fields.
             accelerator: command.shortcut,
             registerAccelerator: command.shortcut.includes("CmdOrCtrl"),
@@ -1604,7 +1610,7 @@ app
       (contents, permission, callback) =>
         callback(
           contents === window?.webContents &&
-            ["media", "display-capture", "fullscreen", "local-fonts"].includes(permission),
+          ["media", "display-capture", "fullscreen", "local-fonts"].includes(permission),
         ),
     );
     session.defaultSession.setPermissionCheckHandler((contents, permission) =>

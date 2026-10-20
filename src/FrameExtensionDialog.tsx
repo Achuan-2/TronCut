@@ -4,6 +4,7 @@ import {
   frameExtensionAt,
   frameExtensionError,
   setFrameExtension,
+  type FrameExtensionPosition,
 } from "../shared/frame-extension";
 import type { Editor } from "./useEditor";
 
@@ -25,10 +26,12 @@ export default function FrameExtensionDialog({
   const clip = editor.project.clips.find((clip) => clip.id === id);
   const existing = clip && frameExtensionAt(clip, local);
   const [seconds, setSeconds] = useState(String(existing?.duration ?? 1));
+  const [position, setPosition] = useState<FrameExtensionPosition>("playhead");
+  const height = existing ? 190 : 240;
   const value = Number(seconds);
   const error =
     seconds.trim() && value >= 1 / editor.project.canvas.fps
-      ? frameExtensionError(editor.project, id, local, value)
+      ? frameExtensionError(editor.project, id, local, value, position)
       : "请输入至少一帧的持续时间";
   return createPortal(
     <div
@@ -49,19 +52,37 @@ export default function FrameExtensionDialog({
         aria-labelledby="frame-extension-title"
         style={{
           left: Math.max(8, Math.min(x, window.innerWidth - 348)),
-          top: Math.max(8, Math.min(y - 180, window.innerHeight - 190)),
+          top: Math.max(
+            8,
+            Math.min(y - height + 10, window.innerHeight - height),
+          ),
         }}
         onPointerDown={(event) => event.stopPropagation()}
         onSubmit={(event) => {
           event.preventDefault();
           if (error) return;
           editor.apply((project) =>
-            setFrameExtension(project, id, local, value),
+            setFrameExtension(project, id, local, value, position),
           );
           onClose();
         }}
       >
         <h3 id="frame-extension-title">{existing ? "编辑帧定格" : "帧定格"}</h3>
+        {!existing && (
+          <label className="field">
+            定格位置
+            <select
+              value={position}
+              onChange={(event) =>
+                setPosition(event.target.value as FrameExtensionPosition)
+              }
+            >
+              <option value="playhead">播放头所在位置</option>
+              <option value="start">视频开始点</option>
+              <option value="end">视频结束点</option>
+            </select>
+          </label>
+        )}
         <label className="field">
           持续时间（秒）
           <input

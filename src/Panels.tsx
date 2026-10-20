@@ -161,7 +161,7 @@ export default function Panels(props: Props) {
                 editor.editProjectMedia((p) =>
                   removeLibraryAssets(p, assets.map((asset) => asset.id)),
                 );
-                toast(`已移除 ${assets.length} 个素材及引用片段，保存后清理工程副本，可撤销`);
+                toast(`已移除 ${assets.length} 个素材及引用片段，保存后清理项目副本，可撤销`);
               }
             })}
             onMoveToFolder={(ids, folderId) => run(async () => {
@@ -196,7 +196,7 @@ export default function Panels(props: Props) {
                 editor.selectAssetClips(asset.id);
               } else if (command === "delete") {
                 editor.editLibraryAsset(asset.id);
-                toast("已移除素材及引用片段，保存后清理工程副本，可撤销");
+                toast("已移除素材及引用片段，保存后清理项目副本，可撤销");
               } else {
                 const consumed = requiredMediaDuration(
                   assetClips(editor.documentProject, asset.id),
@@ -261,7 +261,7 @@ export default function Panels(props: Props) {
         />
         {tab === "settings" && (
           <>
-            <h3 className="section-title">工程画布</h3>
+            <h3 className="section-title">项目画布</h3>
             <label className="field">
               分辨率
               <select
@@ -458,8 +458,8 @@ export function Inspector({ editor }: { editor: Editor }) {
     () =>
       c?.caption
         ? editor.project.clips.filter(
-            (clip) => clip.caption && clip.trackId === c.trackId,
-          ).length
+          (clip) => clip.caption && clip.trackId === c.trackId,
+        ).length
         : 0,
     [editor.project.clips, c?.caption, c?.trackId],
   );
@@ -491,18 +491,18 @@ export function Inspector({ editor }: { editor: Editor }) {
   ];
   const activeTab =
     editor.selectedKeyframe?.clipId === c?.id ? "video" :
-    editor.selectedDrawing?.clipId === c?.id ? "annotation" :
-    editor.selectedBehavior?.clipId === c?.id
-      ? "behaviors"
-      : tab.clipId === c?.id &&
-          tab.name !== "behaviors" &&
-          tabs.some((item) => item.name === tab.name)
-        ? tab.name
-        : hasAnnotation ? "annotation" : isRecording ? "recording" : hasText
-          ? "text"
-          : c?.kind === "audio"
-            ? "audio"
-            : "video";
+      editor.selectedDrawing?.clipId === c?.id ? "annotation" :
+        editor.selectedBehavior?.clipId === c?.id
+          ? "behaviors"
+          : tab.clipId === c?.id &&
+            tab.name !== "behaviors" &&
+            tabs.some((item) => item.name === tab.name)
+            ? tab.name
+            : hasAnnotation ? "annotation" : isRecording ? "recording" : hasText
+              ? "text"
+              : c?.kind === "audio"
+                ? "audio"
+                : "video";
   const cursorActive = activeTab === "cursor";
   const textActive = activeTab === "text";
   const value =
@@ -531,9 +531,9 @@ export function Inspector({ editor }: { editor: Editor }) {
   const asset = selectedAsset;
   const fit = asset
     ? Math.min(
-        editor.project.canvas.width / Math.max(1, asset.width),
-        editor.project.canvas.height / Math.max(1, asset.height),
-      )
+      editor.project.canvas.width / Math.max(1, asset.width),
+      editor.project.canvas.height / Math.max(1, asset.height),
+    )
     : 1;
   const crop = sampledVisual?.crop ?? defaultCrop;
   const size =
@@ -541,9 +541,9 @@ export function Inspector({ editor }: { editor: Editor }) {
       ? textBoxFor(c)
       : asset
         ? {
-            width: asset.width * fit * (1 - crop.left - crop.right),
-            height: asset.height * fit * (1 - crop.top - crop.bottom),
-          }
+          width: asset.width * fit * (1 - crop.left - crop.right),
+          height: asset.height * fit * (1 - crop.top - crop.bottom),
+        }
         : c ? shapeSize(c) : { width: 600, height: 300 };
   const resize = (axis: "width" | "height", pixels: number) => {
     if (!c || locked) return;
@@ -603,9 +603,9 @@ export function Inspector({ editor }: { editor: Editor }) {
                 : event.key === "End"
                   ? tabs.length - 1
                   : (current +
-                      (event.key === "ArrowRight" ? 1 : -1) +
-                      tabs.length) %
-                    tabs.length;
+                    (event.key === "ArrowRight" ? 1 : -1) +
+                    tabs.length) %
+                  tabs.length;
             if (tabs[index].name !== "video") editor.clearKeyframeEdit();
             if (tabs[index].name !== "behaviors") editor.select(c.id);
             else if (c.behaviors?.length)
@@ -613,7 +613,7 @@ export function Inspector({ editor }: { editor: Editor }) {
             setTab({ clipId: c.id, name: tabs[index].name });
             event.currentTarget
               .querySelectorAll<HTMLButtonElement>("button")
-              [index]?.focus();
+            [index]?.focus();
           }}
         >
           {tabs.map(({ name, label, icon: Icon }) => (
@@ -703,8 +703,8 @@ export function Inspector({ editor }: { editor: Editor }) {
                   {editor.selectedKeyframe.side === "start"
                     ? "起点"
                     : "终点"} · {timeLabel(
-                    c.start + editor.selectedKeyframe.time - (c.animationOffset ?? 0),
-                  )}
+                      c.start + editor.selectedKeyframe.time - (c.animationOffset ?? 0),
+                    )}
                 </span>
                 <button type="button" onClick={editor.clearKeyframeEdit}>
                   退出

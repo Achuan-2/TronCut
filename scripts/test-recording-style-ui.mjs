@@ -156,7 +156,7 @@ try {
   await expect(page.locator(".timeline-clip")).toHaveCount(1);
   await page.getByTitle("撤销 Ctrl+Z", { exact: true }).click();
   await expect(page.locator(".timeline-clip")).toHaveCount(2);
-  await page.getByLabel("工程名称").fill("录屏美化验收");
+  await page.getByLabel("项目名称").fill("录屏美化验收");
   await app.evaluate(({ dialog }, folder) => {
     dialog.showOpenDialog = async () => ({
       canceled: false,
@@ -164,7 +164,7 @@ try {
     });
   }, root);
   await page.getByRole("button", { name: "保存", exact: true }).click();
-  await expect(page.getByRole("status")).toContainText("工程已保存", {
+  await expect(page.getByRole("status")).toContainText("项目已保存", {
     timeout: 20000,
   });
   const saved = JSON.parse(
@@ -240,13 +240,13 @@ try {
   await expect(page.getByLabel("缩放 (%)", { exact: true })).toHaveValue("85");
   expect(errors).toEqual([]);
   console.log(
-    `默认直角、关闭后重启记忆、真实 WGC 录屏、录后圆角/留白/鼠标与背景编辑、撤销重做及工程重开通过：${root}`,
+    `默认直角、关闭后重启记忆、真实 WGC 录屏、录后圆角/留白/鼠标与背景编辑、撤销重做及项目重开通过：${root}`,
   );
 } catch (error) {
   await app
     .windows()[0]
     ?.screenshot({ path: path.join(root, "failure.png") })
-    .catch(() => {});
+    .catch(() => { });
   console.error(`失败截图：${root}`);
   throw error;
 } finally {

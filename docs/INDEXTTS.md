@@ -1,6 +1,6 @@
 # IndexTTS 2.5 本地配置
 
-开发版配音面板已接入 IndexTTS 2.5，用 1–30 秒的参考人声复刻音色，支持现有中英配音、0.5–2 倍语速、试听、取消、时间线插入和工程保存。模型本身支持更多语言，本次界面先提供中文与英语。参考音频会作为工程素材收集到 `media/`，配音参数通过 `referenceAssetId` 保留引用；推理使用参考音频的前 15 秒。
+开发版配音面板已接入 IndexTTS 2.5，用 1–30 秒的参考人声复刻音色，支持现有中英配音、0.5–2 倍语速、试听、取消、时间线插入和项目保存。模型本身支持更多语言，本次界面先提供中文与英语。参考音频会作为项目素材收集到 `media/`，配音参数通过 `referenceAssetId` 保留引用；推理使用参考音频的前 15 秒。
 
 IndexTTS 依赖 Python 3.11、PyTorch/torchaudio 2.8.0 和 Transformers 4.52.1，独立环境避免与 Kokoro/Qwen 冲突。Windows NVIDIA 环境使用 CUDA 12.8 版 PyTorch 与 BF16；未启用 DeepSpeed、Flash Attention、自定义 CUDA kernel 或 torch.compile，不要求用户为这些可选加速器安装编译工具。主模型和辅助模型需要下载数 GB。
 
@@ -27,6 +27,6 @@ pnpm dev
 
 2026-10-13 完成 `.framecraft-dev/` 中的独立 CUDA 环境和全部模型配置，`setup-indextts.ps1 -Offline` 通过，PyTorch 2.8.0+cu128 能识别 RTX 4050 Laptop（6141 MiB）并支持 BF16。Electron 内选取 7.325 秒的已生成 Kokoro 测试音频作参考，离线生成“欢迎使用，这是一段测试配音。”，输出 3.341271 秒的 48 kHz 单声道有效 WAV。worker 记录实际设备 `cuda:0`、精度 `bf16`、首次加载 137.782 秒、生成 11.451 秒；这是一条短样本，不是音色保真或模型速度对照。
 
-试听、自动插入声音轨、参考音频随工程归档、保存重开与配音参数读取全部通过，前端运行错误为零。证据位于 `test-output/tts/index-desktop-1791888307077/validation.json` 和 `index-narration.png`。目前每次生成重新加载模型，尚未实现常驻推理；长文稿、真人参考音色、CPU 和 Mac 仍待验证。本次未重新打包或发布安装包。
+试听、自动插入声音轨、参考音频随项目归档、保存重开与配音参数读取全部通过，前端运行错误为零。证据位于 `test-output/tts/index-desktop-1791888307077/validation.json` 和 `index-narration.png`。目前每次生成重新加载模型，尚未实现常驻推理；长文稿、真人参考音色、CPU 和 Mac 仍待验证。本次未重新打包或发布安装包。
 
 官方文档：[IndexTTS](https://github.com/index-tts/index-tts)、[IndexTTS 2.5 模型卡](https://huggingface.co/IndexTeam/IndexTTS-2.5)。源码及模型采用 Bilibili IndexTTS/模型许可，不属于 TronCut 的 AGPL，也不能直接标记为 Apache-2.0。

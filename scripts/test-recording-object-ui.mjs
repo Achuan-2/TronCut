@@ -274,7 +274,7 @@ try {
     });
   }, root);
   await page.getByRole("button", { name: "保存", exact: true }).click();
-  await expect(page.getByRole("status")).toContainText("工程已保存", {
+  await expect(page.getByRole("status")).toContainText("项目已保存", {
     timeout: 20000,
   });
   const archive = path.join(root, project.name, `${project.name}.troncut`);
@@ -328,7 +328,7 @@ try {
     await app.firstWindow()
   )
     .screenshot({ path: path.join(root, "failure.png") })
-    .catch(() => {});
+    .catch(() => { });
   throw error;
 } finally {
   await app.close();

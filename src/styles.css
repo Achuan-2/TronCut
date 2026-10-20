@@ -890,7 +890,7 @@ fieldset:disabled {
   border-left: 2px dashed #bfccd6;
   border-right: 2px dashed #bfccd6;
   background: repeating-linear-gradient(135deg, #b0c7da18 0 3px, #12192240 3px 7px);
-  cursor: context-menu;
+  cursor: inherit;
   min-width: 4px;
 }
 .frame-extension-region > span {

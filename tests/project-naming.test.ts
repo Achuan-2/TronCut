@@ -7,8 +7,8 @@ import { openProject, saveProject, saveProjectInDirectory, renameProjectStorage 
 import { defaultExportFileName } from "../shared/export-settings";
 import type { Asset } from "../shared/model";
 
-describe("工程命名与保存往返", () => {
-  it("同名项目并发保存时独立归档，另存副本收集素材且保留原工程", async () => {
+describe("项目命名与保存往返", () => {
+  it("同名项目并发保存时独立归档，另存副本收集素材且保留原项目", async () => {
     const root = await fs.mkdtemp(path.join(os.tmpdir(), "troncut-default-project-"));
     try {
       const directory = path.join(root, "Projects");
@@ -24,7 +24,7 @@ describe("工程命名与保存往返", () => {
         saveProjectInDirectory(project, directory),
       ]);
       expect(new Set(results.map((result) => result.project.name))).toEqual(
-        new Set(["未命名工程", "未命名工程-2"]),
+        new Set(["未命名项目", "未命名项目-2"]),
       );
       for (const result of results) {
         expect(path.basename(path.dirname(result.file))).toBe(result.project.name);
@@ -47,12 +47,12 @@ describe("工程命名与保存往返", () => {
     }
   });
 
-  it("默认未命名工程保存到具体文件名时，自动同步工程名称与导出视频名称", async () => {
+  it("默认未命名项目保存到具体文件名时，自动同步项目名称与导出视频名称", async () => {
     const root = await fs.mkdtemp(path.join(os.tmpdir(), "troncut-name-test-"));
     try {
       const file = path.join(root, "我的教程视频.troncut");
-      const project = createProject(); // 默认 "未命名工程"
-      expect(project.name).toBe("未命名工程");
+      const project = createProject(); // 默认 "未命名项目"
+      expect(project.name).toBe("未命名项目");
 
       const saved = await saveProject(project, file);
       expect(saved.name).toBe("我的教程视频");
@@ -61,7 +61,7 @@ describe("工程命名与保存往返", () => {
       const raw = JSON.parse(await fs.readFile(file, "utf8"));
       expect(raw.name).toBe("我的教程视频");
 
-      // 验证重新打开该工程
+      // 验证重新打开该项目
       const opened = await openProject(file);
       expect(opened.name).toBe("我的教程视频");
 
@@ -72,26 +72,26 @@ describe("工程命名与保存往返", () => {
     }
   });
 
-  it("已命名工程保存时保留原名称；历史未命名工程按文件名纠正", async () => {
+  it("已命名项目保存时保留原名称；历史未命名项目按文件名纠正", async () => {
     const root = await fs.mkdtemp(path.join(os.tmpdir(), "troncut-name-test2-"));
     try {
-      // 1. 已命名工程保持自定义名称
+      // 1. 已命名项目保持自定义名称
       const fileCustom = path.join(root, "fileA.troncut");
       const customProject = createProject("自定义好名字");
       const savedCustom = await saveProject(customProject, fileCustom);
       expect(savedCustom.name).toBe("自定义好名字");
 
-      // 2. 模拟过去遗留的历史工程（文件名为 产品发布会.troncut，但内部 json 的 name 仍是 未命名工程）
+      // Both generations of the default name still adopt a meaningful file name.
       const legacyFile = path.join(root, "产品发布会.troncut");
-      await fs.writeFile(
-        legacyFile,
-        JSON.stringify({ ...createProject(), name: "未命名工程" }),
-        "utf8",
-      );
-
-      const openedLegacy = await openProject(legacyFile);
-      expect(openedLegacy.name).toBe("产品发布会");
-      expect(defaultExportFileName(openedLegacy.name)).toBe("产品发布会");
+      for (const name of ["未命名项目", "未命名工程"]) {
+        const legacy = { ...createProject(), name };
+        await fs.writeFile(legacyFile, JSON.stringify(legacy), "utf8");
+        const openedLegacy = await openProject(legacyFile);
+        expect(openedLegacy.name).toBe("产品发布会");
+        expect(defaultExportFileName(openedLegacy.name)).toBe("产品发布会");
+        const savedLegacy = await saveProject(legacy, path.join(root, "另存发布会.troncut"));
+        expect(savedLegacy.name).toBe("另存发布会");
+      }
     } finally {
       await fs.rm(root, { recursive: true, force: true });
     }
@@ -100,7 +100,7 @@ describe("工程命名与保存往返", () => {
   it("直接修改项目名称时，专属项目文件夹和项目文件同步改名且素材映射有效", async () => {
     const root = await fs.mkdtemp(path.join(os.tmpdir(), "troncut-rename-test-"));
     try {
-      // 创建专属工程目录 root/初版演示/初版演示.troncut
+      // 创建专属项目目录 root/初版演示/初版演示.troncut
       const folderA = path.join(root, "初版演示");
       const fileA = path.join(folderA, "初版演示.troncut");
       const project = createProject("初版演示");
@@ -159,7 +159,7 @@ describe("工程命名与保存往返", () => {
       await fs.mkdir(conflictFolder);
       await expect(
         renameProjectStorage(result.project, expectedFileB, "已有同名"),
-      ).rejects.toThrow("同名工程文件夹“已有同名”已存在");
+      ).rejects.toThrow("同名项目文件夹“已有同名”已存在");
     } finally {
       await fs.rm(root, { recursive: true, force: true });
     }

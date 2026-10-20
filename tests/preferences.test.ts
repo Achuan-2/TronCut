@@ -37,7 +37,7 @@ it("已移除壁纸的旧设置迁移为透视网格，保留其他录屏样式"
   ).toBe(false);
 });
 
-it("首选项持久化且不向界面或工程暴露密钥，更换服务不会复用原密钥", async () => {
+it("首选项持久化且不向界面或项目暴露密钥，更换服务不会复用原密钥", async () => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "troncut-preferences-"));
   try {
     const file = path.join(root, "preferences.json");

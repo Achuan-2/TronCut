@@ -34,7 +34,7 @@ export function importCamtasia(data: unknown, file: string): Project {
     Number(source.editRate) <= 0
   )
     throw new Error(
-      "未识别的 Camtasia 工程结构，需要 sourceBin、editRate 与 timeline.sceneTrack.scenes",
+      "未识别的 Camtasia 项目结构，需要 sourceBin、editRate 与 timeline.sceneTrack.scenes",
     );
   const project = createProject(
     source.title || path.basename(file, ".tscproj"),
@@ -216,7 +216,7 @@ export function importCamtasia(data: unknown, file: string): Project {
   if (!project.tracks.length) project.tracks = createProject().tracks;
   project.camtasiaOriginal = data;
   project.importReport = [
-    `已转换 ${project.assets.length} 个素材引用、${project.clips.length} 个片段。原始工程完整保留在 camtasiaOriginal。`,
+    `已转换 ${project.assets.length} 个素材引用、${project.clips.length} 个片段。原始项目完整保留在 camtasiaOriginal。`,
     ...report,
   ];
   return project;

@@ -150,7 +150,7 @@ try {
   await expect(
     page.getByRole("region", { name: "边框属性", exact: true }),
   ).toBeVisible();
-  await page.getByTitle("保存工程 Ctrl+S", { exact: true }).click();
+  await page.getByTitle("保存项目 Ctrl+S", { exact: true }).click();
   await expect(page.locator(".busy-overlay")).toHaveCount(0);
   await expect(page.locator(".project-save-state")).not.toContainText("*");
   const saved = JSON.parse(await fs.readFile(file, "utf8"));
@@ -166,7 +166,7 @@ try {
       root,
       changes,
       checks:
-        "九种效果逐帧像素、离开停止、键盘聚焦、减少动态效果、搜索卸载、收藏夹、拖放与双击应用、工程隔离",
+        "九种效果逐帧像素、离开停止、键盘聚焦、减少动态效果、搜索卸载、收藏夹、拖放与双击应用、项目隔离",
       rendererErrors: errors,
     }),
   );
@@ -175,7 +175,7 @@ try {
     await app.firstWindow()
   )
     .screenshot({ path: path.join(root, "failure.png") })
-    .catch(() => {});
+    .catch(() => { });
   console.error(root);
   throw error;
 } finally {

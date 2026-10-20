@@ -46,15 +46,15 @@ const clips = ["text", "image", "video"].map((kind) => ({
   name: kind,
   ...(kind === "text"
     ? {
-        text: "ABC 文字动效",
-        style: {
-          fontSize: 68,
-          color: "#ffffff",
-          outline: "#111111",
-          outlineWidth: 2,
-          fontFamily: "Microsoft YaHei",
-        },
-      }
+      text: "ABC 文字动效",
+      style: {
+        fontSize: 68,
+        color: "#ffffff",
+        outline: "#111111",
+        outlineWidth: 2,
+        fontFamily: "Microsoft YaHei",
+      },
+    }
     : { assetId: kind }),
   start: 0,
   duration: 5,
@@ -205,8 +205,8 @@ try {
   await expect(page.locator(".timeline-clip")).toHaveCount(3);
   await page.getByTitle("撤销 Ctrl+Z").click();
   await expect(page.locator(".clip-behavior-effect")).toHaveCount(4);
-  await page.getByTitle("保存工程 Ctrl+S").click();
-  await expect(page.locator(".toast")).toContainText("工程已保存");
+  await page.getByTitle("保存项目 Ctrl+S").click();
+  await expect(page.locator(".toast")).toContainText("项目已保存");
   const saved = JSON.parse(await fs.readFile(file, "utf8"));
   expect(
     saved.clips.find((clip) => clip.id === "image").behaviors,
@@ -350,8 +350,8 @@ try {
   await page.getByRole("menuitemradio", { name: "同时", exact: true }).click();
   await page.screenshot({ path: path.join(root, "shifting-text-during.png") });
   await checkEffectsInsideClips(page);
-  await page.getByTitle("保存工程 Ctrl+S").click();
-  await expect(page.locator(".toast")).toContainText("工程已保存");
+  await page.getByTitle("保存项目 Ctrl+S").click();
+  await expect(page.locator(".toast")).toContainText("项目已保存");
   await expect
     .poll(async () => {
       const project = JSON.parse(await fs.readFile(file, "utf8"));
@@ -375,7 +375,7 @@ try {
   const page = await app.firstWindow();
   await page
     .screenshot({ path: path.join(root, "failure.png") })
-    .catch(() => {});
+    .catch(() => { });
   console.error("行为交互检查失败，截图目录：", root);
   throw error;
 } finally {

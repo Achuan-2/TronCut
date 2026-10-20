@@ -75,6 +75,11 @@ project.clips = [
     kind: "video",
     assetId: project.assets[0].id,
     duration: 4,
+    stitch: [
+      { sourceIn: 0, duration: 1 },
+      { sourceIn: 1, duration: 1, freeze: true },
+      { sourceIn: 1, duration: 2 },
+    ],
   },
 ];
 project.tracks.find((track) => track.id === "audio").locked = true;
@@ -97,6 +102,20 @@ page.on("pageerror", (error) => errors.push(error.message));
 const clip = (id = "video") =>
   page.locator(`.timeline-clip[data-clip-id="${id}"]`);
 const region = () => clip().locator(".frame-extension-region");
+const dragRegion = async (target, delta, trackId) => {
+  const box = await target.boundingBox();
+  const lane = trackId
+    ? await page.locator(`.track-lane[data-track="${trackId}"]`).boundingBox()
+    : null;
+  const x = box.x + box.width / 2,
+    y = box.y + box.height / 2;
+  await page.mouse.move(x, y);
+  await page.mouse.down();
+  await page.mouse.move(x + delta, lane ? lane.y + lane.height / 2 : y, {
+    steps: 10,
+  });
+  await page.mouse.up();
+};
 const dialog = page.getByRole("dialog");
 const seconds = dialog.getByLabel("持续时间（秒）", { exact: true });
 const save = async () => {
@@ -122,6 +141,14 @@ try {
   await page.getByLabel("预览画质", { exact: true }).selectOption("original");
   await seek(1);
   await choose("帧定格…");
+  await expect(dialog.getByRole("combobox", { name: "定格位置", exact: true })).toHaveValue(
+    "playhead",
+  );
+  expect(await dialog.locator("select option").allTextContents()).toEqual([
+    "播放头所在位置",
+    "视频开始点",
+    "视频结束点",
+  ]);
   await expect(seconds).toBeFocused();
   await seconds.fill("0");
   await expect(
@@ -129,6 +156,40 @@ try {
   ).toBeDisabled();
   await seconds.press("Escape");
   await expect(dialog).toHaveCount(0);
+  // Endpoint placement is available even when the playhead is outside this video.
+  for (const position of ["start", "end"]) {
+    await seek(8);
+    await choose("帧定格…");
+    await expect(
+      dialog.getByRole("button", { name: "确定", exact: true }),
+    ).toBeDisabled();
+    await dialog.getByRole("combobox", { name: "定格位置", exact: true }).selectOption(position);
+    await seconds.fill("0.5");
+    await expect(
+      dialog.getByRole("button", { name: "确定", exact: true }),
+    ).toBeEnabled();
+    if (position === "end")
+      await page.screenshot({ path: path.join(root, "position-options.png") });
+    await seconds.press("Enter");
+    await expect(region()).toHaveAttribute(
+      "data-start",
+      position === "start" ? "0" : "4",
+    );
+    await expect(region()).toHaveAttribute("data-duration", "0.5");
+    const endpointSaved = await save();
+    const video = endpointSaved.clips.find((clip) => clip.id === "video");
+    expect(video.duration).toBe(4.5);
+    expect(video.stitch.find((part) => part.freeze).sourceIn).toBeCloseTo(
+      position === "start" ? 0 : 3.95,
+      8,
+    );
+    expect(endpointSaved.clips.find((clip) => clip.id === "later").start).toBe(
+      4.5,
+    );
+    await page.getByTitle("撤销 Ctrl+Z", { exact: true }).click();
+    await expect(region()).toHaveCount(0);
+  }
+  await seek(1);
   await choose("帧定格…");
   await seconds.fill("1");
   await page.screenshot({ path: path.join(root, "duration-dialog.png") });
@@ -142,6 +203,60 @@ try {
   await expect(region()).toHaveCount(0);
   await page.getByTitle("重做 Ctrl+Shift+Z", { exact: true }).click();
   await expect(region()).toHaveCount(1);
+  const moveZoom = await timelineZoom(page);
+  const originalStitch = saved.clips.find((clip) => clip.id === "video").stitch;
+  await dragRegion(region(), moveZoom, "titles");
+  saved = await save();
+  expect(saved.clips.find((clip) => clip.id === "video")).toMatchObject({
+    trackId: "titles",
+    duration: 5,
+    stitch: originalStitch,
+  });
+  expect(saved.clips.find((clip) => clip.id === "video").start).toBeCloseTo(
+    1,
+    6,
+  );
+  expect(saved.clips.find((clip) => clip.id === "later").start).toBe(5);
+  await page.getByTitle("撤销 Ctrl+Z", { exact: true }).click();
+  saved = await save();
+  expect(saved.clips.find((clip) => clip.id === "video")).toMatchObject({
+    start: 0,
+    trackId: "video",
+  });
+  await region().click();
+  await clip("later").click({ modifiers: ["Control"] });
+  await expect(clip()).toHaveClass(/selected/);
+  await expect(clip("later")).toHaveClass(/selected/);
+  await dragRegion(region(), moveZoom);
+  saved = await save();
+  expect(saved.clips.find((clip) => clip.id === "video")).toMatchObject({
+    duration: 5,
+    stitch: originalStitch,
+  });
+  expect(saved.clips.find((clip) => clip.id === "video").start).toBeCloseTo(
+    1,
+    6,
+  );
+  expect(saved.clips.find((clip) => clip.id === "later").start).toBeCloseTo(
+    6,
+    6,
+  );
+  await page.getByTitle("撤销 Ctrl+Z", { exact: true }).click();
+  await dragRegion(
+    clip("locked").locator(".frame-extension-region"),
+    moveZoom,
+    "titles",
+  );
+  saved = await save();
+  expect(saved.clips.find((clip) => clip.id === "locked")).toMatchObject({
+    start: 0,
+    trackId: "audio",
+    duration: 4,
+  });
+  await region().dblclick();
+  await expect(dialog.getByRole("combobox", { name: "定格位置", exact: true })).toHaveCount(0);
+  await expect(seconds).toHaveValue("1");
+  await seconds.press("Escape");
   await choose("调整帧定格时长", region());
   await expect(seconds).toHaveValue("1");
   await seconds.fill("2");
@@ -184,7 +299,10 @@ try {
   await seek(1);
   await clip("locked").click({ button: "right" });
   await expect(
-    page.getByRole("menuitem", { name: "帧定格…", exact: true }),
+    page.getByRole("menuitem", { name: "调整帧定格时长", exact: true }),
+  ).toBeDisabled();
+  await expect(
+    page.getByRole("menuitem", { name: "移除帧定格", exact: true }),
   ).toBeDisabled();
   await page.keyboard.press("Escape");
   await choose("移除帧定格", region());
@@ -200,7 +318,7 @@ try {
   await expect(region()).toHaveAttribute("data-duration", "3");
   expect(errors).toEqual([]);
   console.log(
-    `帧定格右键添加/编辑/移除、时长拖动、播放停帧与恢复、锁定、撤销重做及保存重开通过：${root}`,
+    `帧定格三种位置与越界播放头、区域拖动换轨和多选移动、双击及右键编辑/移除、时长拖动、播放停帧与恢复、锁定、撤销重做及保存重开通过：${root}`,
   );
 } catch (error) {
   await page

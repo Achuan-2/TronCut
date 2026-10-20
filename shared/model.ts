@@ -438,7 +438,7 @@ export const textPresets: { name: string; style: TextStyle }[] = [
     },
   },
 ];
-export function createProject(name = "未命名工程"): Project {
+export function createProject(name = "未命名项目"): Project {
   return {
     format: "troncut",
     version: 1,

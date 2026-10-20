@@ -218,7 +218,7 @@ describe("可编辑片段拼接", () => {
     ).toBe(project);
   });
 
-  it("工程验证拒绝越界拼接和非媒体拼接", () => {
+  it("项目验证拒绝越界拼接和非媒体拼接", () => {
     const project = fixture();
     const result = stitchClips(
       project,

@@ -126,10 +126,10 @@ try {
   await expect(cards).toHaveCount(75);
   await expect(grid).toHaveAttribute("aria-pressed", "true");
   await expect(
-    page.getByText("保存工程时，素材自动归档", { exact: true }),
+    page.getByText("保存项目时，素材自动归档", { exact: true }),
   ).toHaveCount(0);
   await expect(
-    page.getByText("JSON 工程，随时看得懂", { exact: true }),
+    page.getByText("JSON 项目，随时看得懂", { exact: true }),
   ).toHaveCount(0);
   await expect
     .poll(() => page.locator(".asset-thumbnail img").count())
@@ -242,7 +242,7 @@ try {
     await app.firstWindow()
   )
     .screenshot({ path: path.join(root, "failure.png") })
-    .catch(() => {});
+    .catch(() => { });
   throw error;
 } finally {
   await app.close();

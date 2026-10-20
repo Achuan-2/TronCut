@@ -205,8 +205,8 @@ describe("多片段编辑与波纹时间映射", () => {
   });
 });
 
-describe("工程效果兼容与边界", () => {
-  it("同时读取旧工程与新工程，但拒绝裁切掉整个画面", () => {
+describe("项目效果兼容与边界", () => {
+  it("同时读取旧项目与新项目，但拒绝裁切掉整个画面", () => {
     const p = createProject();
     expect(validateProject({ ...p, format: "framecraft" }).format).toBe(
       "framecraft",

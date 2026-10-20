@@ -179,7 +179,7 @@ try {
     path.join(root, `${project.name}.troncut`),
   );
   await page.getByRole("button", { name: "保存", exact: true }).click();
-  await expect(page.locator(".toast")).toContainText("工程已保存");
+  await expect(page.locator(".toast")).toContainText("项目已保存");
   const file = path.join(root, project.name, `${project.name}.troncut`);
   const saved = JSON.parse(await fs.readFile(file, "utf8"));
   expect(saved.clips[0].textRuns).toEqual([
@@ -297,7 +297,7 @@ try {
   const page = await app.firstWindow();
   await page
     .screenshot({ path: path.join(root, "failure.png") })
-    .catch(() => {});
+    .catch(() => { });
   console.error(await page.locator(".font-select-error").allTextContents());
   throw error;
 } finally {

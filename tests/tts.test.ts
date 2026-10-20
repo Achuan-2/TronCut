@@ -80,7 +80,7 @@ describe("ONNX 本地配音", () => {
     expect(args).not.toContain(options.text);
     expect(args).not.toContain("--extra");
   });
-  it("旧配音参数仍能解析和打开工程，但不启动旧推理环境", async () => {
+  it("旧配音参数仍能解析和打开项目，但不启动旧推理环境", async () => {
     for (const legacy of [
       { engine: "kokoro", voice: "zf_001" },
       { engine: "qwen-small", voice: "Vivian" },
@@ -110,12 +110,12 @@ describe("ONNX 本地配音", () => {
           narration,
           { userData: "unused", workers: "unused", resources: "" },
           new AbortController().signal,
-          () => {},
+          () => { },
         ),
       ).rejects.toThrow("配音已改用 ONNX");
     }
   });
-  it("保留模型参数、运行记录和工程素材，语速仅转换一次", async () => {
+  it("保留模型参数、运行记录和项目素材，语速仅转换一次", async () => {
     const userData = path.resolve(`test-output/tts/onnx-${Date.now()}`);
     const calls: string[][] = [];
     vi.mocked(runProcess).mockImplementation(
@@ -159,7 +159,7 @@ describe("ONNX 本地配音", () => {
       { ...options, speed: 1.25 },
       paths,
       new AbortController().signal,
-      () => {},
+      () => { },
     );
     expect(calls.filter((args) => args.includes("atempo=1.25"))).toHaveLength(
       1,
@@ -194,7 +194,7 @@ describe("ONNX 本地配音", () => {
         { ...options, speed: 1.25 },
         paths,
         new AbortController().signal,
-        () => {},
+        () => { },
       ),
     ).rejects.toThrow("无效音频");
     expect(await fs.readdir(path.join(userData, "narration"))).toEqual(before);
@@ -209,7 +209,7 @@ describe("ONNX 本地配音", () => {
         { ...options, speed: 1.25 },
         paths,
         controller.signal,
-        () => {},
+        () => { },
       ),
     ).rejects.toThrow("配音已取消");
     expect(await fs.readdir(path.join(userData, "narration"))).toEqual(before);

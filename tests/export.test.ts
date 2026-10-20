@@ -18,8 +18,8 @@ import {
   saveProject,
 } from "../electron/project-store";
 
-describe("真实视频与工程往返", () => {
-  it("Windows 工程文件夹图标写入后可以再次保存，隐藏 desktop.ini 不阻止正文保存", async () => {
+describe("真实视频与项目往返", () => {
+  it("Windows 项目文件夹图标写入后可以再次保存，隐藏 desktop.ini 不阻止正文保存", async () => {
     const root = path.resolve(`test-output/repeated-save-${Date.now()}`);
     const file = path.join(root, "repeat.troncut"),
       p = createProject("第一次保存");
@@ -128,7 +128,7 @@ describe("真实视频与工程往返", () => {
       path.join(root, "render"),
       info.rubberband,
       new AbortController().signal,
-      () => {},
+      () => { },
     );
     const output = await probeMedia(target);
     expect(output.hasAudio).toBe(true);
@@ -182,7 +182,7 @@ describe("真实视频与工程往返", () => {
       path.resolve("test-output/hidden-render"),
       false,
       new AbortController().signal,
-      () => {},
+      () => { },
     );
     expect((await probeMedia(output)).duration).toBeCloseTo(0.5, 1);
   });

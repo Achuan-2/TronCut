@@ -90,6 +90,29 @@ it("实际导出在扩展区间保持同一视频帧并静音，结束后恢复�
   const expected = await frame(source, 1.5, "source-resumed");
   expect(difference(resumed, expected)).toBeLessThan(7);
   expect(difference(first, resumed)).toBeGreaterThan(8);
+  for (const position of ["start", "end"] as const) {
+    const endpoint = setFrameExtension(project, "video", 99, 1, position);
+    const output = path.join(root, `${position}.mp4`);
+    await exportVideo(
+      endpoint,
+      output,
+      path.join(root, position),
+      false,
+      signal,
+      () => {},
+    );
+    expect((await probeMedia(output)).duration).toBeCloseTo(4, 1);
+    const from = position === "start" ? 0 : 3;
+    const heldFirst = await frame(output, from + 0.2, `${position}-held-first`);
+    const heldLast = await frame(output, from + 0.8, `${position}-held-last`);
+    const originalFrame = await frame(
+      source,
+      position === "start" ? 0 : 2.95,
+      `${position}-source`,
+    );
+    expect(difference(heldFirst, heldLast)).toBeLessThan(1);
+    expect(difference(heldFirst, originalFrame)).toBeLessThan(7);
+  }
   const capture = path.join(root, "snapshot.png");
   await exportFrame(reopened, 2, capture, path.join(root, "capture"), signal);
   expect(

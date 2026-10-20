@@ -11,22 +11,25 @@ import {
   cursorRecordingSchema,
 } from "../shared/model";
 
+// Keep the legacy default recognizable when opening or resaving older files.
+const unnamedProjectNames = new Set(["未命名项目", "未命名工程"]);
+
 export function resolveContained(root: string, relative: string): string {
   if (path.isAbsolute(relative))
-    throw new Error("TronCut 工程素材必须使用相对路径");
+    throw new Error("TronCut 项目素材必须使用相对路径");
   const resolved = path.resolve(root, relative),
     rel = path.relative(root, resolved);
   if (rel === ".." || rel.startsWith(`..${path.sep}`) || path.isAbsolute(rel))
-    throw new Error(`工程素材越出了工程目录：${relative}`);
+    throw new Error(`项目素材越出了项目目录：${relative}`);
   return resolved;
 }
 export async function openProject(file: string): Promise<Project> {
   const project = validateProject(JSON.parse(await fs.readFile(file, "utf8")));
   const baseName = path.basename(file, path.extname(file)).trim();
   if (
-    (!project.name || project.name === "未命名工程") &&
+    (!project.name || unnamedProjectNames.has(project.name)) &&
     baseName &&
-    baseName !== "未命名工程"
+    !unnamedProjectNames.has(baseName)
   ) {
     project.name = baseName;
   }
@@ -89,9 +92,9 @@ export async function saveProject(
     });
   const fileBaseName = path.basename(file, path.extname(file)).trim();
   if (
-    (!valid.name || valid.name === "未命名工程") &&
+    (!valid.name || unnamedProjectNames.has(valid.name)) &&
     fileBaseName &&
-    fileBaseName !== "未命名工程"
+    !unnamedProjectNames.has(fileBaseName)
   ) {
     valid.name = fileBaseName;
   }
@@ -137,7 +140,7 @@ export async function saveProject(
   try {
     await cleanupProjectMedia(serialized, file, previous);
   } catch (error) {
-    throw new Error(`工程已保存，但清理已删除素材失败：${String(error)}`);
+    throw new Error(`项目已保存，但清理已删除素材失败：${String(error)}`);
   }
   if (process.platform === "win32" && iconPath) {
     const desktopIni = path.join(root, "desktop.ini");
@@ -167,17 +170,17 @@ export async function saveProject(
             fs.readFile(iconPath),
           ]).catch(() => null);
           if (icons && icons[0].equals(icons[1]))
-            await fs.unlink(legacyIcon).catch(() => {});
+            await fs.unlink(legacyIcon).catch(() => { });
         }
       }
     }
     const { runProcess } = await import("./process");
-    await runProcess("attrib", ["+r", root]).catch(() => {});
+    await runProcess("attrib", ["+r", root]).catch(() => { });
     await runProcess("attrib", [
       "+s",
       "+h",
       path.join(root, "desktop.ini"),
-    ]).catch(() => {});
+    ]).catch(() => { });
   }
   return {
     ...valid,
@@ -199,7 +202,7 @@ export async function saveProjectInDirectory(
   const name = project.name
     .replace(/[<>:"/\\|?*\x00-\x1f]/g, "_")
     .replace(/[. ]+$/, "")
-    .trim() || "未命名工程";
+    .trim() || "未命名项目";
   await fs.mkdir(directory, { recursive: true });
   for (let suffix = 1; ; suffix++) {
     const folderName = suffix === 1 ? name : `${name}-${suffix}`;
@@ -226,7 +229,7 @@ export async function renameProjectStorage(
     .replace(/[<>:"/\\|?*\x00-\x1f]/g, "_")
     .replace(/[. ]+$/, "")
     .trim();
-  if (!sanitized) throw new Error("工程名称无效");
+  if (!sanitized) throw new Error("项目名称无效");
 
   const oldRoot = path.dirname(path.resolve(currentFile));
   const oldFileName = path.basename(currentFile);
@@ -243,13 +246,13 @@ export async function renameProjectStorage(
   const sameFile =
     process.platform === "win32"
       ? path.resolve(currentFile).toLowerCase() ===
-        path.resolve(newFile).toLowerCase()
+      path.resolve(newFile).toLowerCase()
       : path.resolve(currentFile) === path.resolve(newFile);
 
   const sameFolder =
     process.platform === "win32"
       ? path.resolve(oldRoot).toLowerCase() ===
-        path.resolve(newRoot).toLowerCase()
+      path.resolve(newRoot).toLowerCase()
       : path.resolve(oldRoot) === path.resolve(newRoot);
 
   if (!sameFile && !sameFolder) {
@@ -260,7 +263,7 @@ export async function renameProjectStorage(
           () => false,
         )
       ) {
-        throw new Error(`同名工程文件夹“${sanitized}”已存在，请更换名称`);
+        throw new Error(`同名项目文件夹“${sanitized}”已存在，请更换名称`);
       }
     } else {
       if (
@@ -270,13 +273,13 @@ export async function renameProjectStorage(
         )
       ) {
         throw new Error(
-          `同名工程文件“${sanitized}.troncut”已存在，请更换名称`,
+          `同名项目文件“${sanitized}.troncut”已存在，请更换名称`,
         );
       }
     }
   }
 
-  // 1. 如果是专属工程文件夹，先重命名文件夹
+  // 1. 如果是专属项目文件夹，先重命名文件夹
   if (isDedicatedFolder && !sameFolder) {
     if (
       process.platform === "win32" &&
@@ -290,7 +293,7 @@ export async function renameProjectStorage(
     }
   }
 
-  // 2. 如果文件夹内的工程文件需要改名
+  // 2. 如果文件夹内的项目文件需要改名
   const currentFileInNewRoot = isDedicatedFolder
     ? path.join(newRoot, oldFileName)
     : currentFile;
@@ -299,7 +302,7 @@ export async function renameProjectStorage(
     if (
       process.platform === "win32" &&
       path.resolve(currentFileInNewRoot).toLowerCase() ===
-        path.resolve(newFile).toLowerCase()
+      path.resolve(newFile).toLowerCase()
     ) {
       const tempFile = `${currentFileInNewRoot}_rename_tmp_${Date.now()}`;
       await fs.rename(currentFileInNewRoot, tempFile);

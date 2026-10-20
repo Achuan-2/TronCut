@@ -241,7 +241,7 @@ try {
   await expect(page.locator(".timeline-clip.text")).toHaveCount(1);
   await page.getByTitle("撤销 Ctrl+Z", { exact: true }).click();
   await expect(marker("校对点")).toHaveCount(1);
-  await page.getByTitle("保存工程 Ctrl+S", { exact: true }).click();
+  await page.getByTitle("保存项目 Ctrl+S", { exact: true }).click();
   await expect
     .poll(
       async () => JSON.parse(await fs.readFile(file, "utf8")).markers.length,
@@ -304,7 +304,7 @@ try {
 } catch (error) {
   await page
     ?.screenshot({ path: path.join(root, "failure.png") })
-    .catch(() => {});
+    .catch(() => { });
   console.error(root);
   throw error;
 } finally {

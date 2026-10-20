@@ -117,7 +117,7 @@ try {
       Math.abs(slider.y + slider.height / 2 - number.y - number.height / 2),
     ).toBeLessThan(2);
   }
-  await page.getByTitle("保存工程 Ctrl+S", { exact: true }).click();
+  await page.getByTitle("保存项目 Ctrl+S", { exact: true }).click();
   await expect
     .poll(
       async () =>
@@ -142,7 +142,7 @@ try {
     await app.firstWindow()
   )
     .screenshot({ path: path.join(root, "failure.png") })
-    .catch(() => {});
+    .catch(() => { });
   console.error(root);
   throw error;
 } finally {

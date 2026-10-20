@@ -38,7 +38,7 @@ it("蓝色渐变按画布生成参考图的浅蓝到浅青色", async () => {
 });
 
 it.each(["image", "video"] as const)(
-  "自定义 %s 背景复制保存，迁移工程后仍可独立导出",
+  "自定义 %s 背景复制保存，迁移项目后仍可独立导出",
   async (kind) => {
     const root = path.resolve(`test-output/custom-${kind}-${Date.now()}`);
     await fs.mkdir(root, { recursive: true });
@@ -146,7 +146,7 @@ it.each(["image", "video"] as const)(
       path.join(root, "render"),
       false,
       AbortSignal.timeout(30000),
-      () => {},
+      () => { },
     );
     // Exports include a silent audio stream even when the recording has no sound.
     // Decode samples to verify the custom video's tone never reaches that stream.
@@ -267,7 +267,7 @@ it.each([0, 18])("真实导出和归档重开保留背景、圆角 %i 与自动�
     path.join(root, "render"),
     false,
     signal,
-    () => {},
+    () => { },
   );
   const pixels: number[][] = [];
   for (const [i, time] of [0, 2.1].entries()) {
@@ -391,7 +391,7 @@ it.each([
       path.join(root, "render"),
       false,
       AbortSignal.timeout(60000),
-      () => {},
+      () => { },
     );
     const borders: Buffer[] = [];
     for (const time of [0, 0.7, background.duration + 0.7]) {

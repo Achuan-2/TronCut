@@ -46,7 +46,7 @@ describe("文本框与自动字号", () => {
     ).toThrow();
   });
 
-  it("新增文本的所有预设默认无背景，旧工程和主动开启的填充仍保留", () => {
+  it("新增文本的所有预设默认无背景，旧项目和主动开启的填充仍保留", () => {
     for (const [index] of textPresets.entries()) {
       const preset = newText("titles", 0, index);
       expect(preset.style!.fillEnabled).toBe(false);
@@ -138,7 +138,7 @@ describe("文本框与自动字号", () => {
     );
     expect(fitTextFont("小", { width: 16, height: 16 }, 20, measure)).toBe(8);
   });
-  it("旧工程仍可打开，新增文本框及自动设置往返后保留", () => {
+  it("旧项目仍可打开，新增文本框及自动设置往返后保留", () => {
     const project = createProject();
     const text = newText("titles", 0);
     project.clips = [text];

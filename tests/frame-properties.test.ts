@@ -35,7 +35,7 @@ it("倾斜、深度与三轴旋转组合后拖拽可逆，关键帧缺省、端�
   expect(transformAt(pasted, 5)).toMatchObject({ skew: 80, z: 1000 });
 });
 
-it("圆角作为可选效果添加且不重复，旧工程保留圆角，关闭不丢失半径和角设置", () => {
+it("圆角作为可选效果添加且不重复，旧项目保留圆角，关闭不丢失半径和角设置", () => {
   const clip: Clip = { ...newText("video", 0), kind: "image", assetId: "image" };
   const project = createProject();
   project.assets = [{ id: "image", name: "图片", path: "image.png", kind: "image", width: 400, height: 200, duration: 0, hasAudio: false }];

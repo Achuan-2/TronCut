@@ -369,7 +369,7 @@ export default function AiProvidersFields({
             ))}
           </div>
           <p className="field-help">
-            密钥使用系统安全存储加密，不写入工程。更换服务来源后需重新填写密钥；字幕
+            密钥使用系统安全存储加密，不写入项目。更换服务来源后需重新填写密钥；字幕
             AI 功能使用当前模型。
           </p>
         </>

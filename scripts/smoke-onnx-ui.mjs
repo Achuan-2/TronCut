@@ -43,7 +43,7 @@ try {
   const page = await app.firstWindow();
   page.on("pageerror", (error) => errors.push(error.message));
   await page.getByRole("button", { name: "新建项目", exact: true }).click();
-  await page.getByLabel("工程名称", { exact: true }).fill("ONNX语音");
+  await page.getByLabel("项目名称", { exact: true }).fill("ONNX语音");
   await page.getByRole("button", { name: "旁白", exact: true }).click();
   await page.getByRole("button", { name: "旁白更多选项", exact: true }).click();
   await page
@@ -117,7 +117,7 @@ try {
     });
   }, saveFolder);
   await page.getByRole("button", { name: "保存", exact: true }).click();
-  await expect(page.getByRole("status")).toContainText("工程已保存", {
+  await expect(page.getByRole("status")).toContainText("项目已保存", {
     timeout: 20000,
   });
   const project = JSON.parse(await fs.readFile(file, "utf8"));
@@ -134,7 +134,7 @@ try {
     JSON.stringify({ projectFile: file, rendererErrors: errors }, null, 2),
   );
   console.log(
-    "ONNX 桌面生成、试听停止、参数保留、自动模型缓存、字幕与工程保存通过",
+    "ONNX 桌面生成、试听停止、参数保留、自动模型缓存、字幕与项目保存通过",
   );
 } finally {
   await app.close();

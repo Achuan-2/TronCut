@@ -142,7 +142,7 @@ try {
     path.join(root, `${project.name}.troncut`),
   );
   await page.getByRole("button", { name: "保存", exact: true }).click();
-  await expect(page.locator(".toast")).toContainText("工程已保存", {
+  await expect(page.locator(".toast")).toContainText("项目已保存", {
     timeout: 20000,
   });
   const saved = JSON.parse(
@@ -182,7 +182,7 @@ try {
 } catch (error) {
   await page
     .screenshot({ path: path.join(root, "failure.png") })
-    .catch(() => {});
+    .catch(() => { });
   console.error(root);
   throw error;
 } finally {

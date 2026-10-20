@@ -15,7 +15,7 @@
 | [行为](BEHAVIORS.md) | 文字、图片与视频动效、进／期间／出、对象与逐字类型、效果条 |
 | [转换](TRANSITIONS.md) | Smooth Slide 片头、片尾与相邻接点拖放、时长和属性 |
 | [画布与动画](CANVAS.md) | 图层尺寸、自动动画、整幅画面的缩放与平移 |
-| [工程管理](PROJECTS.md) | 最近项目、手动恢复、保存、素材归档与迁移 |
+| [项目管理](PROJECTS.md) | 最近项目、手动恢复、保存、素材归档与迁移 |
 | [视频导出](EXPORT.md) | 导出位置、分辨率、质量、格式与进度取消 |
 | [本地配音](TTS.md) | Kokoro/VITS、ONNX 模型下载与离线合成 |
 | [Codex CLI](CLI.md) | 剪辑、抽帧、转录、文案配音、字幕与导出 |
@@ -25,12 +25,12 @@
 | 文档 | 内容 |
 | --- | --- |
 | [功能清单与路线图](FEATURES.md) | 当前实现状态和待完成能力 |
-| [架构与工程协议](ARCHITECTURE.md) | 分层、时间与空间模型、预览边界 |
+| [架构与项目协议](ARCHITECTURE.md) | 分层、时间与空间模型、预览边界 |
 | [构建与发布](BUILDING.md) | 开发环境、媒体引擎与安装包 |
 | [验证记录](VALIDATION.md) | 自动检查、真实数据与桌面验证证据 |
 | [本地语音字幕](SENSEVOICE.md) | Qwen3-ASR、SenseVoice 与全局字幕识别说明 |
 | [字幕断句与 AI 精修](AI-CAPTIONS.md) | 首选项、AI 模型、断句、纠错精修与润色 |
-| [Camtasia 工程测试](CAMTASIA-REAL-PROJECT-TEST.md) | 实际工程转换结果与限制 |
+| [Camtasia 项目测试](CAMTASIA-REAL-PROJECT-TEST.md) | 实际项目转换结果与限制 |
 | [0.2 交付记录](TRONCUT-0.2.md) | 版本实现、修复和交付边界 |
 
 [返回项目首页](../README.md)

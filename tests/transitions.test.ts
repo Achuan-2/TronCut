@@ -236,7 +236,7 @@ describe("转换效果", () => {
         path.join(root, "render"),
         false,
         signal,
-        () => {},
+        () => { },
       );
       for (const time of [0.6, 0.8, 1, 1.2, 1.4]) {
         const expected = path.join(root, `expected-${time}.png`);
@@ -375,7 +375,7 @@ describe("转换效果", () => {
     expect(snapshot.clips.every((clip) => !clip.transitions)).toBe(true);
   });
 
-  it("拆分只保留原片头与片尾转换，工程 schema 可以往返", () => {
+  it("拆分只保留原片头与片尾转换，项目 schema 可以往返", () => {
     let project = addTransition(adjacentProject(), {
       clipId: "red",
       side: "incoming",
@@ -451,7 +451,7 @@ describe("转换效果", () => {
       path.join(root, "render"),
       false,
       new AbortController().signal,
-      () => {},
+      () => { },
     );
     const frame = path.join(root, "middle.png");
     await runProcess(findBinary("ffmpeg"), [

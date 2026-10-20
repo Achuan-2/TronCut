@@ -99,7 +99,7 @@ describe("本机预设库", () => {
     ).toBe(false);
   });
 
-  it("自定义花字拖拽及工程自带样式，不依赖本机预设库", () => {
+  it("自定义花字拖拽及项目自带样式，不依赖本机预设库", () => {
     const preset = captureTextPreset(
       { ...textPresets[1].style, fontFamily: "Arial", fillEnabled: true },
       "自定义",
@@ -254,10 +254,10 @@ describe("本机预设库", () => {
     ).toBe(false);
   });
 
-  it("工程自带自定义效果的名称和参数，不依赖本机预设库即可继续渲染", () => {
+  it("项目自带自定义效果的名称和参数，不依赖本机预设库即可继续渲染", () => {
     const original = createBehavior("pop", 5)!;
     original.incoming.speed = 93;
-    const custom = captureBehaviorPreset(original, "工程中的自定义弹出");
+    const custom = captureBehaviorPreset(original, "项目中的自定义弹出");
     const applied = { ...behaviorFromPreset(custom, 5), name: custom.name };
     const project = createProject();
     project.clips = [{ ...newText("titles", 0), behaviors: [applied] }];

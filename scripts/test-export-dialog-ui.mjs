@@ -102,7 +102,7 @@ try {
     });
   }, root);
   await page.getByRole("button", { name: "保存", exact: true }).click();
-  await expect(page.getByRole("status")).toContainText("工程已保存", {
+  await expect(page.getByRole("status")).toContainText("项目已保存", {
     timeout: 20000,
   });
   const projectDirectory = path.join(root, project.name);
@@ -205,7 +205,7 @@ try {
     "opus",
   );
   await page.getByRole("button", { name: "保存", exact: true }).click();
-  await expect(page.getByRole("status")).toContainText("工程已保存", {
+  await expect(page.getByRole("status")).toContainText("项目已保存", {
     timeout: 20000,
   });
   const saved = JSON.parse(
@@ -228,7 +228,7 @@ try {
   await app
     .windows()[0]
     ?.screenshot({ path: path.join(root, "failure.png") })
-    .catch(() => {});
+    .catch(() => { });
   console.error(`失败截图：${root}`);
   throw error;
 } finally {

@@ -166,10 +166,10 @@ try {
     ),
   );
   console.log(
-    "LuxTTS ONNX 创建音色、缓存配音、进程重启、音色删除后工程播放通过：",
+    "LuxTTS ONNX 创建音色、缓存配音、进程重启、音色删除后项目播放通过：",
     root,
   );
 } finally {
   await closeOnnxSessions();
-  if (voice) await store.remove(voice.id).catch(() => {});
+  if (voice) await store.remove(voice.id).catch(() => { });
 }

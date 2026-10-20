@@ -1816,9 +1816,11 @@ export default function Timeline({
                               ]);
                             const mode = (event.target as HTMLElement).dataset
                               .trim as "left" | "right" | undefined;
-                            event.currentTarget.setPointerCapture(
-                              event.pointerId,
-                            );
+                            // Keep freeze-region clicks targeted at that region so
+                            // its double-click editor still works after dragging.
+                            const captureTarget = (event.target as HTMLElement)
+                              .closest<HTMLElement>(".frame-extension-region") ?? event.currentTarget;
+                            captureTarget.setPointerCapture(event.pointerId);
                             setDrag({
                               id: c.id,
                               mode: mode ?? "move",

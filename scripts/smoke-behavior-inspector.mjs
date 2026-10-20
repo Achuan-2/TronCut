@@ -129,7 +129,7 @@ try {
   await page
     .locator(".inspector")
     .screenshot({ path: path.join(root, "independent-panels.png") });
-  await page.getByTitle("保存工程 Ctrl+S", { exact: true }).click();
+  await page.getByTitle("保存项目 Ctrl+S", { exact: true }).click();
   await expect
     .poll(
       async () =>
@@ -144,7 +144,7 @@ try {
     await app.firstWindow()
   )
     .screenshot({ path: path.join(root, "failure.png") })
-    .catch(() => {});
+    .catch(() => { });
   console.error(root);
   throw error;
 } finally {

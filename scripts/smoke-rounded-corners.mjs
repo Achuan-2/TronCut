@@ -115,7 +115,7 @@ try {
   await expect(input).toHaveValue("20");
   await input.fill("75");
   await expect.poll(radiusRatio).toBeCloseTo(0.375, 2);
-  await page.getByTitle("保存工程 Ctrl+S", { exact: true }).click();
+  await page.getByTitle("保存项目 Ctrl+S", { exact: true }).click();
   await expect
     .poll(
       async () =>
@@ -141,7 +141,7 @@ try {
 } catch (error) {
   await page
     ?.screenshot({ path: path.join(root, "failure.png") })
-    .catch(() => {});
+    .catch(() => { });
   throw error;
 } finally {
   await app?.close();

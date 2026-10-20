@@ -25,11 +25,11 @@ function context(root: string) {
     resources: path.resolve("resources"),
     version: "test",
     signal: new AbortController().signal,
-    progress: () => {},
+    progress: () => { },
   };
 }
 
-describe("Codex CLI 工程与命令协议", () => {
+describe("Codex CLI 项目与命令协议", () => {
   it("CLI 字幕与编辑器共用默认字号和位置，并保留显式设置", () => {
     const cues = [{ start: 0, end: 2, text: "默认字幕" }];
     const project = addCaptionCues(createProject(), cues);
@@ -183,7 +183,7 @@ describe("Codex CLI 工程与命令协议", () => {
     );
   });
 
-  it("真实无声素材可剪辑、抽帧、请求文案，字幕和变速按工程导出", async () => {
+  it("真实无声素材可剪辑、抽帧、请求文案，字幕和变速按项目导出", async () => {
     const root = path.resolve(`test-output/cli-integration-${Date.now()}`);
     await fs.mkdir(root, { recursive: true });
     const input = path.join(root, "无声 素材.mp4");

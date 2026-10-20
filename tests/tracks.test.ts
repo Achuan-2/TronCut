@@ -22,7 +22,7 @@ const image: Asset = {
 };
 
 describe("通用编号轨道与图片粘贴", () => {
-  it("单条轨道高度保存重开后保留，旧工程仍可使用默认高度", () => {
+  it("单条轨道高度保存重开后保留，旧项目仍可使用默认高度", () => {
     const project = createProject();
     const id = project.tracks[0].id;
     const changed = setTrackHeight(project, id, 135.6);

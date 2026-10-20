@@ -74,7 +74,7 @@ it("多选及嵌套组合保留相对时间、上下层级和独立的组合关�
   expect(validateProject(result.project).clips).toHaveLength(4);
 });
 
-it("轨道达到上限时仍可复用空闲顶层，不能新增时保持工程完整", () => {
+it("轨道达到上限时仍可复用空闲顶层，不能新增时保持项目完整", () => {
   const { project, source, top } = fixture();
   while (project.tracks.length < 128) project.tracks.push(newTrack(project.tracks.length));
   expect(pasteClips(project, [source], 5, { pasteToTop: true }).ids).toHaveLength(1);

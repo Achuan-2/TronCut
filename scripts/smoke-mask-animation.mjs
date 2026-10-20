@@ -159,9 +159,9 @@ try {
     await dragFrom(
       box.x + box.width * (part === "center" ? 0.5 : 0.25),
       box.y +
-        (part === "border"
-          ? 0.5
-          : box.height * (part === "center" ? 0.5 : 0.25)),
+      (part === "border"
+        ? 0.5
+        : box.height * (part === "center" ? 0.5 : 0.25)),
       35,
       15,
     );
@@ -233,7 +233,7 @@ try {
   expect(clip.keyframes.at(-1).value.maskWidth).toBeCloseTo(1, 2);
   expect(
     clip.keyframes.at(-1).value.maskX -
-      clip.keyframes.at(-1).value.maskWidth / 2,
+    clip.keyframes.at(-1).value.maskWidth / 2,
   ).toBeCloseTo(0, 3);
   for (const [time, visible, hidden] of [
     [0.5, 0.14, 0.4],
@@ -334,7 +334,7 @@ try {
     JSON.stringify({
       root,
       checks:
-        "单击遮罩区域/边框/标签立即显示控制点且不修改工程、控制点按选择显隐、中央控制点移动遮罩、区域及边框拖动素材、八点缩放、自动动画、滑动显示像素、起止端点、撤销、时长拖动、取消、保存重开",
+        "单击遮罩区域/边框/标签立即显示控制点且不修改项目、控制点按选择显隐、中央控制点移动遮罩、区域及边框拖动素材、八点缩放、自动动画、滑动显示像素、起止端点、撤销、时长拖动、取消、保存重开",
       rendererErrors: errors,
     }),
   );
@@ -344,7 +344,7 @@ try {
       await app.firstWindow()
     )
       .screenshot({ path: path.join(root, "failure.png") })
-      .catch(() => {});
+      .catch(() => { });
   console.error(root);
   throw error;
 } finally {

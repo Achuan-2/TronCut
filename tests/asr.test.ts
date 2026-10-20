@@ -94,7 +94,7 @@ describe("字幕引擎与源时间映射", () => {
       { device: "cpu", offline: true },
       paths,
       new AbortController().signal,
-      () => {},
+      () => { },
     );
     expect(result[0].text).toBe("CPU 字幕");
     expect(
@@ -173,7 +173,7 @@ describe("字幕引擎与源时间映射", () => {
       ),
     ).toContain("from_sense_voice");
   });
-  it("全局识别混音一次并返回工程时间，不使用传入的源区间限制", async () => {
+  it("全局识别混音一次并返回项目时间，不使用传入的源区间限制", async () => {
     const temp = path.resolve(`test-output/project-asr-contract-${Date.now()}`);
     await fs.mkdir(temp, { recursive: true });
     const project = createProject();
@@ -230,7 +230,7 @@ describe("字幕引擎与源时间映射", () => {
         resources: "",
       },
       new AbortController().signal,
-      () => {},
+      () => { },
     );
     expect(requests).toHaveLength(1);
     expect(requests[0]).toMatchObject({

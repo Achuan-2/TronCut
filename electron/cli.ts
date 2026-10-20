@@ -157,7 +157,7 @@ export async function prepareFrames(
     !duration ||
     !project.clips.some((clip) => ["video", "image"].includes(clip.kind))
   )
-    throw new Error("抽帧需要包含画面的非空工程");
+    throw new Error("抽帧需要包含画面的非空项目");
   const interval = z.number().finite().positive().parse(options.interval);
   const maximum = z.number().int().min(1).max(200).parse(options.maxFrames);
   const inputs = project.assets.map((asset) => asset.path);
@@ -233,7 +233,7 @@ export async function prepareFrames(
   );
   await fs.writeFile(
     guide,
-    `# 根据画面生成解说\n\n阅读 frames.json 的图片，按编辑后时间线（总长 ${duration.toFixed(3)} 秒）生成中文文案。${options.prompt ? `\n\n用户要求：${options.prompt}` : ""}\n\n只描述实际画面能够支持的内容；抽帧之间未观察到的操作细节不要编造。把配音写成简短、自然的句子，按 start/end/text 写入 script-template.json 的 segments。时间段按顺序且不重叠，每段 end 不超过总时长；留出足够朗读时间。然后调用 TronCut CLI 的 narrate，或把脚本放入 run 计划的 narration 字段。CLI 会生成实际音频、按真实音频分段时间添加字幕，并保存可编辑工程。\n`,
+    `# 根据画面生成解说\n\n阅读 frames.json 的图片，按编辑后时间线（总长 ${duration.toFixed(3)} 秒）生成中文文案。${options.prompt ? `\n\n用户要求：${options.prompt}` : ""}\n\n只描述实际画面能够支持的内容；抽帧之间未观察到的操作细节不要编造。把配音写成简短、自然的句子，按 start/end/text 写入 script-template.json 的 segments。时间段按顺序且不重叠，每段 end 不超过总时长；留出足够朗读时间。然后调用 TronCut CLI 的 narrate，或把脚本放入 run 计划的 narration 字段。CLI 会生成实际音频、按真实音频分段时间添加字幕，并保存可编辑项目。\n`,
   );
   return { directory, manifest, template, guide, duration, frames };
 }
@@ -266,7 +266,7 @@ async function saveOutputs(
         ),
     ).size !== [projectFile, srt, video].filter(Boolean).length
   )
-    throw new Error("工程、字幕和视频输出路径不能相同");
+    throw new Error("项目、字幕和视频输出路径不能相同");
   const saved = await saveProject(project, projectFile);
   if (srt) await fs.writeFile(srt, toSrt(projectCues(saved)), "utf8");
   if (video) {
@@ -455,9 +455,9 @@ export async function executeCli(
       );
       script.modelDir = script.modelDir
         ? path.resolve(
-            path.dirname(path.resolve(options.script!)),
-            script.modelDir,
-          )
+          path.dirname(path.resolve(options.script!)),
+          script.modelDir,
+        )
         : "";
       if (options.offline) script.offline = true;
       project = (
@@ -622,7 +622,7 @@ export async function runCli(
         );
         if (
           path.dirname(path.resolve(values.result)) ===
-            path.resolve(values.output) &&
+          path.resolve(values.output) &&
           /^frame-\d+\.jpg$/i.test(path.basename(values.result))
         )
           throw new Error("结果文件不能覆盖抽帧图片");

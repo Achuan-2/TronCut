@@ -81,6 +81,6 @@ describe("Camtasia 导入边界", () => {
     expect(project.importReport?.length).toBeGreaterThan(1);
     expect(() => validateProject(project)).not.toThrow();
   });
-  it("拒绝没有 editRate 的工程", () =>
+  it("拒绝没有 editRate 的项目", () =>
     expect(() => importCamtasia({ sourceBin: [] }, "x")).toThrow("未识别"));
 });

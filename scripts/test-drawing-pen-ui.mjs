@@ -132,7 +132,7 @@ try {
       dialog.showSaveDialog = async () => ({ canceled: false, filePath });
     }, target);
     await page.getByRole("button", { name: "保存", exact: true }).click();
-    await expect(page.locator(".toast")).toContainText("工程已保存");
+    await expect(page.locator(".toast")).toContainText("项目已保存");
     return JSON.parse(
       await fs.readFile(
         path.join(root, project.name, `${project.name}.troncut`),

@@ -67,7 +67,7 @@ function ProjectTitleInput({
   }, [name]);
 
   const commit = async () => {
-    const next = value.trim() || name || "未命名工程";
+    const next = value.trim() || name || "未命名项目";
     setValue(next);
     if (next !== name) {
       try {
@@ -80,7 +80,7 @@ function ProjectTitleInput({
 
   return (
     <input
-      aria-label="工程名称"
+      aria-label="项目名称"
       disabled={disabled}
       value={value}
       onChange={(e) => setValue(e.target.value)}
@@ -138,8 +138,8 @@ export default function App() {
   const editingSurface = useRef<"canvas" | "timeline">("timeline");
   const [exportOpen, setExportOpen] = useState(false);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
-      undefined,
-    ),
+    undefined,
+  ),
     clipClipboard = useRef<Clip[]>([]),
     clipClipboardToken = useRef("");
   const initialized = useRef(false);
@@ -213,9 +213,9 @@ export default function App() {
     const focused = () =>
       setEditingInput(
         document.activeElement instanceof HTMLElement &&
-          !!document.activeElement.closest(
-            'input, textarea, [contenteditable="true"]',
-          ),
+        !!document.activeElement.closest(
+          'input, textarea, [contenteditable="true"]',
+        ),
       );
     document.addEventListener("focusin", focused);
     document.addEventListener("focusout", focused);
@@ -351,8 +351,8 @@ export default function App() {
       if (result) {
         editor.markSaved(result.project);
         setFile(result.file);
-        void refreshHome().catch(() => {});
-        toast("工程已保存，工程文件和素材已归档到工程文件夹");
+        void refreshHome().catch(() => { });
+        toast("项目已保存，项目文件和素材已归档到项目文件夹");
       }
     });
   const renameProject = async (nextName: string) => {
@@ -368,8 +368,8 @@ export default function App() {
       if (result) {
         editor.markSaved(result.project);
         setFile(result.file);
-        void refreshHome().catch(() => {});
-        toast(`工程及文件夹已重命名为“${result.project.name}”`);
+        void refreshHome().catch(() => { });
+        toast(`项目及文件夹已重命名为“${result.project.name}”`);
         success = true;
       }
     });
@@ -377,7 +377,7 @@ export default function App() {
   };
   const open = () =>
     run(async () => {
-      if (editor.dirty && !confirm("当前工程有未保存修改，确定打开其他工程？"))
+      if (editor.dirty && !confirm("当前项目有未保存修改，确定打开其他项目？"))
         return;
       const result = await bridge().openProject();
       if (result) {
@@ -385,7 +385,7 @@ export default function App() {
         setFile(result.file);
         enterEditor();
         const missing = result.project.assets.filter((a) => a.missing).length;
-        toast(missing ? `工程已打开，${missing} 个素材离线` : "工程已打开");
+        toast(missing ? `项目已打开，${missing} 个素材离线` : "项目已打开");
       }
     });
   const importMedia = () =>
@@ -398,7 +398,7 @@ export default function App() {
     });
   const importCamtasia = () =>
     run(async () => {
-      if (editor.dirty && !confirm("当前工程有未保存修改，确定导入其他工程？"))
+      if (editor.dirty && !confirm("当前项目有未保存修改，确定导入其他项目？"))
         return;
       const project = await bridge().importCamtasia();
       if (project) {
@@ -428,12 +428,12 @@ export default function App() {
       const result = window.framecraft
         ? await window.framecraft.importClipboardMedia()
         : {
-            assets: [],
-            clipToken:
-              editor.behaviorClipboardToken() ??
-              editor.animationClipboardToken() ??
-              clipClipboardToken.current,
-          };
+          assets: [],
+          clipToken:
+            editor.behaviorClipboardToken() ??
+            editor.animationClipboardToken() ??
+            clipClipboardToken.current,
+        };
       if (result.assets.length) {
         editor.setPlaying(false);
         editor.addAssets(result.assets, true, { pasteToTop: true });
@@ -533,7 +533,7 @@ export default function App() {
         setCapturingFrame(false);
       }
     });
-  const pasteHandler = useRef<(event: ClipboardEvent) => void>(() => {});
+  const pasteHandler = useRef<(event: ClipboardEvent) => void>(() => { });
   pasteHandler.current = (event) => {
     if (
       (event.target as HTMLElement).closest(
@@ -567,7 +567,7 @@ export default function App() {
     };
   }, []);
   const newProject = (record = false) => {
-    if (editor.dirty && !confirm("当前工程有未保存修改，确定新建工程？"))
+    if (editor.dirty && !confirm("当前项目有未保存修改，确定新建项目？"))
       return;
     void run(async () => {
       const result = await window.framecraft?.newProject();
@@ -578,7 +578,7 @@ export default function App() {
       setFile(result?.file ?? "");
       setRecovery(null);
       enterEditor();
-      void refreshHome().catch(() => {});
+      void refreshHome().catch(() => { });
       if (record) setRecording(true);
     });
   };
@@ -606,7 +606,7 @@ export default function App() {
       setProgress(null);
     }
   };
-  const commands = useRef<(command: string) => void>(() => {});
+  const commands = useRef<(command: string) => void>(() => { });
   commands.current = (command) => {
     if (actionsBlocked || preferencesOpen) return;
     if (command === "preferences") {
@@ -632,7 +632,7 @@ export default function App() {
       void run(async () => {
         if (
           editor.dirty &&
-          !confirm("当前工程有未保存修改，确定打开其他工程？")
+          !confirm("当前项目有未保存修改，确定打开其他项目？")
         )
           return;
         const result = await bridge().initialProject();
@@ -779,7 +779,7 @@ export default function App() {
     () => window.framecraft?.onShortcut((command) => commands.current(command)),
     [],
   );
-  const keys = useRef<(e: KeyboardEvent) => void>(() => {});
+  const keys = useRef<(e: KeyboardEvent) => void>(() => { });
   keys.current = (event) => {
     const target = event.target as HTMLElement;
     if (
@@ -817,7 +817,7 @@ export default function App() {
       event.preventDefault();
       commands.current(
         ({ d: "duplicate", x: "cut", y: "redo" } as Record<string, string>)[
-          event.key.toLowerCase()
+        event.key.toLowerCase()
         ],
       );
       return;
@@ -943,7 +943,7 @@ export default function App() {
         editor.dirty &&
         editorPreferences.program.autoRecovery
       )
-        void window.framecraft.writeRecovery(editor.documentProject).catch(() => {});
+        void window.framecraft.writeRecovery(editor.documentProject).catch(() => { });
     }, editorPreferences.program.recoveryDelay * 1000);
     return () => clearTimeout(timer);
   }, [
@@ -972,7 +972,7 @@ export default function App() {
   }, []);
   const recover = () =>
     run(async () => {
-      if (editor.dirty && !confirm("当前工程有未保存修改，确定恢复上次编辑？"))
+      if (editor.dirty && !confirm("当前项目有未保存修改，确定恢复上次编辑？"))
         return;
       const result = await bridge().readRecovery();
       if (!result) {
@@ -983,11 +983,11 @@ export default function App() {
       editor.replace(result.project, true);
       setFile(result.file ?? "");
       enterEditor();
-      toast("已恢复上次自动保存的工程");
+      toast("已恢复上次自动保存的项目");
     });
   const openRecent = (file: string) =>
     run(async () => {
-      if (editor.dirty && !confirm("当前工程有未保存修改，确定打开其他工程？"))
+      if (editor.dirty && !confirm("当前项目有未保存修改，确定打开其他项目？"))
         return;
       const result = await bridge().openRecentProject(file);
       editor.replace(result.project);
@@ -1009,7 +1009,7 @@ export default function App() {
       const result = await bridge().saveRecentProjectAs(recentFile);
       if (result) {
         await refreshHome();
-        toast("工程副本已保存");
+        toast("项目副本已保存");
       }
     });
   };
@@ -1145,7 +1145,7 @@ export default function App() {
               />
               <span
                 className="project-save-state"
-                title={editor.dirty ? "未保存" : file ? "已保存" : "起始工程"}
+                title={editor.dirty ? "未保存" : file ? "已保存" : "起始项目"}
               >
                 {editor.dirty ? "*" : ""}
               </span>
@@ -1182,7 +1182,7 @@ export default function App() {
           </button>
           <button
             className="save-button"
-            title="保存工程 Ctrl+S"
+            title="保存项目 Ctrl+S"
             disabled={actionsBlocked}
             onClick={() => void save()}
           >
@@ -1366,7 +1366,7 @@ export default function App() {
             <div className="modal-heading">
               <div>
                 <h2>Camtasia 导入报告</h2>
-                <p>导入后的效果需要核对，原始工程数据完整保留。</p>
+                <p>导入后的效果需要核对，原始项目数据完整保留。</p>
               </div>
               <button onClick={() => setImportReport(null)}>
                 <X size={20} />

@@ -102,7 +102,7 @@ it("自动缩放处理点击边沿、压缩的静止采样和源时间，忽略�
   expect(recordingZoomFrames(dwell, { ...clip, duration: 0.5 }, 2)).toEqual([]);
 });
 
-it("录屏、镜头和背景分层导入，保留素材与原工程；禁用美化和缺少轨迹时不生成效果", () => {
+it("录屏、镜头和背景分层导入，保留素材与原项目；禁用美化和缺少轨迹时不生成效果", () => {
   const project = createProject(),
     original = JSON.stringify(project);
   const screen = { ...asset, cursor: { samples: [sample(1, 0.8, 0.1, true)] } };
@@ -185,7 +185,7 @@ it("录屏、镜头和背景分层导入，保留素材与原工程；禁用美�
   expect(fallback.clips[0].keyframes).toEqual([]);
 });
 
-it("录后自动缩放可编辑端点、裁剪和时间，拆分与工程序列化保留动画和原始素材", () => {
+it("录后自动缩放可编辑端点、裁剪和时间，拆分与项目序列化保留动画和原始素材", () => {
   const screen = { ...asset, cursor: { samples: [sample(2, 0.8, 0.1, true)] } };
   const project = addRecordedAssets(
     createProject(),

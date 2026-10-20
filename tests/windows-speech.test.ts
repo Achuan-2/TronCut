@@ -11,7 +11,7 @@ import { runProcess } from "../electron/process";
 
 vi.mock("../electron/process", () => ({ runProcess: vi.fn() }));
 
-it("Windows 系统音色 ID 可以随工程保留，CLI 未指定音色时自动优先云希", () => {
+it("Windows 系统音色 ID 可以随项目保留，CLI 未指定音色时自动优先云希", () => {
   expect(
     ttsOptionsSchema.parse({
       text: "中文男声",

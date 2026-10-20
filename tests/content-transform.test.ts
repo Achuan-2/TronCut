@@ -40,7 +40,7 @@ const base: Clip = {
 const size = { width: 400, height: 200 },
   canvas = { width: 1000, height: 500 };
 
-it("框内缩放和平移不修改外框及任何动画端点，旧工程默认完整画面", () => {
+it("框内缩放和平移不修改外框及任何动画端点，旧项目默认完整画面", () => {
   const animated = setTransform(base, { x: 0.7 }, 3, true);
   const next = setContentTransform(animated, { scale: 2, x: 0.1 });
   expect(next.transform).toBe(animated.transform);

@@ -136,7 +136,7 @@ describe("画布缩放与运镜", () => {
       ).scale,
     ).toBe(0.05);
   });
-  it("旧工程默认完整画面，运镜自动补起点并平滑插值", () => {
+  it("旧项目默认完整画面，运镜自动补起点并平滑插值", () => {
     const original = createProject();
     expect(cameraAt(original, 10)).toEqual(defaultTransform);
     const changed = setCameraTransform(original, { scale: 2, x: 0.75 }, 2);

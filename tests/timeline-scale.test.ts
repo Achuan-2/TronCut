@@ -39,7 +39,7 @@ it("时间线缩小保持刻度可读，放大按帧划分并保留帧号", () =
   expect(timelineRulerLabel(3600, 30, 900)).toBe("60:00");
 });
 
-it("缩放下限随当前时长变化，短片和多日工程都能完整显示", () => {
+it("缩放下限随当前时长变化，短片和多日项目都能完整显示", () => {
   for (const duration of [20, 90, 3600, 86400 * 7]) {
     const minimum = timelineFitZoom(duration, 1224);
     expect(duration * minimum).toBeCloseTo(1200);

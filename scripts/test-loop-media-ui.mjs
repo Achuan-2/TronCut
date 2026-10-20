@@ -173,7 +173,7 @@ try {
     path.join(root, "loop.troncut"),
   );
   await page.getByRole("button", { name: "保存", exact: true }).click();
-  await expect(page.locator(".toast")).toContainText("工程已保存");
+  await expect(page.locator(".toast")).toContainText("项目已保存");
   const saved = JSON.parse(
     await fs.readFile(path.join(root, "loop", "loop.troncut"), "utf8"),
   );

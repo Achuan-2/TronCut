@@ -15,7 +15,7 @@ import { findBinary, runProcess } from "../electron/process";
 import * as mediaProcess from "../electron/process";
 import { saveProject, openProject } from "../electron/project-store";
 
-it("截帧冻结当前动画、裁剪、淡入与运镜，按变速后的源时间取帧且不修改工程", () => {
+it("截帧冻结当前动画、裁剪、淡入与运镜，按变速后的源时间取帧且不修改项目", () => {
   const project = createProject();
   const clip: Clip = {
     ...newText("video", 4),

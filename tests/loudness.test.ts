@@ -89,7 +89,7 @@ it("静音测量跳过增益，无效或缺失的测量结果明确失败", () =
   ).toThrow("无效");
 });
 
-it("在组合中修改项目响度设置会写回完整工程，保留组合外素材", () => {
+it("在组合中修改项目响度设置会写回完整项目，保留组合外素材", () => {
   let document = createProject();
   document.clips = [
     newText("video", 2),
@@ -181,7 +181,7 @@ it("真实安静和较响音频统一到目标响度，预览缓存、试听与�
     path.join(root, "export"),
     false,
     new AbortController().signal,
-    () => {},
+    () => { },
   );
   const levels = await Promise.all(
     [0, 3].map((start) => measure(target, start, 3)),
@@ -272,7 +272,7 @@ it("视频裁剪变速及帧定格使用同一标准化音轨，定格区间保�
     path.join(root, "export"),
     false,
     new AbortController().signal,
-    () => {},
+    () => { },
   );
   expect((await probeMedia(target)).duration).toBeCloseTo(3, 1);
   expect(
@@ -291,7 +291,7 @@ it("视频裁剪变速及帧定格使用同一标准化音轨，定格区间保�
     path.join(root, "trimmed"),
     false,
     new AbortController().signal,
-    () => {},
+    () => { },
   );
   expect((await probeMedia(trimmed)).duration).toBeCloseTo(1.5, 1);
   expect(Math.abs((await measure(trimmed))!.integrated + 18)).toBeLessThan(1);

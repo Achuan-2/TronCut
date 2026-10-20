@@ -15,8 +15,8 @@ const packaged = process.env.FRAMECRAFT_PACKAGED_SMOKE === "1";
 const app = await electron.launch({
   ...(packaged
     ? {
-        executablePath: path.resolve("release/win-unpacked/TronCut.exe"),
-      }
+      executablePath: path.resolve("release/win-unpacked/TronCut.exe"),
+    }
     : {}),
   args: packaged ? [] : ["."],
   env,
@@ -33,8 +33,8 @@ try {
   });
   page.on("pageerror", (err) => errors.push(err.message));
   await page.getByRole("button", { name: "新建项目", exact: true }).click();
-  await page.getByLabel("工程名称").fill("我的第一个视频");
-  await page.getByLabel("工程名称").blur();
+  await page.getByLabel("项目名称").fill("我的第一个视频");
+  await page.getByLabel("项目名称").blur();
   const projectFile = path.join(
     root,
     "TronCut",
@@ -210,11 +210,11 @@ try {
   await page.getByRole("button", { name: "媒体", exact: true }).click();
   await page.getByRole("button", { name: "保存", exact: true }).click();
   await expect(
-    page.getByText("工程已保存，工程文件和素材已归档到工程文件夹", { exact: true }),
+    page.getByText("项目已保存，项目文件和素材已归档到项目文件夹", { exact: true }),
   ).toBeVisible({ timeout: 20000 });
   const saved = JSON.parse(await fs.readFile(projectFile, "utf8"));
   if (saved.clips.length !== 4 || !saved.assets[0].path.startsWith("media/"))
-    throw new Error("工程收集素材验证失败");
+    throw new Error("项目收集素材验证失败");
   await page.getByRole("button", { name: "导出视频", exact: true }).click();
   await page.getByLabel("导出位置", { exact: true }).fill(root);
   await page.getByLabel("导出文件名", { exact: true }).fill("desktop-export");
@@ -276,7 +276,7 @@ try {
       await expect(page.getByLabel("鼠标样式")).toBeVisible();
       await selectPreview(page, "鼠标样式", "circle");
       await page.getByRole("button", { name: "保存", exact: true }).click();
-      await expect(page.getByRole("status")).toContainText("工程已保存", {
+      await expect(page.getByRole("status")).toContainText("项目已保存", {
         timeout: 20000,
       });
       const disk = JSON.parse(await fs.readFile(projectFile, "utf8"));
@@ -322,7 +322,7 @@ try {
     ),
   );
   console.log(
-    "桌面 UI、文本编辑、自动关键帧、动画右键缓动、素材导入、工程归档与 MP4 导出通过",
+    "桌面 UI、文本编辑、自动关键帧、动画右键缓动、素材导入、项目归档与 MP4 导出通过",
   );
 } finally {
   await app.close();

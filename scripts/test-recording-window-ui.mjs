@@ -21,11 +21,11 @@ const packaged = process.env.FRAMECRAFT_PACKAGED_SMOKE === "1";
 const app = await electron.launch({
   ...(packaged
     ? {
-        executablePath: path.resolve(
-          process.env.FRAMECRAFT_PACKAGED_APP ??
-            "release/win-unpacked/TronCut.exe",
-        ),
-      }
+      executablePath: path.resolve(
+        process.env.FRAMECRAFT_PACKAGED_APP ??
+        "release/win-unpacked/TronCut.exe",
+      ),
+    }
     : {}),
   args: packaged ? [] : ["."],
   env,
@@ -216,7 +216,7 @@ try {
     });
     expect(placement).toEqual({ centered: true, inside: true });
     const projectName = page.getByRole("textbox", {
-      name: "工程名称",
+      name: "项目名称",
       exact: true,
     });
     await expect(projectName).toBeEnabled();
@@ -242,7 +242,7 @@ try {
     await page.getByRole("button", { name: "开始录制", exact: true }).click();
     const countdown = await countdownOpened;
     await expect(countdown.locator("strong")).toHaveText("3");
-    const countdownName = page.getByRole("textbox", { name: "工程名称", exact: true });
+    const countdownName = page.getByRole("textbox", { name: "项目名称", exact: true });
     await expect(countdownName).toBeEnabled();
     await countdownName.fill(`倒计时期间编辑 ${native}`);
     await countdownName.blur();
@@ -253,7 +253,7 @@ try {
     await expect(page.locator(".recorder-modal, .recording-bar")).toHaveCount(
       0,
     );
-    const name = page.getByRole("textbox", { name: "工程名称", exact: true });
+    const name = page.getByRole("textbox", { name: "项目名称", exact: true });
     await name.fill(`TronCut 自录 ${native}`);
     await name.blur();
     await page.keyboard.press("Control+z");
@@ -329,7 +329,7 @@ try {
     await app.firstWindow()
   )
     .screenshot({ path: path.join(root, "failure.png") })
-    .catch(() => {});
+    .catch(() => { });
   throw error;
 } finally {
   await app.close();

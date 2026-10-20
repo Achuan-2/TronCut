@@ -402,7 +402,7 @@ export default function PreferencesDialog({
                     <span>秒</span>
                   </label>
                   <p className="field-help">
-                    备份用于异常退出后的“恢复编辑”，不代替手动保存工程。
+                    备份用于异常退出后的“恢复编辑”，不代替手动保存项目。
                   </p>
                   <h3>存储</h3>
                   {storageField("backupDirectory", "备份文件夹")}
@@ -558,7 +558,7 @@ export default function PreferencesDialog({
                     />
                   </label>
                   <p className="field-help">
-                    新建项目与新建录制使用这些值。已打开工程保留自己的画布设置。
+                    新建项目与新建录制使用这些值。已打开项目保留自己的画布设置。
                   </p>
                   <h3>录屏默认设置</h3>
                   <label className="field">
@@ -717,7 +717,7 @@ export default function PreferencesDialog({
                         name: "前一个 / 后一个媒体",
                         key: shortcut("CmdOrCtrl") + "+← / →",
                       },
-                      { name: "保存工程", key: shortcut("CmdOrCtrl+S") },
+                      { name: "保存项目", key: shortcut("CmdOrCtrl+S") },
                       { name: "导出视频", key: shortcut("CmdOrCtrl+E") },
                     ]
                       .filter((item) =>

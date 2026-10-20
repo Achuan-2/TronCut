@@ -105,7 +105,7 @@ try {
 
   // Saving from a group tab must serialize the complete document in global time.
   await command("save");
-  await expect(page.getByRole("status")).toContainText("工程已保存");
+  await expect(page.getByRole("status")).toContainText("项目已保存");
   const saved = JSON.parse(await fs.readFile(file, "utf8"));
   assert.equal(saved.clips.length, 3);
   assert.equal(
@@ -186,7 +186,7 @@ try {
       await app.firstWindow()
     )
       .screenshot({ path: path.join(root, "failure.png") })
-      .catch(() => {});
+      .catch(() => { });
   console.log(root);
   throw error;
 } finally {

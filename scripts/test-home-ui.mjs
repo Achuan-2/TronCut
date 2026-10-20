@@ -142,17 +142,17 @@ try {
   expect(await fs.readFile(recoveryFile, "utf8")).toBe(recoveryText);
   await page.screenshot({ path: path.join(root, "home-recent-projects.png") });
   await page.getByRole("button", { name: "恢复编辑", exact: true }).click();
-  await expect(page.getByLabel("工程名称")).toHaveValue("未保存草稿");
+  await expect(page.getByLabel("项目名称")).toHaveValue("未保存草稿");
   await expect(page.getByRole("button", { name: "关于", exact: true })).toBeVisible();
   await expect(page.locator(".timeline-clip.image")).toHaveCount(1);
   await page.getByRole("button", { name: "返回首页", exact: true }).click();
   await expect(page.locator(".home-page")).toBeVisible();
   await page.getByRole("button", { name: "继续编辑", exact: true }).click();
-  await expect(page.getByLabel("工程名称")).toHaveValue("未保存草稿");
+  await expect(page.getByLabel("项目名称")).toHaveValue("未保存草稿");
   await page.getByRole("button", { name: "返回首页", exact: true }).click();
   page.on("dialog", (dialog) => dialog.accept());
   await page.locator(".recent-project").click();
-  await expect(page.getByLabel("工程名称")).toHaveValue("中文测试项目");
+  await expect(page.getByLabel("项目名称")).toHaveValue("中文测试项目");
   await page.getByRole("button", { name: "返回首页", exact: true }).click();
   await page.getByRole("button", { name: "项目", exact: true }).click();
   await expect(page.locator(".project-menu button")).toHaveText([
@@ -161,9 +161,9 @@ try {
   await page.screenshot({ path: path.join(root, "project-menu.png") });
   await page.locator(".project-menu").getByRole("button", { name: "新建项目", exact: true }).click();
   await expect(page.locator(".timeline-clip")).toHaveCount(0);
-  await page.getByLabel("工程名称").fill("从首页新建");
-  await page.getByLabel("工程名称").press("Enter");
-  await expect(page.getByRole("status")).toContainText("工程及文件夹已重命名");
+  await page.getByLabel("项目名称").fill("从首页新建");
+  await page.getByLabel("项目名称").press("Enter");
+  await expect(page.getByRole("status")).toContainText("项目及文件夹已重命名");
   await expect(page.locator(".busy-overlay")).toHaveCount(0);
   await app.evaluate(({ dialog }, root) => {
     dialog.showOpenDialog = async () => ({
@@ -172,7 +172,7 @@ try {
     });
   }, root);
   await page.getByRole("button", { name: "保存", exact: true }).click();
-  await expect(page.getByRole("status")).toContainText("工程已保存", {
+  await expect(page.getByRole("status")).toContainText("项目已保存", {
     timeout: 20000,
   });
   await page.getByRole("button", { name: "返回首页", exact: true }).click();
@@ -180,7 +180,7 @@ try {
   await app.evaluate(({ dialog }, file) => { dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [file] }); }, savedFile);
   await page.getByRole("button", { name: "项目", exact: true }).click();
   await page.getByRole("button", { name: "导入项目", exact: true }).click();
-  await expect(page.getByLabel("工程名称")).toHaveValue("中文测试项目");
+  await expect(page.getByLabel("项目名称")).toHaveValue("中文测试项目");
   await page.getByRole("button", { name: "返回首页", exact: true }).click();
   await expect(page.locator(".recent-project").first()).toContainText(
     "中文测试项目",
@@ -195,7 +195,7 @@ try {
     .locator(".recent-project")
     .filter({ hasText: "从首页新建" })
     .click();
-  await expect(page.getByLabel("工程名称")).toHaveValue("从首页新建");
+  await expect(page.getByLabel("项目名称")).toHaveValue("从首页新建");
   await page.getByRole("button", { name: "返回首页", exact: true }).click();
   await fs.rename(savedFile, savedFile + ".moved");
   await page.getByRole("button", { name: "继续编辑", exact: true }).click();
@@ -215,7 +215,7 @@ try {
       await app.firstWindow()
     )
       .screenshot({ path: path.join(root, "failure.png") })
-      .catch(() => {});
+      .catch(() => { });
   throw error;
 } finally {
   if (app) await app.close();

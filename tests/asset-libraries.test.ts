@@ -36,7 +36,7 @@ async function fixture() {
   return { root, store, asset };
 }
 
-describe("跨工程素材库", () => {
+describe("跨项目素材库", () => {
   it("初始化默认库，管理名称与库，拒绝空白/重名及删除默认库", async () => {
     const { root, store } = await fixture();
     expect(await store.list()).toEqual([
@@ -53,7 +53,7 @@ describe("跨工程素材库", () => {
     await store.remove(id);
     expect(await store.list()).toHaveLength(1);
   });
-  it("独立复制原始文件及鼠标元数据，重复使用复用项目素材，删除库不破坏工程和原文件", async () => {
+  it("独立复制原始文件及鼠标元数据，重复使用复用项目素材，删除库不破坏项目和原文件", async () => {
     const { store, asset } = await fixture();
     const id = await store.create("录屏");
     await store.add(id, [asset]);
@@ -196,7 +196,7 @@ describe("跨工程素材库", () => {
     await store.removeAsset("default", saved.id);
     expect((await store.list())[0].folders?.[0].assetIds).toEqual([]);
   });
-  it("重命名保留文件和元数据，复制独立副本，移动后工程副本仍可读取", async () => {
+  it("重命名保留文件和元数据，复制独立副本，移动后项目副本仍可读取", async () => {
     const { root, store, asset } = await fixture();
     const target = await store.create("目标库");
     await store.add("default", [asset]);

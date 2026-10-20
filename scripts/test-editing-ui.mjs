@@ -99,11 +99,11 @@ const packaged = process.env.FRAMECRAFT_PACKAGED_SMOKE === "1";
 const app = await electron.launch({
   ...(packaged
     ? {
-        executablePath: path.resolve(
-          process.env.FRAMECRAFT_PACKAGED_APP ??
-            "release/win-unpacked/TronCut.exe",
-        ),
-      }
+      executablePath: path.resolve(
+        process.env.FRAMECRAFT_PACKAGED_APP ??
+        "release/win-unpacked/TronCut.exe",
+      ),
+    }
     : {}),
   args: packaged ? [] : ["."],
   env,
@@ -218,7 +218,7 @@ try {
     Menu.getApplicationMenu().items.find(
       (item) => item.label === "编辑",
     ).submenu.popup = ({ x, y }) =>
-      globalThis.windowMenuRequests.push({ label: "编辑", x, y });
+        globalThis.windowMenuRequests.push({ label: "编辑", x, y });
   });
   await page.getByRole("button", { name: "编辑", exact: true }).click();
   await expect(page.getByRole("button", { name: "视图", exact: true })).toHaveCount(0);
@@ -429,9 +429,11 @@ try {
   await expect(page.getByLabel("内容位置 X (%)", { exact: true })).toHaveValue("0");
   await page.getByTitle("重做 Ctrl+Shift+Z", { exact: true }).click();
   await expect.poll(async () => Number(await page.getByLabel("内容位置 X (%)", { exact: true }).inputValue())).toBeGreaterThan(0);
-  const savedVideoContent = { scale: 2,
+  const savedVideoContent = {
+    scale: 2,
     x: Number(await page.getByLabel("内容位置 X (%)", { exact: true }).inputValue()) / 100,
-    y: Number(await page.getByLabel("内容位置 Y (%)", { exact: true }).inputValue()) / 100 };
+    y: Number(await page.getByLabel("内容位置 Y (%)", { exact: true }).inputValue()) / 100
+  };
   expect(savedVideoContent.x).toBeGreaterThan(0);
   await page.screenshot({ path: path.join(root, "fixed-crop-content.png") });
   await page.getByRole("button", { name: "选择模式", exact: true }).click();
@@ -980,7 +982,7 @@ try {
     });
   }, root);
   await page.getByRole("button", { name: "保存", exact: true }).click();
-  await expect(page.getByRole("status")).toContainText("工程已保存", {
+  await expect(page.getByRole("status")).toContainText("项目已保存", {
     timeout: 20000,
   });
   const saved = JSON.parse(
@@ -1069,10 +1071,10 @@ try {
     );
     await page
       .screenshot({ path: path.join(root, "failure.png") })
-      .catch(() => {});
+      .catch(() => { });
     console.error(`失败截图：${path.join(root, "failure.png")}`);
   }
   throw error;
 } finally {
-  await app.close().catch(() => {});
+  await app.close().catch(() => { });
 }

@@ -83,12 +83,12 @@ export function stitchSelectionError(
       (clip) =>
         appearance(clip) !== original ||
         JSON.stringify(canonical(clip.keyframes)) !==
-          JSON.stringify(canonical(first.keyframes)) ||
+        JSON.stringify(canonical(first.keyframes)) ||
         (clip.keyframes.length > 0 &&
           Math.abs(
             (clip.animationOffset ?? 0) -
-              (first.animationOffset ?? 0) -
-              (clip.start - first.start),
+            (first.animationOffset ?? 0) -
+            (clip.start - first.start),
           ) > 1e-6),
     )
   )
@@ -106,7 +106,7 @@ export function stitchSelectionError(
     clips.reduce((sum, clip) => sum + clip.duration, 0) > 86400 ||
     clips.reduce((sum, clip) => sum + mediaSegments(clip).length, 0) > 10000
   )
-    return "拼接后的时长或分段数超出工程限制";
+    return "拼接后的时长或分段数超出项目限制";
   return null;
 }
 

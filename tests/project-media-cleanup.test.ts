@@ -53,7 +53,7 @@ it("保存后清除已删除归档与轨迹，保留原件和导出视频；历�
   expect(resolveProjectMediaAsset(project.assets[0]).path).toBe(archived);
 });
 
-it("清理历史 UUID 残留，保留手动放入的文件以及其他工程仍在引用的素材", async () => {
+it("清理历史 UUID 残留，保留手动放入的文件以及其他项目仍在引用的素材", async () => {
   const { file, project } = await fixture();
   const media = path.dirname(project.assets[0].path);
   const custom = path.join(media, "manual-notes.txt");
@@ -76,7 +76,7 @@ it("清理历史 UUID 残留，保留手动放入的文件以及其他工程仍�
   await expect(fs.access(orphan)).rejects.toMatchObject({ code: "ENOENT" });
 });
 
-it("保存收集素材失败时保留上次工程与全部归档，无法读取的同目录工程阻止清理", async () => {
+it("保存收集素材失败时保留上次项目与全部归档，无法读取的同目录项目阻止清理", async () => {
   const { file, project } = await fixture();
   const previous = await fs.readFile(file, "utf8");
   const missing: Asset = {
@@ -116,7 +116,7 @@ it("非 UUID 的已知归档在素材改名或删除后也会清理", async () =
   expect(await fs.readdir(path.dirname(renamed.assets[0].path))).toEqual([]);
 });
 
-it("不会沿符号链接或目录联接清理工程外的文件", async () => {
+it("不会沿符号链接或目录联接清理项目外的文件", async () => {
   const { root, file, project } = await fixture();
   const outside = path.join(root, "outside");
   await fs.mkdir(outside);

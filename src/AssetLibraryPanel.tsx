@@ -12,15 +12,15 @@ import "./AssetLibraryPanel.css";
 type Request = {
   project?: boolean;
   kind:
-    | "create"
-    | "rename"
-    | "delete"
-    | "save"
-    | "remove"
-    | "asset-rename"
-    | "folder-create"
-    | "folder-rename"
-    | "folder-delete";
+  | "create"
+  | "rename"
+  | "delete"
+  | "save"
+  | "remove"
+  | "asset-rename"
+  | "folder-create"
+  | "folder-rename"
+  | "folder-delete";
   asset?: Asset;
   folderId?: string;
 };
@@ -64,8 +64,8 @@ function LibraryDialog({
       ? (request.asset?.name ?? "")
       : request.kind === "folder-rename"
         ? ((request.project ? projectFolders : library?.folders)?.find(
-            (folder) => folder.id === request.folderId,
-          )?.name ?? "")
+          (folder) => folder.id === request.folderId,
+        )?.name ?? "")
         : request.kind === "rename"
           ? (library?.name ?? "")
           : request.kind === "save"
@@ -134,12 +134,12 @@ function LibraryDialog({
         {destructive ? (
           <p>
             {request.kind === "delete"
-              ? `确定删除“${library?.name}”及其中的 ${library?.assets.length ?? 0} 个素材？已加入工程的素材仍会保留。`
+              ? `确定删除“${library?.name}”及其中的 ${library?.assets.length ?? 0} 个素材？已加入项目的素材仍会保留。`
               : request.kind === "folder-delete"
                 ? request.project
                   ? "确定删除此文件夹？其中的素材会移回未分组，素材及时间线片段保持不变。"
                   : "确定删除此文件夹？其中的素材和子文件夹会移回库根目录。"
-                : `确定从库中移除“${request.asset?.name}”？已加入工程的素材仍会保留。`}
+                : `确定从库中移除“${request.asset?.name}”？已加入项目的素材仍会保留。`}
           </p>
         ) : request.kind === "save" ? (
           <label className="field">
@@ -305,7 +305,7 @@ export default function AssetLibraryPanel(
       } else if (request.kind === "save" && request.asset) {
         await api.addLibraryAssets(value, [request.asset.id]);
         setSelected(value);
-        props.toast("已添加到素材库，可在其他工程复用");
+        props.toast("已添加到素材库，可在其他项目复用");
       }
       await refresh();
       setRequest(null);
@@ -495,59 +495,59 @@ export default function AssetLibraryPanel(
           onTransfer={
             tab === "library"
               ? (asset, targetId, move) =>
-                  void act(async () => {
-                    if (!library) return;
-                    await desktop().transferLibraryAsset(
-                      library.id,
-                      asset.id,
-                      targetId,
-                      move,
-                    );
-                    await refresh();
-                    props.toast(
-                      `已${move ? "移动" : "复制"}到“${libraries.find((item) => item.id === targetId)?.name}”`,
-                    );
-                  })
+                void act(async () => {
+                  if (!library) return;
+                  await desktop().transferLibraryAsset(
+                    library.id,
+                    asset.id,
+                    targetId,
+                    move,
+                  );
+                  await refresh();
+                  props.toast(
+                    `已${move ? "移动" : "复制"}到“${libraries.find((item) => item.id === targetId)?.name}”`,
+                  );
+                })
               : undefined
           }
           onDropAsset={
             tab === "library"
               ? (assetId, folderId) =>
-                  void act(async () => {
-                    if (!library) return;
-                    await desktop().setLibraryAssetFolder(
-                      library.id,
-                      assetId,
-                      folderId,
-                    );
-                    await refresh();
-                  })
+                void act(async () => {
+                  if (!library) return;
+                  await desktop().setLibraryAssetFolder(
+                    library.id,
+                    assetId,
+                    folderId,
+                  );
+                  await refresh();
+                })
               : (assetId, folderId) =>
-                  props.onMoveToFolder?.([assetId], folderId)
+                props.onMoveToFolder?.([assetId], folderId)
           }
           onLibraryCommand={
             tab === "library"
               ? (command, folderId) => {
-                  if (disabled) return;
-                  if (command === "new-folder")
-                    show({ kind: "folder-create", folderId });
-                  else if (command === "rename" && folderId)
-                    show({ kind: "folder-rename", folderId });
-                  else if (command === "delete" && folderId)
-                    show({ kind: "folder-delete", folderId });
-                  else if (command === "import") importToLibrary();
-                  else if (command === "export-library") exportLibrary();
-                  else if (command === "import-library") importLibrary();
-                }
+                if (disabled) return;
+                if (command === "new-folder")
+                  show({ kind: "folder-create", folderId });
+                else if (command === "rename" && folderId)
+                  show({ kind: "folder-rename", folderId });
+                else if (command === "delete" && folderId)
+                  show({ kind: "folder-delete", folderId });
+                else if (command === "import") importToLibrary();
+                else if (command === "export-library") exportLibrary();
+                else if (command === "import-library") importLibrary();
+              }
               : (command, folderId) => {
-                  if (disabled) return;
-                  if (command === "new-folder")
-                    show({ kind: "folder-create", project: true });
-                  else if (command === "rename" && folderId)
-                    show({ kind: "folder-rename", folderId, project: true });
-                  else if (command === "delete" && folderId)
-                    show({ kind: "folder-delete", folderId, project: true });
-                }
+                if (disabled) return;
+                if (command === "new-folder")
+                  show({ kind: "folder-create", project: true });
+                else if (command === "rename" && folderId)
+                  show({ kind: "folder-rename", folderId, project: true });
+                else if (command === "delete" && folderId)
+                  show({ kind: "folder-delete", folderId, project: true });
+              }
           }
           onSaveToLibrary={
             tab === "project"
@@ -559,38 +559,38 @@ export default function AssetLibraryPanel(
             tab === "project"
               ? props.onCommand
               : (asset, command) => {
-                  if (command === "add") useAsset(asset);
-                  else if (command === "delete")
-                    show({ kind: "remove", asset });
-                  else if (command === "rename")
-                    show({ kind: "asset-rename", asset });
-                  else if (command === "export")
-                    void act(async () => {
-                      if (
-                        library &&
-                        (await desktop().exportLibraryAsset(
-                          library.id,
-                          asset.id,
-                        ))
-                      )
-                        props.toast("资产已导出，可通过“导入压缩库”复用");
-                    });
-                }
+                if (command === "add") useAsset(asset);
+                else if (command === "delete")
+                  show({ kind: "remove", asset });
+                else if (command === "rename")
+                  show({ kind: "asset-rename", asset });
+                else if (command === "export")
+                  void act(async () => {
+                    if (
+                      library &&
+                      (await desktop().exportLibraryAsset(
+                        library.id,
+                        asset.id,
+                      ))
+                    )
+                      props.toast("资产已导出，可通过“导入压缩库”复用");
+                  });
+              }
           }
           unavailable={
             tab === "project"
               ? props.unavailable
               : (asset) =>
-                  disabled
-                    ? {
-                        add: "正在处理，请稍候",
-                        delete: "正在处理，请稍候",
-                        rename: "正在处理，请稍候",
-                        export: "正在处理，请稍候",
-                      }
-                    : asset.missing
-                      ? { add: "素材文件缺失", export: "素材文件缺失" }
-                      : {}
+                disabled
+                  ? {
+                    add: "正在处理，请稍候",
+                    delete: "正在处理，请稍候",
+                    rename: "正在处理，请稍候",
+                    export: "正在处理，请稍候",
+                  }
+                  : asset.missing
+                    ? { add: "素材文件缺失", export: "素材文件缺失" }
+                    : {}
           }
           onImport={tab === "project" ? props.onImport : importToLibrary}
         />

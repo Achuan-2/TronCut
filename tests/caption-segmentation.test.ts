@@ -79,7 +79,7 @@ describe("已有字幕重新断句", () => {
     expect(captionSegmentationGroups(project, ids)).toHaveLength(3);
   });
 
-  it("新建字幕和从工程恢复的字幕按属性值比较样式，不依赖字段顺序", () => {
+  it("新建字幕和从项目恢复的字幕按属性值比较样式，不依赖字段顺序", () => {
     const { project, ids } = fixture();
     project.clips[0] = validateProject(project).clips[0];
     expect(captionSegmentationGroups(project, ids)[0].clips).toHaveLength(2);

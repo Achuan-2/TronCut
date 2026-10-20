@@ -25,7 +25,7 @@
    ↓
 [4] CLI 转录 → 字幕 JSON
    ↓
-[5] 手动编排或自动脚本 → TronCut 工程
+[5] 手动编排或自动脚本 → TronCut 项目
    ↓
 [6] TronCut 导出 → 最终视频
 ```
@@ -382,7 +382,7 @@ pnpm --silent cli run --plan scripts/transcribe-plan.json
 
 ---
 
-### 步骤 5：自动组织到 TronCut 工程
+### 步骤 5：自动组织到 TronCut 项目
 
 #### 5.1 创建组织脚本
 
@@ -400,7 +400,7 @@ async function organizeToTronCut() {
     fs.readFileSync("transcription_output.json")
   );
 
-  // 构建 TronCut 工程结构
+  // 构建 TronCut 项目结构
   const project = {
     version: "0.4.8",
     metadata: {
@@ -460,7 +460,7 @@ async function organizeToTronCut() {
     },
   };
 
-  // 保存工程文件
+  // 保存项目文件
   fs.writeFileSync(
     "generated_project.troncut",
     JSON.stringify(project, null, 2)
@@ -601,7 +601,7 @@ async function main() {
     ]);
     console.log("✅ Captions generated\n");
 
-    // 步骤 5: 组织工程
+    // 步骤 5: 组织项目
     console.log("Step 5/6: Organizing TronCut project...");
     await runCommand("node", ["scripts/organize-to-troncut.mjs"]);
     console.log("✅ Project organized\n");

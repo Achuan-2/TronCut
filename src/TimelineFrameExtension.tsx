@@ -40,13 +40,8 @@ export default function TimelineFrameExtension({
       }}
       title={
         error ??
-        `帧定格 · ${Number(duration.toFixed(3))} 秒；双击修改，拖动右边缘调整时长`
+        `帧定格 · ${Number(duration.toFixed(3))} 秒；拖动移动视频，双击修改，拖动右边缘调整时长`
       }
-      onPointerDown={(event) => {
-        event.stopPropagation();
-        editor.setPlaying(false);
-        editor.select(clip.id);
-      }}
       onDoubleClick={(event) => {
         event.stopPropagation();
         if (!locked) onEdit(event.clientX, event.clientY);

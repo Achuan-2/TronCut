@@ -22,7 +22,7 @@ import {
 } from "../shared/timeline";
 
 function fixture() {
-  const project = createProject("组合工程");
+  const project = createProject("组合项目");
   project.clips = [
     newText("titles", 10, 0, "组内甲"),
     newText("video", 12, 0, "组内乙"),
@@ -82,7 +82,7 @@ describe("组合时间线", () => {
       )!.markers![0].time,
     ).toBe(1);
   });
-  it("组内新增和调整轨道顺序会写回工程，保持图层前后关系", () => {
+  it("组内新增和调整轨道顺序会写回项目，保持图层前后关系", () => {
     const { project, id } = fixture();
     const scope = createGroupScope(project, id)!;
     const local = projectForGroup(project, scope);
@@ -148,7 +148,7 @@ describe("组合时间线", () => {
     expect(deleteClips(project, ids)).toBe(project);
   });
 
-  it("旧工程的 groupId 可直接打开，主时间线折叠后覆盖全部组内媒体", () => {
+  it("旧项目的 groupId 可直接打开，主时间线折叠后覆盖全部组内媒体", () => {
     const { project, id } = fixture();
     delete project.groups;
     const timeline = groupedTimeline(project);
@@ -186,7 +186,7 @@ describe("组合时间线", () => {
     expect(merged.assets).toBe(project.assets);
   });
 
-  it("在组合内添加素材、轨道和标记后，工程保存重开仍能继续编辑", () => {
+  it("在组合内添加素材、轨道和标记后，项目保存重开仍能继续编辑", () => {
     const { project, id } = fixture();
     const scope = createGroupScope(project, id)!;
     const local = projectForGroup(project, scope);

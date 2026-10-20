@@ -23,6 +23,7 @@ import { canvasAlignmentTargets } from "../shared/canvas-alignment";
 import {
   frameExtensionAt,
   frameExtensionError,
+  frameExtensionTargetError,
   setFrameExtension,
 } from "../shared/frame-extension";
 
@@ -124,9 +125,7 @@ export default function ClipContextMenu({
   const extensionTime =
     menu?.frameExtensionTime ?? editor.playhead - (source?.start ?? 0);
   const extension = source && frameExtensionAt(source, extensionTime);
-  const extensionError = source && frameExtensionError(
-    project, source.id, extensionTime, extension?.duration ?? 1,
-  );
+  const extensionError = source && frameExtensionTargetError(project, source.id);
   useEffect(() => {
     if (projectId.current !== project.id) {
       projectId.current = project.id;

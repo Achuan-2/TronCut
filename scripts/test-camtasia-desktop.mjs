@@ -10,7 +10,7 @@ const evidence = JSON.parse(
   await fs.readFile("test-output/camtasia-import/latest.json", "utf8"),
 );
 if (evidence.originalFile !== file)
-  throw new Error("请先执行该工程的结构导入测试");
+  throw new Error("请先执行该项目的结构导入测试");
 const root = evidence.root;
 const before = createHash("sha256")
   .update(await fs.readFile(file))
@@ -115,7 +115,7 @@ try {
     JSON.stringify(result, null, 2),
   );
   if (errors.length || before !== after)
-    throw new Error("桌面运行错误或原工程发生变化");
+    throw new Error("桌面运行错误或原项目发生变化");
   console.log(JSON.stringify(result, null, 2));
 } finally {
   await app.close();

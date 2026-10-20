@@ -174,7 +174,7 @@ try {
   expect(beforeCountdownEnd.movable).toBe(true);
   expect(beforeCountdownEnd.bounds.x).toBeGreaterThan(
     beforeCountdownEnd.controlsBounds.x +
-      beforeCountdownEnd.controlsBounds.width,
+    beforeCountdownEnd.controlsBounds.width,
   );
   // Electron's outer bounds can include a few DIPs of native window padding.
   const rightGap =
@@ -301,7 +301,7 @@ try {
   });
   await expect.poll(previewDetails).toBeNull();
   await page.getByRole("button", { name: "保存", exact: true }).click();
-  await expect(page.locator(".toast")).toContainText("工程已保存", {
+  await expect(page.locator(".toast")).toContainText("项目已保存", {
     timeout: 20000,
   });
   const saved = JSON.parse(

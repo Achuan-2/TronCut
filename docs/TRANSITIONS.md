@@ -10,4 +10,4 @@ Smooth Slide 使用圆滑缓入缓出曲线：正常方向下，前一个画面�
 
 交互依据项目内 Camtasia 2024 英文帮助第 192–194 页的规则：拖到左端、右端或中部，拖动转换边缘调节时长，点击转换后在属性中启用、禁用或删除。当前只实现 Smooth Slide，其他转换样式以及 Camtasia 转换参数导入尚未覆盖。
 
-`pnpm exec vitest run tests/transitions.test.ts` 验证放置规则、接点联动、工程 schema、拆分、预览截帧和真实 FFmpeg 视频的接点像素。构建后运行 `node scripts/smoke-transitions.mjs` 可验证拖放高亮、片段内标记、属性、反转、启用、时长拖动、删除、撤销和保存。
+`pnpm exec vitest run tests/transitions.test.ts` 验证放置规则、接点联动、项目 schema、拆分、预览截帧和真实 FFmpeg 视频的接点像素。构建后运行 `node scripts/smoke-transitions.mjs` 可验证拖放高亮、片段内标记、属性、反转、启用、时长拖动、删除、撤销和保存。

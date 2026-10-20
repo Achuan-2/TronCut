@@ -86,7 +86,7 @@ describe("动画菜单编辑", () => {
     expect(transformAt(eased, 4.25).x).toBeCloseTo(0.75);
     expect(transformAt(clip, 4.25).x).toBeCloseTo(0.73125);
   });
-  it("旧工程自动缓动保持原曲线，各模式起止精确且中途有区别", () => {
+  it("旧项目自动缓动保持原曲线，各模式起止精确且中途有区别", () => {
     for (const easing of animationEasings) {
       expect(easeProgress(0, easing)).toBe(0);
       expect(easeProgress(1, easing)).toBe(1);

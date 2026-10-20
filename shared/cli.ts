@@ -172,17 +172,17 @@ export type CliPlan = z.infer<typeof cliPlanSchema>;
 export const cliHelp = {
   protocol: "troncut-cli-v1",
   commands: {
-    inspect: "--input 媒体文件 或 --project 工程；返回素材、片段、时长等 JSON",
+    inspect: "--input 媒体文件 或 --project 项目；返回素材、片段、时长等 JSON",
     frames:
-      "--input 媒体 或 --project 工程 --output 文件夹 [--interval 2 --max-frames 40]；抽帧并生成 Codex 文案说明",
-    build: "--plan 剪辑计划.json；创建可编辑工程，不执行语音或导出",
-    edit: "--project 工程 --edits 编辑操作.json --output 新工程",
+      "--input 媒体 或 --project 项目 --output 文件夹 [--interval 2 --max-frames 40]；抽帧并生成 Codex 文案说明",
+    build: "--plan 剪辑计划.json；创建可编辑项目，不执行语音或导出",
+    edit: "--project 项目 --edits 编辑操作.json --output 新项目",
     transcribe:
-      "--project 工程 --output 新工程 [--engine qwen3-asr --device cpu --language auto --model-dir 路径 --offline --srt 字幕.srt]",
+      "--project 项目 --output 新项目 [--engine qwen3-asr --device cpu --language auto --model-dir 路径 --offline --srt 字幕.srt]",
     narrate:
-      "--project 工程 --script 分段文案.json --output 新工程 [--srt 字幕.srt]",
-    export: "--project 工程 --output 视频.mp4 [--software]",
-    run: "--plan 计划.json；剪辑→转录或文案配音→字幕→保存工程→导出；无语音且未提供文案时返回 needs_script 与抽帧",
+      "--project 项目 --script 分段文案.json --output 新项目 [--srt 字幕.srt]",
+    export: "--project 项目 --output 视频.mp4 [--software]",
+    run: "--plan 计划.json；剪辑→转录或文案配音→字幕→保存项目→导出；无语音且未提供文案时返回 needs_script 与抽帧",
     models:
       "--engine qwen3-asr|sensevoice|kokoro-onnx|vits-onnx|lux-onnx；下载模型",
   },

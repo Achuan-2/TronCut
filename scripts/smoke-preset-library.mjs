@@ -67,8 +67,8 @@ const storage = (page) =>
     JSON.parse(localStorage.getItem("troncut.preset-library")),
   );
 const saveProject = async (page) => {
-  await page.getByTitle("保存工程 Ctrl+S").click();
-  await expect(page.locator(".toast")).toContainText("工程已保存");
+  await page.getByTitle("保存项目 Ctrl+S").click();
+  await expect(page.locator(".toast")).toContainText("项目已保存");
   return JSON.parse(await fs.readFile(file, "utf8"));
 };
 try {
@@ -299,7 +299,7 @@ try {
     JSON.stringify({
       root,
       checks:
-        "三阶段自定义预设、头像标识、改名、删除与恢复默认、三类收藏与筛选、收藏夹应用、拖放到图片、重启持久化、删除预设后工程保持完整",
+        "三阶段自定义预设、头像标识、改名、删除与恢复默认、三类收藏与筛选、收藏夹应用、拖放到图片、重启持久化、删除预设后项目保持完整",
       rendererErrors: errors,
     }),
   );
@@ -308,7 +308,7 @@ try {
     await app.firstWindow()
   )
     .screenshot({ path: path.join(root, "failure.png") })
-    .catch(() => {});
+    .catch(() => { });
   console.error("预设与收藏检查失败，截图目录：", root);
   throw error;
 } finally {

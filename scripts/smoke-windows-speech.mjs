@@ -29,7 +29,7 @@ try {
     (await fs.readdir(path.join(root, "profile/narration")).catch(() => []))
       .length;
   await page.getByRole("button", { name: "新建项目", exact: true }).click();
-  await page.getByLabel("工程名称", { exact: true }).fill("Windows语音");
+  await page.getByLabel("项目名称", { exact: true }).fill("Windows语音");
   await page.getByRole("button", { name: "旁白", exact: true }).click();
   await expect(page.getByLabel("配音模型", { exact: true })).toHaveCount(0);
   await expect(
@@ -111,7 +111,7 @@ try {
     });
   }, root);
   await page.getByRole("button", { name: "保存", exact: true }).click();
-  await expect(page.getByRole("status")).toContainText("工程已保存", {
+  await expect(page.getByRole("status")).toContainText("项目已保存", {
     timeout: 20000,
   });
   const file = path.join(root, "Windows语音/Windows语音.troncut");

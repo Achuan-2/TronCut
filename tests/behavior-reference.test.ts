@@ -10,8 +10,8 @@ import {
   phaseSeconds,
 } from "../shared/behaviors";
 
-describe("用户 Camtasia 行为工程的参考时序与运动特征", () => {
-  it("保留参考工程按 editRate 换算的时长、逐字间隔与阶段组合", () => {
+describe("用户 Camtasia 行为项目的参考时序与运动特征", () => {
+  it("保留参考项目按 editRate 换算的时长、逐字间隔与阶段组合", () => {
     const cut = createBehavior("cut", 5)!;
     expect(phaseSeconds(cut.incoming)).toBeCloseTo(1070160000 / 705600000, 10);
     expect(phaseSeconds(cut.outgoing)).toBeCloseTo(305760000 / 705600000, 10);
@@ -79,7 +79,7 @@ describe("用户 Camtasia 行为工程的参考时序与运动特征", () => {
     }
   });
 
-  it("速度和张力编辑会更新精确时长，旧工程可补齐新增字段", () => {
+  it("速度和张力编辑会更新精确时长，旧项目可补齐新增字段", () => {
     const original = createBehavior("cut", 5)!;
     const faster = changeBehaviorPhase(original.outgoing, { speed: 97 });
     expect(phaseSeconds(faster)).toBeLessThan(phaseSeconds(original.outgoing));

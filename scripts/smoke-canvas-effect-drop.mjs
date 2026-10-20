@@ -107,7 +107,7 @@ try {
     page.locator(`.canvas .preview-layer[data-clip-id="${id}"]`);
   const highlighted = page.locator(".canvas .effect-drop-target");
   const save = async () => {
-    await page.getByTitle("保存工程 Ctrl+S", { exact: true }).click();
+    await page.getByTitle("保存项目 Ctrl+S", { exact: true }).click();
     await expect(page.locator(".project-save-state")).not.toContainText("*");
     return JSON.parse(await fs.readFile(file, "utf8"));
   };
@@ -236,7 +236,7 @@ try {
       await app.firstWindow()
     )
       .screenshot({ path: path.join(root, "failure.png") })
-      .catch(() => {});
+      .catch(() => { });
   console.error(root);
   throw error;
 } finally {

@@ -59,7 +59,7 @@ describe("整幅画面的真实运镜导出", () => {
     project.clips = [image, shape];
     project = setCameraTransform(project, { scale: 2, x: 0.75 }, 0.8);
     project = setCameraTransform(project, { x: 0.25 }, 1);
-    const file = path.join(root, "工程", "运镜.troncut");
+    const file = path.join(root, "项目", "运镜.troncut");
     await saveProject(project, file);
     const reopened = await openProject(file);
     expect(reopened.camera).toEqual(project.camera);
@@ -70,7 +70,7 @@ describe("整幅画面的真实运镜导出", () => {
       path.join(root, "render"),
       false,
       new AbortController().signal,
-      () => {},
+      () => { },
     );
     const info = await probeMedia(output);
     expect(info.width).toBe(160);

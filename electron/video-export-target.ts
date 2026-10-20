@@ -43,5 +43,5 @@ export async function assertExportTarget(
   ]);
   if (projectFile) protectedFiles.push(projectFile);
   if ((await Promise.all(protectedFiles.map(canonical))).includes(output))
-    throw new Error("导出目标不能覆盖工程文件或源素材，请更换文件名或导出位置");
+    throw new Error("导出目标不能覆盖项目文件或源素材，请更换文件名或导出位置");
 }

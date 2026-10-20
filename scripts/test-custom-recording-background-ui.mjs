@@ -121,10 +121,10 @@ try {
         preview.evaluate((node) =>
           node.tagName === "VIDEO"
             ? node.readyState >= 2 &&
-              !node.paused &&
-              node.loop &&
-              node.muted &&
-              node.currentTime > 0.1
+            !node.paused &&
+            node.loop &&
+            node.muted &&
+            node.currentTime > 0.1
             : node.complete && node.naturalWidth > 0,
         ),
       )
@@ -160,7 +160,7 @@ try {
     });
   }, root);
   await page.getByRole("button", { name: "保存", exact: true }).click();
-  await expect(page.getByRole("status")).toContainText("工程已保存");
+  await expect(page.getByRole("status")).toContainText("项目已保存");
   await app.close();
   app = await electron.launch({ args: ["."], env });
   page = await app.firstWindow();
@@ -205,8 +205,8 @@ try {
     await app.firstWindow()
   )
     .screenshot({ path: path.join(root, "failure.png") })
-    .catch(() => {});
+    .catch(() => { });
   throw error;
 } finally {
-  await app.close().catch(() => {});
+  await app.close().catch(() => { });
 }

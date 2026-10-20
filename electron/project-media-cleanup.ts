@@ -66,7 +66,7 @@ export async function cleanupProjectMedia(
   if (!stat?.isDirectory() || stat.isSymbolicLink()) return [];
   const realRoot = await fs.realpath(root);
   const realMedia = await fs.realpath(media);
-  if (!contained(realRoot, realMedia)) throw new Error("工程素材目录越界");
+  if (!contained(realRoot, realMedia)) throw new Error("项目素材目录越界");
   const kept = new Set(references(project, root));
   // Sibling projects can intentionally share this directory. If a project
   // cannot be read, ownership is uncertain and cleanup must leave it alone.
@@ -108,7 +108,7 @@ export async function cleanupProjectMedia(
       !contained(path.resolve(historyDirectory), backup) ||
       !contained(realMedia, realSource)
     )
-      throw new Error("工程素材清理路径越界");
+      throw new Error("项目素材清理路径越界");
     try {
       await fs.rename(source, backup);
     } catch (error) {

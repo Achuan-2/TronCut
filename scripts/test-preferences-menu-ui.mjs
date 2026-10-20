@@ -169,7 +169,7 @@ try {
   ).toBe(clipboardBefore);
   await expect(page.locator(".timeline-clip.text")).toHaveCount(2);
   await lock.click();
-  const title = page.getByLabel("工程名称", { exact: true });
+  const title = page.getByLabel("项目名称", { exact: true });
   await title.fill("文本复制测试");
   await page.keyboard.press("Control+k");
   await expect(title).toHaveValue("文本复制测试");
@@ -180,7 +180,7 @@ try {
     .poll(() => app.evaluate(({ clipboard }) => clipboard.readText()))
     .toBe("文本复制测试");
   await title.press("Tab");
-  await expect(page.getByRole("status")).toContainText("工程及文件夹已重命名");
+  await expect(page.getByRole("status")).toContainText("项目及文件夹已重命名");
   await expect(page.locator(".busy-overlay")).toHaveCount(0);
   await app.evaluate(({ dialog }, file) => {
     dialog.showOpenDialog = async () => ({
@@ -224,7 +224,7 @@ try {
   await app
     .windows()[0]
     ?.screenshot({ path: path.join(root, "failure.png") })
-    .catch(() => {});
+    .catch(() => { });
   console.error(`失败截图：${root}`);
   throw error;
 } finally {

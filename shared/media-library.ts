@@ -84,39 +84,39 @@ export function updateLibraryAsset(
       replacement.kind !== "image" &&
       replacement.duration + 1e-6 < requiredMediaDuration(clips)
     )
-      throw new Error("新素材短于工程使用的源区间");
+      throw new Error("新素材短于项目使用的源区间");
   }
   const removed = replacement
     ? project
     : deleteClips(
-        project,
-        clips.map((clip) => clip.id),
-      );
+      project,
+      clips.map((clip) => clip.id),
+    );
   if (!replacement && assetClips(removed, id).length)
     throw new Error("素材被锁定组合使用，请先解锁轨道");
   return {
     ...removed,
     ...(project.mediaFolders
       ? {
-          mediaFolders: project.mediaFolders.map((folder) => ({
-            ...folder,
-            assetIds: folder.assetIds.flatMap((assetId) =>
-              assetId === id
-                ? replacement
-                  ? [replacement.id]
-                  : []
-                : [assetId],
-            ),
-          })),
-        }
+        mediaFolders: project.mediaFolders.map((folder) => ({
+          ...folder,
+          assetIds: folder.assetIds.flatMap((assetId) =>
+            assetId === id
+              ? replacement
+                ? [replacement.id]
+                : []
+              : [assetId],
+          ),
+        })),
+      }
       : {}),
     assets: replacement
       ? project.assets.map((asset) => (asset.id === id ? replacement : asset))
       : project.assets.filter((asset) => asset.id !== id),
     clips: replacement
       ? project.clips.map((clip) =>
-          clip.assetId === id ? { ...clip, assetId: replacement.id } : clip,
-        )
+        clip.assetId === id ? { ...clip, assetId: replacement.id } : clip,
+      )
       : removed.clips,
   };
 }
@@ -186,7 +186,7 @@ export function editProjectMediaFolder(
       command === "new-folder"
         ? [...folders, { id: uid(), name: trimmed, assetIds: [] }]
         : folders.map((folder) =>
-            folder.id === folderId ? { ...folder, name: trimmed } : folder,
-          ),
+          folder.id === folderId ? { ...folder, name: trimmed } : folder,
+        ),
   };
 }

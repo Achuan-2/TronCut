@@ -146,7 +146,7 @@ try {
   const paths = layer.locator("svg path");
   await expect(paths).toHaveCount(5);
   const save = async () => {
-    await page.getByTitle("保存工程 Ctrl+S", { exact: true }).click();
+    await page.getByTitle("保存项目 Ctrl+S", { exact: true }).click();
     await expect(page.locator(".project-save-state")).not.toContainText("*");
     return JSON.parse(await fs.readFile(file, "utf8"));
   };
@@ -302,7 +302,7 @@ try {
   if (page)
     await page
       .screenshot({ path: path.join(root, "failure.png") })
-      .catch(() => {});
+      .catch(() => { });
   throw error;
 } finally {
   await app.close();
