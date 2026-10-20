@@ -26,6 +26,7 @@ export default function MarkerDialog({
   onClose: () => void;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
+  const nameInput = useRef<HTMLInputElement>(null);
   const [label, setLabel] = useState(marker.label);
   const [comments, setComments] = useState(marker.comments ?? "");
   const [color, setColor] = useState(marker.color ?? legacyMarkerColor);
@@ -48,6 +49,8 @@ export default function MarkerDialog({
   useEffect(() => {
     const previous = document.activeElement as HTMLElement | null;
     dialog.current?.showModal();
+    nameInput.current?.focus();
+    nameInput.current?.select();
     return () => {
       dialog.current?.close();
       previous?.focus();
@@ -87,7 +90,7 @@ export default function MarkerDialog({
         <label className="field">
           名称
           <input
-            autoFocus
+            ref={nameInput}
             aria-label="标记名称"
             value={label}
             onChange={(event) => setLabel(event.target.value)}

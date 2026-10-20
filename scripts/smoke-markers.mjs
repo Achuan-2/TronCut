@@ -5,6 +5,8 @@ import path from "node:path";
 
 const root = path.resolve(`test-output/timeline-markers-${Date.now()}`);
 await fs.mkdir(root, { recursive: true });
+const documents = path.join(root, "Documents");
+await fs.mkdir(documents, { recursive: true });
 const bundle = await build({
   stdin: {
     contents: 'export { createProject, newText } from "./shared/model";',
@@ -34,11 +36,24 @@ let page;
 const errors = [];
 const open = async () => {
   app = await electron.launch({ args: [".", file], env });
+  await app.evaluate(
+    ({ app }, directory) => app.setPath("documents", directory),
+    documents,
+  );
   page = await app.firstWindow();
   page.on("pageerror", (error) => errors.push(error.message));
   await expect(page.locator(".timeline-clip.text")).toHaveCount(1);
 };
 const dialog = () => page.getByRole("dialog");
+const typeMarkerName = async (name) => {
+  const input = dialog().getByLabel("标记名称", { exact: true });
+  await expect(input).toBeFocused();
+  expect(
+    await input.evaluate(node => [node.selectionStart, node.selectionEnd]),
+  ).toEqual([0, (await input.inputValue()).length]);
+  await page.keyboard.type(name);
+  await expect(input).toHaveValue(name);
+};
 const marker = (name) =>
   page.getByRole("button", { name: `标记：${name}`, exact: true });
 const save = () =>
@@ -69,7 +84,7 @@ try {
   await expect(
     dialog().getByRole("checkbox", { name: "区域标记", exact: true }),
   ).toBeChecked();
-  await dialog().getByLabel("标记名称", { exact: true }).fill("取消的标记");
+  await typeMarkerName("取消的标记");
   await page.keyboard.press("Escape");
   await expect(dialog()).toHaveCount(0);
   await expect(page.locator(".timeline-marker")).toHaveCount(1);
@@ -84,7 +99,7 @@ try {
   await expect(
     dialog().getByLabel("标记结束时间（秒）", { exact: true }),
   ).toHaveValue("12");
-  await dialog().getByLabel("标记名称", { exact: true }).fill("片头修改");
+  await typeMarkerName("片头修改");
   await dialog()
     .getByLabel("标记备注", { exact: true })
     .fill("缩短开场停顿\n补充标题动画");
@@ -282,7 +297,7 @@ try {
     JSON.stringify({
       root,
       checks:
-        "区域/点标记、选中片段范围、备注、预设/自定义颜色、时间校验、移动/两端裁切、单步撤销、取消、键盘微调、反向框选、删除隔离、保存重开和旧标记兼容",
+        "名称自动聚焦全选与直接输入、区域/点标记、选中片段范围、备注、预设/自定义颜色、时间校验、移动/两端裁切、单步撤销、取消、键盘微调、反向框选、删除隔离、保存重开和旧标记兼容",
       rendererErrors: errors,
     }),
   );
