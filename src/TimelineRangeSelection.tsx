@@ -20,6 +20,8 @@ export function TimelineRangeHandles({
   onRevealTime: (time: number) => void;
 }) {
   const playhead = useEditorPlayhead(editor);
+  const minTime = editor.timelineBounds?.start ?? 0;
+  maxTime = editor.timelineBounds?.end ?? maxTime;
   const range = editor.timelineRange ?? { start: playhead, end: playhead };
   const drag = useRef<{
     pointerId: number;
@@ -30,7 +32,7 @@ export function TimelineRangeHandles({
   } | null>(null);
   const update = (part: Part, time: number, anchor: TimelineRange) => {
     const frame = Math.max(
-      0,
+      minTime,
       Math.min(
         maxTime,
         Math.round(time * editor.project.canvas.fps) /
@@ -117,7 +119,7 @@ export function TimelineRangeHandles({
                   key={part}
                   role="slider"
                   aria-label={part === "start" ? "范围起点" : "范围终点"}
-                  aria-valuemin={0}
+                  aria-valuemin={minTime}
                   aria-valuemax={maxTime}
                   aria-valuenow={range[part]}
                   aria-valuetext={timeLabel(range[part])}
@@ -142,7 +144,7 @@ export function TimelineRangeHandles({
                       (event.shiftKey ? 10 : 1) / editor.project.canvas.fps;
                     const time =
                       event.key === "Home"
-                        ? 0
+                        ? minTime
                         : event.key === "End"
                           ? maxTime
                           : range[part] +

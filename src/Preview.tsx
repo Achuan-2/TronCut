@@ -1348,7 +1348,8 @@ export default function Preview({
     }
   };
   const { project, playing, seek, advancePlayback, setPlaying } = editor,
-    duration = useMemo(() => projectDuration(project), [project.clips]);
+    duration = editor.timelineBounds?.end ?? projectDuration(project);
+  const startTime = editor.timelineBounds?.start ?? 0;
   useEffect(() => {
     const element = holder.current;
     if (!element) return;
@@ -1607,7 +1608,7 @@ export default function Preview({
           <button
             aria-label="前一帧"
             title="前一帧（←）"
-            disabled={playhead <= 0 || !duration}
+            disabled={playhead <= startTime || !duration}
             onClick={() => editor.stepFrame(-1)}
           >
             <StepBack size={17} fill="currentColor" />
@@ -1625,7 +1626,7 @@ export default function Preview({
             title="播放 / 暂停（空格）"
             disabled={!duration}
             onClick={() => {
-              if (!playing && playhead >= duration) seek(0);
+              if (!playing && playhead >= duration) seek(startTime);
               setPlaying(!playing);
             }}
           >
@@ -1638,7 +1639,7 @@ export default function Preview({
           <button
             aria-label="前一个媒体"
             title="前一个媒体（Ctrl/⌘ + ←）"
-            disabled={playhead <= 0 || !duration}
+            disabled={playhead <= startTime || !duration}
             onClick={() => editor.jumpMedia(-1)}
           >
             <ChevronLeft size={19} />
@@ -1656,7 +1657,7 @@ export default function Preview({
           className="playback-progress"
           aria-label="播放进度"
           type="range"
-          min={0}
+          min={startTime}
           max={duration || 1}
           step={1 / project.canvas.fps}
           value={Math.min(playhead, duration)}

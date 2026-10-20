@@ -6,6 +6,8 @@ import path from "node:path";
 
 const root = path.resolve(`test-output/group-timeline/run-${Date.now()}`);
 await fs.mkdir(root, { recursive: true });
+const documents = path.join(root, "Documents");
+await fs.mkdir(documents, { recursive: true });
 const bundled = await build({
   stdin: {
     contents:
@@ -45,6 +47,7 @@ let app;
 try {
   app = await electron.launch({ args: [".", file], env });
   let page = await app.firstWindow();
+  await app.evaluate(({ app }, directory) => app.setPath("documents", directory), documents);
   page.on("pageerror", (error) => errors.push(error.message));
   const command = (name) =>
     app.evaluate(({ BrowserWindow }, command) => {
@@ -53,7 +56,7 @@ try {
   const group = () => page.locator(`.clip-group[data-group-id="${groupId}"]`);
   const main = () => page.getByRole("tab", { name: "主时间线", exact: true });
   await expect(group()).toHaveCount(1);
-  await expect(page.getByRole("tab")).toHaveCount(0);
+  await expect(page.locator('.timeline-tabs [role="tab"]')).toHaveCount(0);
   await expect(page.locator(".timeline-clip")).toHaveCount(2);
   await expect(group()).toContainText("2 个媒体");
   const groupBounds = await group().boundingBox();
@@ -75,7 +78,7 @@ try {
         .locator(".timeline-scroll")
         .evaluate((element) => element.scrollLeft),
     )
-    .toBe(0);
+    .toBeGreaterThan(0);
   await expect(
     page.getByRole("tab", { name: "组合 1", exact: true }),
   ).toHaveAttribute("aria-selected", "true");
@@ -84,7 +87,7 @@ try {
   const first = page.locator(
     `.timeline-clip[data-clip-id="${project.clips[0].id}"]`,
   );
-  // Undoing a move from the main timeline must preserve the group's local spacing.
+  // Undoing a main-timeline move keeps the group's document time coordinates.
   await command("undo");
   await expect
     .poll(() =>
@@ -92,10 +95,10 @@ try {
         .locator(`.timeline-clip[data-clip-id="${project.clips[1].id}"]`)
         .evaluate((element) => parseFloat(element.style.left)),
     )
-    .toBe(65);
+    .toBe(325);
   await expect
     .poll(() => first.evaluate((element) => parseFloat(element.style.left)))
-    .toBe(0);
+    .toBe(260);
   await first.click();
   await expect(page.locator(".timeline-clip.selected")).toHaveCount(1);
   await page.getByLabel("文本内容", { exact: true }).fill("已编辑的组内甲");
@@ -142,10 +145,10 @@ try {
   await page
     .getByRole("button", { name: "关闭开场画面时间线", exact: true })
     .click();
-  await expect(page.getByRole("tab")).toHaveCount(0);
+  await expect(page.locator('.timeline-tabs [role="tab"]')).toHaveCount(0);
   await expect(group()).toHaveCount(1);
   await group().dblclick();
-  await expect(page.getByRole("tab")).toHaveCount(2);
+  await expect(page.locator('.timeline-tabs [role="tab"]')).toHaveCount(2);
   await command("save");
   await expect
     .poll(
@@ -160,6 +163,7 @@ try {
 
   app = await electron.launch({ args: [".", file], env });
   page = await app.firstWindow();
+  await app.evaluate(({ app }, directory) => app.setPath("documents", directory), documents);
   page.on("pageerror", (error) => errors.push(error.message));
   await expect(group()).toContainText("开场画面");
   await group().dblclick();

@@ -11,7 +11,11 @@ import {
   rootGroupId,
   ungroupClips,
 } from "./clip-groups";
-import { constrainTimelineMove, timelineTrackIsFree } from "./timeline-collision";
+import {
+  constrainTimelineMove,
+  timelineTrackIsFree,
+  hasProjectTimelineOverlap,
+} from "./timeline-collision";
 
 export function editableIds(
   project: Project,
@@ -110,6 +114,51 @@ export function moveClips(
 }
 
 type Range = { start: number; end: number };
+
+/** Move a collapsed group as one item while preserving its internal layer spacing. */
+export function moveClipGroup(
+  project: Project,
+  id: string,
+  wanted: number,
+  targetTrackId: string,
+): Project {
+  const members = groupMembers(project, id);
+  const selected = new Set(members.map((clip) => clip.id));
+  if (
+    !members.length || !Number.isFinite(wanted) ||
+    editableIds(project, [...selected]).size !== selected.size
+  ) return project;
+  const trackIndices = new Map(project.tracks.map((track, index) => [track.id, index]));
+  const anchor = Math.min(...members.map((clip) => trackIndices.get(clip.trackId) ?? -1));
+  const target = project.tracks.findIndex((track) => track.id === targetTrackId);
+  if (anchor < 0 || target < 0 || project.tracks[target].locked) return project;
+  const shift = target - anchor;
+  if (!shift) return moveClips(project, [...selected], wanted);
+  const tracks = [...project.tracks];
+  const last = Math.max(...members.map((clip) => trackIndices.get(clip.trackId)!)) + shift;
+  if (last >= 128) return project;
+  while (tracks.length <= last) tracks.push(newTrack(tracks.length));
+  const destinations = new Map(members.map((clip) => [
+    clip.id, tracks[trackIndices.get(clip.trackId)! + shift],
+  ]));
+  if (
+    members.some((clip) => {
+      const track = destinations.get(clip.id)!;
+      return track.locked || Boolean(track.captionTrack) !== Boolean(clip.caption);
+    })
+  ) return project;
+  const delta = constrainTimelineMove(project, [...selected], wanted, targetTrackId);
+  const result = {
+    ...project,
+    tracks: numberTracks(tracks),
+    clips: project.clips.map((clip) =>
+      selected.has(clip.id)
+        ? { ...clip, start: clip.start + delta, trackId: destinations.get(clip.id)!.id }
+        : clip,
+    ),
+  };
+  return hasProjectTimelineOverlap(result) ? project : result;
+}
 function union(ranges: Range[]): Range[] {
   const result: Range[] = [];
   for (const range of [...ranges].sort((a, b) => a.start - b.start)) {

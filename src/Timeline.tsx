@@ -138,6 +138,7 @@ import {
 } from "../shared/recording-objects";
 import { groupName, groupedTimeline, rootGroupId } from "../shared/clip-groups";
 import GroupTimelineNavigation from "./GroupTimelineNavigation";
+import GroupTimelineMask from "./GroupTimelineMask";
 import TimelineGroupClip from "./TimelineGroupClip";
 import {
   constrainTimelineMove,
@@ -294,9 +295,9 @@ export default function Timeline({
       () =>
         project.markers.reduce(
           (end, marker) => Math.max(end, markerEnd(marker) + 5),
-          Math.max(20, projectDuration(project) + 5),
+          Math.max(20, projectDuration(editor.documentProject) + 5),
         ),
-      [project.clips, project.markers],
+      [editor.documentProject.clips, project.markers],
     ),
     // The overlay handles no longer extend the scroll pane's intrinsic width.
     width = duration * zoom + 19;
@@ -739,6 +740,12 @@ export default function Timeline({
     observer.observe(element);
     return () => observer.disconnect();
   }, [layoutKey, width, syncRangeHandles]);
+  useLayoutEffect(() => {
+    const element = scroll.current;
+    if (!element || !editor.timelineBounds) return;
+    element.scrollLeft = Math.max(0, editor.timelineBounds.start * zoom - 160);
+    syncRangeHandles(element);
+  }, [editor.activeGroupId, project.id]);
   const locked =
     selected && project.tracks.find((t) => t.id === selected.trackId)?.locked;
   function selectedCaptions(id: string) {
@@ -818,9 +825,9 @@ export default function Timeline({
       React.MouseEvent<HTMLDivElement> | React.PointerEvent<HTMLDivElement>,
   ) =>
     Math.max(
-      0,
+      editor.timelineBounds?.start ?? 0,
       Math.min(
-        duration,
+        editor.timelineBounds?.end ?? duration,
         (event.clientX - event.currentTarget.getBoundingClientRect().left) /
           zoom,
       ),
@@ -828,7 +835,7 @@ export default function Timeline({
   return (
     <section
       ref={panel}
-      className={`timeline ${fileDrop ? "file-drag-active" : ""}`}
+      className={`timeline ${editor.activeGroupId ? "group-editing" : ""} ${fileDrop ? "file-drag-active" : ""}`}
       onClick={() => context && setContext(null)}
       onContextMenuCapture={(event) => {
         if ((event.target as HTMLElement).closest(".clip-animations"))
@@ -1258,7 +1265,10 @@ export default function Timeline({
             className={`timeline-content ${marquee ? "marquee-active" : ""}`}
             style={{
               width,
-              minHeight: trackHeights.reduce((sum, height) => sum + height, 36),
+              minHeight: Math.max(
+                editor.timelineBounds ? viewport.height : 0,
+                trackHeights.reduce((sum, height) => sum + height, 36),
+              ),
             }}
             onPointerDown={(event) => {
               if (
@@ -1320,7 +1330,8 @@ export default function Timeline({
               if (!event.currentTarget.hasPointerCapture(event.pointerId))
                 scheduleMarqueeUpdate(null);
             }}
-          >
+            >
+            <GroupTimelineMask editor={editor} zoom={zoom} width={width} />
             <div
               className="ruler"
               title="拖动定位；Shift+拖动添加区域标记"

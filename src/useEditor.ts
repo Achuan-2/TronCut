@@ -139,6 +139,7 @@ import { createPlaybackStore } from "./playback-store";
 import { stitchClips, stitchSelectionError, unstitchClips } from "../shared/stitch";
 import {
   createGroupScope,
+  clampGroupTime,
   groupName,
   mergeGroupProject,
   projectForGroup,
@@ -195,7 +196,7 @@ export function useEditor(
   const [openGroups, setOpenGroups] = useState<string[]>([]);
   const timelinePositions = useRef(new Map<string, number>());
   const groupScopes = useRef(new Map<string, GroupScope>());
-  // Editing uses a local timeline; saving and exporting use the full document.
+  // Group editing filters members while retaining the document's time coordinates.
   const project = useMemo(
     () => projectForGroup(documentProject, groupScope),
     [documentProject, groupScope],
@@ -205,7 +206,11 @@ export function useEditor(
   const setTimelineRange = useCallback(
     (range: TimelineRange | null) => {
       setTimelineRangeState(range
-        ? normalizeTimelineRange(range.start, range.end, project.canvas.fps)
+        ? normalizeTimelineRange(
+            clampGroupTime(scopeRef.current, range.start),
+            clampGroupTime(scopeRef.current, range.end),
+            project.canvas.fps,
+          )
         : null);
     },
     [project.canvas.fps],
@@ -332,14 +337,16 @@ export function useEditor(
   const seek = useCallback(
     (next: SetStateAction<number>) => {
       clearKeyframeEdit();
-      playback.set(next);
+      playback.set((time) => clampGroupTime(
+        scopeRef.current, typeof next === "function" ? next(time) : next,
+      ));
     },
     [clearKeyframeEdit, playback],
   );
   // Playback advances dozens of times per second. It only moves the clock and
   // must not pay for interactive seek cleanup on every frame.
   const advancePlayback = useCallback((next: number) => {
-    playback.set(next);
+    playback.set(clampGroupTime(scopeRef.current, next));
   }, [playback]);
   const [playing, setPlayingState] = useState(false);
   const [narrationRecording, setNarrationRecording] = useState<{
@@ -422,13 +429,17 @@ export function useEditor(
         setTimelineConflict((count) => count + 1);
         return;
       }
-      if (scopeRef.current)
-        scopeRef.current.trackIds = [
-          ...new Set([
-            ...scopeRef.current.trackIds,
-            ...after.tracks.map((track) => track.id),
-          ]),
-        ];
+      if (scopeRef.current) {
+        const nextScope = createGroupScope(documentAfter, scopeRef.current.id);
+        if (nextScope) {
+          nextScope.trackIds = [...new Set([
+            ...scopeRef.current.trackIds, ...after.tracks.map((track) => track.id),
+          ])];
+          scopeRef.current = nextScope;
+          setGroupScope(nextScope);
+          playback.set(clampGroupTime(nextScope, playback.getSnapshot()));
+        }
+      }
       past.current = [...past.current.slice(-99), documentBefore];
       future.current = [];
       documentCurrent.current = documentAfter;
@@ -436,7 +447,7 @@ export function useEditor(
       setDocumentProject(documentAfter);
       setDirty(true);
     },
-    [],
+    [playback],
   );
   const switchTimeline = useCallback(
     (id: string | null) => {
@@ -466,7 +477,7 @@ export function useEditor(
       select(null);
       seek(Math.min(
         projectDuration(current.current),
-        timelinePositions.current.get(id ?? "main") ?? 0,
+        timelinePositions.current.get(id ?? "main") ?? playback.getSnapshot(),
       ));
     },
     [playback, select, seek, setPlaying],
@@ -625,8 +636,7 @@ export function useEditor(
       future.current.push(documentCurrent.current);
       documentCurrent.current = previous;
       if (scopeRef.current) {
-        // History can restore a group moved on the main timeline. Rebase its
-        // local origin before projecting, so earlier media is never clamped away.
+        // History can restore a group moved on the main timeline; refresh its bounds.
         const scope = createGroupScope(previous, scopeRef.current.id);
         if (scope) {
           scopeRef.current = scope;
@@ -634,10 +644,11 @@ export function useEditor(
         }
       }
       current.current = projectForGroup(previous, scopeRef.current);
+      playback.set(clampGroupTime(scopeRef.current, playback.getSnapshot()));
       setDocumentProject(previous);
       setDirty(true);
     }
-  }, []);
+  }, [playback]);
   const redo = useCallback(() => {
     const next = future.current.pop();
     if (next) {
@@ -651,10 +662,11 @@ export function useEditor(
         }
       }
       current.current = projectForGroup(next, scopeRef.current);
+      playback.set(clampGroupTime(scopeRef.current, playback.getSnapshot()));
       setDocumentProject(next);
       setDirty(true);
     }
-  }, []);
+  }, [playback]);
   const updateClip = useCallback(
     (id: string, updater: Partial<Clip> | ((clip: Clip) => Clip)) => {
       const selected = current.current.clips.find((c) => c.id === id);
@@ -1774,6 +1786,7 @@ export function useEditor(
     documentProject,
     timelineConflict,
     activeGroupId: groupScope?.id ?? null,
+    timelineBounds: groupScope ? { start: groupScope.offset, end: groupScope.end } : null,
     timelineTabs: openGroups.map((id) => ({
       id,
       name: groupName(documentProject, id),

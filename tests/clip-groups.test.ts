@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { createProject, newText, validateProject } from "../shared/model";
 import {
   createGroupScope,
+  clampGroupTime,
   groupMembers,
   groupName,
   groupedTimeline,
@@ -14,6 +15,7 @@ import {
   deleteClips,
   groupSelection,
   moveClips,
+  moveClipGroup,
   pasteClips,
   selectionWithGroups,
   splitSelection,
@@ -35,6 +37,51 @@ function fixture() {
 }
 
 describe("组合时间线", () => {
+  it("组合跨轨道移动保留成员层次与时间，底部不足时增加内部轨道", () => {
+    const { project, id } = fixture();
+    const result = moveClipGroup(project, id, 2, "audio");
+    expect(result.tracks).toHaveLength(4);
+    expect(result.clips[0]).toMatchObject({ trackId: "audio", start: 12 });
+    expect(result.clips[1]).toMatchObject({
+      trackId: result.tracks[3].id,
+      start: 14,
+    });
+    expect(result.clips[2]).toBe(project.clips[2]);
+    const proxy = groupedTimeline(result).clips.find(
+      (clip) => clip.groupId === id,
+    )!;
+    expect(proxy).toMatchObject({ trackId: "audio", start: 12, duration: 7 });
+    expect(validateProject(result).clips).toHaveLength(3);
+  });
+
+  it("组合跨轨道移动不会改动锁定目标或部分移动含锁定成员的组合", () => {
+    const { project, id } = fixture();
+    project.tracks.find((track) => track.id === "audio")!.locked = true;
+    expect(moveClipGroup(project, id, 1, "audio")).toBe(project);
+    expect(moveClipGroup(project, id, 1, "video")).toBe(project);
+    project.tracks.find((track) => track.id === "titles")!.locked = true;
+    expect(moveClipGroup(project, id, 1, "titles")).toBe(project);
+  });
+
+  it("组内使用主时间线刻度，旧标记映射到原位置，定位被限制在组合起止之间", () => {
+    const { project, id } = fixture();
+    project.groups!.find((group) => group.id === id)!.markers = [
+      { id: "m", time: 1, label: "旧标记" },
+    ];
+    const scope = createGroupScope(project, id)!;
+    expect(scope).toMatchObject({ offset: 10, end: 17 });
+    const view = projectForGroup(project, scope);
+    expect(view.clips.map((clip) => clip.start)).toEqual([10, 12]);
+    expect(view.markers[0].time).toBe(11);
+    expect(
+      [-5, 0, 10, 12, 17, 30].map((time) => clampGroupTime(scope, time)),
+    ).toEqual([10, 10, 10, 12, 17, 17]);
+    expect(
+      mergeGroupProject(project, scope, view).groups!.find(
+        (group) => group.id === id,
+      )!.markers![0].time,
+    ).toBe(1);
+  });
   it("组内新增和调整轨道顺序会写回工程，保持图层前后关系", () => {
     const { project, id } = fixture();
     const scope = createGroupScope(project, id)!;
@@ -113,7 +160,7 @@ describe("组合时间线", () => {
     const scope = createGroupScope(project, id)!;
     expect(
       projectForGroup(project, scope).clips.map((clip) => clip.start),
-    ).toEqual([0, 2]);
+    ).toEqual([10, 12]);
   });
 
   it("组内独立选中、移动、删除只写回当前组合，其他素材与主时间线标记保持原值", () => {
@@ -143,7 +190,7 @@ describe("组合时间线", () => {
     const { project, id } = fixture();
     const scope = createGroupScope(project, id)!;
     const local = projectForGroup(project, scope);
-    local.clips.push(newText("group-extra", 1, 0, "新文本"));
+    local.clips.push(newText("group-extra", 11, 0, "新文本"));
     local.tracks.push({
       id: "group-extra",
       name: "新轨道",
@@ -151,7 +198,7 @@ describe("组合时间线", () => {
       muted: false,
       locked: false,
     });
-    local.markers = [{ id: "group-marker", time: 1, label: "组内标记" }];
+    local.markers = [{ id: "group-marker", time: 11, label: "组内标记" }];
     const reopened = validateProject(
       JSON.parse(JSON.stringify(mergeGroupProject(project, scope, local))),
     );

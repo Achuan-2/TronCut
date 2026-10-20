@@ -5,7 +5,9 @@ export type ClipGroup = NonNullable<Project["groups"]>[number];
 type GroupDocument = Pick<Project, "clips" | "groups">;
 export interface GroupScope {
   id: string;
+  /** Document start; also the origin of legacy group-relative markers. */
   offset: number;
+  end: number;
   trackIds: string[];
 }
 
@@ -155,6 +157,7 @@ export function createGroupScope(
   return {
     id,
     offset: Math.min(...members.map((clip) => clip.start)),
+    end: Math.max(...members.map((clip) => clip.start + clip.duration)),
     trackIds: [...new Set(members.map((clip) => clip.trackId))],
   };
 }
@@ -168,7 +171,6 @@ export function projectForGroup(
   const ids = descendantGroupIds(project, scope.id);
   const clips = groupMembers(project, scope.id).map((clip) => ({
     ...clip,
-    start: Math.max(0, clip.start - scope.offset),
     groupId: clip.groupId === scope.id ? undefined : clip.groupId,
   }));
   const tracks = new Set([
@@ -180,8 +182,9 @@ export function projectForGroup(
     clips,
     tracks: project.tracks.filter((track) => tracks.has(track.id)),
     camera: undefined,
-    markers:
-      project.groups?.find((group) => group.id === scope.id)?.markers ?? [],
+    markers: (
+      project.groups?.find((group) => group.id === scope.id)?.markers ?? []
+    ).map((marker) => ({ ...marker, time: marker.time + scope.offset })),
     groups: project.groups
       ?.filter((group) => group.id !== scope.id && ids.has(group.id))
       .map((group) =>
@@ -190,7 +193,7 @@ export function projectForGroup(
   };
 }
 
-/** Write local edits into the original document, retaining unrelated media and tracks. */
+/** Group edits keep document time; only the stored group markers use a local clock. */
 export function mergeGroupProject(
   document: Project,
   scope: GroupScope,
@@ -204,7 +207,6 @@ export function mergeGroupProject(
       clip.id,
       {
         ...clip,
-        start: clip.start + scope.offset,
         groupId: clip.groupId ?? scope.id,
       },
     ]),
@@ -245,6 +247,9 @@ export function mergeGroupProject(
     id: scope.id,
     name: groupName(document, scope.id),
   };
+  const origin = edited.clips.length
+    ? Math.min(...edited.clips.map((clip) => clip.start))
+    : scope.offset;
   const retainedAssets = document.assets.filter(
     (asset) =>
       outside.some((clip) => clip.assetId === asset.id) &&
@@ -262,13 +267,23 @@ export function mergeGroupProject(
     tracks,
     groups: [
       ...(document.groups ?? []).filter((group) => !descendants.has(group.id)),
-      { ...own, markers: edited.markers },
+      {
+        ...own,
+        markers: edited.markers.map((marker) => ({
+          ...marker,
+          time: Math.max(0, marker.time - origin),
+        })),
+      },
       ...(edited.groups ?? []).map((group) => ({
         ...group,
         parentId: group.parentId ?? scope.id,
       })),
     ],
   };
+}
+
+export function clampGroupTime(scope: GroupScope | null, time: number) {
+  return scope ? Math.max(scope.offset, Math.min(scope.end, time)) : time;
 }
 
 export interface TimelineGroup {

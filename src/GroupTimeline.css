@@ -74,3 +74,15 @@
   font-size: 10px;
   flex-shrink: 0;
 }
+.group-timeline-mask {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 12;
+  background: #34393fd9;
+  border-inline: 1px solid #78808a80;
+  cursor: not-allowed;
+}
+.timeline.group-editing .timeline-ruler-overlay {
+  z-index: 13;
+}
