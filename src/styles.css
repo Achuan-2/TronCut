@@ -3231,40 +3231,35 @@ fieldset:disabled {
   overflow: hidden;
   background: #090c0e;
 }
-.transition-card-preview > span {
+.transition-card-preview > img {
   position: absolute;
-  display: grid;
-  width: 54%;
-  height: 58%;
-  place-items: center;
-  font-size: 25px;
-  color: #fff;
-  background: #426a61;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
   animation: transition-card-slide 2.4s ease-in-out infinite;
 }
-.transition-card-preview > span:first-child {
+.transition-card-preview > img:first-child {
   animation-name: transition-card-slide-out;
 }
-.transition-card-preview > span:last-child {
-  background: #496f98;
-}
-.transition-card-preview.fade > span:last-child {
+.transition-card-preview.fade > img:last-child {
   animation-name: transition-card-fade;
 }
-.transition-card-preview.fade > span:first-child,
-.transition-card-preview.zoom > span:first-child {
+.transition-card-preview.fade > img:first-child,
+.transition-card-preview.zoom > img:first-child {
   animation: none;
 }
-.transition-card-preview.zoom > span:last-child {
+.transition-card-preview.zoom > img:last-child {
   animation-name: transition-card-zoom;
 }
-.transition-card-preview.whip-pan > span {
+.transition-card-preview.whip-pan > img {
   animation-timing-function: cubic-bezier(0.76, 0, 0.24, 1);
 }
-.transition-card-preview.whip-pan > span:last-child {
+.transition-card-preview.whip-pan > img:last-child {
   animation-name: transition-card-whip;
 }
-.transition-card-preview.whip-pan > span:first-child {
+.transition-card-preview.whip-pan > img:first-child {
   animation-name: transition-card-whip-out;
 }
 @keyframes transition-card-fade {
@@ -3276,14 +3271,14 @@ fieldset:disabled {
   55%, 100% { opacity: 1; transform: scale(1); }
 }
 @keyframes transition-card-whip {
-  0%, 20% { transform: translateX(110%); }
+  0%, 20% { transform: translateX(100%); }
   37% { transform: translateX(55%) scaleX(1.16); }
   55%, 100% { transform: translateX(0); }
 }
 @keyframes transition-card-whip-out {
   0%, 20% { transform: translateX(0); }
   37% { transform: translateX(-55%) scaleX(1.16); }
-  55%, 100% { transform: translateX(-110%); }
+  55%, 100% { transform: translateX(-100%); }
 }
 .transition-card > b {
   width: 100%;
@@ -3295,7 +3290,7 @@ fieldset:disabled {
 @keyframes transition-card-slide {
   0%,
   20% {
-    translate: 110% 0;
+    translate: 100% 0;
   }
   55%,
   100% {
@@ -3309,7 +3304,7 @@ fieldset:disabled {
   }
   55%,
   100% {
-    translate: -110% 0;
+    translate: -100% 0;
   }
 }
 .transition-heading-actions {

@@ -4,6 +4,8 @@ import {
   transitionPresets,
 } from "../shared/transitions";
 import type { Editor } from "./useEditor";
+import mountainPreview from "./assets/transitions/mountain-lake.svg";
+import desertPreview from "./assets/transitions/desert.svg";
 
 export default function TransitionsPanel({ editor }: { editor: Editor }) {
   return (
@@ -38,8 +40,8 @@ export default function TransitionsPanel({ editor }: { editor: Editor }) {
               className={`transition-card-preview ${type}`}
               aria-hidden="true"
             >
-              <span>A</span>
-              <span>B</span>
+              <img src={mountainPreview} alt="" draggable={false} />
+              <img src={desertPreview} alt="" draggable={false} />
             </span>
             <b>{name}</b>
           </button>

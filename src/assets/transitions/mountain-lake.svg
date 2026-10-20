@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360" viewBox="0 0 640 360">
+  <defs>
+    <linearGradient id="sky" x2="0" y2="1">
+      <stop stop-color="#68b9dc"/>
+      <stop offset="1" stop-color="#d4edf0"/>
+    </linearGradient>
+    <linearGradient id="lake" x2="0" y2="1">
+      <stop stop-color="#65bcc4"/>
+      <stop offset="1" stop-color="#216b82"/>
+    </linearGradient>
+  </defs>
+  <path fill="url(#sky)" d="M0 0h640v360H0z"/>
+  <circle cx="510" cy="73" r="31" fill="#fff4cd"/>
+  <path fill="#86aebc" d="m0 208 95-113 78 81L296 37l123 150 91-90 130 120v63H0z"/>
+  <path fill="#edf6f5" d="m227 115 69-78 72 88-43-18-29 17-25-31-22 23z"/>
+  <path fill="#477d8c" d="m0 243 95-89 105 104 110-88 127 87 104-92 99 76v119H0z"/>
+  <path fill="url(#lake)" d="M0 248q150-16 320 1t320-3v114H0z"/>
+  <path fill="#a0d8d6" opacity=".55" d="m252 263 137 1-26 8H278zm-62 26h265l-35 6H215zm69 26h134l-20 5H243z"/>
+  <path fill="#25595b" d="m0 269 81 16 75 37 69 38H0zm640-8-70 24-49 37-61 38h180z"/>
+  <path fill="#163f47" d="m36 177-27 67h17L2 287h25v38h18v-38h27l-26-43h18zm560 6-25 64h16l-25 42h25v40h18v-40h26l-25-42h16z"/>
+</svg>
