@@ -40,6 +40,8 @@ TronCut 集成录屏、剪辑、文字、字幕和声音处理，大大提升教
 
 前往 **[GitHub Releases](https://github.com/Achuan-2/TronCut/releases)** 下载：
 
+当前版本为 **[v0.6.1](https://github.com/Achuan-2/TronCut/releases/tag/v0.6.1)**，新增媒体行为预设、视频帧定格、时间线连续画面预览和自动响度标准化，并改进组合编辑与项目存储。详见[发布说明](docs/releases/v0.6.1.md)。
+
 使用方法按功能模块整理在 [使用文档](docs/README.md) 中，包括素材与录屏鼠标、时间线、文本、画布动画和项目管理。首次使用可阅读 [开始使用](docs/GETTING-STARTED.md)。
 
 
@@ -62,7 +64,7 @@ pnpm install --frozen-lockfile
 pnpm dev
 ```
 
-开发时可从 PATH 查找 FFmpeg/FFprobe，也可在设置中选择引擎。独立二进制不提交到 Git，打包前的引擎准备方式见 [构建与发布](docs/BUILDING.md)。单独运行 Vite 只有界面预览；文件、录屏和导出需要 Electron。
+开发时可从 PATH 查找 FFmpeg/FFprobe，安装包使用随包提供的引擎。独立二进制不提交到 Git，打包前的引擎准备方式见 [构建与发布](docs/BUILDING.md)。单独运行 Vite 只有界面预览；文件、录屏和导出需要 Electron。
 
 ```sh
 pnpm build          # 类型检查 + 编辑器与 Electron 构建

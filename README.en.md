@@ -39,6 +39,8 @@ TronCut also provides multitrack editing, multiple selection, grouping, synchron
 
 Download from **[GitHub Releases](https://github.com/Achuan-2/TronCut/releases)**:
 
+The current version is **[v0.6.1](https://github.com/Achuan-2/TronCut/releases/tag/v0.6.1)**, adding media behavior presets, video freeze frames, continuous timeline thumbnails, and automatic loudness normalization, with improvements to group editing and project storage. See the [release notes](docs/releases/v0.6.1.md).
+
 
 
 Packages include the matching media engine and speech environment manager; Windows also includes native recording helpers. End users do not need to install Node.js, FFmpeg, or uv. **The first speech-caption task needs internet access to download Python, dependencies, and models**; speech recognition then runs locally. Windows and macOS builds are unsigned, and the macOS packages are neither notarized nor validated on real hardware.
@@ -77,7 +79,7 @@ pnpm install --frozen-lockfile
 pnpm dev
 ```
 
-For development, FFmpeg/FFprobe can be found on PATH or selected in Settings. Standalone binaries are not committed to Git; see [building and releases](docs/BUILDING.md) for packaging prerequisites. Vite alone previews the interface; file access, recording, and export require Electron.
+For development, FFmpeg/FFprobe can be found on PATH; installed builds use their bundled engines. Standalone binaries are not committed to Git; see [building and releases](docs/BUILDING.md) for packaging prerequisites. Vite alone previews the interface; file access, recording, and export require Electron.
 
 ```sh
 pnpm build          # Typecheck and build the editor and Electron processes

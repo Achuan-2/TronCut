@@ -4,11 +4,21 @@ import fs from "node:fs/promises";
 import { selectPreview } from "./preview-select.mjs";
 const base = path.resolve("test-output/smoke");
 const root = path.join(base, `run-${Date.now()}`);
-await fs.mkdir(root, { recursive: true });
+const profile = path.join(root, "profile");
+await fs.mkdir(profile, { recursive: true });
+await fs.writeFile(
+  path.join(profile, "preferences.json"),
+  JSON.stringify({
+    storage: {
+      projectDirectory: path.join(root, "TronCut", "Projects"),
+      backupDirectory: path.join(root, "backups"),
+    },
+  }),
+);
 const env = {
   ...process.env,
   FRAMECRAFT_SMOKE: "1",
-  FRAMECRAFT_USER_DATA: path.join(root, `profile-${Date.now()}`),
+  FRAMECRAFT_USER_DATA: profile,
 };
 delete env.ELECTRON_RUN_AS_NODE;
 const packaged = process.env.FRAMECRAFT_PACKAGED_SMOKE === "1";
