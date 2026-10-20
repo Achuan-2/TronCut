@@ -46,7 +46,8 @@ try {
   await page
     .getByLabel("文本内容", { exact: true })
     .fill("这是可以照读的旁白文稿。");
-  await expect(page.locator(".workspace-status")).toContainText("媒体引擎就绪");
+  await expect(page.locator(".workspace-status")).toHaveCount(0);
+  expect((await page.evaluate(() => window.framecraft.capabilities())).ffmpeg).toBe(true);
   const rail = page.locator(".tool-rail");
   await expect(
     rail.getByRole("button", { name: "音频", exact: true }),

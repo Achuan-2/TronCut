@@ -520,9 +520,6 @@ fieldset:disabled {
   margin-right: 7px;
   border-radius: 50%;
 }
-.workspace-status i.pending {
-  background: #d0a55c;
-}
 .window-controls {
   display: flex;
   align-self: stretch;
@@ -4729,7 +4726,7 @@ fieldset:disabled {
   .app-header {
     gap: 8px;
   }
-  .workspace-status .engine-label {
+  .workspace-status .import-label {
     display: none;
   }
   .workspace-status i {

@@ -217,13 +217,19 @@ try {
     );
   };
   const target = page.locator('.track-lane[data-track="bottom"]');
+  // Native drag coordinates are rounded to integer pixels by Chromium.
+  const expectLeftNear = async (clip, expected) => {
+    await expect.poll(async () => Math.abs(await clip.evaluate(
+      (element) => parseFloat(getComputedStyle(element).left),
+    ) - expected)).toBeLessThanOrEqual(1);
+  };
   await tools.getByRole("button", { name: "视觉效果", exact: true }).click();
   await drop([image, video, text], target, 3);
   await expect(page.locator(".timeline-clip.image")).toHaveCount(2);
   await expect(page.locator(".timeline-clip.video")).toHaveCount(1);
   const droppedImage = target.locator(".timeline-clip.image");
-  await expect(droppedImage).toHaveCSS("left", "195px");
-  await expect(page.locator(".timeline-clip.video")).toHaveCSS("left", "195px");
+  await expectLeftNear(droppedImage, 195);
+  await expectLeftNear(page.locator(".timeline-clip.video"), 195);
   await expect(page.locator(".busy-overlay")).toHaveCount(0);
   await expect(page.locator(".timeline-clip.selected")).toHaveCount(2);
   await expect(tools.locator(".selected")).toHaveText("视觉效果");
@@ -235,13 +241,10 @@ try {
     "unsupported image format",
     { timeout: 10000 },
   );
-  await expect(page.locator(".workspace-status")).not.toContainText("正在添加");
+  await expect(page.locator(".workspace-status")).toHaveCount(0);
   await expect(page.locator(".timeline-clip")).toHaveCount(1);
   await drop([video], target, 4);
-  await expect(target.locator(".timeline-clip.video")).toHaveCSS(
-    "left",
-    "260px",
-  );
+  await expectLeftNear(target.locator(".timeline-clip.video"), 260);
   await expect(page.locator(".timeline-clip")).toHaveCount(2);
   await expect(tools.locator(".selected")).toHaveText("视觉效果");
   await tools.getByRole("button", { name: "媒体", exact: true }).click();

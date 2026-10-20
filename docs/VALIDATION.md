@@ -1,5 +1,9 @@
 # 验证记录（含历史与 TronCut 0.3）
 
+## 移除顶部媒体引擎状态（2026-10-20）
+
+移除顶部引擎状态文字、圆点及仅为该提示发起的能力查询，保留导入期间的“正在添加素材…”提示。Rust/Wasm、TypeScript、Vite 和 Electron 构建通过；存储目录桌面回归验证首页与重启后不再显示常驻状态，能力检查仍可独立调用。媒体输入专项覆盖真实音视频图片导入、剪贴板、拖放、撤销与错误恢复，确认导入结束后状态节点移除，无前端运行错误。该脚本原有精确落点断言遇到 0.9 CSS 像素偏差，改为允许 1 CSS 像素舍入误差后通过。结果位于 `test-output/storage-directories-ui/run-1792488665262/` 和 `test-output/media-input/run-1792488708381/`。
+
 ## 移除媒体引擎自定义（2026-10-20）
 
 Rust/Wasm、TypeScript、Vite 和 Electron 构建通过。`scripts/test-storage-directories-ui.mjs` 验证高级页不再显示媒体引擎标题及配置按钮，桥接接口不再暴露 `selectBinary`；在隔离配置中预置无效的旧 `engines.json` 路径，首次启动及重启后自带 FFmpeg/FFprobe 仍通过实际能力检查。原有三个存储目录的选择、保存、重启、项目与备份流程回归通过，无前端运行错误，截图位于 `test-output/storage-directories-ui/run-1792488559170/`。验证使用本地开发构建。

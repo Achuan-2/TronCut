@@ -54,10 +54,8 @@ try {
   await expect(
     page.getByRole("toolbar", { name: "画布工具", exact: true }),
   ).toBeVisible();
-  await expect(page.locator(".workspace-status")).toContainText(
-    "媒体引擎就绪",
-    { timeout: 20000 },
-  );
+  await expect(page.locator(".workspace-status")).toHaveCount(0);
+  expect((await page.evaluate(() => window.framecraft.capabilities())).ffmpeg).toBe(true);
   await page.screenshot({ path: path.join(root, "editor.png") });
   await page.getByRole("button", { name: "字幕", exact: true }).click();
   await expect(

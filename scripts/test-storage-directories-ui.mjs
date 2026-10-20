@@ -42,7 +42,8 @@ async function launch() {
   await expect(
     page.getByRole("button", { name: "编辑", exact: true }),
   ).toBeVisible();
-  await expect(page.locator(".workspace-status")).toContainText("媒体引擎就绪");
+  await expect(page.locator(".workspace-status")).toHaveCount(0);
+  expect((await page.evaluate(() => window.framecraft.capabilities())).ffmpeg).toBe(true);
   expect(await page.evaluate(() => "selectBinary" in window.framecraft)).toBe(
     false,
   );

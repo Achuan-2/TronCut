@@ -16,7 +16,7 @@ import {
   Home as HomeIcon,
 } from "lucide-react";
 import { createProject, projectDuration, type Clip, type Asset, uid } from "../shared/model";
-import type { Capabilities, WindowState } from "../shared/bridge";
+import type { WindowState } from "../shared/bridge";
 import {
   deleteClips,
   splitSelection,
@@ -113,7 +113,6 @@ export default function App() {
     [tab, setTab] = useState<Tab>("media"),
     [recording, setRecording] = useState(false),
     [recordingActive, setRecordingActive] = useState(false),
-    [caps, setCaps] = useState<Capabilities>(),
     [toastMessage, setToast] = useState(""),
     [busy, setBusy] = useState(false),
     [mediaImporting, setMediaImporting] = useState(false),
@@ -341,16 +340,7 @@ export default function App() {
       ?.showWindowMenu(name, bounds.left, bounds.bottom)
       .catch((error) => toast(String(error)));
   };
-  const refreshCapabilities = useCallback(() => {
-    window.framecraft
-      ?.capabilities()
-      .then(setCaps)
-      .catch((e) => toast(String(e)));
-  }, [toast]);
-  useEffect(() => {
-    refreshCapabilities();
-    return window.framecraft?.onProgress(setProgress);
-  }, [refreshCapabilities]);
+  useEffect(() => window.framecraft?.onProgress(setProgress), []);
   useEffect(() => {
     void window.framecraft?.markDirty(editor.dirty);
   }, [editor.dirty]);
@@ -1146,33 +1136,12 @@ export default function App() {
             </>
           )}
         </div>
-        <span
-          className="workspace-status"
-          title={
-            mediaImporting
-              ? "正在添加素材…"
-              : caps?.ffmpeg
-                ? "媒体引擎就绪"
-                : window.framecraft
-                  ? "媒体引擎不可用"
-                  : "浏览器预览 · 文件与录屏请用桌面版"
-          }
-        >
-          <i
-            className={
-              mediaImporting ? "importing" : caps?.ffmpeg ? "ready" : "pending"
-            }
-          />
-          <span className="engine-label">
-            {mediaImporting
-              ? "正在添加素材…"
-              : caps?.ffmpeg
-                ? "媒体引擎就绪"
-                : window.framecraft
-                  ? "媒体引擎不可用"
-                  : "浏览器预览"}
+        {mediaImporting && (
+          <span className="workspace-status" title="正在添加素材…">
+            <i className="importing" />
+            <span className="import-label">正在添加素材…</span>
           </span>
-        </span>
+        )}
         <div className="header-actions" hidden={screen === "home"}>
           <button
             className="record-button"
@@ -1317,7 +1286,6 @@ export default function App() {
           initialTab={preferencesTab}
           onSaved={(value) => {
             setEditorPreferences(value);
-            refreshCapabilities();
           }}
           onClose={() => setPreferencesOpen(false)}
           toast={toast}
