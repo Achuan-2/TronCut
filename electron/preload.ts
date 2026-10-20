@@ -68,6 +68,8 @@ const bridge: FrameCraftBridge = {
   updateMedia: (id, duration) => ipcRenderer.invoke("media:update", id, duration),
   mediaThumbnail: (id, waveform) =>
     ipcRenderer.invoke("media:thumbnail", id, waveform),
+  mediaTimelineThumbnail: (id, time) =>
+    ipcRenderer.invoke("media:timeline-thumbnail", id, time),
   mediaWaveform: (id) => ipcRenderer.invoke("media:waveform", id),
   mediaUrl: (id) => ipcRenderer.invoke("media:url", id),
   previewProxyAvailable: (id) =>

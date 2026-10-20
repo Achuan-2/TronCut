@@ -12,6 +12,45 @@ vi.mock("../electron/process", () => ({
 }));
 afterEach(() => vi.restoreAllMocks());
 
+it("时间线缩略图按源时间独立缓存，帧定格重复请求只解码一次，片尾定位不越界", async () => {
+  const root = await fs.mkdtemp(
+    path.resolve("test-output/timeline-thumbnails-"),
+  );
+  const source = path.join(root, "source.mp4");
+  await fs.writeFile(source, "video");
+  const asset: Asset = {
+    id: "filmstrip",
+    path: source,
+    name: "视频",
+    kind: "video",
+    duration: 3,
+    width: 160,
+    height: 90,
+    hasAudio: true,
+  };
+  const decode = vi
+    .mocked(runProcess)
+    .mockImplementation(async (_binary, args) => {
+      await fs.writeFile(args.at(-1)!, "png");
+      return "";
+    });
+  decode.mockClear();
+  await Promise.all(
+    Array.from({ length: 8 }, () =>
+      mediaThumbnail(asset, false, root, undefined, 1),
+    ),
+  );
+  expect(decode).toHaveBeenCalledTimes(1);
+  await mediaThumbnail(asset, false, root, undefined, 2);
+  expect(decode).toHaveBeenCalledTimes(2);
+  expect(decode.mock.calls[1][1]).toContain("2");
+  await mediaThumbnail(asset, false, root, undefined, 9);
+  expect(decode.mock.calls[2][1]).toContain("2.999");
+  await expect(
+    mediaThumbnail(asset, false, root, undefined, NaN),
+  ).rejects.toThrow("源时间无效");
+});
+
 it("缩略图预算和条目上限按 LRU 淘汰，超大结果不挤掉已有缓存", () => {
   const cache = new ThumbnailMemoryCache(16, 2);
   cache.set("a", "aaa");

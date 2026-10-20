@@ -126,6 +126,7 @@ export interface FrameCraftBridge {
   relinkMedia(assetId: string, requiredDuration: number): Promise<Asset | null>;
   updateMedia(assetId: string, requiredDuration: number): Promise<Asset | null>;
   mediaThumbnail(assetId: string, waveform: boolean): Promise<string | null>;
+  mediaTimelineThumbnail(assetId: string, sourceTime: number): Promise<string | null>;
   mediaWaveform(assetId: string): Promise<AudioWaveform | null>;
   mediaUrl(assetId: string): Promise<string>;
   previewProxyAvailable(assetId: string): Promise<boolean>;

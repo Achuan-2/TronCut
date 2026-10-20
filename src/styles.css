@@ -3986,6 +3986,47 @@ fieldset:disabled {
   height: 48px;
   overflow: hidden;
 }
+.timeline-filmstrip {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  background: #132b2d;
+}
+.timeline-thumbnail {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  overflow: hidden;
+  background: #254447;
+  border-right: 1px solid #142c2f;
+}
+.timeline-thumbnail img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.has-filmstrip .clip-label {
+  position: relative;
+  z-index: 1;
+  height: 17px;
+  padding: 0 6px;
+  background: #073c41d9;
+  color: #e1f1f0;
+}
+.has-filmstrip .clip-label > span:not(.clip-media-icon):not(.clip-duration) {
+  flex: 0 1 auto;
+}
+.has-filmstrip .clip-label .clip-duration {
+  flex: 0 0 auto;
+  font-variant-numeric: tabular-nums;
+  font-size: 9px;
+  color: #c0dbdd;
+}
+.has-filmstrip .clip-detail { display: none; }
+.has-filmstrip .clip-waveform { background: #0a3e42; opacity: 0.85; }
+.compact-track .has-filmstrip .clip-label { height: 15px; display: flex; }
 .clip-effects-tray {
   display: flex;
   flex-direction: column;

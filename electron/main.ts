@@ -861,6 +861,15 @@ function installHandlers() {
       process.resourcesPath,
     ),
   );
+  handle("media:timeline-thumbnail", (id: unknown, time: unknown) =>
+    mediaThumbnail(
+      assetById(id),
+      false,
+      path.join(app.getPath("userData"), "thumbnails"),
+      process.resourcesPath,
+      z.number().finite().nonnegative().parse(time),
+    ),
+  );
   const chooseReplacementMedia = async (
     id: unknown,
     requiredDuration: unknown,

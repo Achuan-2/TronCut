@@ -143,6 +143,7 @@ export async function mediaThumbnail(
   waveform: boolean,
   cacheDir: string,
   resourcesPath?: string,
+  sourceTime?: number,
 ): Promise<string | null> {
   if (
     asset.missing ||
@@ -150,10 +151,18 @@ export async function mediaThumbnail(
     (!waveform && asset.kind === "audio")
   )
     return null;
+  const timeline = sourceTime !== undefined;
+  if (timeline && (!Number.isFinite(sourceTime) || sourceTime < 0))
+    throw new Error("缩略图源时间无效");
+  const time = asset.kind === "video"
+    ? timeline
+      ? Math.min(sourceTime, Math.max(0, asset.duration - 0.001))
+      : Math.min(1, asset.duration / 3)
+    : 0;
   const stat = await fs.stat(asset.path);
   const key = createHash("sha256")
     .update(
-      `${asset.path}|${stat.size}|${stat.mtimeMs}|${waveform}|${asset.kind}|${waveform ? 0 : Math.min(1, asset.duration / 3)}`,
+      `${asset.path}|${stat.size}|${stat.mtimeMs}|${waveform}|${asset.kind}|${waveform ? 0 : time}|${timeline ? "timeline-v1" : "library"}`,
     )
     .digest("hex");
   const cached = memory.get(key);
@@ -178,8 +187,9 @@ export async function mediaThumbnail(
         const temp = path.join(cacheDir, `${key}.partial.png`);
         try {
           const args = ["-y", "-hide_banner"];
+          if (timeline) args.push("-threads", "1");
           if (!waveform && asset.kind === "video")
-            args.push("-ss", String(Math.min(1, asset.duration / 3)));
+            args.push("-ss", String(time));
           args.push("-i", asset.path);
           if (waveform)
             args.push(
@@ -190,7 +200,9 @@ export async function mediaThumbnail(
           else
             args.push(
               "-vf",
-              "scale=320:180:force_original_aspect_ratio=decrease,pad=320:180:(ow-iw)/2:(oh-ih)/2:color=0x142821",
+              timeline
+                ? "scale=160:90:force_original_aspect_ratio=decrease"
+                : "scale=320:180:force_original_aspect_ratio=decrease,pad=320:180:(ow-iw)/2:(oh-ih)/2:color=0x142821",
               "-an",
             );
           args.push("-frames:v", "1", temp);

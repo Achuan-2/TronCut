@@ -70,6 +70,7 @@ import {
   editableIds,
 } from "../shared/timeline";
 import TimelineWaveform from "./TimelineWaveform";
+import TimelineFilmstrip from "./TimelineFilmstrip";
 import { TimelineAnimations } from "./TimelineAnimations";
 import {
   animationRanges,
@@ -485,8 +486,11 @@ export default function Timeline({
   } | null>(null);
   const trackLayouts = useMemo(() => {
     const rows = new Map<string, number>();
+    const previewTracks = new Set<string>();
     for (const clip of timeline.clips) {
       if (timeline.groups.has(clip.id)) continue;
+      if (clip.kind === "video" || clip.kind === "image")
+        previewTracks.add(clip.trackId);
       if (expandedEffects[clip.id]) {
         const count =
           Number(hasClipSpeed(clip)) +
@@ -501,7 +505,8 @@ export default function Timeline({
         trackHeightDraft?.projectId === project.id &&
           trackHeightDraft.trackId === track.id
           ? trackHeightDraft.height
-          : (track.height ?? defaultTrackHeight),
+          : (track.height ??
+            (previewTracks.has(track.id) ? 100 : defaultTrackHeight)),
       );
       const compact = baseHeight < 56;
       const clipInset = compact ? 4 : 9;
@@ -1558,11 +1563,20 @@ export default function Timeline({
                     const hasTransformAnimation = animationRanges(c).length > 0;
                     const hasDrawingAnimation =
                       drawingAnimationRanges(c).length > 0;
+                    const mediaAsset = c.assetId
+                      ? assetsById.get(c.assetId)
+                      : undefined;
+                    const hasFilmstrip =
+                      !!mediaAsset && !mediaAsset.missing &&
+                      (c.kind === "video" || c.kind === "image");
+                    const hasWaveform =
+                      editor.preferences.program.waveforms &&
+                      !c.audioDetached && !!mediaAsset?.hasAudio;
                     return (
                       <Fragment key={c.id}>
                         <div
                           data-clip-id={c.id}
-                          className={`timeline-clip ${c.kind} ${isRecording ? "recording-object" : ""} ${c.caption ? "caption" : ""} ${hasTransformAnimation || hasDrawingAnimation ? "has-animation" : ""} ${hasTransformAnimation && hasDrawingAnimation ? "has-drawing-and-transform" : ""} ${selectedIdSet.has(c.id) ? "selected" : ""} ${track.locked ? "locked" : ""} ${effectDrop === c.id ? "effect-drop-target" : ""} ${transitionHighlights.some((item) => item.clipId === c.id) ? "transition-drop-target" : ""}`}
+                          className={`timeline-clip ${c.kind} ${hasFilmstrip ? "has-filmstrip" : ""} ${isRecording ? "recording-object" : ""} ${c.caption ? "caption" : ""} ${hasTransformAnimation || hasDrawingAnimation ? "has-animation" : ""} ${hasTransformAnimation && hasDrawingAnimation ? "has-drawing-and-transform" : ""} ${selectedIdSet.has(c.id) ? "selected" : ""} ${track.locked ? "locked" : ""} ${effectDrop === c.id ? "effect-drop-target" : ""} ${transitionHighlights.some((item) => item.clipId === c.id) ? "transition-drop-target" : ""}`}
                           style={{
                             left: c.start * zoom,
                             width: Math.max(4, c.duration * zoom),
@@ -1921,6 +1935,17 @@ export default function Timeline({
                               height: trackLayouts[trackIndex].contentHeight,
                             }}
                           >
+                            {hasFilmstrip && mediaAsset && (
+                              <TimelineFilmstrip
+                                asset={mediaAsset}
+                                clip={c}
+                                zoom={zoom}
+                                height={trackLayouts[trackIndex].contentHeight}
+                                viewportLeft={viewport.left}
+                                viewportWidth={viewport.width}
+                                waveform={hasWaveform}
+                              />
+                            )}
                             <span
                               className="trim-handle left"
                               data-trim="left"
@@ -1960,6 +1985,11 @@ export default function Timeline({
                               </span>
                               {c.speed !== 1 && (
                                 <b>{Number(c.speed.toFixed(2))}×</b>
+                              )}
+                              {hasFilmstrip && (
+                                <span className="clip-duration">
+                                  {timeLabel(c.duration)}
+                                </span>
                               )}
                             </div>
                             {c.kind !== "text" && (
