@@ -182,6 +182,7 @@ export interface FrameCraftBridge {
   ): () => void;
   onShortcut(callback: (command: string) => void): () => void;
   capabilities(): Promise<Capabilities>;
+  showAbout(): Promise<void>;
   transcribe(
     project: Project,
     engine: SpeechEngine,

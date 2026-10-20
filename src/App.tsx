@@ -1091,6 +1091,16 @@ export default function App() {
               编辑
             </button>
           )}
+          {window.framecraft && (
+            <button
+              disabled={actionsBlocked}
+              onClick={() =>
+                void bridge().showAbout().catch((error) => toast(String(error)))
+              }
+            >
+              关于
+            </button>
+          )}
           {menu && !actionsBlocked && (
             <div className="project-menu" onClick={() => setMenu(false)}>
               <button onClick={() => newProject()}>

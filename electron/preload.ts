@@ -137,6 +137,7 @@ const bridge: FrameCraftBridge = {
     return () => ipcRenderer.removeListener("shortcut", fn);
   },
   capabilities: () => ipcRenderer.invoke("app:capabilities"),
+  showAbout: () => ipcRenderer.invoke("app:about"),
   transcribe: (project, engine, language, options) =>
     ipcRenderer.invoke(
       "subtitles:transcribe",

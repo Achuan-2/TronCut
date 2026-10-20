@@ -17,6 +17,7 @@ import fs from "node:fs/promises";
 import type { FileHandle } from "node:fs/promises";
 import path from "node:path";
 import { z } from "zod";
+import packageInfo from "../package.json";
 import {
   type Asset,
   type Project,
@@ -289,6 +290,19 @@ async function chooseFile(
   return result.canceled ? null : result.filePaths[0];
 }
 function installHandlers() {
+  handle("app:about", async () => {
+    const result = await dialog.showMessageBox(window, {
+      type: "info",
+      title: `关于 ${packageInfo.productName}`,
+      message: `${packageInfo.productName} v${app.getVersion()}`,
+      detail: `开发作者：Achuan-2\n项目 GitHub：${packageInfo.homepage}`,
+      buttons: ["关闭", "打开项目 GitHub"],
+      defaultId: 0,
+      cancelId: 0,
+      noLink: true,
+    });
+    if (result.response === 1) await shell.openExternal(packageInfo.homepage);
+  });
   handle("preferences:get", () => preferences.get());
   handle("preferences:save", async (input: unknown) => {
     const update = preferencesUpdateSchema.parse(input);

@@ -102,6 +102,35 @@ try {
   });
   expect(Math.abs(layout.pageWidth - layout.contentWidth)).toBeLessThan(1);
   expect(Math.abs(layout.leftGap)).toBeLessThan(1);
+  await expect(page.getByRole("button", { name: "关于", exact: true })).toBeVisible();
+  const version = await app.evaluate(({ app }) => app.getVersion());
+  await app.evaluate(({ dialog, shell }) => {
+    globalThis.aboutOriginalDialog = dialog.showMessageBox;
+    globalThis.aboutOriginalExternal = shell.openExternal;
+    globalThis.aboutResponse = 0;
+    globalThis.aboutOpened = [];
+    dialog.showMessageBox = async (_parent, options) => {
+      globalThis.aboutOptions = options;
+      return { response: globalThis.aboutResponse, checkboxChecked: false };
+    };
+    shell.openExternal = async (url) => { globalThis.aboutOpened.push(url); };
+  });
+  await page.getByRole("button", { name: "关于", exact: true }).click();
+  await expect.poll(() => app.evaluate(() => globalThis.aboutOptions?.message)).toBe(`TronCut v${version}`);
+  expect(await app.evaluate(() => globalThis.aboutOptions)).toMatchObject({
+    title: "关于 TronCut",
+    detail: "开发作者：Achuan-2\n项目 GitHub：https://github.com/Achuan-2/TronCut",
+    buttons: ["关闭", "打开项目 GitHub"],
+    cancelId: 0,
+  });
+  expect(await app.evaluate(() => globalThis.aboutOpened)).toEqual([]);
+  await app.evaluate(() => { globalThis.aboutResponse = 1; });
+  await page.getByRole("button", { name: "关于", exact: true }).click();
+  await expect.poll(() => app.evaluate(() => globalThis.aboutOpened)).toEqual(["https://github.com/Achuan-2/TronCut"]);
+  await app.evaluate(({ dialog, shell }) => {
+    dialog.showMessageBox = globalThis.aboutOriginalDialog;
+    shell.openExternal = globalThis.aboutOriginalExternal;
+  });
   await expect(page.locator(".timeline")).toHaveCount(0);
   await expect(page.locator(".home-recovery")).toContainText("未保存草稿");
   await expect(page.locator(".recent-project")).toHaveCount(1); // old-version history migration
@@ -114,6 +143,7 @@ try {
   await page.screenshot({ path: path.join(root, "home-recent-projects.png") });
   await page.getByRole("button", { name: "恢复编辑", exact: true }).click();
   await expect(page.getByLabel("工程名称")).toHaveValue("未保存草稿");
+  await expect(page.getByRole("button", { name: "关于", exact: true })).toBeVisible();
   await expect(page.locator(".timeline-clip.image")).toHaveCount(1);
   await page.getByRole("button", { name: "返回首页", exact: true }).click();
   await expect(page.locator(".home-page")).toBeVisible();
