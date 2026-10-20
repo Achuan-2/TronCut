@@ -221,8 +221,8 @@ try {
       filePaths: [file],
     });
   }, file);
-  await page.getByRole("button", { name: "工程", exact: true }).click();
-  await page.getByRole("button", { name: "打开工程", exact: true }).click();
+  await page.getByRole("button", { name: "项目", exact: true }).click();
+  await page.getByRole("button", { name: "导入项目", exact: true }).click();
   await expect(arrowLayer.locator(".preview-line-art")).toHaveJSProperty(
     "innerHTML",
     bentSvg,

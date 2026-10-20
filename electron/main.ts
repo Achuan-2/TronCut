@@ -891,7 +891,7 @@ function installHandlers() {
     chooseReplacementMedia(id, duration, false),
   );
   handle("project:open", async () => {
-    const file = await chooseFile("打开 TronCut 工程", [
+    const file = await chooseFile("导入 TronCut 项目", [
       "troncut",
       "framecraft",
       "json",
@@ -945,7 +945,7 @@ function installHandlers() {
   });
   handle("project:camtasia", async () => {
     const file = await chooseFile(
-      "导入 Camtasia 工程（Mac 请选 cmproj 内的 project.tscproj）",
+      "导入 Camtasia 项目（Mac 请选 cmproj 内的 project.tscproj）",
       ["tscproj"],
     );
     if (!file) return null;
@@ -1484,20 +1484,20 @@ async function createWindow() {
           ]
         : []),
       {
-        label: "文件",
+        label: "项目",
         submenu: [
           {
-            label: "新建工程",
+            label: "新建项目",
             accelerator: "CmdOrCtrl+N",
             click: () => shortcut("new"),
           },
           {
-            label: "打开工程",
+            label: "导入项目",
             accelerator: "CmdOrCtrl+O",
             click: () => shortcut("open"),
           },
           {
-            label: "保存工程",
+            label: "保存项目",
             accelerator: "CmdOrCtrl+S",
             click: () => shortcut("save"),
           },
@@ -1512,7 +1512,7 @@ async function createWindow() {
             accelerator: "CmdOrCtrl+I",
             click: () => shortcut("import"),
           },
-          { label: "导入 Camtasia 工程", click: () => shortcut("camtasia") },
+          { label: "导入 Camtasia 项目", click: () => shortcut("camtasia") },
           {
             label: "导出视频",
             accelerator: "CmdOrCtrl+E",

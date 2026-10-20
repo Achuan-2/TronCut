@@ -240,8 +240,8 @@ try {
   await expect(arrows).toHaveCount(3);
   // Saved animations survive reopening the project.
   await save();
-  await page.getByRole("button", { name: "工程", exact: true }).click();
-  await page.getByRole("button", { name: "打开工程", exact: true }).click();
+  await page.getByRole("button", { name: "项目", exact: true }).click();
+  await page.getByRole("button", { name: "导入项目", exact: true }).click();
   await expect(page.getByLabel("播放进度", { exact: true })).toHaveValue("0");
   await expect(arrows).toHaveCount(3);
   assert.deepEqual(errors, []);

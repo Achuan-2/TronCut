@@ -154,7 +154,12 @@ try {
   await page.locator(".recent-project").click();
   await expect(page.getByLabel("工程名称")).toHaveValue("中文测试项目");
   await page.getByRole("button", { name: "返回首页", exact: true }).click();
-  await page.getByRole("button", { name: "新建项目", exact: true }).click();
+  await page.getByRole("button", { name: "项目", exact: true }).click();
+  await expect(page.locator(".project-menu button")).toHaveText([
+    "新建项目", "导入项目", "另存为", "导入 Camtasia 项目",
+  ]);
+  await page.screenshot({ path: path.join(root, "project-menu.png") });
+  await page.locator(".project-menu").getByRole("button", { name: "新建项目", exact: true }).click();
   await expect(page.locator(".timeline-clip")).toHaveCount(0);
   await page.getByLabel("工程名称").fill("从首页新建");
   await page.getByLabel("工程名称").press("Enter");
@@ -173,7 +178,8 @@ try {
   await page.getByRole("button", { name: "返回首页", exact: true }).click();
   await expect(page.locator(".recent-project")).toHaveCount(2);
   await app.evaluate(({ dialog }, file) => { dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [file] }); }, savedFile);
-  await page.getByRole("button", { name: "打开项目", exact: true }).click();
+  await page.getByRole("button", { name: "项目", exact: true }).click();
+  await page.getByRole("button", { name: "导入项目", exact: true }).click();
   await expect(page.getByLabel("工程名称")).toHaveValue("中文测试项目");
   await page.getByRole("button", { name: "返回首页", exact: true }).click();
   await expect(page.locator(".recent-project").first()).toContainText(

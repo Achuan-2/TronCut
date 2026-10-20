@@ -1079,7 +1079,7 @@ export default function App() {
               setMenu(!menu);
             }}
           >
-            工程
+            项目
             <ChevronDown size={11} />
           </button>
           {window.framecraft && (
@@ -1105,11 +1105,11 @@ export default function App() {
             <div className="project-menu" onClick={() => setMenu(false)}>
               <button onClick={() => newProject()}>
                 <Plus size={15} />
-                新建工程
+                新建项目
               </button>
               <button onClick={() => void open()}>
                 <FolderOpen size={15} />
-                打开工程
+                导入项目
               </button>
               <button onClick={() => void save(true)}>
                 <Save size={15} />
@@ -1117,7 +1117,7 @@ export default function App() {
               </button>
               <button onClick={() => void importCamtasia()}>
                 <FileJson size={15} />
-                导入 Camtasia 工程
+                导入 Camtasia 项目
               </button>
             </div>
           )}

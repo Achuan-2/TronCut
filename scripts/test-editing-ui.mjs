@@ -210,9 +210,9 @@ try {
     window.restore();
     window.focus();
   });
-  await page.getByRole("button", { name: "工程", exact: true }).click();
+  await page.getByRole("button", { name: "项目", exact: true }).click();
   await expect(page.locator(".project-menu")).toBeVisible();
-  await page.getByRole("button", { name: "工程", exact: true }).click();
+  await page.getByRole("button", { name: "项目", exact: true }).click();
   await app.evaluate(({ Menu }) => {
     globalThis.windowMenuRequests = [];
     Menu.getApplicationMenu().items.find(

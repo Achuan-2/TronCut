@@ -1,5 +1,9 @@
 # 验证记录（含历史与 TronCut 0.3）
 
+## 顶部项目菜单命名（2026-10-20）
+
+顶部菜单和系统菜单统一使用“项目”“新建项目”“导入项目”“导入 Camtasia 项目”，对应文件选择窗口同步使用“项目”。Rust/Wasm、TypeScript、Vite 和 Electron 构建通过；`scripts/test-home-ui.mjs` 验证下拉菜单文案及通过菜单新建、导入实际项目，并通过首页与重启回归，无前端运行错误。菜单截图位于 `test-output/home/run-1792489152519/project-menu.png`。
+
 ## 顶部关于按钮（2026-10-20）
 
 首页和编辑器顶部新增“关于”按钮，通过原生信息弹窗显示开发作者、项目 GitHub 和 `app.getVersion()` 返回的运行版本，可通过系统浏览器打开项目仓库。Rust/Wasm、TypeScript、Vite 和 Electron 构建通过；`scripts/test-home-ui.mjs` 验证两个页面的按钮可见、点击后的弹窗内容与当前版本一致、关闭不访问外部链接、GitHub 操作传递正确仓库地址，并通过原有首页与工程流程回归，无前端运行错误。原生弹窗及浏览器打开操作由脚本拦截校验，未进行原生窗口视觉验收；结果位于 `test-output/home/run-1792489029801/`。

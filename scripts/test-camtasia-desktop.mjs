@@ -38,10 +38,10 @@ try {
       filePaths: [file],
     });
   }, file);
-  await page.getByRole("button", { name: "工程", exact: true }).click();
+  await page.getByRole("button", { name: "项目", exact: true }).click();
   await page
     .locator(".project-menu")
-    .getByRole("button", { name: "导入 Camtasia 工程", exact: true })
+    .getByRole("button", { name: "导入 Camtasia 项目", exact: true })
     .click();
   await expect(page.locator(".report-modal")).toBeVisible({ timeout: 30000 });
   const report = await page.locator(".report-lines p").allTextContents();
