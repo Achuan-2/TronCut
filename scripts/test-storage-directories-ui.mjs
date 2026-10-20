@@ -82,6 +82,15 @@ async function save(page) {
 try {
   let page = await launch();
   await preferences(page);
+  await expect(
+    page.getByRole("tab", { name: "高级", exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("heading", { name: "存储", exact: true }),
+  ).toBeVisible();
+  await expect(page.getByLabel("ONNX 模型文件夹", { exact: true })).toHaveValue(
+    path.join(profile, "models/onnx"),
+  );
   await expect(page.getByLabel("备份文件夹", { exact: true })).toHaveValue(
     profile,
   );
@@ -90,7 +99,6 @@ try {
     profile,
   );
   await choose(page, "备份文件夹", directories.backupDirectory);
-  await page.getByRole("tab", { name: "高级", exact: true }).click();
   await expect(
     page.getByRole("heading", { name: "媒体引擎", exact: true }),
   ).toHaveCount(0);
@@ -98,6 +106,10 @@ try {
     page.getByRole("button", { name: /配置 FFmpeg|配置 FFprobe/ }),
   ).toHaveCount(0);
   await choose(page, "ONNX 模型文件夹", directories.onnxModelsDirectory);
+  await page
+    .getByRole("heading", { name: "存储", exact: true })
+    .scrollIntoViewIfNeeded();
+  await page.screenshot({ path: path.join(root, "program-storage.png") });
   await page.getByRole("tab", { name: "项目", exact: true }).click();
   await choose(page, "默认项目创建位置", directories.projectDirectory);
   await page.screenshot({ path: path.join(root, "project.png") });
@@ -152,7 +164,7 @@ try {
     ).isFile(),
   ).toBe(true);
 
-  await preferences(page, "高级");
+  await preferences(page);
   let opened;
   await app.evaluate(({ shell }) => {
     globalThis.storageOpened = "";
@@ -169,6 +181,10 @@ try {
     .click();
   opened = await app.evaluate(() => globalThis.storageOpened);
   expect(opened).toBe(directories.onnxModelsDirectory);
+  await page
+    .getByRole("button", { name: "打开配置文件夹", exact: true })
+    .click();
+  expect(await app.evaluate(() => globalThis.storageOpened)).toBe(profile);
   await page.screenshot({ path: path.join(root, "models.png") });
   await page
     .getByRole("button", { name: "ONNX 模型文件夹：恢复默认", exact: true })

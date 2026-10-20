@@ -10,6 +10,10 @@ const root = path.resolve(
 );
 const profile = path.join(root, "profile");
 await fs.mkdir(profile, { recursive: true });
+await fs.writeFile(
+  path.join(profile, "preferences.json"),
+  JSON.stringify({ storage: { projectDirectory: path.join(root, "projects") } }),
+);
 const image = path.join(root, "default-image.png");
 await sharp({
   create: { width: 160, height: 90, channels: 3, background: "#76e5b5" },
@@ -53,7 +57,14 @@ try {
   await command("preferences");
   await expect(
     page.getByRole("tablist", { name: "首选项分组" }).getByRole("tab"),
-  ).toHaveCount(6);
+  ).toHaveText(["程序", "计时", "快捷键", "项目", "AI 模型"]);
+  await expect(
+    page.getByRole("heading", { name: "存储", exact: true }),
+  ).toBeVisible();
+  await expect(page.getByLabel("备份文件夹", { exact: true })).toHaveCount(1);
+  await expect(
+    page.getByLabel("ONNX 模型文件夹", { exact: true }),
+  ).toHaveCount(1);
   await page.getByLabel("默认启用时间线吸附", { exact: true }).uncheck();
   await page.getByLabel("显示时间线音频波形", { exact: true }).uncheck();
   await page.screenshot({ path: path.join(root, "program.png") });
@@ -134,11 +145,12 @@ try {
   ).toBe("CmdOrCtrl+K");
   await expect.poll(() => enabled("split")).toBe(true);
   await page.keyboard.press("Control+k");
-  await expect(page.locator(".timeline-clip.text")).toHaveCount(4);
+  // Duplicated/pasted clips occupy consecutive spans; this playhead crosses one.
+  await expect(page.locator(".timeline-clip.text")).toHaveCount(3);
   await command("undo");
   await expect(page.locator(".timeline-clip.text")).toHaveCount(2);
   await command("split");
-  await expect(page.locator(".timeline-clip.text")).toHaveCount(4);
+  await expect(page.locator(".timeline-clip.text")).toHaveCount(3);
   await command("undo");
   await expect(page.locator(".timeline-clip.text")).toHaveCount(2);
   const lock = page
@@ -167,6 +179,9 @@ try {
   await expect
     .poll(() => app.evaluate(({ clipboard }) => clipboard.readText()))
     .toBe("文本复制测试");
+  await title.press("Tab");
+  await expect(page.getByRole("status")).toContainText("工程及文件夹已重命名");
+  await expect(page.locator(".busy-overlay")).toHaveCount(0);
   await app.evaluate(({ dialog }, file) => {
     dialog.showOpenDialog = async () => ({
       canceled: false,

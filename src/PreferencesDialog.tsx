@@ -27,7 +27,6 @@ const tabs = [
   { id: "shortcuts", name: "快捷键" },
   { id: "project", name: "项目" },
   { id: "ai", name: "AI 模型" },
-  { id: "advanced", name: "高级" },
 ];
 export default function PreferencesDialog({
   onClose,
@@ -405,10 +404,25 @@ export default function PreferencesDialog({
                   <p className="field-help">
                     备份用于异常退出后的“恢复编辑”，不代替手动保存工程。
                   </p>
+                  <h3>存储</h3>
                   {storageField("backupDirectory", "备份文件夹")}
                   <p className="field-help">
                     保存时复制已有备份，保留源文件；目标文件夹中已有备份优先。
                   </p>
+                  {storageField("onnxModelsDirectory", "ONNX 模型文件夹")}
+                  <p className="field-help">
+                    保存时复制已有模型，保留源文件；目标文件夹中已有文件优先。模型较大时请等待复制完成。
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      void perform(() =>
+                        window.framecraft!.openPreferencesFolder(),
+                      )
+                    }
+                  >
+                    打开配置文件夹
+                  </button>
                 </>
               )}
               {tab === "timing" && (
@@ -729,25 +743,6 @@ export default function PreferencesDialog({
                   perform={perform}
                   toast={toast}
                 />
-              )}
-              {tab === "advanced" && (
-                <>
-                  <h3>本地数据</h3>
-                  {storageField("onnxModelsDirectory", "ONNX 模型文件夹")}
-                  <p className="field-help">
-                    保存时复制已有模型，保留源文件；目标文件夹中已有文件优先。模型较大时请等待复制完成。
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      void perform(() =>
-                        window.framecraft!.openPreferencesFolder(),
-                      )
-                    }
-                  >
-                    打开配置文件夹
-                  </button>
-                </>
               )}
             </section>
           </fieldset>
