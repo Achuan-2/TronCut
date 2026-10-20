@@ -55,7 +55,6 @@ export default function FrameTransformProperties({
     : [
         (value.x - 0.5) * canvas.width,
         (0.5 - value.y) * canvas.height,
-        value.z ?? 0,
       ];
   return (
     <div className="frame-transform-properties">
@@ -129,34 +128,27 @@ export default function FrameTransformProperties({
         </div>
         <div className="position-axes">
           {positions.map((position, index) => {
-            const axis = (["X", "Y", "Z"] as const)[index];
+            const axis = (["X", "Y"] as const)[index];
             const label = editingContent
               ? `内容位置 ${axis} (%)`
               : `位置 ${axis} (px)`;
-            const origin = editingContent ? 0 : index < 2 ? 0.5 : 0;
+            const origin = editingContent ? 0 : 0.5;
             return (
               <label className="position-axis" key={axis}>
                 <span>{axis}</span>
                 <NumberInput
                   aria-label={label}
                   step={0.1}
-                  min={index === 2 ? -10000 : undefined}
-                  max={index === 2 ? 1000 : undefined}
                   value={Number(position.toFixed(3))}
                   disabled={disabled}
                   onValueChange={(next) => {
-                    if (index === 2) {
-                      if (next >= -10000 && next <= 1000)
-                        onTransform("z", next);
-                    } else {
-                      const coordinate = editingContent
-                        ? next / 100
-                        : index === 0
-                          ? next / canvas.width + origin
-                          : origin - next / canvas.height;
-                      if (coordinate >= -4 && coordinate <= 4)
-                        onContentOrFrame(index === 0 ? "x" : "y", coordinate);
-                    }
+                    const coordinate = editingContent
+                      ? next / 100
+                      : index === 0
+                        ? next / canvas.width + origin
+                        : origin - next / canvas.height;
+                    if (coordinate >= -4 && coordinate <= 4)
+                      onContentOrFrame(index === 0 ? "x" : "y", coordinate);
                   }}
                 />
                 <PropertyResetButton
@@ -165,9 +157,7 @@ export default function FrameTransformProperties({
                   defaultValue={0}
                   disabled={disabled}
                   onReset={() =>
-                    index === 2
-                      ? onTransform("z", 0)
-                      : onContentOrFrame(index === 0 ? "x" : "y", origin)
+                    onContentOrFrame(index === 0 ? "x" : "y", origin)
                   }
                 />
               </label>
