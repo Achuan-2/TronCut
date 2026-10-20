@@ -405,6 +405,10 @@ export default function PreferencesDialog({
                     备份用于异常退出后的“恢复编辑”，不代替手动保存项目。
                   </p>
                   <h3>存储</h3>
+                  {storageField("projectDirectory", "默认项目创建位置")}
+                  <p className="field-help">
+                    用于新建项目，已有项目保留原位置。
+                  </p>
                   {storageField("backupDirectory", "备份文件夹")}
                   <p className="field-help">
                     保存时复制已有备份，保留源文件；目标文件夹中已有备份优先。
@@ -472,11 +476,6 @@ export default function PreferencesDialog({
               )}
               {tab === "project" && (
                 <>
-                  <h3>项目存储</h3>
-                  {storageField("projectDirectory", "默认项目创建位置")}
-                  <p className="field-help">
-                    用于新建项目，已有项目保留原位置。
-                  </p>
                   <h3>默认项目设置</h3>
                   <label className="field">
                     画布规格

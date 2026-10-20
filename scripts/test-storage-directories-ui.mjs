@@ -106,12 +106,15 @@ try {
     page.getByRole("button", { name: /配置 FFmpeg|配置 FFprobe/ }),
   ).toHaveCount(0);
   await choose(page, "ONNX 模型文件夹", directories.onnxModelsDirectory);
+  await choose(page, "默认项目创建位置", directories.projectDirectory);
   await page
     .getByRole("heading", { name: "存储", exact: true })
     .scrollIntoViewIfNeeded();
   await page.screenshot({ path: path.join(root, "program-storage.png") });
   await page.getByRole("tab", { name: "项目", exact: true }).click();
-  await choose(page, "默认项目创建位置", directories.projectDirectory);
+  await expect(
+    page.getByLabel("默认项目创建位置", { exact: true }),
+  ).toHaveCount(0);
   await page.screenshot({ path: path.join(root, "project.png") });
   await save(page);
   expect(
@@ -173,6 +176,13 @@ try {
       return "";
     };
   });
+  await page.getByRole("button", {
+    name: "默认项目创建位置：打开当前文件夹",
+    exact: true,
+  }).click();
+  expect(await app.evaluate(() => globalThis.storageOpened)).toBe(
+    directories.projectDirectory,
+  );
   await page
     .getByRole("button", {
       name: "ONNX 模型文件夹：打开当前文件夹",
@@ -192,6 +202,16 @@ try {
   await expect(page.getByLabel("ONNX 模型文件夹", { exact: true })).toHaveValue(
     path.join(profile, "models/onnx"),
   );
+  const defaultProjectDirectory = (
+    await page.evaluate(() => window.framecraft.preferences())
+  ).storageDefaults.projectDirectory;
+  await page.getByRole("button", {
+    name: "默认项目创建位置：恢复默认",
+    exact: true,
+  }).click();
+  await expect(
+    page.getByLabel("默认项目创建位置", { exact: true }),
+  ).toHaveValue(defaultProjectDirectory);
   await page.getByRole("button", { name: "取消", exact: true }).click();
   expect(
     (await page.evaluate(() => window.framecraft.preferences())).storage,
@@ -205,7 +225,7 @@ try {
   expect(
     (await page.evaluate(() => window.framecraft.recoveryInfo())).name,
   ).toBe(recovery.project.name);
-  await preferences(page, "项目");
+  await preferences(page);
   await expect(
     page.getByLabel("默认项目创建位置", { exact: true }),
   ).toHaveValue(directories.projectDirectory);
