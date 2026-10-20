@@ -59,17 +59,6 @@ export default function Home({
   }, [disabled, recent, menu]);
   return (
     <div className="home-page">
-      <aside className="home-sidebar">
-        <div className="home-nav-selected">
-          <FolderOpen size={21} />
-          首页
-        </div>
-        <p>录制 · 剪辑 · 表达</p>
-        <div className="home-sidebar-note">
-          <b>TronCut</b>
-          <span>把想法，变成作品。</span>
-        </div>
-      </aside>
       <div className="home-content">
         <div className="home-welcome">
           <div>

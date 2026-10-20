@@ -7,6 +7,9 @@ const root = path.resolve("test-output/home", `run-${Date.now()}`),
   profile = path.join(root, "profile"),
   savedFolder = path.join(root, "已保存项目");
 await fs.mkdir(profile, { recursive: true });
+await fs.writeFile(path.join(profile, "preferences.json"), JSON.stringify({
+  storage: { projectDirectory: path.join(root, "Projects") },
+}));
 await fs.mkdir(savedFolder, { recursive: true });
 await sharp({
   create: { width: 320, height: 180, channels: 3, background: "#4c87b3" },
@@ -91,6 +94,14 @@ try {
   const errors = [];
   page.on("pageerror", (error) => errors.push(error.message));
   await expect(page.locator(".home-page")).toBeVisible();
+  await expect(page.locator(".home-page aside")).toHaveCount(0);
+  const layout = await page.locator(".home-page").evaluate((home) => {
+    const page = home.getBoundingClientRect();
+    const content = home.querySelector(".home-content").getBoundingClientRect();
+    return { pageWidth: page.width, contentWidth: content.width, leftGap: content.left - page.left };
+  });
+  expect(Math.abs(layout.pageWidth - layout.contentWidth)).toBeLessThan(1);
+  expect(Math.abs(layout.leftGap)).toBeLessThan(1);
   await expect(page.locator(".timeline")).toHaveCount(0);
   await expect(page.locator(".home-recovery")).toContainText("未保存草稿");
   await expect(page.locator(".recent-project")).toHaveCount(1); // old-version history migration
@@ -116,6 +127,9 @@ try {
   await page.getByRole("button", { name: "新建项目", exact: true }).click();
   await expect(page.locator(".timeline-clip")).toHaveCount(0);
   await page.getByLabel("工程名称").fill("从首页新建");
+  await page.getByLabel("工程名称").press("Enter");
+  await expect(page.getByRole("status")).toContainText("工程及文件夹已重命名");
+  await expect(page.locator(".busy-overlay")).toHaveCount(0);
   await app.evaluate(({ dialog }, root) => {
     dialog.showOpenDialog = async () => ({
       canceled: false,

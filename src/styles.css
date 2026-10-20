@@ -154,47 +154,6 @@ fieldset:disabled {
   min-height: 0;
   background: #1c2125;
 }
-.home-sidebar {
-  width: 210px;
-  padding: 28px 18px;
-  border-right: 1px solid #353b3f;
-  flex-shrink: 0;
-  display: flex;
-  flex-direction: column;
-  background: #20262a;
-}
-.home-nav-selected {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  background: #76e5b52b;
-  color: var(--accent);
-  padding: 15px 17px;
-  border-radius: 8px;
-  font-size: 17px;
-  font-weight: 650;
-}
-.home-sidebar > p {
-  font-size: 11px;
-  color: #7b8c85;
-  padding: 19px 8px;
-}
-.home-sidebar-note {
-  margin-top: auto;
-  border-top: 1px solid #3b4641;
-  padding: 22px 8px 0;
-  display: flex;
-  flex-direction: column;
-  gap: 9px;
-}
-.home-sidebar-note b {
-  color: #b2cec0;
-  font-size: 18px;
-}
-.home-sidebar-note span {
-  color: #7e9186;
-  font-size: 11px;
-}
 .home-content {
   flex: 1;
   min-width: 0;
