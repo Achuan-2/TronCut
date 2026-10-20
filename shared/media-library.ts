@@ -12,10 +12,10 @@ export function requiredMediaDuration(clips: readonly Clip[]) {
     // Preserve the complete stitch data, including currently trimmed ranges;
     // project validation and later trim extensions still reference those parts.
     const parts = clip.stitch ?? [
-      { sourceIn: clip.sourceIn, duration: clip.duration * clip.speed },
+      { sourceIn: clip.sourceIn, duration: clip.duration * clip.speed, freeze: undefined },
     ];
     for (const part of parts)
-      end = Math.max(end, part.sourceIn + part.duration);
+      end = Math.max(end, part.sourceIn + (part.freeze ? 1e-6 : part.duration));
   }
   return end;
 }

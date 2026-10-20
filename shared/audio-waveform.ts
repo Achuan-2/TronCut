@@ -68,6 +68,7 @@ export function waveformColumns(
       i++
     ) {
       const part = parts[i];
+      if (part.freeze) continue;
       const source =
         part.sourceIn + (Math.max(time, part.start) - part.start) * clip.speed;
       const end = Math.min(

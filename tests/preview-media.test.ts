@@ -50,6 +50,34 @@ const state = (): PreviewMediaState => ({
 const controllerFor = (media: Media) =>
   createPreviewMediaController(media as unknown as HTMLMediaElement);
 
+it("帧定格播放时暂停解码器并静音，越过停留区间后恢复播放", async () => {
+  const media = new Media();
+  const controller = controllerFor(media);
+  media.loaded();
+  const s = state();
+  s.playing = true;
+  s.muted = false;
+  s.clip = { ...s.clip, sourceIn: 0, speed: 1, duration: 4, stitch: [
+    { sourceIn: 8, duration: 1 }, { sourceIn: 9, duration: 2, freeze: true }, { sourceIn: 9, duration: 1 },
+  ] };
+  controller.update(s);
+  media.seeked();
+  await Promise.resolve(); await Promise.resolve();
+  controller.update({ ...s, localTime: 1.5 });
+  media.seeked();
+  expect(media.paused).toBe(true);
+  expect(media.muted).toBe(true);
+  expect(media.currentTime).toBe(9);
+  controller.update({ ...s, localTime: 2.5 });
+  expect(media.currentTime).toBe(9);
+  controller.update({ ...s, localTime: 3.5 });
+  media.seeked();
+  expect(media.paused).toBe(false);
+  expect(media.muted).toBe(false);
+  expect(media.currentTime).toBe(9.5);
+  controller.dispose();
+});
+
 it("拆分后视频即使调整音量仍保持静音，独立音频正常发声", () => {
   const media = new Media(),
     controller = controllerFor(media),

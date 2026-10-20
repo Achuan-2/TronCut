@@ -119,6 +119,9 @@ import TrackResizeHandle from "./TrackResizeHandle";
 import TrackContextMenu, { type TrackMenuPosition } from "./TrackContextMenu";
 import ClipContextMenu, { type ClipCommand } from "./ClipContextMenu";
 import ClipRenameDialog from "./ClipRenameDialog";
+import FrameExtensionDialog from "./FrameExtensionDialog";
+import TimelineFrameExtension from "./TimelineFrameExtension";
+import { frameExtensions } from "../shared/frame-extension";
 import { useViewportZoom } from "./useViewportZoom";
 import { useRAFThrottle } from "./hooks/useRAFThrottle";
 import { usePerformanceMonitor } from "./hooks/usePerformanceMonitor";
@@ -268,6 +271,7 @@ export default function Timeline({
       y: number;
       id: string;
       stitchTime?: number;
+      frameExtensionTime?: number;
     } | null>(null);
 
   // RAF-throttled drag updates for smooth 60fps performance
@@ -353,6 +357,16 @@ export default function Timeline({
   const [trackMenu, setTrackMenu] = useState<TrackMenuPosition | null>(null);
   const [markerEditor, setMarkerEditor] = useState<Marker | null>(null);
   const [renamingClip, setRenamingClip] = useState<string | null>(null);
+  const [extendingFrame, setExtendingFrame] = useState<{
+    id: string;
+    local: number;
+    x: number;
+    y: number;
+  } | null>(null);
+  useEffect(() => setExtendingFrame(null), [project.id, editor.activeGroupId]);
+  const editFrameExtension = (id: string, local: number) => {
+    setExtendingFrame({ id, local, x: context?.x ?? 400, y: context?.y ?? 400 });
+  };
   useEffect(() => setRenamingClip(null), [project.id, editor.activeGroupId]);
   const [markerRange, setMarkerRange] = useState<{
     pointerId: number;
@@ -1950,7 +1964,7 @@ export default function Timeline({
                             </div>
                             {c.kind !== "text" && (
                               <div className="clip-detail">
-                                {`${timeLabel(c.duration)}${c.stitch ? ` · ${mediaSegments(c).length} 段拼接` : ""}${c.podcast ? " · 播客人声" : ""}`}
+                                {`${timeLabel(c.duration)}${frameExtensions(c).length ? ` · ${frameExtensions(c).length} 处帧定格` : c.stitch ? ` · ${mediaSegments(c).length} 段拼接` : ""}${c.podcast ? " · 播客人声" : ""}`}
                               </div>
                             )}
                             {editor.preferences.program.waveforms &&
@@ -1969,6 +1983,25 @@ export default function Timeline({
                                   />
                                 );
                               })()}
+                            {c.kind === "video" && frameExtensions(c).map((part) => (
+                              <TimelineFrameExtension
+                                key={part.start}
+                                clip={c}
+                                start={part.start}
+                                duration={part.duration}
+                                editor={editor}
+                                zoom={zoom}
+                                onEdit={(x, y) =>
+                                  setExtendingFrame({ id: c.id, local: part.start, x, y })
+                                }
+                                onContextMenu={(x, y) => {
+                                  editor.setPlaying(false);
+                                  select(c.id);
+                                  setTrackMenu(null);
+                                  setContext({ x, y, id: c.id, frameExtensionTime: part.start });
+                                }}
+                              />
+                            ))}
                             {stitchBoundaries(c).map((time) => (
                               <button
                                 key={time}
@@ -2259,6 +2292,7 @@ export default function Timeline({
                 portalTarget={panel.current}
                 surface="timeline"
                 onRename={setRenamingClip}
+                onExtendFrame={editFrameExtension}
               >
                 <hr />
                 <button
@@ -2340,6 +2374,7 @@ export default function Timeline({
               portalTarget={panel.current}
               surface="timeline"
               onRename={setRenamingClip}
+              onExtendFrame={editFrameExtension}
             >
               <hr />
               <button
@@ -2386,6 +2421,14 @@ export default function Timeline({
           );
         })()}
       <BehaviorContextMenu editor={editor} />
+      {extendingFrame && (
+        <FrameExtensionDialog
+          key={`${extendingFrame.id}:${extendingFrame.local}`}
+          editor={editor}
+          {...extendingFrame}
+          onClose={() => setExtendingFrame(null)}
+        />
+      )}
       {renamingClip && (
         <ClipRenameDialog
           key={renamingClip}

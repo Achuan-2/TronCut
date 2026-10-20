@@ -21,11 +21,15 @@ export function stitchInputFilters(
           `[${input}]${split}=${parts.length}${labels.map((label) => `[${label}]`).join("")}`,
         ]
       : [];
-  parts.forEach((part, index) =>
-    filters.push(
-      `[${parts.length > 1 ? labels[index] : input}]${trim}=start=${part.sourceIn}:duration=${part.duration},${pts}=PTS-STARTPTS[${output}part${index}]`,
-    ),
-  );
+  parts.forEach((part, index) => {
+    const source = parts.length > 1 ? labels[index] : input;
+    const chain = part.freeze
+      ? audio
+        ? `atrim=end_sample=1,asetpts=PTS-STARTPTS,volume=0,apad=whole_dur=${part.duration},atrim=duration=${part.duration}`
+        : `trim=start=${part.sourceIn},setpts=PTS-STARTPTS,trim=end_frame=1,tpad=stop_mode=clone:stop_duration=${part.duration},trim=duration=${part.duration},setpts=PTS-STARTPTS`
+      : `${trim}=start=${part.sourceIn}:duration=${part.duration},${pts}=PTS-STARTPTS`;
+    filters.push(`[${source}]${chain}[${output}part${index}]`);
+  });
   filters.push(
     `${parts.map((_, index) => `[${output}part${index}]`).join("")}concat=n=${parts.length}:v=${audio ? 0 : 1}:a=${audio ? 1 : 0}[${output}]`,
   );

@@ -882,6 +882,47 @@ fieldset:disabled {
   filter: drop-shadow(1px 0 1px #101719);
 }
 .stitch-seam:hover { background: #c4e8ff26; }
+.frame-extension-region {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  z-index: 5;
+  border-left: 2px dashed #bfccd6;
+  border-right: 2px dashed #bfccd6;
+  background: repeating-linear-gradient(135deg, #b0c7da18 0 3px, #12192240 3px 7px);
+  cursor: context-menu;
+  min-width: 4px;
+}
+.frame-extension-region > span {
+  display: block;
+  overflow: hidden;
+  white-space: nowrap;
+  padding: 2px 6px;
+  font-size: 10px;
+  color: #d2dee8;
+  pointer-events: none;
+}
+.frame-extension-handle {
+  position: absolute;
+  top: 0;
+  right: -5px;
+  bottom: 0;
+  width: 10px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: ew-resize;
+}
+.frame-extension-handle:hover { background: #b8d9ef40; }
+.caption-dialog.frame-extension-dialog {
+  position: fixed;
+  width: 340px;
+  padding: 16px;
+}
+.frame-extension-dialog h3 { margin: 0 0 12px; font-size: 14px; }
+.frame-extension-dialog input { width: 110px; margin-left: auto; }
+.frame-extension-dialog p { margin: 8px 0; font-size: 12px; color: #edb58b; }
+.modal-backdrop.frame-extension-backdrop { background: transparent; backdrop-filter: none; }
 .tool-group {
   flex-shrink: 0;
 }

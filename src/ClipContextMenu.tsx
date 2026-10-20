@@ -20,6 +20,11 @@ import { stitchBoundaries } from "../shared/media-segments";
 import "./CanvasContextMenu.css";
 import { groupMembers, rootGroupId } from "../shared/clip-groups";
 import { canvasAlignmentTargets } from "../shared/canvas-alignment";
+import {
+  frameExtensionAt,
+  frameExtensionError,
+  setFrameExtension,
+} from "../shared/frame-extension";
 
 const alignments = [
   ["left", "左对齐"],
@@ -48,6 +53,7 @@ export interface ClipMenuPosition {
   y: number;
   clipId: string | null;
   stitchTime?: number;
+  frameExtensionTime?: number;
 }
 
 export default function ClipContextMenu({
@@ -56,6 +62,7 @@ export default function ClipContextMenu({
   onClose,
   onCommand,
   onRename,
+  onExtendFrame,
   portalTarget,
   surface = "canvas",
   children,
@@ -65,6 +72,7 @@ export default function ClipContextMenu({
   onClose: () => void;
   onCommand: (command: ClipCommand) => void;
   onRename?: (id: string) => void;
+  onExtendFrame?: (id: string, local: number) => void;
   portalTarget: HTMLElement | null;
   surface?: "canvas" | "timeline";
   children?: ReactNode;
@@ -113,6 +121,12 @@ export default function ClipContextMenu({
   const stitchError = stitchSelectionError(project, ids);
   const canUnstitch =
     canEdit && selected.some((clip) => stitchBoundaries(clip).length > 0);
+  const extensionTime =
+    menu?.frameExtensionTime ?? editor.playhead - (source?.start ?? 0);
+  const extension = source && frameExtensionAt(source, extensionTime);
+  const extensionError = source && frameExtensionError(
+    project, source.id, extensionTime, extension?.duration ?? 1,
+  );
   useEffect(() => {
     if (projectId.current !== project.id) {
       projectId.current = project.id;
@@ -273,6 +287,37 @@ export default function ClipContextMenu({
     >
       {surface === "timeline" && (
         <>
+          {source?.kind === "video" && onExtendFrame && (
+            <>
+              <button
+                role="menuitem"
+                disabled={!!extensionError}
+                title={extensionError ?? undefined}
+                onPointerEnter={() => setSubmenu(null)}
+                onClick={() => {
+                  onExtendFrame(source.id, extensionTime);
+                  onClose();
+                }}
+              >
+                {extension ? "调整帧定格时长" : "帧定格…"}
+              </button>
+              {extension && (
+                <button
+                  role="menuitem"
+                  disabled={!!frameExtensionError(project, source.id, extension.start, 0)}
+                  onPointerEnter={() => setSubmenu(null)}
+                  onClick={() => {
+                    editor.apply((project) =>
+                      setFrameExtension(project, source.id, extension.start, 0),
+                    );
+                    onClose();
+                  }}
+                >
+                  移除帧定格
+                </button>
+              )}
+            </>
+          )}
           {onRename && !groupId && (
             <button
               role="menuitem"

@@ -203,8 +203,10 @@ export const projectSchema = z.object({
           .array(z.object({
             sourceIn: finite.nonnegative(),
             duration: finite.positive().max(86400),
+            // A frozen range advances the virtual stream while holding one source frame.
+            freeze: z.literal(true).optional(),
           }))
-          .min(2).max(10000).optional(),
+          .min(1).max(10000).optional(),
         speed: finite.min(0.25).max(8),
         speedEffect: z.boolean().optional(),
         loop: z.boolean().optional(),
@@ -501,7 +503,9 @@ export function validateProject(data: unknown): Project {
       if (
         !["video", "audio"].includes(clip.kind) || !asset || clip.loop ||
         clip.sourceIn + clip.duration * clip.speed > length + 1e-6 ||
-        clip.stitch.some((part) => part.sourceIn + part.duration > asset.duration + 1e-6)
+        clip.stitch.some((part) => part.freeze
+          ? part.sourceIn >= asset.duration
+          : part.sourceIn + part.duration > asset.duration + 1e-6)
       )
         throw new Error(`片段 ${clip.name} 的拼接源区间无效`);
     }

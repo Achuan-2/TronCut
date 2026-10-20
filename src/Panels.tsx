@@ -214,13 +214,8 @@ export default function Panels(props: Props) {
                 return;
               }
               run(async () => {
-                const consumed = Math.max(
-                  0,
-                  ...project.clips
-                    .filter((c) => c.assetId === asset.id)
-                    .flatMap((c) => c.stitch
-                      ? c.stitch.map((part) => part.sourceIn + part.duration)
-                      : [c.sourceIn + c.duration * c.speed]),
+                const consumed = requiredMediaDuration(
+                  project.clips.filter((clip) => clip.assetId === asset.id),
                 );
                 const replacement = await bridge().relinkMedia(asset.id, consumed);
                 if (!replacement) return;

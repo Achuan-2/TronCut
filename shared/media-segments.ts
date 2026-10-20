@@ -2,10 +2,11 @@ import type { Clip } from "./model";
 
 export interface MediaSegment {
   sourceIn: number;
-  /** Duration in source seconds, before clip speed. */
+  /** Duration before clip speed; frozen ranges advance only the virtual clock. */
   duration: number;
   /** Start in local timeline seconds. */
   start: number;
+  freeze?: true;
 }
 
 /** Visible source ranges, including trimmed and speed-adjusted stitched clips. */
@@ -26,9 +27,10 @@ export function mediaSegments(clip: Clip): MediaSegment[] {
     const to = Math.min(cursor + part.duration, end);
     if (to - from > 1e-8)
       result.push({
-        sourceIn: part.sourceIn + from - cursor,
+        sourceIn: part.sourceIn + (part.freeze ? 0 : from - cursor),
         duration: to - from,
         start: (from - clip.sourceIn) / clip.speed,
+        ...(part.freeze ? { freeze: true as const } : {}),
       });
     cursor += part.duration;
     if (cursor >= end - 1e-8) break;
@@ -46,14 +48,25 @@ export function sourceTimeAt(clip: Clip, localTime: number): number {
       local < part.start + part.duration / clip.speed - 1e-8,
   );
   return part
-    ? part.sourceIn + Math.max(0, local - part.start) * clip.speed
+    ? part.sourceIn +
+      (part.freeze ? 0 : Math.max(0, local - part.start) * clip.speed)
     : 0;
+}
+
+export function frozenAt(clip: Clip, localTime: number): boolean {
+  if (!clip.stitch) return false;
+  return mediaSegments(clip).some((part) =>
+    part.freeze && localTime >= part.start - 1e-8 &&
+    localTime < part.start + part.duration / clip.speed - 1e-8,
+  );
 }
 
 export function stitchBoundaries(clip: Clip): number[] {
   return clip.stitch
     ? mediaSegments(clip)
-        .slice(1)
+        .filter((part, index, parts) =>
+          index > 0 && !part.freeze && !parts[index - 1].freeze,
+        )
         .map((part) => part.start)
     : [];
 }
@@ -61,11 +74,12 @@ export function stitchBoundaries(clip: Clip): number[] {
 /** Drop invisible ranges after splitting and restore ordinary clips at the ends. */
 export function normalizeStitch(clip: Clip): Clip {
   if (!clip.stitch) return clip;
-  const segments = mediaSegments(clip).map(({ sourceIn, duration }) => ({
+  const segments = mediaSegments(clip).map(({ sourceIn, duration, freeze }) => ({
     sourceIn,
     duration,
+    ...(freeze ? { freeze } : {}),
   }));
-  return segments.length === 1
+  return segments.length === 1 && !segments[0].freeze
     ? { ...clip, sourceIn: segments[0].sourceIn, stitch: undefined }
     : { ...clip, sourceIn: 0, stitch: segments };
 }

@@ -1,5 +1,5 @@
 import type { Asset, Clip } from "../shared/model";
-import { sourceTimeAt, stitchBoundaries } from "../shared/media-segments";
+import { sourceTimeAt, mediaSegments, frozenAt } from "../shared/media-segments";
 
 export interface PreviewMediaState {
   clip: Clip;
@@ -18,7 +18,10 @@ export function createPreviewMediaController(media: HTMLMediaElement) {
   let playPending = false;
   let disposed = false;
   const play = () => {
-    if (disposed || !state?.playing || !media.paused || playPending) return;
+    if (
+      disposed || !state?.playing ||
+      frozenAt(state.clip, state.localTime) || !media.paused || playPending
+    ) return;
     playPending = true;
     void media
       .play()
@@ -33,17 +36,18 @@ export function createPreviewMediaController(media: HTMLMediaElement) {
   const synchronize = (force = false) => {
     if (!state || disposed) return;
     const { clip, asset, localTime, playing, muted } = state;
+    const frozen = frozenAt(clip, localTime);
     if (media.playbackRate !== clip.speed) media.playbackRate = clip.speed;
     if (!media.preservesPitch) media.preservesPitch = true;
     const volume = Math.min(1, Math.max(0, clip.volume));
     if (media.volume !== volume) media.volume = volume;
-    const silent = muted || !!clip.audioDetached;
+    const silent = muted || !!clip.audioDetached || frozen;
     if (media.muted !== silent) media.muted = silent;
     const absolute = sourceTimeAt(clip, localTime);
     const target =
       clip.loop && asset.duration > 0 ? absolute % asset.duration : absolute;
     const segment = clip.stitch
-      ? stitchBoundaries(clip).filter((time) => localTime >= time).length
+      ? mediaSegments(clip).filter((part) => localTime >= part.start).length
       : -1;
     const cut = previousClip?.id !== clip.id || previousSegment !== segment;
     previousClip = clip;
@@ -51,7 +55,7 @@ export function createPreviewMediaController(media: HTMLMediaElement) {
     if (
       force ||
       cut ||
-      Math.abs(media.currentTime - target) > (playing ? 0.25 : 0.025)
+      Math.abs(media.currentTime - target) > (playing && !frozen ? 0.25 : 0.025)
     )
       pendingSeek = target;
     // Wait for the previous seek to finish. Reassigning currentTime every
@@ -69,7 +73,7 @@ export function createPreviewMediaController(media: HTMLMediaElement) {
       pendingSeek = undefined;
       if (Math.abs(media.currentTime - next) > 0.001) media.currentTime = next;
     }
-    if (playing) play();
+    if (playing && !frozen) play();
     else if (!media.paused) media.pause();
   };
   const loaded = () => synchronize(true);

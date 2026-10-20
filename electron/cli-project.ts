@@ -185,7 +185,7 @@ export function editCliProject(input: Project, edits: Edit[]) {
 }
 
 export function sourceCuesToTimeline(cues: Cue[], clip: Clip): Cue[] {
-  return mediaSegments(clip).flatMap((part) => cues.flatMap((cue) => {
+  return mediaSegments(clip).filter((part) => !part.freeze).flatMap((part) => cues.flatMap((cue) => {
     const sourceEnd = part.sourceIn + part.duration;
     const start = Math.max(cue.start, part.sourceIn),
       end = Math.min(cue.end, sourceEnd);

@@ -121,9 +121,10 @@ export function stitchClips(project: Project, ids: readonly string[]): Project {
     duration: clips.reduce((sum, clip) => sum + clip.duration, 0),
     sourceIn: 0,
     stitch: clips.flatMap((clip) =>
-      mediaSegments(clip).map(({ sourceIn, duration }) => ({
+      mediaSegments(clip).map(({ sourceIn, duration, freeze }) => ({
         sourceIn,
         duration,
+        ...(freeze ? { freeze } : {}),
       })),
     ),
     fadeOut: last.fadeOut,
