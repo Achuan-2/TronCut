@@ -55,6 +55,7 @@ export default function ClipContextMenu({
   menu,
   onClose,
   onCommand,
+  onRename,
   portalTarget,
   surface = "canvas",
   children,
@@ -63,6 +64,7 @@ export default function ClipContextMenu({
   menu: ClipMenuPosition | null;
   onClose: () => void;
   onCommand: (command: ClipCommand) => void;
+  onRename?: (id: string) => void;
   portalTarget: HTMLElement | null;
   surface?: "canvas" | "timeline";
   children?: ReactNode;
@@ -271,6 +273,21 @@ export default function ClipContextMenu({
     >
       {surface === "timeline" && (
         <>
+          {onRename && !groupId && (
+            <button
+              role="menuitem"
+              disabled={
+                !source || !editableIds(project, [source.id]).has(source.id)
+              }
+              onPointerEnter={() => setSubmenu(null)}
+              onClick={() => {
+                if (source) onRename(source.id);
+                onClose();
+              }}
+            >
+              重命名
+            </button>
+          )}
           {menu.stitchTime !== undefined && source && (
             <button
               role="menuitem"

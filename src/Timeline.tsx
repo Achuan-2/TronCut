@@ -118,6 +118,7 @@ import {
 import TrackResizeHandle from "./TrackResizeHandle";
 import TrackContextMenu, { type TrackMenuPosition } from "./TrackContextMenu";
 import ClipContextMenu, { type ClipCommand } from "./ClipContextMenu";
+import ClipRenameDialog from "./ClipRenameDialog";
 import { useViewportZoom } from "./useViewportZoom";
 import { useRAFThrottle } from "./hooks/useRAFThrottle";
 import { usePerformanceMonitor } from "./hooks/usePerformanceMonitor";
@@ -351,6 +352,8 @@ export default function Timeline({
   }, [editor.timelineFocus]);
   const [trackMenu, setTrackMenu] = useState<TrackMenuPosition | null>(null);
   const [markerEditor, setMarkerEditor] = useState<Marker | null>(null);
+  const [renamingClip, setRenamingClip] = useState<string | null>(null);
+  useEffect(() => setRenamingClip(null), [project.id, editor.activeGroupId]);
   const [markerRange, setMarkerRange] = useState<{
     pointerId: number;
     start: number;
@@ -1936,7 +1939,9 @@ export default function Timeline({
                                 {isRecording
                                   ? groupName(project, c.groupId!)
                                   : c.kind === "text"
-                                    ? c.text?.replace(/\s+/g, " ").trim() || c.name
+                                    ? c.name && c.name !== c.text?.slice(0, 24)
+                                      ? c.name
+                                      : c.text?.replace(/\s+/g, " ").trim() || c.name
                                     : c.name}
                               </span>
                               {c.speed !== 1 && (
@@ -2253,6 +2258,7 @@ export default function Timeline({
                 onCommand={onCommand}
                 portalTarget={panel.current}
                 surface="timeline"
+                onRename={setRenamingClip}
               >
                 <hr />
                 <button
@@ -2333,6 +2339,7 @@ export default function Timeline({
               onCommand={onCommand}
               portalTarget={panel.current}
               surface="timeline"
+              onRename={setRenamingClip}
             >
               <hr />
               <button
@@ -2379,6 +2386,14 @@ export default function Timeline({
           );
         })()}
       <BehaviorContextMenu editor={editor} />
+      {renamingClip && (
+        <ClipRenameDialog
+          key={renamingClip}
+          editor={editor}
+          id={renamingClip}
+          onClose={() => setRenamingClip(null)}
+        />
+      )}
       <TrackContextMenu
         editor={editor}
         menu={trackMenu}

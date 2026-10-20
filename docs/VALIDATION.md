@@ -1,5 +1,9 @@
 # 验证记录（含历史与 TronCut 0.3）
 
+## 时间线片段重命名（2026-10-20）
+
+时间线右键菜单新增“重命名”，支持 Enter 保存、Esc 与取消按钮关闭、空白名称校验，锁定轨道禁用。多选仅修改右键目标，组内片段可独立改名，文字片段显示改后的名称且保留文字内容；原有组合继续使用“重命名组”。Rust/Wasm、TypeScript、Vite 和 Electron 构建通过。`scripts/test-clip-rename-ui.mjs` 在隔离配置和项目目录中验证上述交互、撤销重做、同名保存不产生撤销记录、素材引用与源文件保持原样，以及组内全局时间和保存重开持久化，前端运行错误为零。结果目录为 `test-output/clip-rename-ui/run-1792490714554/`，本次使用开发构建。
+
 ## 程序页存储分组（2026-10-20）
 
 移除“高级”选项卡，在“程序”页新增“存储”分组，集中设置备份文件夹与 ONNX 模型文件夹，并保留打开配置文件夹的入口。Rust/Wasm、TypeScript、Vite 和 Electron 构建通过；`scripts/test-storage-directories-ui.mjs` 验证五个选项卡布局、目录选择与取消、备份及模型迁移、打开目录、恢复默认、重启持久化和项目备份流程。已检查实际截图 `test-output/storage-directories-ui/run-1792489924486/program-storage.png`，两个目录控件均位于“存储”标题下，前端运行错误为零。
