@@ -45,6 +45,11 @@ import { closeOnnxSessions } from "./onnx-session";
 import { ClonedVoices, validateVoiceReference } from "./cloned-voices";
 import { createClonedVoiceSchema } from "../shared/cloned-voices";
 import { mediaThumbnail, mediaWaveform } from "./thumbnails";
+import { randomUUID } from "node:crypto";
+import {
+  resolveProjectMediaAsset,
+  setProjectMediaHistoryDirectory,
+} from "./project-media-cleanup";
 import { serveMediaFile } from "./media-protocol";
 import { mediaAssetUrl } from "../shared/media-url";
 import { PreviewProxyService } from "./preview-proxies";
@@ -222,6 +227,9 @@ const recordingControls = new RecordingControls((command) => {
     window.webContents.send("shortcut", command === "pause" ? "pauseRecording" : "stopRecording");
 });
 const assets = new Map<string, Asset>();
+setProjectMediaHistoryDirectory(
+  path.join(app.getPath("userData"), "media-undo", randomUUID()),
+);
 const assetLibraries = new AssetLibraries(app.getPath("userData"));
 const speechVoicePreviews = new SpeechVoicePreviews();
 const clonedVoices = new ClonedVoices(app.getPath("userData"));
@@ -253,7 +261,9 @@ const registerProject = (project: Project) => {
 const assetById = (id: unknown) => {
   const asset = assets.get(z.string().parse(id));
   if (!asset) throw new Error("素材未授权或已移除");
-  return asset;
+  const available = resolveProjectMediaAsset(asset);
+  approvedPaths.add(path.resolve(available.path));
+  return available;
 };
 function authorizedProject(input: unknown): Project {
   const project = validateProject(input);
@@ -261,6 +271,7 @@ function authorizedProject(input: unknown): Project {
     assetById(asset.id);
     if (!approvedPaths.has(path.resolve(asset.path)))
       throw new Error("素材路径不能通过界面直接改写，请重新导入素材");
+    asset.path = resolveProjectMediaAsset(asset).path;
   }
   return project;
 }
@@ -1578,7 +1589,7 @@ app
         (asset.animated || url.searchParams.get("preview") === "1") &&
         Number(url.searchParams.get("revision")) > 0;
       const preview = useProxy ? previewProxies.path(asset.id) : undefined;
-      return serveMediaFile(request, preview ?? asset.path);
+      return serveMediaFile(request, preview ?? resolveProjectMediaAsset(asset).path);
     });
     session.defaultSession.setPermissionRequestHandler(
       (contents, permission, callback) =>

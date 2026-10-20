@@ -12,6 +12,9 @@ const profile = path.join(root, "profile");
 await fs.mkdir(profile, { recursive: true });
 const documents = path.join(root, "Documents");
 await fs.mkdir(documents, { recursive: true });
+await fs.writeFile(path.join(profile, "preferences.json"), JSON.stringify({
+  storage: { projectDirectory: path.join(documents, "TronCut", "Projects") },
+}));
 const paths = await Promise.all(
   ["red", "green", "blue"].map(async (color) => {
     const file = path.join(root, `${color}.png`);
@@ -57,7 +60,10 @@ const env = {
 };
 delete env.ELECTRON_RUN_AS_NODE;
 const app = await electron.launch({ args: ["."], env });
-await app.evaluate(({ app }, directory) => app.setPath("documents", directory), documents);
+await app.evaluate(
+  ({ app }, directory) => app.setPath("documents", directory),
+  documents,
+);
 const page = await app.firstWindow();
 const errors = [];
 page.on("pageerror", (error) => errors.push(error.message));
@@ -73,17 +79,30 @@ const save = async () => {
   const button = page.getByRole("button", { name: "保存", exact: true });
   await button.click();
   await expect(button).toBeEnabled();
-  const file = path.join(documents, "TronCut", "Projects", project.name, `${project.name}.troncut`);
-  await expect.poll(() => fs.access(file).then(() => true, () => false)).toBe(true);
-  return JSON.parse(
-    await fs.readFile(file, "utf8"),
+  const file = path.join(
+    documents,
+    "TronCut",
+    "Projects",
+    project.name,
+    `${project.name}.troncut`,
   );
+  await expect
+    .poll(() =>
+      fs.access(file).then(
+        () => true,
+        () => false,
+      ),
+    )
+    .toBe(true);
+  return JSON.parse(await fs.readFile(file, "utf8"));
 };
 try {
   await page.getByRole("button", { name: "恢复编辑", exact: true }).click();
   await card("image-0").click({ button: "right" });
   await expect(menu.getByRole("menuitem")).toHaveCount(7);
-  await expect(menu.getByRole("menuitem", { name: "添加到素材库…", exact: true })).toBeEnabled();
+  await expect(
+    menu.getByRole("menuitem", { name: "添加到素材库…", exact: true }),
+  ).toBeEnabled();
   await expect(action("替换时间轴上所选的媒体")).toBeDisabled();
   await expect(action("在时间线上选择")).toBeDisabled();
   await page.keyboard.press("Escape");
@@ -145,14 +164,56 @@ try {
   saved = await save();
   expect(saved.clips.every((clip) => clip.assetId === "image-1")).toBe(true);
   await page.getByTitle("重做 Ctrl+Shift+Z", { exact: true }).click();
+  saved = await save();
+  const archivedBlue = path.join(
+    documents,
+    "TronCut",
+    "Projects",
+    project.name,
+    saved.assets.find((asset) => asset.id === updated.id).path,
+  );
   await choose(updated.id, "删除");
   await expect(clips).toHaveCount(0);
   await expect(card(updated.id)).toHaveCount(0);
   await fs.access(paths[2]);
+  await save();
+  await expect
+    .poll(() =>
+      fs.access(archivedBlue).then(
+        () => true,
+        () => false,
+      ),
+    )
+    .toBe(false);
+  await fs.access(paths[2]);
   await page.getByTitle("撤销 Ctrl+Z", { exact: true }).click();
   await expect(clips).toHaveCount(2);
   await expect(card(updated.id)).toBeVisible();
+  expect(
+    await page
+      .locator(".preview-layer.image img")
+      .last()
+      .evaluate((image) => {
+        const url = new URL(image.src);
+        url.searchParams.set("undo-check", String(Date.now()));
+        return new Promise(resolve => {
+          const reloaded = new Image();
+          reloaded.onload = () => resolve(reloaded.naturalWidth > 0);
+          reloaded.onerror = () => resolve(false);
+          reloaded.src = url.href;
+        });
+      }),
+  ).toBe(true);
+  await expect
+    .poll(() =>
+      page
+        .locator(".preview-layer.image img")
+        .last()
+        .evaluate((image) => image.naturalWidth),
+    )
+    .toBeGreaterThan(0);
   saved = await save();
+  await fs.access(archivedBlue);
   expect(saved.clips.every((clip) => clip.assetId === updated.id)).toBe(true);
   await page.getByRole("button", { name: "列表视图", exact: true }).click();
   await card(updated.id).click({ button: "right" });
@@ -171,7 +232,7 @@ try {
     JSON.stringify({
       root,
       checks:
-        "六项菜单、禁用状态、播放头添加、仅替换所选、更新全部引用、删除保留原文件、撤销重做、列表视图、保存重开",
+        "媒体菜单、禁用状态、播放头添加、替换与更新、删除保存后清理副本、原件保留、撤销恢复预览与归档、列表视图、保存重开",
       rendererErrors: errors,
     }),
   );

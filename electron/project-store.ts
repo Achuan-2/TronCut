@@ -1,6 +1,11 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import {
+  cleanupProjectMedia,
+  resolveProjectMediaPath,
+  restoredProjectMedia,
+} from "./project-media-cleanup";
+import {
   type Project,
   validateProject,
   cursorRecordingSchema,
@@ -73,6 +78,15 @@ export async function saveProject(
 ): Promise<Project> {
   const valid = validateProject(project),
     root = path.dirname(file);
+  const previous = await fs.readFile(file, "utf8")
+    .then(content => {
+      try { return validateProject(JSON.parse(content)); }
+      catch { return undefined; }
+    })
+    .catch((error: NodeJS.ErrnoException) => {
+      if (error.code === "ENOENT") return undefined;
+      throw error;
+    });
   const fileBaseName = path.basename(file, path.extname(file)).trim();
   if (
     (!valid.name || valid.name === "未命名工程") &&
@@ -95,9 +109,11 @@ export async function saveProject(
     const target = path.join(root, "media", `${asset.id}-${safeName}`);
     if ((await fs.lstat(target).catch(() => null))?.isSymbolicLink())
       throw new Error("素材目标不能是符号链接");
-    if (path.resolve(original.path) !== path.resolve(target)) {
-      await fs.copyFile(original.path, target);
+    const source = resolveProjectMediaPath(original.path);
+    if (path.resolve(source) !== path.resolve(target)) {
+      await fs.copyFile(source, target);
     } else await fs.access(target);
+    restoredProjectMedia(target);
     asset.path = `media/${path.basename(target)}`;
     if (asset.cursor) {
       asset.cursorPath = `media/${asset.id}-cursor.json`;
@@ -118,6 +134,11 @@ export async function saveProject(
     "utf8",
   );
   await fs.rename(temporary, file);
+  try {
+    await cleanupProjectMedia(serialized, file, previous);
+  } catch (error) {
+    throw new Error(`工程已保存，但清理已删除素材失败：${String(error)}`);
+  }
   if (process.platform === "win32" && iconPath) {
     const desktopIni = path.join(root, "desktop.ini");
     const previous = await fs.readFile(desktopIni, "utf16le").catch((error) => {
@@ -322,4 +343,3 @@ export async function renameProjectStorage(
 
   return { project: saved, file: newFile, oldRoot, newRoot };
 }
-
