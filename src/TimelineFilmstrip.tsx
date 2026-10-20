@@ -1,6 +1,9 @@
 import { memo, useEffect, useMemo, useState } from "react";
 import type { Asset, Clip } from "../shared/model";
-import { timelineFilmstripTiles } from "../shared/timeline-filmstrip";
+import {
+  timelineFilmstripInterval,
+  timelineFilmstripTiles,
+} from "../shared/timeline-filmstrip";
 import { timelineThumbnails } from "./timeline-thumbnails";
 
 function Tile({
@@ -8,21 +11,44 @@ function Tile({
   time,
   left,
   width,
+  sourceStart,
+  sourceEnd,
 }: {
   asset: Asset;
   time: number;
   left: number;
   width: number;
+  sourceStart: number;
+  sourceEnd: number;
 }) {
-  const [url, setUrl] = useState<string | null>(null);
+  const [image, setImage] = useState(() => ({
+    asset,
+    time,
+    exact: false,
+    url: timelineThumbnails.cached(asset, time, sourceStart, sourceEnd),
+  }));
+  const url =
+    image.asset === asset && image.time === time
+      ? image.url
+      : timelineThumbnails.cached(asset, time, sourceStart, sourceEnd);
   useEffect(() => {
-    setUrl(null);
-    return timelineThumbnails.subscribe(asset, time, setUrl);
-  }, [asset, time]);
+    return timelineThumbnails.subscribe(asset, time, (url) => {
+      setImage({
+        asset,
+        time,
+        exact: url !== null,
+        url:
+          url ?? timelineThumbnails.cached(asset, time, sourceStart, sourceEnd),
+      });
+    });
+  }, [asset, time, sourceStart, sourceEnd]);
   return (
     <div
       className="timeline-thumbnail"
       data-source-time={time}
+      data-thumbnail-ready={
+        image.asset === asset && image.time === time && image.exact ? "1" : "0"
+      }
       style={{ left, width }}
     >
       {url && <img src={url} alt="" draggable={false} />}
@@ -48,6 +74,23 @@ export default memo(function TimelineFilmstrip({
   waveform: boolean;
 }) {
   const previewHeight = Math.max(16, height - (waveform ? 20 : 0));
+  const requestedInterval = timelineFilmstripInterval(
+    clip,
+    asset,
+    zoom,
+    previewHeight,
+  );
+  const [settledInterval, setSettledInterval] = useState(requestedInterval);
+  useEffect(() => {
+    // Resize cached tiles during a zoom gesture. Request a finer grid only
+    // after it settles; zooming out immediately uses the cached coarse subset.
+    const timer = window.setTimeout(
+      () => setSettledInterval(requestedInterval),
+      140,
+    );
+    return () => window.clearTimeout(timer);
+  }, [requestedInterval, zoom, previewHeight]);
+  const interval = Math.max(requestedInterval, settledInterval);
   const tiles = useMemo(
     () =>
       timelineFilmstripTiles(
@@ -57,8 +100,9 @@ export default memo(function TimelineFilmstrip({
         previewHeight,
         viewportLeft,
         viewportWidth,
+        interval,
       ),
-    [clip, asset, zoom, previewHeight, viewportLeft, viewportWidth],
+    [clip, asset, zoom, previewHeight, viewportLeft, viewportWidth, interval],
   );
   return (
     <div
@@ -68,7 +112,11 @@ export default memo(function TimelineFilmstrip({
       style={{ bottom: waveform ? 20 : 0 }}
     >
       {tiles.map((tile) => (
-        <Tile key={`${tile.segment}:${tile.index}:${tile.time}`} asset={asset} {...tile} />
+        <Tile
+          key={`${tile.segment}:${tile.index}:${tile.time}`}
+          asset={asset}
+          {...tile}
+        />
       ))}
     </div>
   );

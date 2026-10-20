@@ -133,3 +133,89 @@ it("相同源帧合并请求并缓存，素材更新与失败重试不会复用�
   loader.subscribe(asset, 2, listener);
   await vi.waitFor(() => expect(decode).toHaveBeenCalledTimes(4));
 });
+
+it("同档缩放复用源帧，跨档只增加细网格帧，缩回不重新解码", async () => {
+  const video = { ...clip, start: 0, duration: 6 };
+  const plan = (zoom: number) =>
+    timelineFilmstripTiles(video, asset, zoom, 60, 0, 3000);
+  const coarse = plan(80);
+  expect(plan(100).map((tile) => tile.time)).toEqual(
+    coarse.map((tile) => tile.time),
+  );
+  expect(plan(100).map((tile) => tile.left)).not.toEqual(
+    coarse.map((tile) => tile.left),
+  );
+  const fine = plan(200);
+  const fineTimes = new Set(fine.map((tile) => tile.time));
+  expect(coarse.every((tile) => fineTimes.has(tile.time))).toBe(true);
+  expect(fineTimes.size).toBeGreaterThan(coarse.length);
+  const decode = vi.fn(async (_asset: Asset, time: number) => "frame-" + time);
+  const loader = new TimelineThumbnailLoader(decode);
+  const load = async (tiles: ReturnType<typeof plan>) => {
+    await Promise.all(
+      tiles.map(
+        (tile) =>
+          new Promise((resolve) => loader.subscribe(asset, tile.time, resolve)),
+      ),
+    );
+  };
+  await load(fine);
+  const count = decode.mock.calls.length;
+  await load(coarse);
+  await load(plan(100));
+  await load(plan(200));
+  expect(decode).toHaveBeenCalledTimes(count);
+});
+
+it("补充细网格帧时立即复用同一源区间的缓存，剪掉的画面和更新素材不能作为替代图", async () => {
+  const loader = new TimelineThumbnailLoader(
+    async (_asset, time) => "frame-" + time,
+  );
+  await Promise.all(
+    [2, 8].map(
+      (time) =>
+        new Promise((resolve) => loader.subscribe(asset, time, resolve)),
+    ),
+  );
+  expect(loader.cached(asset, 3, 2, 6)).toBe("frame-2");
+  expect(loader.cached(asset, 7, 6, 10)).toBe("frame-8");
+  expect(loader.cached(asset, 4, 3, 6)).toBeNull();
+  expect(loader.cached(asset, 2)).toBe("frame-2");
+  expect(loader.cached(asset, 3)).toBeNull();
+  expect(loader.cached({ ...asset }, 3, 0, 10)).toBeNull();
+});
+
+it("非整数时长循环每轮复用同一组帧，裁剪边界不出现空隙", () => {
+  const loopAsset = { ...asset, duration: 3.3 };
+  const looping = {
+    ...clip,
+    start: 0,
+    sourceIn: 0.35,
+    duration: 50,
+    speed: 1,
+    loop: true,
+  };
+  const first = timelineFilmstripTiles(looping, loopAsset, 80, 60, 100, 700);
+  const later = timelineFilmstripTiles(looping, loopAsset, 80, 60, 1900, 700);
+  const times = new Set(
+    first.filter((tile) => tile.time !== 0.35).map((tile) => tile.time),
+  );
+  expect(later.every((tile) => times.has(tile.time))).toBe(true);
+  expect(times.size).toBeLessThan(5);
+  for (let index = 1; index < later.length; index++)
+    expect(later[index].left).toBeCloseTo(
+      later[index - 1].left + later[index - 1].width,
+      7,
+    );
+  const cut = { ...clip, start: 0, sourceIn: 4.3, speed: 1, duration: 5 };
+  const tiles = timelineFilmstripTiles(cut, asset, 100, 60, 0, 1000);
+  expect(tiles[0].left).toBe(0);
+  expect(tiles[0].time).toBe(4.3);
+  expect(tiles.every((tile) => tile.time >= 4.3 && tile.time < 9.3)).toBe(true);
+  for (let index = 1; index < tiles.length; index++)
+    expect(tiles[index].left).toBeCloseTo(
+      tiles[index - 1].left + tiles[index - 1].width,
+      7,
+    );
+  expect(tiles.at(-1)!.left + tiles.at(-1)!.width).toBeCloseTo(500, 7);
+});

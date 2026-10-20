@@ -138,6 +138,23 @@ await app.evaluate(({ app, BrowserWindow }, directory) => {
   BrowserWindow.getAllWindows()[0].setSize(1440, 1000);
 }, documents);
 page.setDefaultTimeout(15000);
+await app.evaluate(() => {
+  const childProcess = process.getBuiltinModule("child_process");
+  const spawn = childProcess.spawn;
+  globalThis.filmstripDecodes = [];
+  globalThis.activeFilmstripDecodes = 0;
+  childProcess.spawn = function (binary, args, options) {
+    const child = spawn.call(this, binary, args, options);
+    if (args.some((arg) => String(arg).startsWith("scale=160:90:"))) {
+      globalThis.filmstripDecodes.push(args[args.indexOf("-ss") + 1]);
+      globalThis.activeFilmstripDecodes++;
+      child.once("close", () => globalThis.activeFilmstripDecodes--);
+    }
+    return child;
+  };
+});
+const decodeCount = () =>
+  app.evaluate(() => globalThis.filmstripDecodes.length);
 const errors = [];
 page.on("pageerror", (error) => errors.push(error.message));
 const clip = (id) => page.locator(`.timeline-clip[data-clip-id="${id}"]`);
@@ -148,7 +165,11 @@ const ready = async (id) => {
       clip(id)
         .locator(".timeline-thumbnail")
         .evaluateAll((tiles) =>
-          tiles.every((tile) => tile.querySelector("img")?.naturalWidth > 0),
+          tiles.every(
+            (tile) =>
+              tile.querySelector("img")?.naturalWidth > 0 &&
+              tile.dataset.thumbnailReady === "1",
+          ),
         ),
     )
     .toBe(true);
@@ -199,6 +220,61 @@ try {
   await page
     .locator(".timeline")
     .screenshot({ path: path.join(root, "filmstrip.png") });
+  // Same density tier: resize existing images without invoking new decoders.
+  await ready("freeze");
+  if (await clip("loop").locator(".timeline-thumbnail").count())
+    await ready("loop");
+  await expect
+    .poll(() => app.evaluate(() => globalThis.activeFilmstripDecodes))
+    .toBe(0);
+  const beforeZoom = await decodeCount();
+  await page.evaluate(() => {
+    globalThis.filmstripFrames = { checked: 0, blank: 0 };
+    globalThis.watchFilmstrip = true;
+    const sample = () => {
+      if (!globalThis.watchFilmstrip) return;
+      const tiles = document.querySelectorAll(
+        '.timeline-clip[data-clip-id="video"] .timeline-thumbnail',
+      );
+      globalThis.filmstripFrames.checked++;
+      if ([...tiles].some((tile) => !tile.querySelector("img")?.naturalWidth))
+        globalThis.filmstripFrames.blank++;
+      requestAnimationFrame(sample);
+    };
+    requestAnimationFrame(sample);
+  });
+  for (const zoom of [90, 110, 95, 105, 100]) {
+    await setTimelineZoom(page, zoom);
+    await ready("video");
+  }
+  expect(await decodeCount()).toBe(beforeZoom);
+  // A finer tier adds only missing samples and uses cached images immediately.
+  await setTimelineZoom(page, 200);
+  await expect
+    .poll(
+      async () => await clip("video").locator(".timeline-thumbnail").count(),
+    )
+    .toBeGreaterThan(colors.length);
+  await ready("video");
+  if (await clip("freeze").locator(".timeline-thumbnail").count())
+    await ready("freeze");
+  await expect
+    .poll(() => app.evaluate(() => globalThis.activeFilmstripDecodes))
+    .toBe(0);
+  const afterFine = await decodeCount();
+  expect(afterFine).toBeGreaterThan(beforeZoom);
+  for (const zoom of [100, 200, 100]) {
+    await setTimelineZoom(page, zoom);
+    await ready("video");
+  }
+  expect(await decodeCount()).toBe(afterFine);
+  const zoomFrames = await page.evaluate(() => {
+    globalThis.watchFilmstrip = false;
+    return globalThis.filmstripFrames;
+  });
+  expect(zoomFrames.checked).toBeGreaterThan(0);
+  expect(zoomFrames.blank).toBe(0);
+  console.log(JSON.stringify({ beforeZoom, afterFine, zoomFrames }));
   // Thumbnails never intercept selection, context menus or trimming gestures.
   await clip("video").click({ position: { x: 50, y: 35 } });
   await expect(clip("video")).toHaveClass(/selected/);
