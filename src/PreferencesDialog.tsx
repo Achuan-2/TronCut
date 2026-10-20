@@ -1,5 +1,10 @@
 import { useEffect, useRef, useState } from "react";
-import { X } from "lucide-react";
+import { X, FolderOpen, RotateCcw } from "lucide-react";
+import {
+  storagePreferencesSchema,
+  type StoragePreferences,
+  type StorageDirectoryKind,
+} from "../shared/storage";
 import {
   preferencesUpdateSchema,
   type Preferences,
@@ -42,6 +47,12 @@ export default function PreferencesDialog({
     structuredClone(defaultEditorPreferences),
   );
   const [providers, setProviders] = useState<ProviderDraft[]>([]);
+  const [storage, setStorage] = useState(() =>
+    storagePreferencesSchema.parse({}),
+  );
+  const [storageDefaults, setStorageDefaults] =
+    useState<StoragePreferences>(storage);
+  const savedStorage = useRef(storage);
   const [activeId, setActiveId] = useState("");
   const [loaded, setLoaded] = useState(false);
   const [working, setWorking] = useState(false);
@@ -65,6 +76,9 @@ export default function PreferencesDialog({
       .preferences()
       .then((value) => {
         if (!active) return;
+        setStorage(value.storage);
+        savedStorage.current = value.storage;
+        setStorageDefaults(value.storageDefaults);
         setSettings({
           program: value.program,
           timing: value.timing,
@@ -98,6 +112,7 @@ export default function PreferencesDialog({
   }, [error]);
   const update: PreferencesUpdate = {
     ...settings,
+    storage,
     aiProviders: providers.map(providerUpdate),
     activeAiModelId: activeId,
   };
@@ -124,6 +139,56 @@ export default function PreferencesDialog({
   };
   const project = (patch: Partial<EditorPreferences["project"]>) =>
     setSettings((s) => ({ ...s, project: { ...s.project, ...patch } }));
+  const storageField = (kind: StorageDirectoryKind, label: string) => (
+    <div className="storage-directory-field">
+      <label className="field vertical">
+        {label}
+        <input
+          aria-label={label}
+          readOnly
+          value={storage[kind] || storageDefaults[kind]}
+          title={storage[kind] || storageDefaults[kind]}
+        />
+      </label>
+      <div className="preferences-actions">
+        <button
+          type="button"
+          onClick={() =>
+            void perform(async () => {
+              const directory = await window.framecraft!.selectStorageDirectory(
+                kind,
+                storage[kind] || storageDefaults[kind],
+              );
+              if (directory !== null)
+                setStorage((current) => ({ ...current, [kind]: directory }));
+            })
+          }
+        >
+          选择文件夹
+        </button>
+        <button
+          type="button"
+          aria-label={`${label}：恢复默认`}
+          title="恢复默认位置"
+          disabled={!storage[kind]}
+          onClick={() => setStorage((current) => ({ ...current, [kind]: "" }))}
+        >
+          <RotateCcw size={16} />
+        </button>
+        <button
+          type="button"
+          aria-label={`${label}：打开当前文件夹`}
+          title="打开当前文件夹（更改后请先保存）"
+          disabled={storage[kind] !== savedStorage.current[kind]}
+          onClick={() =>
+            void perform(() => window.framecraft!.openStorageDirectory(kind))
+          }
+        >
+          <FolderOpen size={16} />
+        </button>
+      </div>
+    </div>
+  );
   const shortcut = (value: string) =>
     value.replace(
       "CmdOrCtrl",
@@ -340,16 +405,10 @@ export default function PreferencesDialog({
                   <p className="field-help">
                     备份用于异常退出后的“恢复编辑”，不代替手动保存工程。
                   </p>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      void perform(() =>
-                        window.framecraft!.openPreferencesFolder(),
-                      )
-                    }
-                  >
-                    打开备份文件夹
-                  </button>
+                  {storageField("backupDirectory", "备份文件夹")}
+                  <p className="field-help">
+                    保存时复制已有备份，保留源文件；目标文件夹中已有备份优先。
+                  </p>
                 </>
               )}
               {tab === "timing" && (
@@ -399,6 +458,11 @@ export default function PreferencesDialog({
               )}
               {tab === "project" && (
                 <>
+                  <h3>项目存储</h3>
+                  {storageField("projectDirectory", "默认项目创建位置")}
+                  <p className="field-help">
+                    用于新建项目，已有项目保留原位置。
+                  </p>
                   <h3>默认项目设置</h3>
                   <label className="field">
                     画布规格
@@ -485,8 +549,21 @@ export default function PreferencesDialog({
                   <h3>录屏默认设置</h3>
                   <label className="field">
                     自动缩放范围
-                    <select aria-label="默认自动缩放范围" value={settings.recording.zoomBackground ? "scene" : "screen"}
-                      onChange={e => setSettings(s => ({ ...s, recording: { ...s.recording, zoomBackground: e.target.value === "scene" } }))}>
+                    <select
+                      aria-label="默认自动缩放范围"
+                      value={
+                        settings.recording.zoomBackground ? "scene" : "screen"
+                      }
+                      onChange={(e) =>
+                        setSettings((s) => ({
+                          ...s,
+                          recording: {
+                            ...s.recording,
+                            zoomBackground: e.target.value === "scene",
+                          },
+                        }))
+                      }
+                    >
                       <option value="screen">仅录屏缩放，背景固定</option>
                       <option value="scene">录屏和背景一起缩放</option>
                     </select>
@@ -675,6 +752,10 @@ export default function PreferencesDialog({
                     </button>
                   ))}
                   <h3>本地数据</h3>
+                  {storageField("onnxModelsDirectory", "ONNX 模型文件夹")}
+                  <p className="field-help">
+                    保存时复制已有模型，保留源文件；目标文件夹中已有文件优先。模型较大时请等待复制完成。
+                  </p>
                   <button
                     type="button"
                     onClick={() =>
@@ -683,7 +764,7 @@ export default function PreferencesDialog({
                       )
                     }
                   >
-                    打开配置与备份文件夹
+                    打开配置文件夹
                   </button>
                 </>
               )}

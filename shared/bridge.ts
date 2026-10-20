@@ -6,6 +6,7 @@ import type { SpeechEngine, SpeechOptions } from "./asr";
 import type { TtsOptions, WindowsSpeechVoice } from "./tts";
 import type { ClonedVoice, CreateClonedVoice } from "./cloned-voices";
 import type { OnnxModel, PreparedOnnxModel } from "./onnx";
+import type { StorageDirectoryKind } from "./storage";
 import type { RecentProject, RecoveryInfo } from "./recent-projects";
 import type {
   Preferences,
@@ -64,6 +65,11 @@ export interface FrameCraftBridge {
   testAiConnection(update: PreferencesUpdate): Promise<void>;
   listAiModels(provider: AiProviderUpdate): Promise<string[]>;
   openPreferencesFolder(): Promise<void>;
+  selectStorageDirectory(
+    kind: StorageDirectoryKind,
+    defaultPath: string,
+  ): Promise<string | null>;
+  openStorageDirectory(kind: StorageDirectoryKind): Promise<void>;
   refineCaptions(
     cues: Cue[],
     options: CaptionProcessingOptions,

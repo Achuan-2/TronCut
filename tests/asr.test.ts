@@ -98,7 +98,7 @@ describe("字幕引擎与源时间映射", () => {
     );
     expect(result[0].text).toBe("CPU 字幕");
     expect(
-      onnxEnvironment(paths.userData, "workers").UV_PROJECT_ENVIRONMENT,
+      (await onnxEnvironment(paths.userData, "workers")).UV_PROJECT_ENVIRONMENT,
     ).toBe(path.join("workers", ".venv"));
   });
   it("只提取指定源区间，转换为全局源时间并裁掉末尾越界", async () => {

@@ -144,7 +144,7 @@ async function recognizeAudio(
     {
       signal,
       cwd: workers,
-      env: onnxEnvironment(paths.userData, workers),
+      env: await onnxEnvironment(paths.userData, workers),
       onLine(line) {
         const prefix = "FRAMECRAFT_PROGRESS ";
         if (!line.startsWith(prefix)) return;

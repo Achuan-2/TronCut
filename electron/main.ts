@@ -59,6 +59,7 @@ import { AssetLibraries } from "./asset-libraries";
 import { libraryNameSchema } from "../shared/asset-libraries";
 import { runCli } from "./cli";
 import { PreferencesStore } from "./preferences";
+import { defaultStorageDirectories } from "./storage";
 import { preferencesUpdateSchema, aiProviderUpdateSchema } from "../shared/preferences";
 import { captionProcessingSchema, cueSchema } from "../shared/caption-processing";
 import { processCaptionCues } from "./caption-processing";
@@ -121,12 +122,19 @@ const windowState = () => ({
   fullscreen: window.isFullScreen(),
 });
 let projectFile: string | null = null;
-const defaultProjectDirectory = () => path.join(app.getPath("documents"), "TronCut", "Projects");
+const defaultProjectDirectory = async () => (await preferences.storageDirectories()).projectDirectory;
 const projectIcon = () => app.isPackaged
   ? path.join(process.resourcesPath, "project.ico")
   : path.resolve("resources/icon.ico");
 const recentProjects = new RecentProjects(path.join(app.getPath("userData"), "recent-projects.json"));
-const preferences = new PreferencesStore(path.join(app.getPath("userData"), "preferences.json"), safeStorage);
+const preferences = new PreferencesStore(path.join(app.getPath("userData"), "preferences.json"), safeStorage, {
+  ...defaultStorageDirectories(app.getPath("userData")),
+  projectDirectory: path.join(app.getPath("documents"), "TronCut", "Projects"),
+});
+const recoveryFile = async () => path.join((await preferences.storageDirectories()).backupDirectory, "recovery.json");
+const clearRecovery = () => preferences.useStorage(async ({ backupDirectory }) => {
+  await fs.rm(path.join(backupDirectory, "recovery.json"), { force: true });
+});
 const recordingStyle = new RecordingStyleStore(
   app.getPath("userData"), path.join(app.getAppPath(), "dist/recording/wallpapers"),
   process.resourcesPath,
@@ -282,7 +290,32 @@ async function chooseFile(
 }
 function installHandlers() {
   handle("preferences:get", () => preferences.get());
-  handle("preferences:save", (input: unknown) => preferences.save(preferencesUpdateSchema.parse(input)));
+  handle("preferences:save", async (input: unknown) => {
+    const update = preferencesUpdateSchema.parse(input);
+    if (update.storage && task) throw new Error("请等待后台任务完成后再更改存储位置");
+    const previous = await preferences.storageDirectories();
+    const saved = await preferences.save(update);
+    if (previous.onnxModelsDirectory !== (await preferences.storageDirectories()).onnxModelsDirectory)
+      await closeOnnxSessions();
+    return saved;
+  });
+  const storageKind = z.enum(["backupDirectory", "onnxModelsDirectory", "projectDirectory"]);
+  handle("preferences:storage:select", async (input: unknown, inputPath: unknown) => {
+    const kind = storageKind.parse(input);
+    const defaultPath = z.string().max(32768).parse(inputPath);
+    const result = await dialog.showOpenDialog(window, {
+      title: { backupDirectory: "选择备份文件夹", onnxModelsDirectory: "选择 ONNX 模型文件夹", projectDirectory: "选择默认项目创建位置" }[kind],
+      defaultPath: defaultPath || (await preferences.storageDirectories())[kind],
+      properties: ["openDirectory", "createDirectory"],
+    });
+    return result.canceled ? null : result.filePaths[0] ?? null;
+  });
+  handle("preferences:storage:open", async (input: unknown) => {
+    const directory = (await preferences.storageDirectories())[storageKind.parse(input)];
+    await fs.mkdir(directory, { recursive: true });
+    const error = await shell.openPath(directory);
+    if (error) throw new Error(error);
+  });
   handle("preferences:folder", async () => {
     await fs.mkdir(app.getPath("userData"), { recursive: true });
     const error = await shell.openPath(app.getPath("userData"));
@@ -563,29 +596,28 @@ function installHandlers() {
   handle("project:new", async () => {
     const project = createProject();
     project.canvas = { ...(await preferences.get()).project };
-    const result = await saveProjectInDirectory(project, defaultProjectDirectory(), projectIcon());
+    const result = await saveProjectInDirectory(project, await defaultProjectDirectory(), projectIcon());
     projectFile = result.file;
     registerProject(result.project);
     await rememberProject(result.project, result.file);
-    await fs.rm(path.join(app.getPath("userData"), "recovery.json"), {
-      force: true,
-    });
+    await clearRecovery();
     return result;
   });
-  handle("project:recovery:write", async (input: unknown) => {
+  handle("project:recovery:write", (input: unknown) => {
     const project = authorizedProject(input);
-    const file = path.join(app.getPath("userData"), "recovery.json");
-    await fs.writeFile(
-      `${file}.tmp`,
-      JSON.stringify({ project, file: projectFile }),
-    );
-    await fs.rename(`${file}.tmp`, file);
+    const content = JSON.stringify({ project, file: projectFile });
+    return preferences.useStorage(async ({ backupDirectory }) => {
+      await fs.mkdir(backupDirectory, { recursive: true });
+      const file = path.join(backupDirectory, "recovery.json");
+      await fs.writeFile(`${file}.tmp`, content);
+      await fs.rename(`${file}.tmp`, file);
+    });
   });
   handle("project:recovery:read", async () => {
     try {
       const result = JSON.parse(
         await fs.readFile(
-          path.join(app.getPath("userData"), "recovery.json"),
+          await recoveryFile(),
           "utf8",
         ),
       );
@@ -603,7 +635,7 @@ function installHandlers() {
   });
   handle("project:recovery:info", async () => {
     try {
-      const file = path.join(app.getPath("userData"), "recovery.json");
+      const file = await recoveryFile();
       const result = JSON.parse(await fs.readFile(file, "utf8"));
       const project = validateProject(result.project);
       return { name: project.name, file: typeof result.file === "string" ? result.file : null,
@@ -616,7 +648,7 @@ function installHandlers() {
     // Older versions only kept the last project's path in recovery. Import that
     // existing saved project into history without selecting or restoring it.
     try {
-      const recovery = JSON.parse(await fs.readFile(path.join(app.getPath("userData"), "recovery.json"), "utf8"));
+      const recovery = JSON.parse(await fs.readFile(await recoveryFile(), "utf8"));
       if (typeof recovery.file === "string") await rememberProject(await openProject(recovery.file), recovery.file);
     } catch { /* No saved project to migrate. */ }
     return recentProjects.list();
@@ -653,7 +685,7 @@ function installHandlers() {
       ? path.basename(currentDirectory) === path.basename(currentFile, path.extname(currentFile))
         ? path.dirname(currentDirectory)
         : currentDirectory
-      : defaultProjectDirectory();
+      : await defaultProjectDirectory();
     const result = await dialog.showSaveDialog(window, {
       title: "工程另存为",
       defaultPath: path.join(directory, `${fileName}.troncut`),
@@ -862,14 +894,12 @@ function installHandlers() {
       ? await saveProjectAs(project, projectFile)
       : projectFile
         ? { project: await saveProject(project, projectFile, projectIcon()), file: projectFile }
-        : await saveProjectInDirectory(project, defaultProjectDirectory(), projectIcon());
+        : await saveProjectInDirectory(project, await defaultProjectDirectory(), projectIcon());
     if (!result) return null;
     const saved = registerProject(result.project);
     projectFile = result.file;
     await rememberProject(saved, result.file);
-    await fs.rm(path.join(app.getPath("userData"), "recovery.json"), {
-      force: true,
-    });
+    await clearRecovery();
     return { project: saved, file: result.file };
   });
   handle("project:rename", async (input: unknown, nameInput: unknown) => {
@@ -896,9 +926,7 @@ function installHandlers() {
       await recentProjects.remove(oldFile);
     }
     await rememberProject(saved, result.file);
-    await fs.rm(path.join(app.getPath("userData"), "recovery.json"), {
-      force: true,
-    });
+    await clearRecovery();
     return { project: saved, file: result.file };
   });
   handle("project:camtasia", async () => {

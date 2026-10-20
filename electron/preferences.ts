@@ -14,6 +14,15 @@ import {
 } from "../shared/preferences";
 import { editorPreferencesSchema } from "../shared/editor-preferences";
 import { recordingSettingsSchema } from "../shared/recording";
+import {
+  storagePreferencesSchema,
+  type StoragePreferences,
+} from "../shared/storage";
+import {
+  defaultStorageDirectories,
+  resolveStorageDirectories,
+  prepareStorageDirectories,
+} from "./storage";
 
 interface SecretStorage {
   isEncryptionAvailable(): boolean;
@@ -34,6 +43,7 @@ const storedProviderSchema = z.object({
   encryptedKey: z.string().default(""),
 });
 const storedSchema = z.object({
+  storage: storagePreferencesSchema.default({}),
   ...editorPreferencesSchema.shape,
   ai: z
     .object({ baseUrl: z.string(), model: z.string() })
@@ -52,7 +62,35 @@ export class PreferencesStore {
   constructor(
     private file: string,
     private secrets: SecretStorage,
+    private storageDefaults = defaultStorageDirectories(path.dirname(file)),
   ) {}
+  /** Serialize backup writes with directory changes so migration sees the latest backup. */
+  async useStorage<T>(
+    operation: (directories: StoragePreferences) => Promise<T>,
+  ): Promise<T> {
+    const result = this.writes.then(async () =>
+      operation(
+        resolveStorageDirectories(
+          path.dirname(this.file),
+          (await this.read()).storage,
+          this.storageDefaults,
+        ),
+      ),
+    );
+    this.writes = result.then(
+      () => {},
+      () => {},
+    );
+    return result;
+  }
+  async storageDirectories() {
+    await this.writes;
+    return resolveStorageDirectories(
+      path.dirname(this.file),
+      (await this.read()).storage,
+      this.storageDefaults,
+    );
+  }
   private async read() {
     let data: z.infer<typeof storedSchema>;
     let hasRecording = false;
@@ -113,6 +151,8 @@ export class PreferencesStore {
       (model) => model.id === data.activeAiModelId,
     );
     return {
+      storage: data.storage,
+      storageDefaults: this.storageDefaults,
       ai: active
         ? { baseUrl: active.baseUrl, model: active.model }
         : defaultAiSettings,
@@ -331,6 +371,7 @@ export class PreferencesStore {
           if (!provider.models.length) providers.push(provider);
     }
     const data = {
+      storage: update.storage ?? stored.storage,
       aiProviders: providers,
       activeAiModelId: active?.id ?? "",
       captions: update.captions ?? stored.captions,
@@ -339,6 +380,21 @@ export class PreferencesStore {
       project: update.project ?? stored.project,
       recording: update.recording ?? stored.recording,
     };
+    if (update.storage) {
+      const userData = path.dirname(this.file);
+      await prepareStorageDirectories(
+        resolveStorageDirectories(
+          userData,
+          stored.storage,
+          this.storageDefaults,
+        ),
+        resolveStorageDirectories(
+          userData,
+          update.storage,
+          this.storageDefaults,
+        ),
+      );
+    }
     await fs.mkdir(path.dirname(this.file), { recursive: true });
     const temporary = `${this.file}.${randomUUID()}.tmp`;
     try {

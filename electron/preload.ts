@@ -19,6 +19,10 @@ const bridge: FrameCraftBridge = {
     ipcRenderer.invoke("preferences:ai:test", update),
   listAiModels: (provider) => ipcRenderer.invoke("preferences:ai:models", provider),
   openPreferencesFolder: () => ipcRenderer.invoke("preferences:folder"),
+  selectStorageDirectory: (kind, defaultPath) =>
+    ipcRenderer.invoke("preferences:storage:select", kind, defaultPath),
+  openStorageDirectory: (kind) =>
+    ipcRenderer.invoke("preferences:storage:open", kind),
   refineCaptions: (cues, options) =>
     ipcRenderer.invoke("subtitles:refine", cues, options),
   platform: process.platform,

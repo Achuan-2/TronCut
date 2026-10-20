@@ -8,6 +8,7 @@ import {
 } from "../shared/onnx";
 import { findBinary, runProcess } from "./process";
 import { runOnnxSession } from "./onnx-session";
+import { readStorageDirectories } from "./storage";
 
 export async function prepareOnnxWorker(source: string, userData: string) {
   const workers = path.join(userData, "workers", "onnx");
@@ -29,17 +30,18 @@ export async function prepareOnnxWorker(source: string, userData: string) {
   return workers;
 }
 
-export function onnxEnvironment(
+export async function onnxEnvironment(
   userData: string,
   workers: string,
-): NodeJS.ProcessEnv {
+): Promise<NodeJS.ProcessEnv> {
+  const { onnxModelsDirectory } = await readStorageDirectories(userData);
   return {
     ...process.env,
     PYTHONUTF8: "1",
     UV_CACHE_DIR: path.join(userData, "uv-cache"),
     UV_PYTHON_INSTALL_DIR: path.join(userData, "python"),
     UV_PROJECT_ENVIRONMENT: path.join(workers, ".venv"),
-    TRONCUT_ONNX_MODELS: path.join(userData, "models", "onnx"),
+    TRONCUT_ONNX_MODELS: onnxModelsDirectory,
     HF_HOME: path.join(userData, "models", "huggingface"),
   };
 }
@@ -85,7 +87,7 @@ export async function downloadOnnxModel(
     {
       signal,
       cwd: workers,
-      env: onnxEnvironment(paths.userData, workers),
+      env: await onnxEnvironment(paths.userData, workers),
       onLine(line) {
         const prefix = "TRONCUT_PROGRESS ";
         if (!line.startsWith(prefix)) return;

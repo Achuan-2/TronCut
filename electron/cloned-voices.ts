@@ -145,7 +145,7 @@ export class ClonedVoices {
         {
           signal,
           cwd: workers,
-          env: onnxEnvironment(paths.userData, workers),
+          env: await onnxEnvironment(paths.userData, workers),
           onLine(line) {
             if (!line.startsWith("TRONCUT_PROGRESS ")) return;
             try {

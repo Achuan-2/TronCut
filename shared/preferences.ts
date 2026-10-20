@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { captionProcessingSchema } from "./caption-processing";
 import { recordingSettingsSchema } from "./recording";
+import { storagePreferencesSchema, type StoragePreferences } from "./storage";
 import {
   programPreferencesSchema,
   timingPreferencesSchema,
@@ -67,6 +68,8 @@ export interface AiModelProfile {
   hasApiKey: boolean;
 }
 export interface Preferences extends EditorPreferences {
+  storage: StoragePreferences;
+  storageDefaults: StoragePreferences;
   ai: { baseUrl: string; model: string };
   hasApiKey: boolean;
   aiModels: AiModelProfile[];
@@ -105,6 +108,7 @@ export const preferencesUpdateSchema = z
     timing: timingPreferencesSchema.optional(),
     project: projectPreferencesSchema.optional(),
     recording: recordingSettingsSchema.optional(),
+    storage: storagePreferencesSchema.optional(),
   })
   .strict();
 export type PreferencesUpdate = z.input<typeof preferencesUpdateSchema>;

@@ -118,7 +118,7 @@ export async function synthesizeSpeech(
         {
           signal,
           cwd: workers,
-          env: onnxEnvironment(paths.userData, workers),
+          env: await onnxEnvironment(paths.userData, workers),
           onLine(line) {
             const prefix = "TRONCUT_PROGRESS ";
             if (!line.startsWith(prefix)) return;

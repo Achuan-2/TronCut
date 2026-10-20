@@ -1501,6 +1501,22 @@ fieldset:disabled {
   gap: 8px;
 }
 .preferences-grouped .check-field { margin: 12px 0; }
+.storage-directory-field {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: end;
+  margin: 12px 0;
+}
+.storage-directory-field .field { margin: 0; min-width: 0; }
+.storage-directory-field .preferences-actions { margin-top: 0; gap: 6px; }
+.storage-directory-field .preferences-actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 34px;
+  padding: 6px 10px;
+}
 .preferences-grouped .field-help { margin: 12px 0; }
 .preferences-footer {
   display: flex;
