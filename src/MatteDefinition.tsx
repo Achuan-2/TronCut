@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Clip, Project } from "../shared/model";
 import { transformAt } from "../shared/editor";
-import { transitionTransform } from "../shared/transitions";
+import { transitionBlur, transitionTransform } from "../shared/transitions";
+import { TransitionBlurFilter } from "./TransitionMotionBlur";
 import { fadeOpacity, previewFilter, defaultCrop } from "../shared/effects";
 import { effectAmount } from "../shared/visual-effects";
 import { visualEffectSvg } from "../shared/visual-effect-svg";
@@ -172,9 +173,12 @@ export default function MatteDefinition({
     `blur(${clip.effects?.blur ?? 0}px)`,
     `blur(${(clip.effects?.blur ?? 0) * scale}px)`,
   );
+  const motionBlur = transitionBlur(project, clip, time);
+  const motionBlurId = `${id}-motion`;
   return (
     <svg ref={ref} className="effect-svg-definitions" aria-hidden="true">
       <defs>
+        {motionBlur > 0 && <TransitionBlurFilter id={motionBlurId} amount={motionBlur} />}
         <defs dangerouslySetInnerHTML={{ __html: defs }} />
         <clipPath id={cropId}>
           <path
@@ -227,7 +231,12 @@ export default function MatteDefinition({
                 opacity: pose.opacity * fadeOpacity(clip, local),
               }}
             >
-              <g filter={defs ? `url(#${effectId})` : undefined}>
+              <g style={{
+                filter: [
+                  defs ? `url(#${effectId})` : "",
+                  motionBlur > 0 ? `url(#${motionBlurId})` : "",
+                ].filter(Boolean).join(" ") || undefined,
+              }}>
                 {fill && (
                   <rect
                     x={-fill.paddingX * scale}

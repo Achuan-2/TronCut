@@ -20,6 +20,7 @@ import {
   transitionTransform,
   transitionVisual,
   transitionPresets,
+  transitionBlur,
   updateTransition,
 } from "../shared/transitions";
 import { exportFrame, exportVideo } from "../electron/export";
@@ -58,6 +59,85 @@ function adjacentProject() {
 }
 
 describe("转换效果", () => {
+  it("横扫实际渲染只模糊水平方向，保留垂直细节", async () => {
+    const root = path.resolve(
+      `test-output/transition-directional-blur-${Date.now()}`,
+    );
+    await fs.mkdir(root, { recursive: true });
+    let project = adjacentProject();
+    project.canvas = { width: 160, height: 90, fps: 20, background: "#000000" };
+    project.clips = [project.clips[0]];
+    project.assets = [project.assets[0]];
+    const source = path.join(root, "stripes.png");
+    const pixels = Buffer.alloc(160 * 90 * 3);
+    for (let y = 0; y < 90; y++)
+      for (let x = 0; x < 160; x++) {
+        const value = Math.floor((y < 45 ? x : y) / 2) % 2 ? 255 : 0;
+        pixels.fill(value, (y * 160 + x) * 3, (y * 160 + x + 1) * 3);
+      }
+    await sharp(pixels, { raw: { width: 160, height: 90, channels: 3 } })
+      .png()
+      .toFile(source);
+    project.assets[0].path = source;
+    project = addTransition(
+      project,
+      { clipId: "red", side: "incoming" },
+      0.5,
+      "whip-pan",
+    );
+    const output = path.join(root, "blur.png");
+    await exportFrame(
+      project,
+      0.25,
+      output,
+      path.join(root, "frame"),
+      new AbortController().signal,
+    );
+    const frame = await sharp(output).removeAlpha().raw().toBuffer();
+    const gradient = (top: number, horizontal: boolean) => {
+      let total = 0;
+      for (let y = top; y < top + 20; y++)
+        for (let x = 100; x < 140; x++) {
+          const index = (y * 160 + x) * 3;
+          total += Math.abs(
+            frame[index] - frame[index + (horizontal ? 3 : 160 * 3)],
+          );
+        }
+      return total / 800;
+    };
+    expect(gradient(10, true)).toBeLessThan(8);
+    expect(gradient(55, false)).toBeGreaterThan(65);
+  });
+
+  it("横扫的方向模糊随速度增强，端点清晰，反转不改变强度，禁用后移除", () => {
+    let project = addTransition(
+      adjacentProject(),
+      { clipId: "red", side: "outgoing", neighborId: "blue" },
+      1,
+      "whip-pan",
+    );
+    for (const clip of project.clips) {
+      expect(transitionBlur(project, clip, 0.5)).toBe(0);
+      expect(transitionBlur(project, clip, 0.75)).toBeCloseTo(0.01);
+      expect(transitionBlur(project, clip, 1)).toBeCloseTo(0.04);
+      expect(transitionBlur(project, clip, 1.25)).toBeCloseTo(0.01);
+      expect(transitionBlur(project, clip, 1.5)).toBe(0);
+    }
+    project = updateTransition(
+      project,
+      { clipId: "red", side: "outgoing" },
+      { reverse: true },
+    );
+    expect(transitionBlur(project, project.clips[0], 1)).toBeCloseTo(0.04);
+    project = updateTransition(
+      project,
+      { clipId: "red", side: "outgoing" },
+      { enabled: false },
+    );
+    expect(transitionBlur(project, project.clips[0], 1)).toBe(0);
+    expect(transitionBlur(project, project.clips[1], 1)).toBe(0);
+  });
+
   it.each(transitionPresets)("$name 支持保存、接点同步和禁用", ({ type }) => {
     let project = addTransition(
       adjacentProject(),
@@ -236,7 +316,7 @@ describe("转换效果", () => {
         path.join(root, "render"),
         false,
         signal,
-        () => { },
+        () => {},
       );
       for (const time of [0.6, 0.8, 1, 1.2, 1.4]) {
         const expected = path.join(root, `expected-${time}.png`);
@@ -451,7 +531,7 @@ describe("转换效果", () => {
       path.join(root, "render"),
       false,
       new AbortController().signal,
-      () => { },
+      () => {},
     );
     const frame = path.join(root, "middle.png");
     await runProcess(findBinary("ffmpeg"), [

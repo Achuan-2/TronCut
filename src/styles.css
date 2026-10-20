@@ -3253,14 +3253,15 @@ fieldset:disabled {
 .transition-card-preview.zoom > img:last-child {
   animation-name: transition-card-zoom;
 }
-.transition-card-preview.whip-pan > img {
-  animation-timing-function: cubic-bezier(0.76, 0, 0.24, 1);
-}
 .transition-card-preview.whip-pan > img:last-child {
-  animation-name: transition-card-whip;
+  animation:
+    transition-card-whip 2.4s cubic-bezier(0.65, 0, 0.35, 1) infinite,
+    transition-card-whip-stretch 2.4s linear infinite;
 }
 .transition-card-preview.whip-pan > img:first-child {
-  animation-name: transition-card-whip-out;
+  animation:
+    transition-card-whip-out 2.4s cubic-bezier(0.65, 0, 0.35, 1) infinite,
+    transition-card-whip-stretch 2.4s linear infinite;
 }
 @keyframes transition-card-fade {
   0%, 20% { opacity: 0; }
@@ -3271,14 +3272,17 @@ fieldset:disabled {
   55%, 100% { opacity: 1; transform: scale(1); }
 }
 @keyframes transition-card-whip {
-  0%, 20% { transform: translateX(100%); }
-  37% { transform: translateX(55%) scaleX(1.16); }
-  55%, 100% { transform: translateX(0); }
+  0%, 20% { translate: 100% 0; }
+  55%, 100% { translate: 0 0; }
 }
 @keyframes transition-card-whip-out {
-  0%, 20% { transform: translateX(0); }
-  37% { transform: translateX(-55%) scaleX(1.16); }
-  55%, 100% { transform: translateX(-100%); }
+  0%, 20% { translate: 0 0; }
+  55%, 100% { translate: -100% 0; }
+}
+@keyframes transition-card-whip-stretch {
+  0%, 20%, 55%, 100% { scale: 1 1; }
+  28.75%, 46.25% { scale: 1.12 1; }
+  37.5% { scale: 1.16 1; }
 }
 .transition-card > b {
   width: 100%;

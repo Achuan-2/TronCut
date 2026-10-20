@@ -278,6 +278,37 @@ export function transitionOffset(project: Project, clip: Clip, time: number) {
   return transitionVisual(project, clip, time).x;
 }
 
+/** Horizontal shutter smear, proportional to the cubic pan's velocity. */
+export function whipPanBlur(progress: number) {
+  const p = Math.max(0, Math.min(1, progress));
+  return 0.04 * 4 * Math.min(p, 1 - p) ** 2;
+}
+
+/** Gaussian sigma as a fraction of the layer width, before its transform. */
+export function transitionBlur(project: Project, clip: Clip, time: number) {
+  return transitionWindows(project, clip).reduce(
+    (blur, window) =>
+      window.type === "whip-pan"
+        ? Math.max(blur, whipPanBlur((time - window.start) / window.duration))
+        : blur,
+    0,
+  );
+}
+
+export function transitionBlurExpression(
+  project: Project,
+  clip: Clip,
+  clock = "t",
+) {
+  const terms = transitionWindows(project, clip)
+    .filter((window) => window.type === "whip-pan")
+    .map((window) => {
+      const p = `clip(((${clock})-(${window.start}))/${window.duration},0,1)`;
+      return `(0.04*4*pow(min(${p},1-(${p})),2))`;
+    });
+  return terms.reduce((result, term) => `max(${result},${term})`, "0");
+}
+
 /** Normalized offsets and multipliers shared by preview and frame capture. */
 export function transitionVisual(project: Project, clip: Clip, time: number) {
   const visual = { x: 0, scale: 1, scaleX: 1, opacity: 1 };

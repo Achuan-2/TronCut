@@ -52,6 +52,8 @@ import {
   transitionRange,
   transitionOffsetExpression,
   transitionVisualExpressions,
+  transitionBlur,
+  transitionBlurExpression,
 } from "../shared/transitions";
 
 // Avoid lookahead buffering in short, delayed overlay graphs. Hardware failure
@@ -401,6 +403,7 @@ export async function exportFrame(
     () => {},
     resourcesPath,
     true,
+    new Map(project.clips.map(clip => [clip.id, transitionBlur(project, clip, time)])),
   );
 }
 
@@ -413,6 +416,7 @@ async function renderProject(
   progress: (percent: number) => void,
   resourcesPath?: string,
   still = false,
+  frozenTransitionBlur?: ReadonlyMap<string, number>,
 ): Promise<void> {
   const duration = still ? 1 / project.canvas.fps : projectDuration(project);
   if (duration <= 0) throw new Error("时间线为空");
@@ -861,6 +865,25 @@ async function renderProject(
       args.push(...attached.args);
       input += attached.inputCount;
       filters.push(...attached.filters);
+      // Update only horizontal sigma on every input frame. Run on the fixed
+      // layer plane before resizing, so stills and video use identical units.
+      let transitionSource = attached.label;
+      const blur = frozenTransitionBlur?.get(clip.id);
+      const blurExpression = transitionBlurExpression(project, clip);
+      if (blur !== undefined ? blur > 0 : blurExpression !== "0") {
+        transitionSource = `transitionblur${layer}`;
+        let chain: string;
+        if (blur !== undefined) {
+          chain = `gblur=sigma=${Math.min(1024, (cropWidth + effectPadding * 2) * blur)}:sigmaV=0:steps=3`;
+        } else {
+          const commandFile = `transition-blur-${layer}.cmd`;
+          const instance = `gblur@transition${layer}`;
+          await fs.writeFile(path.join(workDir, commandFile),
+            `0 [expr] ${instance} sigma 'min(1024,W*(${transitionBlurExpression(project, clip, "T")}))';\n`);
+          chain = `sendcmd=f='${commandFile}',${instance}=sigma=0:sigmaV=0:steps=3:enable='gt(${blurExpression},0)'`;
+        }
+        filters.push(`[${attached.label}]${chain}[${transitionSource}]`);
+      }
       // Evaluate alpha on the fixed source dimensions during transition zooms.
       // RGB geq after a resizing scale can retain its initial frame dimensions.
       const alphaBeforeTransform = transitionMotion.scale !== "1" || transitionMotion.scaleX !== "1" || objectMotion.scale !== "1";
@@ -873,7 +896,7 @@ async function renderProject(
       const geometry = rotateBeforeScale
         ? [...rotate, `scale=w='max(2,trunc(iw*${fit}*(${scale})/2)*2)':h='max(2,trunc(ih*${fit}*(${scale})/2)*2)':eval=frame`, "setsar=1"]
         : [transform, "setsar=1", ...rotate];
-      filters.push(`[${attached.label}]${[...(alphaBeforeTransform ? alphaFilters : []), ...geometry, ...(alphaBeforeTransform ? [] : alphaFilters), ...outputFormat].join(",")}[${visual}]`);
+      filters.push(`[${transitionSource}]${[...(alphaBeforeTransform ? alphaFilters : []), ...geometry, ...(alphaBeforeTransform ? [] : alphaFilters), ...outputFormat].join(",")}[${visual}]`);
       // Composite text before chroma subsampling so rounded fills and glyphs
       // retain the same pixel position in video and frame captures.
       const matte = clip.visualEffects?.["media-matte"];

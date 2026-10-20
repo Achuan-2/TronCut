@@ -87,7 +87,8 @@ import {
   visualEffectMime,
   type VisualEffectId,
 } from "../shared/visual-effect-drag";
-import { transitionTransform } from "../shared/transitions";
+import { transitionBlur, transitionTransform } from "../shared/transitions";
+import TransitionMotionBlur from "./TransitionMotionBlur";
 import { projectIndex } from "../shared/project-index";
 import { sourceTimeAt } from "../shared/media-segments";
 import { createPreviewMediaPlan } from "../shared/preview-media-plan";
@@ -188,6 +189,7 @@ function PreviewLayerImpl({
 }) {
   const localTime = Math.max(0, Math.min(clip.duration, playhead - clip.start));
   const filterId = `visual-effect-${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
+  const motionBlurId = `${filterId}-motion`;
   const [regionDraft, setRegionDraft] = useState<{
     id: "mask" | "blur-region";
     geometry: Partial<Region>;
@@ -205,6 +207,7 @@ function PreviewLayerImpl({
     );
   clip = visualClipAt(clip, transform);
   const editing = interactive && editor.editingTextId === clip.id;
+  const motionBlur = editing ? 0 : transitionBlur(project, clip, playhead);
   const penEditing =
     interactive &&
     editor.canvasMode === "draw" &&
@@ -773,6 +776,7 @@ function PreviewLayerImpl({
       onPointerCancel={() => setGesture(null)}
       onLostPointerCapture={() => setGesture(null)}
     >
+      {motionBlur > 0 && <TransitionMotionBlur id={motionBlurId} amount={motionBlur} />}
       {effectMarkup && (
         <svg className="effect-svg-definitions" aria-hidden="true">
           <defs dangerouslySetInnerHTML={{ __html: effectMarkup }} />
@@ -781,7 +785,7 @@ function PreviewLayerImpl({
       <div
         className="preview-effect-content"
         style={
-          effectMarkup || matteSource
+          effectMarkup || matteSource || motionBlur > 0
             ? {
                 width: "100%",
                 height: "100%",
@@ -789,7 +793,10 @@ function PreviewLayerImpl({
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                filter: effectMarkup ? `url(#${filterId})` : undefined,
+                filter: [
+                  effectMarkup ? `url(#${filterId})` : "",
+                  motionBlur > 0 ? `url(#${motionBlurId})` : "",
+                ].filter(Boolean).join(" ") || undefined,
                 visibility: matteSource ? "hidden" : undefined,
               }
             : { display: "contents" }
