@@ -50,6 +50,52 @@ const state = (): PreviewMediaState => ({
 const controllerFor = (media: Media) =>
   createPreviewMediaController(media as unknown as HTMLMediaElement);
 
+it("拖动光标的子帧位置共用同一预览帧，解码中只保留最新帧", () => {
+  const media = new Media(),
+    controller = controllerFor(media);
+  const s = {
+    ...state(),
+    fps: 20,
+    clip: { ...state().clip, sourceIn: 0, speed: 1 },
+  };
+  media.loaded();
+  controller.update({ ...s, localTime: 3 });
+  media.seeked();
+  for (const localTime of [3.001, 3.006, 3.012, 3.024])
+    controller.update({ ...s, localTime });
+  expect(media.seeks).toEqual([3]);
+  controller.update({ ...s, localTime: 3.026 });
+  controller.update({ ...s, localTime: 3.081 });
+  expect(media.seeks).toEqual([3, 3.05]);
+  media.seeked();
+  expect(media.seeks).toEqual([3, 3.05, 3.1]);
+  controller.dispose();
+});
+
+it("高帧率逐帧定位不被暂停容差跳过，实际播放仍使用连续源时间", () => {
+  const media = new Media(),
+    controller = controllerFor(media);
+  const s = {
+    ...state(),
+    fps: 120,
+    clip: { ...state().clip, sourceIn: 0, speed: 1 },
+  };
+  media.loaded();
+  controller.update({ ...s, localTime: 1 });
+  media.seeked();
+  controller.update({ ...s, localTime: 1 + 1 / 120 });
+  expect(media.seeks.at(-1)).toBeCloseTo(1 + 1 / 120, 8);
+  media.seeked();
+  controller.update({
+    ...s,
+    playing: true,
+    clip: { ...s.clip, id: "playing" },
+    localTime: 1.234,
+  });
+  expect(media.seeks.at(-1)).toBe(1.234);
+  controller.dispose();
+});
+
 it("帧定格播放时暂停解码器并静音，越过停留区间后恢复播放", async () => {
   const media = new Media();
   const controller = controllerFor(media);
@@ -57,12 +103,21 @@ it("帧定格播放时暂停解码器并静音，越过停留区间后恢复播�
   const s = state();
   s.playing = true;
   s.muted = false;
-  s.clip = { ...s.clip, sourceIn: 0, speed: 1, duration: 4, stitch: [
-    { sourceIn: 8, duration: 1 }, { sourceIn: 9, duration: 2, freeze: true }, { sourceIn: 9, duration: 1 },
-  ] };
+  s.clip = {
+    ...s.clip,
+    sourceIn: 0,
+    speed: 1,
+    duration: 4,
+    stitch: [
+      { sourceIn: 8, duration: 1 },
+      { sourceIn: 9, duration: 2, freeze: true },
+      { sourceIn: 9, duration: 1 },
+    ],
+  };
   controller.update(s);
   media.seeked();
-  await Promise.resolve(); await Promise.resolve();
+  await Promise.resolve();
+  await Promise.resolve();
   controller.update({ ...s, localTime: 1.5 });
   media.seeked();
   expect(media.paused).toBe(true);

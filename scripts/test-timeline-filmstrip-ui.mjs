@@ -347,6 +347,103 @@ try {
   await setTimelineZoom(page, 100);
   await ready("video");
   await ready("image");
+  // At high zoom, the cursor follows pixels while the decoder shares video
+  // frames. Only releasing the handle snaps its final position to a frame.
+  await page.getByLabel("播放进度", { exact: true }).fill("3");
+  await setTimelineZoom(page, 2400);
+  await ready("video");
+  const head = page.getByRole("button", { name: "播放头", exact: true });
+  const headBox = await head.boundingBox();
+  const headX = headBox.x + headBox.width / 2,
+    headY = headBox.y + 7;
+  await page.mouse.move(headX, headY);
+  await page.mouse.down();
+  await page.evaluate(() => {
+    globalThis.scrubFrames = [];
+    globalThis.scrubSeeks = 0;
+    globalThis.watchScrub = true;
+    document
+      .querySelector(".preview-layer.video video")
+      .addEventListener("seeking", () => globalThis.scrubSeeks++);
+    const sample = () => {
+      if (!globalThis.watchScrub) return;
+      globalThis.scrubFrames.push(
+        new DOMMatrix(document.querySelector(".ruler-playhead").style.transform)
+          .m41,
+      );
+      requestAnimationFrame(sample);
+    };
+    requestAnimationFrame(sample);
+  });
+  await page.mouse.move(headX + 477, headY, { steps: 120 });
+  const scrub = await page.evaluate(() => {
+    globalThis.watchScrub = false;
+    return {
+      positions: globalThis.scrubFrames,
+      seeks: globalThis.scrubSeeks,
+      time:
+        new DOMMatrix(document.querySelector(".ruler-playhead").style.transform)
+          .m41 / 2400,
+    };
+  });
+  expect(new Set(scrub.positions).size).toBeGreaterThan(30);
+  expect(
+    Math.abs(scrub.time * 20 - Math.round(scrub.time * 20)),
+  ).toBeGreaterThan(0.001);
+  expect(scrub.seeks).toBeLessThan(12);
+  await page.mouse.up();
+  await expect
+    .poll(async () =>
+      Number(await page.getByLabel("播放进度", { exact: true }).inputValue()),
+    )
+    .toBeCloseTo(3.2, 7);
+  await expect
+    .poll(() =>
+      page
+        .locator(".preview-layer.video video")
+        .evaluate((video) => video.currentTime),
+    )
+    .toBeCloseTo(5.2, 3);
+  // A final pointer movement and release in the same task must flush the final
+  // position instead of allowing a stale animation frame to overwrite it.
+  const finalBox = await head.boundingBox();
+  const finalX = finalBox.x + finalBox.width / 2;
+  await page.mouse.move(finalX, headY);
+  await page.mouse.down();
+  await head.evaluate(
+    (element, position) => {
+      for (const type of ["pointermove", "pointerup"])
+        element.dispatchEvent(
+          new PointerEvent(type, {
+            bubbles: true,
+            pointerId: 1,
+            buttons: type === "pointermove" ? 1 : 0,
+            clientX: position.x + 95,
+            clientY: position.y,
+          }),
+        );
+    },
+    { x: finalX, y: headY },
+  );
+  await page.mouse.up();
+  await page.evaluate(
+    () =>
+      new Promise((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(resolve)),
+      ),
+  );
+  expect(
+    Number(await page.getByLabel("播放进度", { exact: true }).inputValue()),
+  ).toBeCloseTo(3.25, 7);
+  console.log(
+    JSON.stringify({
+      scrubPositions: new Set(scrub.positions).size,
+      scrubSeeks: scrub.seeks,
+    }),
+  );
+  await page
+    .locator(".timeline")
+    .screenshot({ path: path.join(root, "high-zoom-scrubbing.png") });
   expect(errors).toEqual([]);
   console.log(
     `视频连续源帧、图片平铺、名称时长与波形、选中/右键、帧定格、循环、缩放与可见区域加载通过：${root}`,

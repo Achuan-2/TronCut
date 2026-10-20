@@ -1,4 +1,4 @@
-import { useRef, type MouseEvent, type PointerEvent } from "react";
+import { useEffect, useRef, type MouseEvent, type PointerEvent } from "react";
 import { createPortal } from "react-dom";
 import { useEditorPlayhead, type Editor } from "./useEditor";
 import { timeLabel } from "./Preview";
@@ -29,41 +29,76 @@ export function TimelineRangeHandles({
     range: TimelineRange;
     x: number;
     time: number;
+    latestTime: number;
   } | null>(null);
-  const update = (part: Part, time: number, anchor: TimelineRange) => {
-    const frame = Math.max(
+  const animationFrame = useRef<number | null>(null);
+  const cancelFrame = () => {
+    if (animationFrame.current !== null) {
+      cancelAnimationFrame(animationFrame.current);
+      animationFrame.current = null;
+    }
+  };
+  useEffect(
+    () => () => {
+      cancelFrame();
+      drag.current = null;
+    },
+    [editor.project.id, editor.activeGroupId],
+  );
+  const update = (
+    part: Part,
+    time: number,
+    anchor: TimelineRange,
+    snapToFrame = true,
+  ) => {
+    const position = Math.max(
       minTime,
       Math.min(
         maxTime,
-        Math.round(time * editor.project.canvas.fps) /
-          editor.project.canvas.fps,
+        snapToFrame
+          ? Math.round(time * editor.project.canvas.fps) /
+              editor.project.canvas.fps
+          : time,
       ),
     );
-    if (part === "playhead") editor.seek(frame);
+    if (part === "playhead") editor.seek(position);
     else {
       const next =
         part === "start"
-          ? { start: Math.min(frame, anchor.end), end: anchor.end }
-          : { start: anchor.start, end: Math.max(frame, anchor.start) };
+          ? { start: Math.min(position, anchor.end), end: anchor.end }
+          : { start: anchor.start, end: Math.max(position, anchor.start) };
       editor.setTimelineRange(next);
       editor.seek(part === "start" ? next.start : next.end);
       return next[part];
     }
-    return frame;
+    return position;
   };
   const move = (event: PointerEvent<HTMLButtonElement>) => {
     const active = drag.current;
     if (!active || active.pointerId !== event.pointerId) return;
     event.stopPropagation();
-    update(
-      active.part,
-      active.time + (event.clientX - active.x) / zoom,
-      active.range,
-    );
+    active.latestTime = active.time + (event.clientX - active.x) / zoom;
+    if (animationFrame.current !== null) return;
+    animationFrame.current = requestAnimationFrame(() => {
+      animationFrame.current = null;
+      const latest = drag.current;
+      if (latest)
+        update(
+          latest.part,
+          latest.latestTime,
+          latest.range,
+          latest.part !== "playhead",
+        );
+    });
   };
   const finish = (event: PointerEvent<HTMLButtonElement>) => {
-    if (drag.current?.pointerId !== event.pointerId) return;
+    const active = drag.current;
+    if (!active || active.pointerId !== event.pointerId) return;
     event.stopPropagation();
+    cancelFrame();
+    // Keep the last movement even if pointer-up precedes the queued frame.
+    // The cursor follows pixels while dragging and lands on a video frame.
+    update(active.part, active.latestTime, active.range);
     drag.current = null;
     if (event.currentTarget.hasPointerCapture(event.pointerId))
       event.currentTarget.releasePointerCapture(event.pointerId);
@@ -81,6 +116,7 @@ export function TimelineRangeHandles({
         range: { ...range },
         x: event.clientX,
         time: part === "playhead" ? playhead : range[part],
+        latestTime: part === "playhead" ? playhead : range[part],
       };
       event.currentTarget.focus({ preventScroll: true });
       event.currentTarget.setPointerCapture(event.pointerId);
@@ -88,9 +124,7 @@ export function TimelineRangeHandles({
     onPointerMove: move,
     onPointerUp: finish,
     onPointerCancel: finish,
-    onLostPointerCapture: () => {
-      drag.current = null;
-    },
+    onLostPointerCapture: finish,
     onClick: (event: MouseEvent) => event.stopPropagation(),
   });
   return (

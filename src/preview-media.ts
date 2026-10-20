@@ -1,5 +1,9 @@
 import type { Asset, Clip } from "../shared/model";
-import { sourceTimeAt, mediaSegments, frozenAt } from "../shared/media-segments";
+import {
+  sourceTimeAt,
+  mediaSegments,
+  frozenAt,
+} from "../shared/media-segments";
 
 export interface PreviewMediaState {
   clip: Clip;
@@ -7,6 +11,7 @@ export interface PreviewMediaState {
   localTime: number;
   playing: boolean;
   muted: boolean;
+  fps?: number;
 }
 
 /** One decoder owns its seeks and play requests, including asynchronous loads. */
@@ -19,9 +24,13 @@ export function createPreviewMediaController(media: HTMLMediaElement) {
   let disposed = false;
   const play = () => {
     if (
-      disposed || !state?.playing ||
-      frozenAt(state.clip, state.localTime) || !media.paused || playPending
-    ) return;
+      disposed ||
+      !state?.playing ||
+      frozenAt(state.clip, state.localTime) ||
+      !media.paused ||
+      playPending
+    )
+      return;
     playPending = true;
     void media
       .play()
@@ -35,7 +44,12 @@ export function createPreviewMediaController(media: HTMLMediaElement) {
   };
   const synchronize = (force = false) => {
     if (!state || disposed) return;
-    const { clip, asset, localTime, playing, muted } = state;
+    const { clip, asset, playing, muted, fps } = state;
+    // A free-moving scrub cursor must not decode every subframe pointer step.
+    const localTime =
+      !playing && fps
+        ? Math.round(state.localTime * fps) / fps
+        : state.localTime;
     const frozen = frozenAt(clip, localTime);
     if (media.playbackRate !== clip.speed) media.playbackRate = clip.speed;
     if (!media.preservesPitch) media.preservesPitch = true;
@@ -55,7 +69,8 @@ export function createPreviewMediaController(media: HTMLMediaElement) {
     if (
       force ||
       cut ||
-      Math.abs(media.currentTime - target) > (playing && !frozen ? 0.25 : 0.025)
+      Math.abs(media.currentTime - target) >
+        (playing && !frozen ? 0.25 : fps ? 0.001 : 0.025)
     )
       pendingSeek = target;
     // Wait for the previous seek to finish. Reassigning currentTime every

@@ -835,6 +835,7 @@ function PreviewLayerImpl({
               <PreviewMedia
                 clip={clip}
                 asset={asset}
+                fps={project.canvas.fps}
                 localTime={
                   held
                     ? Math.max(
