@@ -71,6 +71,100 @@ try {
   await expect(page.locator(".transition-card")).toHaveCount(4);
   for (const name of ["放大", "淡入淡出", "横扫"])
     await expect(page.getByRole("button", { name, exact: true })).toBeVisible();
+  await expect(page.locator(".transition-card > b")).toHaveText([
+    "平滑切换",
+    "横扫",
+    "放大",
+    "淡入淡出",
+  ]);
+
+  // Check rendered pixels at a naturally reached blur peak, including after
+  // leaving and reopening the panel; a filter URL alone proves no visual effect.
+  const blurChecks = [];
+  for (const pass of ["initial", "reopened"]) {
+    if (pass === "reopened") {
+      await page.getByRole("button", { name: "媒体", exact: true }).click();
+      await page.getByRole("button", { name: "转换", exact: true }).click();
+    }
+    const preview = page.locator(".transition-card-preview.whip-pan");
+    await preview.locator("img").evaluateAll(async (images) => {
+      await Promise.all(images.map((image) => image.decode()));
+    });
+    await expect
+      .poll(() =>
+        page
+          .locator(".transitions-panel feGaussianBlur")
+          .evaluate((blur) => blur.stdDeviationX.animVal),
+      )
+      .toBeGreaterThan(0.07);
+    const sample = await preview.evaluate((element) => {
+      const svg = document.querySelector(".transitions-panel > svg");
+      const blur = svg.querySelector("feGaussianBlur");
+      svg.pauseAnimations();
+      const animations = [...element.querySelectorAll("img")].flatMap((image) =>
+        image.getAnimations(),
+      );
+      animations.forEach((animation) => animation.pause());
+      return {
+        x: blur.stdDeviationX.animVal,
+        y: blur.stdDeviationY.animVal,
+        cssTime: Number(animations[0].currentTime) % 2400,
+      };
+    });
+    expect(sample.x).toBeGreaterThan(0.07);
+    expect(sample.y).toBe(0);
+    const blurred = await preview.screenshot({
+      path: path.join(root, `card-${pass}-blurred.png`),
+    });
+    await preview.locator("img").evaluateAll((images) => {
+      images.forEach((image) => (image.style.filter = "none"));
+    });
+    const clear = await preview.screenshot({
+      path: path.join(root, `card-${pass}-clear.png`),
+    });
+    const pixels = await sharp(blurred).removeAlpha().raw().toBuffer();
+    const reference = await sharp(clear).removeAlpha().raw().toBuffer();
+    const difference =
+      pixels.reduce(
+        (sum, value, index) => sum + Math.abs(value - reference[index]),
+        0,
+      ) / pixels.length;
+    expect(difference).toBeGreaterThan(3);
+    blurChecks.push({ pass, ...sample, difference });
+    await preview.locator("img").evaluateAll((images) => {
+      const filter = document.querySelector(
+        ".transitions-panel > svg filter",
+      ).id;
+      images.forEach((image) => {
+        image.style.filter = `url(#${filter})`;
+        image
+          .getAnimations()
+          .forEach((animation) => (animation.currentTime = 0));
+      });
+    });
+    await expect
+      .poll(() =>
+        page
+          .locator(".transitions-panel feGaussianBlur")
+          .evaluate((blur) => blur.stdDeviationX.animVal),
+      )
+      .toBe(0);
+    await preview.screenshot({
+      path: path.join(root, `card-${pass}-rest.png`),
+    });
+    await preview.locator("img").evaluateAll((images) => {
+      images.forEach((image) =>
+        image.getAnimations().forEach((animation) => animation.play()),
+      );
+    });
+    await page
+      .locator(".transitions-panel > svg")
+      .evaluate((svg) => svg.unpauseAnimations());
+  }
+  await fs.writeFile(
+    path.join(root, "card-blur-checks.json"),
+    JSON.stringify(blurChecks, null, 2),
+  );
 
   const transfer = await page.evaluateHandle(() => {
     const data = new DataTransfer();

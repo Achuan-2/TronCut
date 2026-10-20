@@ -11,9 +11,9 @@ export const transitionTypeSchema = z.enum([
 export type TransitionType = z.infer<typeof transitionTypeSchema>;
 export const transitionPresets: { type: TransitionType; name: string }[] = [
   { type: "smooth-slide", name: "平滑切换" },
+  { type: "whip-pan", name: "横扫" },
   { type: "zoom", name: "放大" },
   { type: "fade", name: "淡入淡出" },
-  { type: "whip-pan", name: "横扫" },
 ];
 export const transitionName = (type: TransitionType) =>
   transitionPresets.find((preset) => preset.type === type)!.name;

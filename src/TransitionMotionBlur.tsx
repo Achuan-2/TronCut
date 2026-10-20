@@ -2,11 +2,9 @@
 export function TransitionBlurFilter({
   id,
   amount,
-  animated = false,
 }: {
   id: string;
   amount: number;
-  animated?: boolean;
 }) {
   return (
     <filter
@@ -18,17 +16,7 @@ export function TransitionBlurFilter({
       primitiveUnits="objectBoundingBox"
       colorInterpolationFilters="sRGB"
     >
-      <feGaussianBlur stdDeviation={`${amount} 0`} edgeMode="duplicate">
-        {animated && (
-          <animate
-            attributeName="stdDeviation"
-            values={`0 0;0 0;${amount / 4} 0;${amount} 0;${amount / 4} 0;0 0;0 0`}
-            keyTimes="0;0.2;0.2875;0.375;0.4625;0.55;1"
-            dur="2.4s"
-            repeatCount="indefinite"
-          />
-        )}
-      </feGaussianBlur>
+      <feGaussianBlur stdDeviation={`${amount} 0`} edgeMode="duplicate" />
     </filter>
   );
 }
