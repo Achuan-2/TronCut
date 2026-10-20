@@ -1348,8 +1348,12 @@ export default function Preview({
       );
     }
   };
-  const { project, playing, seek, advancePlayback, setPlaying } = editor,
-    duration = editor.timelineBounds?.end ?? projectDuration(project);
+  const { project, playing, seek, advancePlayback, setPlaying } = editor;
+  const totalDuration = useMemo(
+    () => projectDuration(editor.documentProject),
+    [editor.documentProject.clips],
+  );
+  const duration = editor.timelineBounds?.end ?? totalDuration;
   const startTime = editor.timelineBounds?.start ?? 0;
   useEffect(() => {
     const element = holder.current;
@@ -1658,10 +1662,10 @@ export default function Preview({
           className="playback-progress"
           aria-label="播放进度"
           type="range"
-          min={startTime}
-          max={duration || 1}
+          min={0}
+          max={totalDuration || 1}
           step={1 / project.canvas.fps}
-          value={Math.min(playhead, duration)}
+          value={Math.min(playhead, totalDuration)}
           disabled={!duration}
           onChange={(event) => {
             setPlaying(false);
@@ -1669,7 +1673,7 @@ export default function Preview({
           }}
         />
         <span className="timecode">
-          {timeLabel(playhead)} <span>/ {timeLabel(duration)}</span>
+          {timeLabel(playhead)} <span>/ {timeLabel(totalDuration)}</span>
         </span>
         <label className="preview-quality" title="预览画质设置">
           <select

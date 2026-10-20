@@ -158,21 +158,50 @@ try {
   await page.getByRole("button", { name: "播放头", exact: true }).dblclick();
   await expect(start).toHaveAttribute("aria-valuenow", "20");
   const progress = page.getByRole("slider", { name: "播放进度", exact: true });
-  await expect(progress).toHaveAttribute("min", "12");
-  await expect(progress).toHaveAttribute("max", "20");
+  await expect(progress).toHaveAttribute("min", "0");
+  await expect(progress).toHaveAttribute("max", "29");
+  await expect(page.locator(".timecode")).toContainText("/ 00:29.00");
   await progress.focus();
   await progress.press("Home");
   await expect(start).toHaveAttribute("aria-valuenow", "12");
+  await expect(progress).toHaveValue("12");
+  await progress.press("End");
+  await expect(progress).toHaveValue("20");
+  await progress.press("End");
+  await expect(progress).toHaveValue("20");
+  for (const value of [0, 28]) {
+    await progress.evaluate((element, value) => {
+      Object.getOwnPropertyDescriptor(
+        HTMLInputElement.prototype,
+        "value",
+      ).set.call(element, String(value));
+      element.dispatchEvent(new Event("input", { bubbles: true }));
+    }, value);
+    await expect(progress).toHaveValue(value === 0 ? "12" : "20");
+  }
+  const progressBox = await progress.boundingBox();
+  await page.mouse.click(
+    progressBox.x + 1,
+    progressBox.y + progressBox.height / 2,
+  );
+  await expect(progress).toHaveValue("12");
+  await page.mouse.click(
+    progressBox.x + progressBox.width - 1,
+    progressBox.y + progressBox.height / 2,
+  );
+  await expect(progress).toHaveValue("20");
   await seek(19.8);
   await page.getByTitle("播放 / 暂停（空格）", { exact: true }).click();
   await expect(start).toHaveAttribute("aria-valuenow", "20");
   await expect(page.locator(".play-button .lucide-play")).toBeVisible();
   await seek(15);
+  await page.screenshot({ path: path.join(root, "group-progress.png") });
   await page
     .locator(".timeline")
     .screenshot({ path: path.join(root, "group-range.png") });
   await save();
   await page.getByRole("tab", { name: "主时间线", exact: true }).click();
+  await expect(progress).toHaveAttribute("max", "29");
   await setTimelineZoom(page, 40);
   await expect.poll(anchor).toBe("audio");
   await expect(page.locator(".group-timeline-mask")).toHaveCount(0);
