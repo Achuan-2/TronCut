@@ -1,5 +1,9 @@
 # 验证记录（含历史与 TronCut 0.3）
 
+## 移除媒体引擎自定义（2026-10-20）
+
+Rust/Wasm、TypeScript、Vite 和 Electron 构建通过。`scripts/test-storage-directories-ui.mjs` 验证高级页不再显示媒体引擎标题及配置按钮，桥接接口不再暴露 `selectBinary`；在隔离配置中预置无效的旧 `engines.json` 路径，首次启动及重启后自带 FFmpeg/FFprobe 仍通过实际能力检查。原有三个存储目录的选择、保存、重启、项目与备份流程回归通过，无前端运行错误，截图位于 `test-output/storage-directories-ui/run-1792488559170/`。验证使用本地开发构建。
+
 ## 自定义存储目录（2026-10-20）
 
 Rust/Wasm、TypeScript、Vite 和 Electron 构建通过；存储目录、首选项、ONNX 下载与常驻进程、ASR、TTS、声音克隆的 7 个测试文件共 31 项测试通过。新增存储测试验证旧配置默认值、自定义路径持久化、备份与模型复制、目标同名文件保留、忽略下载暂存目录、恢复默认、失败时保留配置，以及备份写入与路径切换串行执行。

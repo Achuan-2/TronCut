@@ -16,7 +16,7 @@ The Git repository intentionally excludes standalone binaries. Before packaging,
 | wgc-capture.exe / cursor-sampler.exe / recording-border.exe | Run `powershell -ExecutionPolicy Bypass -File scripts/build-native.ps1`. Requires Visual Studio 2022 C++, Windows SDK 10.0.22621+, and CMake.                                                                          |
 | uv.exe                               | Obtain uv 0.6.5 Windows x64 from [the official release](https://github.com/astral-sh/uv/releases/tag/0.6.5) and retain its MIT/Apache license files.                                                                   |
 
-首次公开版本使用 FFmpeg 9.0.2、uv 0.6.5 和 vendored OpenScreen C++ 捕获组件。精确 FFmpeg 来源与压缩包校验值在 `resources/bin/manifest.json`，第三方声明见 [THIRD_PARTY_NOTICES.md](../THIRD_PARTY_NOTICES.md)。开发时也可使用 PATH 或设置面板中的媒体引擎，但打包要求引擎随程序分发。
+首次公开版本使用 FFmpeg 9.0.2、uv 0.6.5 和 vendored OpenScreen C++ 捕获组件。精确 FFmpeg 来源与压缩包校验值在 `resources/bin/manifest.json`，第三方声明见 [THIRD_PARTY_NOTICES.md](../THIRD_PARTY_NOTICES.md)。开发时也可使用 PATH 中的媒体引擎，但打包要求引擎随程序分发。
 
 ```powershell
 pnpm build

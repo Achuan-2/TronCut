@@ -19,6 +19,14 @@ await fs.writeFile(
   path.join(profile, "models/onnx/sensevoice-small/model.int8.onnx"),
   "fixture-model",
 );
+// A stale user-selected binary must no longer override the bundled engines.
+await fs.writeFile(
+  path.join(profile, "engines.json"),
+  JSON.stringify({
+    FFMPEG: path.join(root, "missing-ffmpeg.exe"),
+    FFPROBE: path.join(root, "missing-ffprobe.exe"),
+  }),
+);
 const env = {
   ...process.env,
   FRAMECRAFT_SMOKE: "1",
@@ -34,6 +42,10 @@ async function launch() {
   await expect(
     page.getByRole("button", { name: "编辑", exact: true }),
   ).toBeVisible();
+  await expect(page.locator(".workspace-status")).toContainText("媒体引擎就绪");
+  expect(await page.evaluate(() => "selectBinary" in window.framecraft)).toBe(
+    false,
+  );
   return page;
 }
 async function preferences(page, tab = "程序") {
@@ -78,6 +90,12 @@ try {
   );
   await choose(page, "备份文件夹", directories.backupDirectory);
   await page.getByRole("tab", { name: "高级", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "媒体引擎", exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: /配置 FFmpeg|配置 FFprobe/ }),
+  ).toHaveCount(0);
   await choose(page, "ONNX 模型文件夹", directories.onnxModelsDirectory);
   await page.getByRole("tab", { name: "项目", exact: true }).click();
   await choose(page, "默认项目创建位置", directories.projectDirectory);

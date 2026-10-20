@@ -182,7 +182,6 @@ export interface FrameCraftBridge {
   ): () => void;
   onShortcut(callback: (command: string) => void): () => void;
   capabilities(): Promise<Capabilities>;
-  selectBinary(name: "ffmpeg" | "ffprobe" | "videocaptioner"): Promise<void>;
   transcribe(
     project: Project,
     engine: SpeechEngine,

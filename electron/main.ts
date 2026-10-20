@@ -1196,29 +1196,6 @@ function installHandlers() {
       await fs.rm(temp, { recursive: true, force: true });
     }
   });
-  handle("app:selectBinary", async (value: unknown) => {
-    const name = z.enum(["ffmpeg", "ffprobe", "videocaptioner"]).parse(value);
-    const file = await chooseFile(
-      `选择 ${name} 可执行文件`,
-      process.platform === "win32" ? ["exe"] : ["*"],
-    );
-    if (file) {
-      process.env[`FRAMECRAFT_${name.toUpperCase()}`] = file;
-      await fs.writeFile(
-        path.join(app.getPath("userData"), "engines.json"),
-        JSON.stringify(
-          Object.fromEntries(
-            ["FFMPEG", "FFPROBE", "VIDEOCAPTIONER"].map((n) => [
-              n,
-              process.env[`FRAMECRAFT_${n}`] ?? "",
-            ]),
-          ),
-          null,
-          2,
-        ),
-      );
-    }
-  });
   handle(
     "subtitles:transcribe",
     async (
@@ -1552,19 +1529,6 @@ app
   .whenReady()
   .then(async () => {
     await fs.mkdir(app.getPath("userData"), { recursive: true });
-    try {
-      const config = JSON.parse(
-        await fs.readFile(
-          path.join(app.getPath("userData"), "engines.json"),
-          "utf8",
-        ),
-      );
-      for (const name of ["FFMPEG", "FFPROBE", "VIDEOCAPTIONER"])
-        if (typeof config[name] === "string" && config[name])
-          process.env[`FRAMECRAFT_${name}`] = config[name];
-    } catch {
-      /* First launch uses bundled engines or PATH. */
-    }
     if (cliMode) {
       const controller = new AbortController();
       const cancel = () => controller.abort();

@@ -137,7 +137,6 @@ const bridge: FrameCraftBridge = {
     return () => ipcRenderer.removeListener("shortcut", fn);
   },
   capabilities: () => ipcRenderer.invoke("app:capabilities"),
-  selectBinary: (name) => ipcRenderer.invoke("app:selectBinary", name),
   transcribe: (project, engine, language, options) =>
     ipcRenderer.invoke(
       "subtitles:transcribe",

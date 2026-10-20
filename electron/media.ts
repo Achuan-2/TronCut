@@ -85,7 +85,7 @@ export async function capabilities(resourcesPath?: string) {
       { timeout: 10000 },
     );
     if (!/\blibx264\b/.test(encoders))
-      throw new Error("FFmpeg 缺少 libx264 H.264 编码器，请配置完整媒体引擎");
+      throw new Error("FFmpeg 缺少 libx264 H.264 编码器");
     return {
       ffmpeg: true,
       rubberband: /\brubberband\b/.test(filters),

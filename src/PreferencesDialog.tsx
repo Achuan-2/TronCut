@@ -732,25 +732,6 @@ export default function PreferencesDialog({
               )}
               {tab === "advanced" && (
                 <>
-                  <h3>媒体引擎</h3>
-                  <p className="field-help">
-                    安装包自带媒体引擎。需要使用其他版本时，可指定可执行文件。
-                  </p>
-                  {(["ffmpeg", "ffprobe"] as const).map((name) => (
-                    <button
-                      type="button"
-                      className="wide-button"
-                      key={name}
-                      onClick={() =>
-                        void perform(async () => {
-                          await window.framecraft!.selectBinary(name);
-                          toast(`${name} 配置已更新`);
-                        })
-                      }
-                    >
-                      配置 {name === "ffmpeg" ? "FFmpeg" : "FFprobe"}
-                    </button>
-                  ))}
                   <h3>本地数据</h3>
                   {storageField("onnxModelsDirectory", "ONNX 模型文件夹")}
                   <p className="field-help">

@@ -1154,7 +1154,7 @@ export default function App() {
               : caps?.ffmpeg
                 ? "媒体引擎就绪"
                 : window.framecraft
-                  ? "媒体引擎待配置"
+                  ? "媒体引擎不可用"
                   : "浏览器预览 · 文件与录屏请用桌面版"
           }
         >
@@ -1169,7 +1169,7 @@ export default function App() {
               : caps?.ffmpeg
                 ? "媒体引擎就绪"
                 : window.framecraft
-                  ? "媒体引擎待配置"
+                  ? "媒体引擎不可用"
                   : "浏览器预览"}
           </span>
         </span>
