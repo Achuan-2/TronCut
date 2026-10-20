@@ -2417,25 +2417,8 @@ export default function Timeline({
               onRename={setRenamingClip}
               onExtendFrame={editFrameExtension}
             >
-              <hr />
               <button
-                disabled={
-                  !editor.hasBehaviorClipboard() ||
-                  !!project.tracks.find(
-                    (track) =>
-                      track.id ===
-                      project.clips.find((clip) => clip.id === context.id)
-                        ?.trackId,
-                  )?.locked
-                }
-                onClick={() => {
-                  setContext(null);
-                  editor.pasteBehavior(context.id);
-                }}
-              >
-                粘贴效果
-              </button>
-              <button
+                role="menuitem"
                 disabled={
                   selectionLocked ||
                   editor.playhead <= clip.start ||
@@ -2454,7 +2437,6 @@ export default function Timeline({
                   );
                 }}
               >
-                <Scissors size={14} />
                 在播放头拆分
                 <span className="menu-shortcut">Ctrl/⌘+K</span>
               </button>

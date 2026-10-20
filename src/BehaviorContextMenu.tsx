@@ -53,13 +53,15 @@ export default function BehaviorContextMenu({ editor }: { editor: Editor }) {
       >
         复制效果
       </button>
-      <button
-        role="menuitem"
-        disabled={menu.locked || !editor.hasBehaviorClipboard()}
-        onClick={() => editor.pasteBehavior(menu.clipId)}
-      >
-        粘贴效果
-      </button>
+      {editor.hasBehaviorClipboard() && (
+        <button
+          role="menuitem"
+          disabled={menu.locked}
+          onClick={() => editor.pasteBehavior(menu.clipId)}
+        >
+          粘贴效果
+        </button>
+      )}
       <button
         role="menuitem"
         disabled={menu.locked}

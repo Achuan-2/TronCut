@@ -197,7 +197,7 @@ try {
     .click({ button: "right" });
   await page.getByRole("menuitem", { name: "复制效果", exact: true }).click();
   await page.locator(".timeline-clip.image").click({ button: "right" });
-  await page.getByRole("button", { name: "粘贴效果", exact: true }).click();
+  await page.getByRole("menuitem", { name: "粘贴效果", exact: true }).click();
   await expect(page.locator(".clip-behavior-effect")).toHaveCount(4);
   await page.locator(".clip-behavior-effect.selected").click();
   await page.keyboard.press("Delete");

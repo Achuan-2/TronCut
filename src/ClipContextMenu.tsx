@@ -285,81 +285,20 @@ export default function ClipContextMenu({
         buttons[next]?.focus();
       }}
     >
-      {surface === "timeline" && (
-        <>
-          {source?.kind === "video" && onExtendFrame && (
-            <>
-              <button
-                role="menuitem"
-                disabled={!!extensionError}
-                title={extensionError ?? undefined}
-                onPointerEnter={() => setSubmenu(null)}
-                onClick={() => {
-                  onExtendFrame(source.id, extensionTime);
-                  onClose();
-                }}
-              >
-                {extension ? "调整帧定格时长" : "帧定格…"}
-              </button>
-              {extension && (
-                <button
-                  role="menuitem"
-                  disabled={!!frameExtensionError(project, source.id, extension.start, 0)}
-                  onPointerEnter={() => setSubmenu(null)}
-                  onClick={() => {
-                    editor.apply((project) =>
-                      setFrameExtension(project, source.id, extension.start, 0),
-                    );
-                    onClose();
-                  }}
-                >
-                  移除帧定格
-                </button>
-              )}
-            </>
-          )}
-          {onRename && !groupId && (
-            <button
-              role="menuitem"
-              disabled={
-                !source || !editableIds(project, [source.id]).has(source.id)
-              }
-              onPointerEnter={() => setSubmenu(null)}
-              onClick={() => {
-                if (source) onRename(source.id);
-                onClose();
-              }}
-            >
-              重命名
-            </button>
-          )}
-          {menu.stitchTime !== undefined && source && (
-            <button
-              role="menuitem"
-              disabled={!canEdit}
-              onClick={() => {
-                editor.unstitchSelectedClips(menu.stitchTime, source.id);
-                onClose();
-              }}
-            >
-              移除拼接
-            </button>
-          )}
-          {menu.stitchTime === undefined && (
-            <div title={stitchError ?? undefined}>
-              {item("拼接所选媒体", "stitch", "Ctrl+Alt+I", !!stitchError)}
-            </div>
-          )}
-          {canUnstitch &&
-            item("移除全部拼接", "unstitch", "Ctrl+Shift+\\", false)}
-          {item(
-            "拆分视频和音频",
-            "detachAudio",
-            "",
-            !canEdit || !detachableVideos(project, ids).length,
-          )}
-          <hr />
-        </>
+      {surface === "timeline" && onRename && !groupId && (
+        <button
+          role="menuitem"
+          disabled={
+            !source || !editableIds(project, [source.id]).has(source.id)
+          }
+          onPointerEnter={() => setSubmenu(null)}
+          onClick={() => {
+            if (source) onRename(source.id);
+            onClose();
+          }}
+        >
+          重命名
+        </button>
       )}
       {item("剪切", "cut", "Ctrl+X")}
       {item("复制", "copy", "Ctrl+C", !source)}
@@ -393,6 +332,21 @@ export default function ClipContextMenu({
       >
         粘贴属性
       </button>
+      {surface === "timeline" && source && editor.hasBehaviorClipboard() && (
+        <button
+          role="menuitem"
+          disabled={
+            !!project.tracks.find((track) => track.id === source.trackId)?.locked
+          }
+          onPointerEnter={() => setSubmenu(null)}
+          onClick={() => {
+            editor.pasteBehavior(source.id);
+            onClose();
+          }}
+        >
+          粘贴效果
+        </button>
+      )}
       <hr />
       <button
         role="menuitem"
@@ -432,10 +386,75 @@ export default function ClipContextMenu({
           )}
         </>
       )}
-      {children && (
-        <div className="clip-context-extras" onClick={onClose}>
-          {children}
-        </div>
+      {surface === "timeline" && (
+        <>
+          <hr />
+          <div role="group" aria-label="剪辑操作">
+            {source?.kind === "video" && onExtendFrame && (
+              <>
+                <button
+                  role="menuitem"
+                  disabled={!!extensionError}
+                  title={extensionError ?? undefined}
+                  onPointerEnter={() => setSubmenu(null)}
+                  onClick={() => {
+                    onExtendFrame(source.id, extensionTime);
+                    onClose();
+                  }}
+                >
+                  {extension ? "调整帧定格时长" : "帧定格…"}
+                </button>
+                {extension && (
+                  <button
+                    role="menuitem"
+                    disabled={
+                      !!frameExtensionError(project, source.id, extension.start, 0)
+                    }
+                    onPointerEnter={() => setSubmenu(null)}
+                    onClick={() => {
+                      editor.apply((project) =>
+                        setFrameExtension(project, source.id, extension.start, 0),
+                      );
+                      onClose();
+                    }}
+                  >
+                    移除帧定格
+                  </button>
+                )}
+              </>
+            )}
+            {item(
+              "拆分视频和音频",
+              "detachAudio",
+              "",
+              !canEdit || !detachableVideos(project, ids).length,
+            )}
+            {menu.stitchTime !== undefined && source ? (
+              <button
+                role="menuitem"
+                disabled={!canEdit}
+                onPointerEnter={() => setSubmenu(null)}
+                onClick={() => {
+                  editor.unstitchSelectedClips(menu.stitchTime, source.id);
+                  onClose();
+                }}
+              >
+                移除拼接
+              </button>
+            ) : (
+              <div title={stitchError ?? undefined}>
+                {item("拼接所选媒体", "stitch", "Ctrl+Alt+I", !!stitchError)}
+              </div>
+            )}
+            {canUnstitch &&
+              item("移除全部拼接", "unstitch", "Ctrl+Shift+\\", false)}
+            {children && (
+              <div className="clip-context-extras" onClick={onClose}>
+                {children}
+              </div>
+            )}
+          </div>
+        </>
       )}
       {surface === "canvas" && (
         <>
