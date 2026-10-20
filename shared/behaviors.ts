@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { Clip, Transform } from "./model";
 import { referenceBehaviorPhases } from "./behavior-reference";
+import { mediaBehaviorDefinitions } from "./media-behavior-reference";
 
 export const behaviorStyles = [
   "none",
@@ -19,6 +20,12 @@ export const behaviorStyles = [
   "sway",
   "shake",
   "wave",
+  "bounce-in",
+  "grow",
+  "hinge",
+  "implode",
+  "drop",
+  "shrink",
 ] as const;
 export const behaviorStyleLabels: Record<BehaviorStyle, string> = {
   none: "无",
@@ -37,6 +44,12 @@ export const behaviorStyleLabels: Record<BehaviorStyle, string> = {
   sway: "摆动",
   shake: "颤动",
   wave: "波浪",
+  "bounce-in": "弹入",
+  grow: "增长",
+  hinge: "铰链",
+  implode: "内爆",
+  drop: "下降",
+  shrink: "收缩",
 };
 export const behaviorPhaseSchema = z.object({
   style: z.enum(behaviorStyles),
@@ -51,6 +64,7 @@ export const behaviorPhaseSchema = z.object({
     "bounce",
     "circular-out",
     "exponential-out",
+    "back-out",
   ]),
   direction: z.enum(["left", "right", "top", "bottom"]),
   speed: z.number().finite().min(1).max(100),
@@ -74,6 +88,7 @@ export const behaviorSchema = z.object({
   preset: z.string().max(100),
   // Keep applied custom presets readable even if their library entry is removed.
   name: z.string().trim().min(1).max(100).optional(),
+  category: z.enum(["text", "media"]).optional(),
   enabled: z.boolean(),
   // Normal clips start at zero. A frame snapshot shifts the clock backwards
   // while retaining the original duration so it captures the current phase.
@@ -125,6 +140,7 @@ export const behaviorMovementOptions: readonly (readonly [
   ["exponential-out", "缓出 - 指数函数缓动"],
   ["spring", "跳跃"],
   ["bounce", "回弹"],
+  ["back-out", "回摆"],
 ];
 export function shiftingPhase(
   key: BehaviorPhaseKey,
@@ -161,6 +177,7 @@ export function shiftingPhase(
 export interface BehaviorPreset {
   id: string;
   name: string;
+  category?: "text" | "media";
   incoming: BehaviorPhase;
   during: BehaviorPhase;
   outgoing: BehaviorPhase;
@@ -247,6 +264,135 @@ behaviorPresets.unshift({
   },
 });
 
+// Media presets always animate the entire object, including when used on text.
+export const mediaBehaviorPresets: BehaviorPreset[] =
+  mediaBehaviorDefinitions.map(({ id, name, incoming, during, outgoing }) => ({
+    id: `media-${id}`,
+    name,
+    category: "media",
+    incoming: { ...phase("none"), ...incoming, type: "whole", offset: 0 },
+    during: { ...phase("none"), ...during, type: "whole", offset: 0 },
+    outgoing: { ...phase("none"), ...outgoing, type: "whole", offset: 0 },
+  }));
+behaviorPresets.push(...mediaBehaviorPresets);
+
+/** Camtasia exposes different media styles in each phase. */
+export const mediaBehaviorStyles: Record<
+  BehaviorPhaseKey,
+  readonly (readonly [BehaviorStyle, string])[]
+> = {
+  incoming: [
+    ["bounce-in", "弹入"],
+    ["drift", "漂移"],
+    ["fade", "淡入"],
+    ["fly", "飞入"],
+    ["grow", "增长"],
+    ["hinge", "铰链"],
+    ["implode", "内爆"],
+    ["none", "无"],
+    ["reveal", "显示"],
+    ["cut", "切换"],
+    ["slide", "滑动"],
+  ],
+  during: [
+    ["drift", "漂移"],
+    ["fade", "正在淡入淡出"],
+    ["bounce", "跳转"],
+    ["none", "无"],
+    ["pop", "弹出"],
+    ["pulse", "脉动"],
+    ["reveal", "显示"],
+    ["cut", "切换"],
+    ["shake", "颤动"],
+    ["sway", "摆动"],
+  ],
+  outgoing: [
+    ["drift", "漂移"],
+    ["drop", "下降"],
+    ["explode", "爆炸"],
+    ["fade", "淡出"],
+    ["fly", "飞出"],
+    ["hinge", "铰链"],
+    ["none", "无"],
+    ["reveal", "显示"],
+    ["cut", "切换"],
+    ["shrink", "收缩"],
+    ["slide", "滑动"],
+  ],
+};
+
+export function mediaBehaviorPhase(
+  style: BehaviorStyle,
+  key: BehaviorPhaseKey,
+): BehaviorPhase {
+  style = mediaBehaviorStyle(style, key);
+  const reference =
+    mediaBehaviorPresets.find((preset) => preset[key].style === style)?.[key] ??
+    behaviorPresets.find(
+      (preset) => preset.category !== "media" && preset[key].style === style,
+    )?.[key];
+  return { ...phase(style), ...reference, style, type: "whole", offset: 0 };
+}
+
+/** Text names and media names describe the same whole-object effect family. */
+export function mediaBehaviorStyle(
+  style: BehaviorStyle,
+  key: BehaviorPhaseKey,
+): BehaviorStyle {
+  const alias: Partial<Record<BehaviorStyle, BehaviorStyle>> =
+    key === "during"
+      ? { scale: "pulse", wave: "sway", float: "drift" }
+      : {
+          pop: "hinge",
+          scale: key === "incoming" ? "grow" : "shrink",
+          bounce: key === "incoming" ? "bounce-in" : "drop",
+          explode: key === "incoming" ? "implode" : "explode",
+          float: "drift",
+        };
+  const mapped = alias[style] ?? style;
+  return mediaBehaviorStyles[key].some(([value]) => value === mapped)
+    ? mapped
+    : "none";
+}
+
+export function changeBehaviorType(
+  phase: BehaviorPhase,
+  key: BehaviorPhaseKey,
+  type: BehaviorPhase["type"],
+): BehaviorPhase {
+  if (
+    type === phase.type &&
+    (type !== "whole" || mediaBehaviorStyle(phase.style, key) === phase.style)
+  )
+    return phase;
+  if (type === "whole") return mediaBehaviorPhase(phase.style, key);
+  const aliases: Partial<Record<BehaviorStyle, BehaviorStyle>> = {
+    "bounce-in": "bounce",
+    grow: "scale",
+    hinge: "pop",
+    implode: "explode",
+    drop: "bounce",
+    shrink: "scale",
+  };
+  return { ...phase, style: aliases[phase.style] ?? phase.style, type };
+}
+
+export function behaviorForMedia(behavior: Behavior): Behavior {
+  const convert = (key: BehaviorPhaseKey): BehaviorPhase => ({
+    ...behavior[key],
+    style: mediaBehaviorStyle(behavior[key].style, key),
+    type: "whole",
+    offset: 0,
+  });
+  return {
+    ...behavior,
+    category: "media",
+    incoming: convert("incoming"),
+    during: convert("during"),
+    outgoing: convert("outgoing"),
+  };
+}
+
 export function createBehavior(
   presetId: string,
   duration: number,
@@ -264,6 +410,7 @@ export function behaviorFromPreset(
   const value: Behavior = {
     id: crypto.randomUUID(),
     preset: preset.id,
+    ...(preset.category ? { category: preset.category } : {}),
     enabled: true,
     start: 0,
     duration,
@@ -271,7 +418,36 @@ export function behaviorFromPreset(
     during: { ...preset.during },
     outgoing: { ...preset.outgoing },
   };
-  if (kind !== "text")
+  if (kind !== "text" && preset.category !== "media") {
+    // Adding a text preset to media uses its corresponding media preset when
+    // available, so both library tabs create the same three-phase behavior.
+    const ids: Record<string, string> = {
+      pop: "hinge",
+      scale: "grow",
+      bounce: "bounce-in",
+      explode: "implode",
+      "type-scale": "grow",
+      "type-fade": "fade",
+      "type-reveal": "reveal",
+      "type-fly": "fly",
+      "type-scatter": "slide",
+    };
+    const mediaPreset =
+      !preset.id.startsWith("user-") &&
+      mediaBehaviorPresets.find(
+        (item) => item.id === `media-${ids[preset.id] ?? preset.id}`,
+      );
+    if (mediaPreset)
+      return {
+        ...value,
+        category: "media",
+        incoming: { ...mediaPreset.incoming },
+        during: { ...mediaPreset.during },
+        outgoing: { ...mediaPreset.outgoing },
+      };
+    return behaviorForMedia(value);
+  }
+  if (preset.category === "media")
     for (const key of ["incoming", "during", "outgoing"] as const)
       value[key] = { ...value[key], type: "whole", offset: 0 };
   return value;
@@ -296,16 +472,19 @@ export const shiftBehaviors = (clip: Clip, delta: number) =>
 export function fitBehaviorDuration(clip: Clip): Clip {
   if (
     !clip.behaviors?.some(
-      (behavior) => !behavior.preserveTiming &&
+      (behavior) =>
+        !behavior.preserveTiming &&
         (behavior.start !== 0 || behavior.duration !== clip.duration),
     )
   )
     return clip;
   return {
     ...clip,
-    behaviors: clip.behaviors.map((behavior) => behavior.preserveTiming
-      ? behavior
-      : { ...behavior, start: 0, duration: clip.duration }),
+    behaviors: clip.behaviors.map((behavior) =>
+      behavior.preserveTiming
+        ? behavior
+        : { ...behavior, start: 0, duration: clip.duration },
+    ),
   };
 }
 
@@ -323,6 +502,9 @@ export interface GlyphMotion {
   rotationX: number;
   rotationY: number;
   opacity: number;
+  // Hinge pivot displacement in fractions of the object's own dimensions.
+  pivotX: number;
+  pivotY: number;
 }
 export const neutralMotion = (): GlyphMotion => ({
   x: 0,
@@ -332,6 +514,8 @@ export const neutralMotion = (): GlyphMotion => ({
   rotationX: 0,
   rotationY: 0,
   opacity: 1,
+  pivotX: 0,
+  pivotY: 0,
 });
 function rankFor(type: BehaviorPhase["type"], index: number, count: number) {
   return type === "whole" || type === "simultaneous"
@@ -394,6 +578,10 @@ export function behaviorEase(
       return 1 - 2 ** (-10 * p);
     case "bounce":
       return 1 - Math.abs(Math.cos(p * Math.PI * 2.5)) * (1 - p) ** 2;
+    case "back-out": {
+      const c = 1.70158;
+      return 1 + (c + 1) * (p - 1) ** 3 + c * (p - 1) ** 2;
+    }
     default:
       return 1 - (1 - p) ** 4;
   }
@@ -409,6 +597,8 @@ export function changeBehaviorPhase(
   patch: Partial<BehaviorPhase>,
 ): BehaviorPhase {
   const next = { ...phase, ...patch };
+  if (patch.style !== undefined && patch.style !== phase.style)
+    return { ...next, duration: patch.duration };
   if (phase.duration !== undefined && patch.duration === undefined) {
     if (patch.speed !== undefined)
       next.duration = Math.min(
@@ -472,6 +662,26 @@ function transition(
     else value.y = hidden * distance * (phase.direction === "top" ? -1 : 1);
   }
   if (phase.style === "scale") value.scale = Math.max(0.01, q);
+  if (phase.style === "grow" || phase.style === "shrink")
+    value.scale = Math.max(0.01, q);
+  if (phase.style === "bounce-in" || phase.style === "drop") {
+    const distance = hidden * 12.5;
+    if (phase.direction === "left" || phase.direction === "right")
+      value.x = distance * (phase.direction === "left" ? -1 : 1);
+    else value.y = distance * (phase.direction === "top" ? -1 : 1);
+  }
+  if (phase.style === "hinge") {
+    const horizontal = ["left", "right"].includes(phase.direction);
+    value[horizontal ? "rotationY" : "rotationX"] = 90 * hidden;
+    value[horizontal ? "pivotX" : "pivotY"] =
+      (1 - Math.cos((hidden * Math.PI) / 2)) *
+      (["left", "top"].includes(phase.direction) ? -0.5 : 0.5);
+  }
+  if (phase.style === "implode") {
+    value.scale = 1 / Math.max(0.02, q);
+    value.rotation = 90 * hidden;
+    value.rotationY = 180 * hidden;
+  }
   if (phase.style === "pop") {
     const angle = (hidden * Math.PI) / 2;
     if (phase.direction === "left" || phase.direction === "right") {
@@ -602,6 +812,7 @@ export function glyphMotion(
           (phase.type === "whole" || phase.type === "simultaneous" || index % 2
             ? 1
             : -1);
+      else if (phase.style === "bounce") value.y = -intensity * envelope;
       else if (phase.style !== "none") value.y = -intensity * wave;
     }
     result.x += value.x;
@@ -611,6 +822,8 @@ export function glyphMotion(
     result.rotationY += value.rotationY;
     result.scale *= value.scale;
     result.opacity *= value.opacity;
+    result.pivotX += value.pivotX;
+    result.pivotY += value.pivotY;
   }
   return result;
 }
@@ -641,6 +854,7 @@ export function behaviorTransform(
   clip: Pick<Clip, "kind" | "text" | "behaviors">,
   transform: Transform,
   localTime: number,
+  objectSize = { width: 0.08, height: 0.08 },
 ): Transform {
   const motion = glyphMotion(
     clip,
@@ -651,8 +865,20 @@ export function behaviorTransform(
   );
   return {
     ...transform,
-    x: transform.x + motion.x * 0.08,
-    y: transform.y + motion.y * 0.08,
+    x:
+      transform.x +
+      motion.x * 0.08 +
+      motion.pivotX *
+        objectSize.width *
+        transform.scale *
+        (transform.scaleX ?? 1),
+    y:
+      transform.y +
+      motion.y * 0.08 +
+      motion.pivotY *
+        objectSize.height *
+        transform.scale *
+        (transform.scaleY ?? 1),
     scale: Math.max(0.01, transform.scale * motion.scale),
     opacity: transform.opacity * motion.opacity,
     rotation: (transform.rotation ?? 0) + motion.rotation,

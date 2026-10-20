@@ -31,6 +31,7 @@ const defaultTextPresets: TextPreset[] = textPresets.map((preset, index) => ({
 const customBehaviorSchema = z.object({
   id: z.string().regex(/^user-[a-zA-Z0-9_-]{1,90}$/),
   name: nameSchema,
+  category: z.enum(["text", "media"]).optional(),
   incoming: behaviorPhaseSchema,
   during: behaviorPhaseSchema,
   outgoing: behaviorPhaseSchema,
@@ -145,9 +146,19 @@ export function captureBehaviorPreset(
   behavior: Behavior,
   name: string,
 ): BehaviorPreset {
+  const category = [
+    behavior.incoming,
+    behavior.during,
+    behavior.outgoing,
+  ].every((phase) => phase.type === "whole")
+    ? "media"
+    : behavior.category === "media"
+      ? "text"
+      : behavior.category;
   return customBehaviorSchema.parse({
     id: `user-${crypto.randomUUID()}`,
     name,
+    ...(category ? { category } : {}),
     incoming: structuredClone(behavior.incoming),
     during: structuredClone(behavior.during),
     outgoing: structuredClone(behavior.outgoing),

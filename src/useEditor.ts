@@ -116,6 +116,7 @@ import {
 } from "../shared/editor-preferences";
 import {
   behaviorFromPreset,
+  behaviorForMedia,
   supportsBehaviors,
   fitBehaviorDuration,
   type Behavior,
@@ -1494,15 +1495,13 @@ export function useEditor(
           ?.locked
       )
         return;
-      const value = {
+      let value: Behavior = {
         ...structuredClone(copied),
         id: uid(),
         start: 0,
         duration: clip.duration,
       };
-      if (clip.kind !== "text")
-        for (const key of ["incoming", "during", "outgoing"] as const)
-          value[key] = { ...value[key], type: "whole", offset: 0 };
+      if (clip.kind !== "text") value = behaviorForMedia(value);
       updateClip(clip.id, { behaviors: [...(clip.behaviors ?? []), value] });
       selectBehavior(clip.id, value.id);
     },

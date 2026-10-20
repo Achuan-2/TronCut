@@ -10,6 +10,7 @@ import { contentLayout, defaultContentTransform } from "../shared/crop";
 import { mediaFrameRadii, roundedRectanglePath } from "../shared/media-frame";
 import { visualClipAt } from "../shared/visual-state";
 import { textBoxFor, styledTextLayout } from "./text";
+import { behaviorObjectSize } from "./behavior-object-size";
 import { annotationSvgBody, drawingProgress, shapeSize } from "../shared/annotation-style";
 import { textLineHeight, textFillCss, textFillGeometry } from "../shared/text";
 import {
@@ -98,7 +99,7 @@ export default function MatteDefinition({
   const pose = transitionTransform(
     project,
     clip,
-    behaviorTransform(clip, transform, local),
+    behaviorTransform(clip, transform, local, behaviorObjectSize(clip, project)),
     time,
   );
   const matte = clip.visualEffects!["media-matte"]!;

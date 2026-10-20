@@ -3,7 +3,7 @@ import path from "node:path";
 import fs from "node:fs/promises";
 import sharp from "sharp";
 import { createProject, newText } from "../shared/model";
-import { createBehavior } from "../shared/behaviors";
+import { createBehavior, mediaBehaviorPhase } from "../shared/behaviors";
 import { exportFrame, exportVideo } from "../electron/export";
 import { findBinary, runProcess } from "../electron/process";
 import { saveProject, openProject } from "../electron/project-store";
@@ -409,6 +409,9 @@ it("图片和视频使用对象行为，实际导出包含入场与出场透明�
     };
     clip.transform.scale = 0.5;
     clip.behaviors = [createBehavior("fade", clip.duration, kind)!];
+    // The reference Fade preset exits with Drop. Explicitly choose Fade Out
+    // here because this regression checks alpha rendering in both phases.
+    clip.behaviors[0].outgoing = mediaBehaviorPhase("fade", "outgoing");
     project.clips = [clip];
     const output = path.join(root, `${kind}.mp4`);
     await exportVideo(

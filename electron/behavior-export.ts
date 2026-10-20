@@ -7,7 +7,15 @@ import {
 } from "../shared/behaviors";
 
 type MotionExpressions = Record<
-  "x" | "y" | "scale" | "rotation" | "rotationX" | "rotationY" | "opacity",
+  | "x"
+  | "y"
+  | "scale"
+  | "rotation"
+  | "rotationX"
+  | "rotationY"
+  | "opacity"
+  | "pivotX"
+  | "pivotY",
   string
 >;
 const identity = (): MotionExpressions => ({
@@ -18,6 +26,8 @@ const identity = (): MotionExpressions => ({
   rotationX: "0",
   rotationY: "0",
   opacity: "1",
+  pivotX: "0",
+  pivotY: "0",
 });
 function eased(
   p: string,
@@ -59,6 +69,8 @@ function eased(
       return `if(gte(${p},1),1,1-pow(2,-10*(${p})))`;
     case "bounce":
       return `(1-abs(cos((${p})*PI*2.5))*pow(1-(${p}),2))`;
+    case "back-out":
+      return `(1+2.70158*pow((${p})-1,3)+1.70158*pow((${p})-1,2))`;
     default:
       return `(1-pow(1-(${p}),4))`;
   }
@@ -90,6 +102,24 @@ function transition(
       `(${hidden}*${distance * (["left", "top"].includes(phase.direction) ? -1 : 1)})`;
   }
   if (phase.style === "scale") result.scale = `max(0.01,${q})`;
+  if (phase.style === "grow" || phase.style === "shrink")
+    result.scale = `max(0.01,${q})`;
+  if (phase.style === "bounce-in" || phase.style === "drop") {
+    const key = ["left", "right"].includes(phase.direction) ? "x" : "y";
+    result[key] =
+      `(${hidden}*${12.5 * (["left", "top"].includes(phase.direction) ? -1 : 1)})`;
+  }
+  if (phase.style === "hinge") {
+    const horizontal = ["left", "right"].includes(phase.direction);
+    result[horizontal ? "rotationY" : "rotationX"] = `(90*${hidden})`;
+    result[horizontal ? "pivotX" : "pivotY"] =
+      `((1-cos(${hidden}*PI/2))*${["left", "top"].includes(phase.direction) ? -0.5 : 0.5})`;
+  }
+  if (phase.style === "implode") {
+    result.scale = `(1/max(0.02,${q}))`;
+    result.rotation = `(90*${hidden})`;
+    result.rotationY = `(180*${hidden})`;
+  }
   if (phase.style === "pop") {
     const horizontal =
       phase.direction === "left" || phase.direction === "right";
@@ -144,6 +174,7 @@ function during(phase: BehaviorPhase, time: string): MotionExpressions {
   } else if (["fade", "reveal"].includes(phase.style))
     result.opacity = `(1-${intensity}*${envelope})`;
   else if (phase.style === "cut") result.y = `(${phase.shift / 100}*${wave})`;
+  else if (phase.style === "bounce") result.y = `(-${intensity}*${envelope})`;
   else if (phase.style !== "none") result.y = `(-${intensity}*${wave})`;
   for (const key of Object.keys(result) as (keyof MotionExpressions)[]) {
     const neutral = key === "scale" || key === "opacity" ? "1" : "0";

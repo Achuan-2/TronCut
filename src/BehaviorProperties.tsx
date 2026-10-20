@@ -12,6 +12,9 @@ import {
   shiftingPhase,
   behaviorMovementOptions,
   changeBehaviorPhase,
+  mediaBehaviorStyles,
+  mediaBehaviorPhase,
+  changeBehaviorType,
 } from "../shared/behaviors";
 import type { Clip } from "../shared/model";
 import type { Editor } from "./useEditor";
@@ -19,6 +22,7 @@ import BehaviorTypeMenu from "./BehaviorTypeMenu";
 import ShiftingProperties from "./ShiftingProperties";
 import NumberControl from "./BehaviorNumberControl";
 import NumberInput from "./NumberInput";
+import MediaBehaviorProperties from "./MediaBehaviorProperties";
 
 export default function BehaviorProperties({
   clip,
@@ -62,12 +66,35 @@ export default function BehaviorProperties({
         const expanded = expandedIds.has(behavior.id);
         const phaseKey = phaseKeys[behavior.id] ?? "incoming";
         const phase = behavior[phaseKey];
+        const media = clip.kind !== "text" || phase.type === "whole";
+        const styleOptions = media
+          ? [...mediaBehaviorStyles[phaseKey]]
+          : behaviorStyles
+              .filter(
+                (style) =>
+                  ![
+                    "bounce-in",
+                    "grow",
+                    "hinge",
+                    "implode",
+                    "drop",
+                    "shrink",
+                  ].includes(style),
+              )
+              .map((style) => [style, behaviorStyleLabels[style]] as const);
+        if (!styleOptions.some(([style]) => style === phase.style))
+          styleOptions.push([phase.style, behaviorStyleLabels[phase.style]]);
         const update = (patch: Partial<Behavior>) => {
           if (behaviorSchema.safeParse({ ...behavior, ...patch }).success)
             editor.updateBehavior(clip.id, behavior.id, patch);
         };
         const change = (patch: Partial<BehaviorPhase>) =>
-          update({ [phaseKey]: changeBehaviorPhase(phase, patch) });
+          update({
+            [phaseKey]:
+              patch.type !== undefined && patch.type !== phase.type
+                ? changeBehaviorType(phase, phaseKey, patch.type)
+                : changeBehaviorPhase(phase, patch),
+          });
         const selectField = <K extends "style" | "easing" | "direction">(
           label: string,
           key: K,
@@ -80,9 +107,14 @@ export default function BehaviorProperties({
               value={phase[key]}
               onChange={(event) =>
                 change(
-                  key === "style" && event.target.value === "cut"
-                    ? shiftingPhase(phaseKey, clip.kind)
-                    : { [key]: event.target.value },
+                  key === "style" && media
+                    ? mediaBehaviorPhase(
+                        event.target.value as BehaviorPhase["style"],
+                        phaseKey,
+                      )
+                    : key === "style" && event.target.value === "cut"
+                      ? shiftingPhase(phaseKey, clip.kind)
+                      : { [key]: event.target.value },
                 )
               }
             >
@@ -250,14 +282,26 @@ export default function BehaviorProperties({
                   id={`behavior-${behavior.id}-phase`}
                   aria-label={`行为${phaseKey === "incoming" ? "进" : phaseKey === "during" ? "期间" : "出"}`}
                 >
-                  {selectField(
-                    "样式",
-                    "style",
-                    behaviorStyles.map(
-                      (style) => [style, behaviorStyleLabels[style]] as const,
-                    ),
-                  )}
-                  {phase.style === "cut" ? (
+                  {selectField("样式", "style", styleOptions)}
+                  {media ? (
+                    <>
+                      {clip.kind === "text" && (
+                        <div className="field">
+                          <span>类型</span>
+                          <BehaviorTypeMenu
+                            value={phase.type}
+                            text
+                            change={(type) => change({ type })}
+                          />
+                        </div>
+                      )}
+                      <MediaBehaviorProperties
+                        phase={phase}
+                        phaseKey={phaseKey}
+                        change={change}
+                      />
+                    </>
+                  ) : phase.style === "cut" ? (
                     <ShiftingProperties
                       phase={phase}
                       phaseKey={phaseKey}

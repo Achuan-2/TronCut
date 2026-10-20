@@ -2,6 +2,10 @@ import { describe, expect, it } from "vitest";
 import { createProject, newText, validateProject } from "../shared/model";
 import {
   behaviorGlyphCount,
+  behaviorFromPreset,
+  mediaBehaviorPhase,
+  mediaBehaviorStyles,
+  type BehaviorPhaseKey,
   behaviorTransform,
   behaviorWindows,
   createBehavior,
@@ -201,7 +205,19 @@ describe("行为的对象与逐字时序", () => {
       sqrt: Math.sqrt,
       mod: (a: number, b: number) => a % b,
     };
-    for (const preset of behaviorPresets)
+    const phaseCases = Object.entries(mediaBehaviorStyles).flatMap(
+      ([key, styles]) =>
+        styles.map(([style]) => ({
+          id: `check-${key}-${style}`,
+          name: style,
+          category: "media" as const,
+          incoming: mediaBehaviorPhase("none", "incoming"),
+          during: mediaBehaviorPhase("none", "during"),
+          outgoing: mediaBehaviorPhase("none", "outgoing"),
+          [key]: mediaBehaviorPhase(style, key as BehaviorPhaseKey),
+        })),
+    );
+    for (const preset of [...behaviorPresets, ...phaseCases])
       for (const easing of [
         "linear",
         "smoothstep",
@@ -212,9 +228,10 @@ describe("行为的对象与逐字时序", () => {
         "bounce",
         "circular-out",
         "exponential-out",
+        "back-out",
       ] as const) {
         const clip = { ...newText("titles", 2), kind: "image" as const };
-        const behavior = createBehavior(preset.id, clip.duration, clip.kind)!;
+        const behavior = behaviorFromPreset(preset, clip.duration, clip.kind);
         for (const key of ["incoming", "during", "outgoing"] as const)
           behavior[key].easing = easing;
         behavior.during.delay = 0.2;

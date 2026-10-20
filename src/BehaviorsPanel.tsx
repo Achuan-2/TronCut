@@ -3,6 +3,7 @@ import {
   glyphMotion,
   behaviorFromPreset,
   supportsBehaviors,
+  neutralMotion,
   type BehaviorPreset,
 } from "../shared/behaviors";
 import type { Editor } from "./useEditor";
@@ -21,20 +22,24 @@ export function BehaviorCard({
     const start = performance.now();
     let frame = 0;
     const tick = () => {
-      setTime(((performance.now() - start) / 1000) % 3);
+      setTime(
+        ((performance.now() - start) / 1000) %
+          (preset.category === "media" ? 5 : 3),
+      );
       frame = requestAnimationFrame(tick);
     };
     frame = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frame);
   }, [time === null]);
-  const behavior = { ...behaviorFromPreset(preset, 2.6), id: preset.id };
-  const objectMotion = glyphMotion(
-    { behaviors: [behavior] },
-    time ?? 1.1,
-    0,
-    7,
-    "object",
-  );
+  const media = preset.category === "media";
+  const behavior = {
+    ...behaviorFromPreset(preset, media ? 5 : 2.6),
+    id: preset.id,
+  };
+  const objectMotion =
+    media && time === null
+      ? neutralMotion()
+      : glyphMotion({ behaviors: [behavior] }, time ?? 1.1, 0, 7, "object");
   return (
     <PresetTile
       kind="behavior"
@@ -58,34 +63,50 @@ export function BehaviorCard({
         onDoubleClick={() => editor.addBehavior(preset.id)}
       >
         <span className="behavior-card-preview" aria-hidden="true">
-          <span
-            className="behavior-card-word"
-            style={{
-              opacity: objectMotion.opacity,
-              transform: `translate(${objectMotion.x}em, ${objectMotion.y}em) rotateZ(${objectMotion.rotation}deg) rotateY(${objectMotion.rotationY}deg) rotateX(${objectMotion.rotationX}deg) scale(${objectMotion.scale})`,
-            }}
-          >
-            {Array.from("TronCut").map((text, index) => {
-              const motion = glyphMotion(
-                { behaviors: [behavior] },
-                time ?? 1.1,
-                index,
-                7,
-                "text",
-              );
-              return (
-                <span
-                  key={index}
-                  style={{
-                    opacity: motion.opacity,
-                    transform: `translate(${motion.x}em, ${motion.y}em) rotateZ(${motion.rotation}deg) rotateY(${motion.rotationY}deg) rotateX(${motion.rotationX}deg) scale(${motion.scale})`,
-                  }}
-                >
-                  {text}
-                </span>
-              );
-            })}
-          </span>
+          {media ? (
+            <span
+              className="behavior-card-media"
+              style={{
+                opacity: objectMotion.opacity,
+                transform: `translate(${objectMotion.x * 12.8 + objectMotion.pivotX * 56}px, ${objectMotion.y * 7.2 + objectMotion.pivotY * 42}px) rotateZ(${objectMotion.rotation}deg) rotateY(${objectMotion.rotationY}deg) rotateX(${objectMotion.rotationX}deg) scale(${objectMotion.scale})`,
+              }}
+            >
+              <svg viewBox="0 0 56 42" width="56" height="42">
+                <rect width="56" height="42" rx="4" fill="#243d38" />
+                <path d="M8 33 23 15 35 29 42 21 51 33Z" fill="#70d6b0" />
+                <circle cx="40" cy="11" r="4" fill="#b9f2db" />
+              </svg>
+            </span>
+          ) : (
+            <span
+              className="behavior-card-word"
+              style={{
+                opacity: objectMotion.opacity,
+                transform: `translate(${objectMotion.x}em, ${objectMotion.y}em) rotateZ(${objectMotion.rotation}deg) rotateY(${objectMotion.rotationY}deg) rotateX(${objectMotion.rotationX}deg) scale(${objectMotion.scale})`,
+              }}
+            >
+              {Array.from("TronCut").map((text, index) => {
+                const motion = glyphMotion(
+                  { behaviors: [behavior] },
+                  time ?? 1.1,
+                  index,
+                  7,
+                  "text",
+                );
+                return (
+                  <span
+                    key={index}
+                    style={{
+                      opacity: motion.opacity,
+                      transform: `translate(${motion.x}em, ${motion.y}em) rotateZ(${motion.rotation}deg) rotateY(${motion.rotationY}deg) rotateX(${motion.rotationX}deg) scale(${motion.scale})`,
+                    }}
+                  >
+                    {text}
+                  </span>
+                );
+              })}
+            </span>
+          )}
         </span>
         <b>{preset.name}</b>
       </button>
@@ -93,6 +114,7 @@ export function BehaviorCard({
   );
 }
 export default function BehaviorsPanel({ editor }: { editor: Editor }) {
+  const [tab, setTab] = useState<"text" | "media">("text");
   const canApply = editor.project.clips.some(
     (clip) =>
       editor.selectedIds.includes(clip.id) &&
@@ -101,13 +123,43 @@ export default function BehaviorsPanel({ editor }: { editor: Editor }) {
   );
   return (
     <div className="behaviors-panel">
+      <div
+        className="behavior-library-tabs"
+        role="tablist"
+        aria-label="行为分类"
+      >
+        {(
+          [
+            ["text", "文本"],
+            ["media", "媒体"],
+          ] as const
+        ).map(([key, label]) => (
+          <button
+            key={key}
+            id={`behavior-library-${key}-tab`}
+            role="tab"
+            aria-selected={tab === key}
+            aria-controls="behavior-library-content"
+            onClick={() => setTab(key)}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
       <p className="panel-intro">
         拖到文字、图片或视频片段，或双击应用到所选片段。悬停预览动效。
       </p>
-      <div className="behavior-grid">
-        {editor.presetLibrary.behaviors.map((preset) => (
-          <BehaviorCard key={preset.id} preset={preset} editor={editor} />
-        ))}
+      <div
+        className="behavior-grid"
+        role="tabpanel"
+        id="behavior-library-content"
+        aria-labelledby={`behavior-library-${tab}-tab`}
+      >
+        {editor.presetLibrary.behaviors
+          .filter((preset) => (preset.category ?? "text") === tab)
+          .map((preset) => (
+            <BehaviorCard key={preset.id} preset={preset} editor={editor} />
+          ))}
       </div>
       {!canApply && <p className="small-note">选择片段后可双击添加行为。</p>}
     </div>

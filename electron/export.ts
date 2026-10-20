@@ -97,6 +97,7 @@ export function expression(
     >,
   key: keyof Transform,
   clock = "t",
+  objectSize = { width: 0.08, height: 0.08 },
 ): string {
   const base = baseExpression(clip, key, clock);
   if (
@@ -116,7 +117,11 @@ export function expression(
     { ...clip, kind: clip.kind ?? "image" },
     clock,
   );
-  if (key === "x" || key === "y") return `(${base}+0.08*(${motion[key]}))`;
+  if (key === "x" || key === "y") {
+    const pivot = motion[key === "x" ? "pivotX" : "pivotY"];
+    const displacement = pivot === "0" ? "" : `+(${pivot})*${key === "x" ? objectSize.width : objectSize.height}*(${baseExpression(clip, "scale", clock)})*(${baseExpression(clip, key === "x" ? "scaleX" : "scaleY", clock)})`;
+    return `(${base}+0.08*(${motion[key]})${displacement})`;
+  }
   if (key === "scale" || key === "opacity") return `(${base}*(${motion[key]}))`;
   return `(${base}+(${motion[key as "rotation" | "rotationX" | "rotationY"]}))`;
 }
@@ -634,7 +639,10 @@ async function renderProject(
           ? `clip(${name},${clip.start},${clip.start + clip.duration})`
           : name;
       const pose = (key: keyof Transform, name = "t") => {
-        const value = expression(clip, key, clock(name));
+        const value = expression(clip, key, clock(name), {
+          width: cropWidth * fit / width,
+          height: cropHeight * fit / height,
+        });
         if (key !== "scale" && key !== "scaleX" && key !== "opacity") return value;
         const multiplier = transitionVisualExpressions(project, clip, name)[key];
         if (multiplier === "1") return value;
@@ -855,9 +863,17 @@ async function renderProject(
       filters.push(...attached.filters);
       // Evaluate alpha on the fixed source dimensions during transition zooms.
       // RGB geq after a resizing scale can retain its initial frame dimensions.
-      const alphaBeforeTransform = transitionMotion.scale !== "1" || transitionMotion.scaleX !== "1";
+      const alphaBeforeTransform = transitionMotion.scale !== "1" || transitionMotion.scaleX !== "1" || objectMotion.scale !== "1";
       const alphaFilters = directVideo ? [] : [alpha];
-      filters.push(`[${attached.label}]${[...(alphaBeforeTransform ? alphaFilters : []), transform, "setsar=1", ...rotate, ...(alphaBeforeTransform ? [] : alphaFilters), ...outputFormat].join(",")}[${visual}]`);
+      // A uniform scale commutes with the axis rotation. Sample the small
+      // source plane first: an implosion can initially cover 50 times the
+      // object's size, making per-pixel inverse rotation needlessly expensive.
+      const rotateBeforeScale = hasAxisRotation && objectMotion.scale !== "1" &&
+        pose("scaleX") === "1" && pose("scaleY") === "1";
+      const geometry = rotateBeforeScale
+        ? [...rotate, `scale=w='max(2,trunc(iw*${fit}*(${scale})/2)*2)':h='max(2,trunc(ih*${fit}*(${scale})/2)*2)':eval=frame`, "setsar=1"]
+        : [transform, "setsar=1", ...rotate];
+      filters.push(`[${attached.label}]${[...(alphaBeforeTransform ? alphaFilters : []), ...geometry, ...(alphaBeforeTransform ? [] : alphaFilters), ...outputFormat].join(",")}[${visual}]`);
       // Composite text before chroma subsampling so rounded fills and glyphs
       // retain the same pixel position in video and frame captures.
       const matte = clip.visualEffects?.["media-matte"];

@@ -3371,6 +3371,25 @@ fieldset:disabled {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
 }
+.behavior-library-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 10px;
+}
+.behavior-library-tabs > button {
+  flex: 1;
+  border-radius: 0;
+  border-bottom: 2px solid transparent;
+  padding: 8px;
+}
+.behavior-library-tabs > button[aria-selected="true"] {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+.behavior-card-media {
+  display: inline-flex;
+  transform-style: preserve-3d;
+}
 .behavior-card {
   display: flex;
   flex-direction: column;

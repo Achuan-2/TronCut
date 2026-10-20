@@ -12,7 +12,7 @@ await sharp({
   .png()
   .toFile(path.join(root, "image.png"));
 execFileSync(
-  "ffmpeg",
+  path.resolve("resources/bin/ffmpeg.exe"),
   [
     "-y",
     "-hide_banner",
@@ -46,15 +46,15 @@ const clips = ["text", "image", "video"].map((kind) => ({
   name: kind,
   ...(kind === "text"
     ? {
-      text: "ABC 文字动效",
-      style: {
-        fontSize: 68,
-        color: "#ffffff",
-        outline: "#111111",
-        outlineWidth: 2,
-        fontFamily: "Microsoft YaHei",
-      },
-    }
+        text: "ABC 文字动效",
+        style: {
+          fontSize: 68,
+          color: "#ffffff",
+          outline: "#111111",
+          outlineWidth: 2,
+          fontFamily: "Microsoft YaHei",
+        },
+      }
     : { assetId: kind }),
   start: 0,
   duration: 5,
@@ -123,6 +123,7 @@ async function checkEffectsInsideClips(page) {
 }
 try {
   const page = await app.firstWindow();
+  const properties = page.locator(".behavior-property.selected");
   page.on("pageerror", (error) => errors.push(error.message));
   await expect(page.locator(".timeline-clip")).toHaveCount(3);
   await page.getByRole("button", { name: "行为", exact: true }).click();
@@ -135,23 +136,23 @@ try {
     page.getByRole("tab", { name: "行为", exact: true }),
   ).toHaveAttribute("aria-selected", "true");
   await expect(page.locator(".clip-behavior-effect")).toHaveCount(1);
-  await page.getByLabel("行为速度（%）").fill("60");
-  await page.getByLabel("逐字偏移（秒）").fill("0.15");
-  await page.getByLabel("行为类型", { exact: true }).click();
-  await page.getByRole("menuitemradio", { name: "对象", exact: true }).click();
-  await expect(page.getByLabel("逐字偏移（秒）")).toBeDisabled();
-  await page.getByLabel("行为类型", { exact: true }).click();
+  await properties.getByLabel("行为速度（%）").fill("60");
+  await properties.getByLabel("逐字偏移（秒）").fill("0.15");
+  await properties.getByLabel("行为类型", { exact: true }).click();
+  await page.getByRole("menuitemradio", { name: "媒体", exact: true }).click();
+  await expect(properties.getByLabel("逐字偏移（秒）")).toHaveCount(0);
+  await properties.getByLabel("行为类型", { exact: true }).click();
   await page.getByRole("menuitem", { name: "文本", exact: true }).click();
   await page
     .getByRole("menuitemradio", { name: "最后一个到第一个", exact: true })
     .click();
-  await page.getByRole("tab", { name: "期间", exact: true }).click();
-  await page.getByLabel("行为样式").selectOption("pulse");
-  await page.getByLabel("永远循环").uncheck();
-  await page.getByLabel("行为循环次数").fill("2");
-  await page.getByLabel("行为循环延迟（秒）").fill("0.2");
-  await page.getByRole("tab", { name: "出", exact: true }).click();
-  await page.getByLabel("行为样式").selectOption("none");
+  await properties.getByRole("tab", { name: "期间", exact: true }).click();
+  await properties.getByLabel("行为样式").selectOption("pulse");
+  await properties.getByLabel("永远循环").uncheck();
+  await properties.getByLabel("行为循环次数").fill("2");
+  await properties.getByLabel("行为循环延迟（秒）").fill("0.2");
+  await properties.getByRole("tab", { name: "出", exact: true }).click();
+  await properties.getByLabel("行为样式").selectOption("none");
   await page.getByRole("switch").uncheck();
   await expect(page.locator(".clip-behavior-effect")).toHaveClass(/disabled/);
   await page.getByRole("switch").check();
@@ -173,14 +174,10 @@ try {
         .locator(`.timeline-clip.${kind}`)
         .dispatchEvent("drop", { dataTransfer: transfer });
     }
-    await expect(page.getByLabel("行为类型", { exact: true })).toHaveText(
-      "对象",
-    );
-    await page.getByLabel("行为类型", { exact: true }).click();
     await expect(
-      page.getByRole("menuitem", { name: "文本", exact: true }),
+      properties.getByLabel("行为类型", { exact: true }),
     ).toHaveCount(0);
-    await page.keyboard.press("Escape");
+    await expect(properties.getByLabel("行为样式")).toHaveValue("hinge");
   }
   await expect(page.locator(".clip-behavior-effect")).toHaveCount(3);
   await page.locator(".clip-behavior-effect").first().click();
@@ -273,79 +270,90 @@ try {
     return value;
   });
   await videoClip.dispatchEvent("drop", { dataTransfer: shiftingTransfer });
-  await page.getByRole("tab", { name: "进", exact: true }).click();
-  await expect(page.getByLabel("行为张力", { exact: true })).toHaveValue(
+  await properties.getByRole("tab", { name: "进", exact: true }).click();
+  await expect(properties.getByLabel("行为张力", { exact: true })).toHaveValue(
     "7.00",
   );
-  await expect(page.getByLabel("行为类型", { exact: true })).toHaveCount(0);
-  await expect(page.getByLabel("行为速度（%）", { exact: true })).toHaveCount(
+  await expect(properties.getByLabel("行为类型", { exact: true })).toHaveCount(
     0,
-  );
-  await expect(page.getByLabel("行为移动")).toHaveValue("spring");
-  await page.screenshot({ path: path.join(root, "shifting-video-in.png") });
-  await page.getByLabel("行为张力", { exact: true }).fill("9.50");
-  await page.getByLabel("行为移动").selectOption("quad-out");
-  await expect(page.getByLabel("行为张力", { exact: true })).toHaveCount(0);
-  await expect(page.getByLabel("行为速度（%）", { exact: true })).toHaveValue(
-    "77",
-  );
-  await page.getByLabel("行为移动").selectOption("spring");
-  await expect(page.getByLabel("行为张力", { exact: true })).toHaveValue(
-    "9.50",
-  );
-  await page.getByRole("tab", { name: "期间", exact: true }).click();
-  await expect(page.getByLabel("行为平移", { exact: true })).toHaveValue(
-    "5.00",
   );
   await expect(
-    page.getByLabel("行为循环时间（秒）", { exact: true }),
-  ).toHaveValue("3.17");
-  await expect(page.getByLabel("行为循环次数", { exact: true })).toBeDisabled();
-  await expect(page.getByLabel("逐字偏移（秒）", { exact: true })).toHaveCount(
+    properties.getByLabel("行为速度（%）", { exact: true }),
+  ).toHaveCount(0);
+  await expect(properties.getByLabel("行为移动")).toHaveValue("spring");
+  await page.screenshot({ path: path.join(root, "shifting-video-in.png") });
+  await properties.getByLabel("行为张力", { exact: true }).fill("9.50");
+  await properties.getByLabel("行为移动").selectOption("quad-out");
+  await expect(properties.getByLabel("行为张力", { exact: true })).toHaveCount(
     0,
   );
-  await page.screenshot({ path: path.join(root, "shifting-video-during.png") });
-  await page.getByLabel("永远循环", { exact: true }).uncheck();
-  await page.getByLabel("行为循环次数", { exact: true }).fill("2");
-  await page.getByRole("tab", { name: "出", exact: true }).click();
-  await expect(page.getByLabel("行为移动")).toHaveValue("exponential-out");
-  await expect(page.getByLabel("行为速度（%）", { exact: true })).toHaveValue(
-    "93",
+  await expect(
+    properties.getByLabel("行为速度（%）", { exact: true }),
+  ).toHaveValue("77");
+  await properties.getByLabel("行为移动").selectOption("spring");
+  await expect(properties.getByLabel("行为张力", { exact: true })).toHaveValue(
+    "9.50",
   );
-  await expect(page.getByLabel("行为张力", { exact: true })).toHaveCount(0);
+  await properties.getByRole("tab", { name: "期间", exact: true }).click();
+  await expect(properties.getByLabel("行为平移", { exact: true })).toHaveValue(
+    "5",
+  );
+  await expect(
+    properties.getByLabel("行为循环时间（秒）", { exact: true }),
+  ).toHaveValue("3.17");
+  await expect(
+    properties.getByLabel("行为循环次数", { exact: true }),
+  ).toBeDisabled();
+  await expect(
+    properties.getByLabel("逐字偏移（秒）", { exact: true }),
+  ).toHaveCount(0);
+  await page.screenshot({ path: path.join(root, "shifting-video-during.png") });
+  await properties.getByLabel("永远循环", { exact: true }).uncheck();
+  await properties.getByLabel("行为循环次数", { exact: true }).fill("2");
+  await properties.getByRole("tab", { name: "出", exact: true }).click();
+  await expect(properties.getByLabel("行为移动")).toHaveValue(
+    "exponential-out",
+  );
+  await expect(
+    properties.getByLabel("行为速度（%）", { exact: true }),
+  ).toHaveValue("93");
+  await expect(properties.getByLabel("行为张力", { exact: true })).toHaveCount(
+    0,
+  );
   await page.screenshot({ path: path.join(root, "shifting-video-out.png") });
   await page
     .locator(".timeline-clip.text")
     .dispatchEvent("drop", { dataTransfer: shiftingTransfer });
-  await expect(page.getByLabel("行为类型", { exact: true })).toHaveText(
+  await properties.getByRole("tab", { name: "出", exact: true }).click();
+  await expect(properties.getByLabel("行为类型", { exact: true })).toHaveText(
     "文本 - 中心向外",
   );
-  await expect(page.getByLabel("逐字偏移（秒）", { exact: true })).toHaveValue(
-    "0.033",
-  );
+  await expect(
+    properties.getByLabel("逐字偏移（秒）", { exact: true }),
+  ).toHaveValue("0.033");
   await page.screenshot({ path: path.join(root, "shifting-text-out.png") });
-  await page.getByRole("tab", { name: "进", exact: true }).click();
-  await expect(page.getByLabel("行为张力", { exact: true })).toHaveValue(
+  await properties.getByRole("tab", { name: "进", exact: true }).click();
+  await expect(properties.getByLabel("行为张力", { exact: true })).toHaveValue(
     "7.00",
   );
-  await expect(page.getByLabel("逐字偏移（秒）", { exact: true })).toHaveValue(
-    "0.020",
-  );
+  await expect(
+    properties.getByLabel("逐字偏移（秒）", { exact: true }),
+  ).toHaveValue("0.020");
   await page.screenshot({ path: path.join(root, "shifting-text-in.png") });
-  await page.getByRole("tab", { name: "期间", exact: true }).click();
-  await expect(page.getByLabel("行为类型", { exact: true })).toHaveText(
+  await properties.getByRole("tab", { name: "期间", exact: true }).click();
+  await expect(properties.getByLabel("行为类型", { exact: true })).toHaveText(
     "文本 - 同时",
   );
-  await expect(page.getByLabel("逐字偏移（秒）", { exact: true })).toHaveValue(
-    "0.000",
-  );
-  await page.getByLabel("行为类型", { exact: true }).click();
+  await expect(
+    properties.getByLabel("逐字偏移（秒）", { exact: true }),
+  ).toHaveValue("0.000");
+  await properties.getByLabel("行为类型", { exact: true }).click();
   await page.getByRole("menuitem", { name: "文本", exact: true }).click();
   await page
     .getByRole("menuitemradio", { name: "中心向外", exact: true })
     .click();
-  await page.getByLabel("逐字偏移（秒）", { exact: true }).fill("0.015");
-  await page.getByLabel("行为类型", { exact: true }).click();
+  await properties.getByLabel("逐字偏移（秒）", { exact: true }).fill("0.015");
+  await properties.getByLabel("行为类型", { exact: true }).click();
   await page.getByRole("menuitem", { name: "文本", exact: true }).click();
   await page.getByRole("menuitemradio", { name: "同时", exact: true }).click();
   await page.screenshot({ path: path.join(root, "shifting-text-during.png") });
@@ -375,7 +383,7 @@ try {
   const page = await app.firstWindow();
   await page
     .screenshot({ path: path.join(root, "failure.png") })
-    .catch(() => { });
+    .catch(() => {});
   console.error("行为交互检查失败，截图目录：", root);
   throw error;
 } finally {

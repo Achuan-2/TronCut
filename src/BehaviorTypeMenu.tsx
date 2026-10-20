@@ -216,7 +216,7 @@ export default function BehaviorTypeMenu({
       >
         <span>
           {value === "whole"
-            ? "对象"
+            ? "媒体"
             : `文本 - ${orders.find(([order]) => order === value)?.[1]}`}
         </span>
         <ChevronDown size={14} aria-hidden="true" />
@@ -248,7 +248,7 @@ export default function BehaviorTypeMenu({
                 <span className="behavior-menu-check">
                   {value === "whole" && <Check size={14} aria-hidden="true" />}
                 </span>
-                <span>对象</span>
+                <span>媒体</span>
               </button>
               {text && (
                 <button

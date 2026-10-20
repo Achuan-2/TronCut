@@ -80,6 +80,7 @@ import { normalizationKey, normalizesClip } from "../shared/loudness";
 import { visualClipAt } from "../shared/visual-state";
 import { annotationMime, parseAnnotation } from "../shared/annotations";
 import { behaviorTransform, supportsBehaviors } from "../shared/behaviors";
+import { behaviorObjectSize } from "./behavior-object-size";
 import {
   supportsVisualEffect,
   visualEffectFromDragTypes,
@@ -282,7 +283,7 @@ function PreviewLayerImpl({
     : transitionTransform(
         project,
         clip,
-        behaviorTransform(clip, drag?.value ?? transform, localTime),
+        behaviorTransform(clip, drag?.value ?? transform, localTime, behaviorObjectSize(clip, project)),
         playhead,
       );
   const textBox = clip.kind === "text" ? (drag?.box ?? textBoxFor(clip)) : null;

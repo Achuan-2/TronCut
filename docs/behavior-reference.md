@@ -25,6 +25,24 @@
 
 ## 重现检查
 
+### 媒体行为
+
+行为库的“媒体”标签提供弹入、漂移、淡入、飞入、增长、铰链、内爆、显示、切换、滑入，悬停或键盘聚焦可预览。进、期间、出分别使用思源笔记中 `PixPin_2026-10-20_21-31-33`、`21-34-51`、`21-35-18` 截图的样式列表。媒体模式不显示字符顺序或逐字偏移。
+
+`shared/media-behavior-reference.ts` 保存 `媒体行为动画照搬.tscproj` 中的时间与阶段组合。该项目是样式演示，多数预设保留期间和出场的“切换”，淡入则以下降结束；此处按参考组合实现。新样式包含弹入的回摆位移、增长/收缩、按素材尺寸计算枢轴位移的三维铰链、带放大和双轴旋转的内爆、下降。内爆的均匀缩放在三维采样之后执行，避免对最初数十倍放大的画面逐像素旋转。
+
+文本类型菜单中的“对象”改为“媒体”。文本预设添加到图片或视频时，内置预设使用对应媒体预设的三个阶段；文本片段切换为媒体类型时，相应阶段使用同一套媒体样式、默认参数、预览和导出通道，也可切回逐字模式。自定义预设转换时保留已编辑参数；全部阶段均为媒体模式的预设保存在媒体标签。原项目文件、截图和参考视频只读，应用运行不依赖这些文件。
+
+媒体运动依据项目参数与视频重建，未取得 Camtasia 内部算法；运动路径、三维透视和像素插值不保证逐像素相同。
+
+```powershell
+pnpm exec vitest run tests/media-behaviors.test.ts tests/behaviors.test.ts tests/behaviors-export.test.ts tests/preset-library.test.ts
+pnpm run build
+node scripts/smoke-media-behaviors.mjs
+```
+
+媒体 smoke 脚本使用隔离的配置、项目、备份与素材目录，检查十个预设悬停、双击、拖拽、分阶段选项、文本/媒体类型切换、两种添加路径一致性、循环、撤销、自定义预设以及项目保存重开，并实际导出十个预设和五十张采样帧，核对五十个画布时点的位移、透明度与三轴旋转，输出在 `test-output/media-behaviors-*`。
+
 ```powershell
 pnpm exec vitest run tests/behavior-reference.test.ts tests/behaviors.test.ts tests/behaviors-export.test.ts tests/keyframe-edit.test.ts
 pnpm run build
