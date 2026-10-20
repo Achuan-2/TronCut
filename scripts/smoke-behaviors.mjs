@@ -272,7 +272,7 @@ try {
   await videoClip.dispatchEvent("drop", { dataTransfer: shiftingTransfer });
   await properties.getByRole("tab", { name: "进", exact: true }).click();
   await expect(properties.getByLabel("行为张力", { exact: true })).toHaveValue(
-    "7.00",
+    "9.00",
   );
   await expect(properties.getByLabel("行为类型", { exact: true })).toHaveCount(
     0,
@@ -296,11 +296,11 @@ try {
   );
   await properties.getByRole("tab", { name: "期间", exact: true }).click();
   await expect(properties.getByLabel("行为平移", { exact: true })).toHaveValue(
-    "5",
+    "2",
   );
   await expect(
     properties.getByLabel("行为循环时间（秒）", { exact: true }),
-  ).toHaveValue("3.17");
+  ).toHaveValue("3.00");
   await expect(
     properties.getByLabel("行为循环次数", { exact: true }),
   ).toBeDisabled();
@@ -312,7 +312,7 @@ try {
   await properties.getByLabel("行为循环次数", { exact: true }).fill("2");
   await properties.getByRole("tab", { name: "出", exact: true }).click();
   await expect(properties.getByLabel("行为移动")).toHaveValue(
-    "exponential-out",
+    "quad-in",
   );
   await expect(
     properties.getByLabel("行为速度（%）", { exact: true }),

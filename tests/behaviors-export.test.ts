@@ -3,7 +3,7 @@ import path from "node:path";
 import fs from "node:fs/promises";
 import sharp from "sharp";
 import { createProject, newText } from "../shared/model";
-import { createBehavior, mediaBehaviorPhase } from "../shared/behaviors";
+import { createBehavior } from "../shared/behaviors";
 import { exportFrame, exportVideo } from "../electron/export";
 import { findBinary, runProcess } from "../electron/process";
 import { saveProject, openProject } from "../electron/project-store";
@@ -264,6 +264,7 @@ it("切换的对象平移和文本同时平移真实写入视频，参数可保�
     behavior.outgoing.style = "none";
     behavior.during.shift = 80;
     behavior.during.loopTime = 1;
+    behavior.during.easing = "linear";
     clip.behaviors = [behavior];
     project.clips = [clip];
     const file = path.join(root, kind, "project.troncut");
@@ -280,7 +281,7 @@ it("切换的对象平移和文本同时平移真实写入视频，参数可保�
       () => {},
     );
     const centers: number[] = [];
-    for (const time of [0.1, 0.3]) {
+    for (const time of [0.2, 0.7]) {
       const image = path.join(root, kind, `frame-${time}.png`);
       await runProcess(findBinary("ffmpeg"), [
         "-y",
@@ -298,12 +299,15 @@ it("切换的对象平移和文本同时平移真实写入视频，参数可保�
     const capture = path.join(root, kind, "capture.png");
     await exportFrame(
       reopened,
-      0.3,
+      0.7,
       capture,
       path.join(root, kind, "capture"),
       AbortSignal.timeout(10000),
     );
-    expect(await whiteCenter(capture, "y")).toBeCloseTo(centers[1], 0);
+    // Video chroma conversion and still rasterization may differ by one pixel.
+    expect(
+      Math.abs((await whiteCenter(capture, "y")) - centers[1]),
+    ).toBeLessThanOrEqual(1.5);
   }
 }, 60000);
 it("逐字行为可保存重开，实际导出逐字出现，截帧保留当前阶段", async () => {
@@ -409,9 +413,6 @@ it("图片和视频使用对象行为，实际导出包含入场与出场透明�
     };
     clip.transform.scale = 0.5;
     clip.behaviors = [createBehavior("fade", clip.duration, kind)!];
-    // The reference Fade preset exits with Drop. Explicitly choose Fade Out
-    // here because this regression checks alpha rendering in both phases.
-    clip.behaviors[0].outgoing = mediaBehaviorPhase("fade", "outgoing");
     project.clips = [clip];
     const output = path.join(root, `${kind}.mp4`);
     await exportVideo(

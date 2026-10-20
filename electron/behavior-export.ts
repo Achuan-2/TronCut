@@ -35,6 +35,15 @@ function eased(
   tension = 7,
   seconds = 1,
 ) {
+  const curve = easingCurve(p, easing, tension, seconds);
+  return `if(lte(${p},0.000000001),0,if(gte(${p},0.999999999),1,${curve}))`;
+}
+function easingCurve(
+  p: string,
+  easing: BehaviorPhase["easing"],
+  tension = 7,
+  seconds = 1,
+) {
   switch (easing) {
     case "smoothstep":
       return `((${p})*(${p})*(3-2*(${p})))`;

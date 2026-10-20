@@ -41,8 +41,8 @@ describe("用户 Camtasia 行为项目的参考时序与运动特征", () => {
     const initial = glyphMotion(object, 0.02, 0, 1, "object");
     expect(initial.y).toBeLessThan(-10);
     expect(initial.opacity).toBe(1);
-    // Exponential ease-out is applied forward in exit time, not in reverse.
-    expect(glyphMotion(object, 4.8, 0, 1, "object").y).toBeLessThan(-10);
+    // The curated media preset accelerates out near the end of the clip.
+    expect(glyphMotion(object, 4.99, 0, 1, "object").y).toBeLessThan(-10);
     expect(clipsBehaviorText(object, 0.1, 1)).toBe(false);
   });
 

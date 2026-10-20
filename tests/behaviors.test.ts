@@ -95,17 +95,17 @@ describe("行为的对象与逐字时序", () => {
     expect(video.incoming).toMatchObject({
       type: "whole",
       easing: "spring",
-      tension: 7,
+      tension: 9,
     });
     expect(video.during).toMatchObject({
       style: "cut",
-      easing: "circular-out",
-      shift: 5,
-      loopTime: 3.17,
+      easing: "smoothstep",
+      shift: 2,
+      loopTime: 3,
       loopForever: true,
     });
     expect(video.outgoing).toMatchObject({
-      easing: "exponential-out",
+      easing: "quad-in",
       speed: 93,
     });
     const text = createBehavior("cut", 5, "text")!;
@@ -120,7 +120,7 @@ describe("行为的对象与逐字时序", () => {
     video.incoming.style = "none";
     video.outgoing.style = "none";
     const smallShift = glyphMotion(clip, 0.2, 0, 1, "object").y;
-    video.during.shift = 50;
+    video.during.shift = 20;
     expect(glyphMotion(clip, 0.2, 0, 1, "object").y).toBeCloseTo(
       smallShift * 10,
     );

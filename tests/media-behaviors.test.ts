@@ -19,7 +19,7 @@ import {
 } from "../shared/preset-library";
 
 describe("媒体行为和文本的媒体模式", () => {
-  it("提供十个独立预设，保留原项目阶段组合和精确时长", () => {
+  it("提供十个独立预设，按动作风格搭配进、期间和出并留足展示时间", () => {
     expect(mediaBehaviorPresets.map((preset) => preset.name)).toEqual([
       "弹入",
       "漂移",
@@ -33,10 +33,29 @@ describe("媒体行为和文本的媒体模式", () => {
       "滑入",
     ]);
     expect(createBehavior("media-fade", 5, "image")).toMatchObject({
-      incoming: { duration: 1317928960 / 705600000 },
-      during: { style: "cut", loopTime: 3.17 },
-      outgoing: { style: "drop" },
+      incoming: { style: "fade", duration: 0.65 },
+      during: { style: "none" },
+      outgoing: { style: "fade", duration: 0.65 },
     });
+    const combinations = [
+      ["bounce-in", "pulse", "shrink"],
+      ["drift", "drift", "drift"],
+      ["fade", "none", "fade"],
+      ["fly", "none", "fly"],
+      ["grow", "pulse", "shrink"],
+      ["hinge", "none", "hinge"],
+      ["implode", "none", "explode"],
+      ["reveal", "none", "reveal"],
+      ["cut", "cut", "cut"],
+      ["slide", "none", "slide"],
+    ];
+    expect(
+      mediaBehaviorPresets.map((preset) => [
+        preset.incoming.style,
+        preset.during.style,
+        preset.outgoing.style,
+      ]),
+    ).toEqual(combinations);
     for (const preset of mediaBehaviorPresets) {
       const behavior = behaviorFromPreset(preset, 5, "text");
       for (const key of ["incoming", "during", "outgoing"] as const) {
@@ -45,6 +64,12 @@ describe("媒体行为和文本的媒体模式", () => {
       }
       const short = behaviorWindows({ ...behavior, duration: 0.1 }, 1);
       expect(short.incoming + short.outgoing).toBeLessThanOrEqual(0.100001);
+      const windows = behaviorWindows(behavior, 1);
+      expect(windows.incoming + windows.outgoing).toBeLessThanOrEqual(2);
+      if (behavior.during.style === "pulse")
+        expect(behavior.during.intensity).toBeLessThanOrEqual(3);
+      if (behavior.during.style === "drift")
+        expect(behavior.during.rotation).toBeLessThanOrEqual(2);
     }
   });
 

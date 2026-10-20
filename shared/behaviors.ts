@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { Clip, Transform } from "./model";
 import { referenceBehaviorPhases } from "./behavior-reference";
-import { mediaBehaviorDefinitions } from "./media-behavior-reference";
+import { mediaBehaviorDefinitions } from "./media-behavior-presets";
 
 export const behaviorStyles = [
   "none",
@@ -326,11 +326,23 @@ export function mediaBehaviorPhase(
   key: BehaviorPhaseKey,
 ): BehaviorPhase {
   style = mediaBehaviorStyle(style, key);
+  const family = { shrink: "grow", pulse: "grow", explode: "implode" };
+  const presetId = `media-${family[style as keyof typeof family] ?? style}`;
   const reference =
+    mediaBehaviorPresets.find(
+      (preset) => preset.id === presetId && preset[key].style === style,
+    )?.[key] ??
     mediaBehaviorPresets.find((preset) => preset[key].style === style)?.[key] ??
     behaviorPresets.find(
       (preset) => preset.category !== "media" && preset[key].style === style,
-    )?.[key];
+    )?.[key] ??
+    (style === "drop"
+      ? {
+          direction: "bottom" as const,
+          easing: "quad-in" as const,
+          duration: 0.5,
+        }
+      : undefined);
   return { ...phase(style), ...reference, style, type: "whole", offset: 0 };
 }
 
@@ -539,7 +551,9 @@ export function behaviorEase(
   tension = 7,
   seconds = 1,
 ) {
-  if (p <= 0 || p >= 1) return Math.max(0, Math.min(1, p));
+  // Decimal phase boundaries can differ by a few ulps after timestamp subtraction.
+  if (p <= 1e-9) return 0;
+  if (p >= 1 - 1e-9) return 1;
   switch (easing) {
     case "smoothstep":
       return p * p * (3 - 2 * p);
