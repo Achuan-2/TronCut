@@ -8,6 +8,7 @@ import {
 } from "../shared/behaviors";
 import type { Editor } from "./useEditor";
 import PresetTile from "./PresetTile";
+import { hingeProjectionCss } from "../shared/behavior-projection";
 
 export function BehaviorCard({
   preset,
@@ -68,7 +69,7 @@ export function BehaviorCard({
               className="behavior-card-media"
               style={{
                 opacity: objectMotion.opacity,
-                transform: `translate(${objectMotion.x * 12.8 + objectMotion.pivotX * 56}px, ${objectMotion.y * 7.2 + objectMotion.pivotY * 42}px) rotateZ(${objectMotion.rotation}deg) rotateY(${objectMotion.rotationY}deg) rotateX(${objectMotion.rotationX}deg) scale(${objectMotion.scale})`,
+                transform: `translate(${objectMotion.x * 12.8 + objectMotion.pivotX * 56}px, ${objectMotion.y * 7.2 + objectMotion.pivotY * 42}px) ${hingeProjectionCss(objectMotion, 56, 42)} rotateZ(${objectMotion.rotation}deg) rotateY(${objectMotion.rotationY}deg) rotateX(${objectMotion.rotationX}deg) scale(${objectMotion.scale})`,
               }}
             >
               <svg viewBox="0 0 56 42" width="56" height="42">

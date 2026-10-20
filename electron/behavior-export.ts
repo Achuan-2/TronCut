@@ -15,7 +15,9 @@ type MotionExpressions = Record<
   | "rotationY"
   | "opacity"
   | "pivotX"
-  | "pivotY",
+  | "pivotY"
+  | "perspectiveX"
+  | "perspectiveY",
   string
 >;
 const identity = (): MotionExpressions => ({
@@ -28,6 +30,8 @@ const identity = (): MotionExpressions => ({
   opacity: "1",
   pivotX: "0",
   pivotY: "0",
+  perspectiveX: "0",
+  perspectiveY: "0",
 });
 function eased(
   p: string,
@@ -133,9 +137,13 @@ function transition(
   }
   if (phase.style === "hinge") {
     const horizontal = ["left", "right"].includes(phase.direction);
-    result[horizontal ? "rotationY" : "rotationX"] = `(90*${hidden})`;
+    const sign = ["left", "top"].includes(phase.direction) ? -1 : 1;
+    const angle = `(${hidden}*PI/2)`;
+    result[horizontal ? "rotationY" : "rotationX"] =
+      `(90*${hidden}*${sign * (horizontal ? -1 : 1)})`;
+    result[horizontal ? "perspectiveX" : "perspectiveY"] = String(sign / 3);
     result[horizontal ? "pivotX" : "pivotY"] =
-      `((1-cos(${hidden}*PI/2))*${["left", "top"].includes(phase.direction) ? -0.5 : 0.5})`;
+      `((1-cos(${angle}))*${sign / 2}/(1+sin(${angle})/6))`;
   }
   if (phase.style === "implode") {
     result.scale = `(1/max(0.02,${q}))`;

@@ -520,6 +520,9 @@ export interface GlyphMotion {
   // Size-relative offsets for edge hinges and directional media reveals.
   pivotX: number;
   pivotY: number;
+  // Signed inverse camera distance, in object widths/heights (media hinges).
+  perspectiveX: number;
+  perspectiveY: number;
 }
 export const neutralMotion = (): GlyphMotion => ({
   x: 0,
@@ -531,6 +534,8 @@ export const neutralMotion = (): GlyphMotion => ({
   opacity: 1,
   pivotX: 0,
   pivotY: 0,
+  perspectiveX: 0,
+  perspectiveY: 0,
 });
 function rankFor(type: BehaviorPhase["type"], index: number, count: number) {
   return type === "whole" || type === "simultaneous"
@@ -705,10 +710,17 @@ function transition(
   }
   if (phase.style === "hinge") {
     const horizontal = ["left", "right"].includes(phase.direction);
-    value[horizontal ? "rotationY" : "rotationX"] = 90 * hidden;
+    const sign = ["left", "top"].includes(phase.direction) ? -1 : 1;
+    const angle = (hidden * Math.PI) / 2;
+    const media = phase.type === "whole";
+    value[horizontal ? "rotationY" : "rotationX"] =
+      90 * hidden * (media ? sign * (horizontal ? -1 : 1) : 1);
+    if (media) value[horizontal ? "perspectiveX" : "perspectiveY"] = sign / 3;
+    // Project the center as well as the face; the chosen edge stays pinned.
     value[horizontal ? "pivotX" : "pivotY"] =
-      (1 - Math.cos((hidden * Math.PI) / 2)) *
-      (["left", "top"].includes(phase.direction) ? -0.5 : 0.5);
+      (sign * (1 - Math.cos(angle))) /
+      2 /
+      (media ? 1 + Math.sin(angle) / 6 : 1);
   }
   if (phase.style === "implode") {
     value.scale = 1 / Math.max(0.02, q);
@@ -866,6 +878,8 @@ export function glyphMotion(
     result.opacity *= value.opacity;
     result.pivotX += value.pivotX;
     result.pivotY += value.pivotY;
+    result.perspectiveX += value.perspectiveX;
+    result.perspectiveY += value.perspectiveY;
   }
   return result;
 }

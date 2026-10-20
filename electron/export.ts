@@ -660,6 +660,8 @@ async function renderProject(
       // Per-glyph motion is already rasterized. Only run outer-frame filters
       // for channels that actually contain object motion.
       const objectMotion = objectBehaviorExpressions(clip, clock("t"));
+      const hasHingePerspective =
+        objectMotion.perspectiveX !== "0" || objectMotion.perspectiveY !== "0";
       const alphaAnimated =
         transitionMotion.opacity !== "1" ||
         !!clip.fadeTiming ||
@@ -714,6 +716,16 @@ async function renderProject(
             x: pose("rotationX", "T"),
             y: pose("rotationY", "T"),
             z: pose("rotation", "T"),
+            hinge: hasHingePerspective
+              ? {
+                  x: objectMotion.perspectiveX.replace(/\bt\b/g, "T"),
+                  y: objectMotion.perspectiveY.replace(/\bt\b/g, "T"),
+                  rotationX: objectMotion.rotationX.replace(/\bt\b/g, "T"),
+                  rotationY: objectMotion.rotationY.replace(/\bt\b/g, "T"),
+                  fps,
+                  start: range.start,
+                }
+              : undefined,
             skew: pose("skew", "T"),
             maxSkew: Math.max(
               Math.abs(clip.transform.skew ?? 0),
@@ -935,7 +947,7 @@ async function renderProject(
         filters.push(`[${backdrop}][${maskedBase}][${coverage}]maskedmerge=planes=15[${maskedOutput}]`);
         if (normal) filters.push(`[${maskedOutput}][${normal}]overlay=0:0:format=auto:enable='not(${effectActiveExpression(matte, clip, "t")})'[${output}]`);
       } else filters.push(
-        `[${base}][${visual}]overlay=x='${width}*((${pose("x")})+(${transitionOffsetExpression(project, clip)}))-overlay_w/2':y='${height}*(${pose("y")})-overlay_h/2':enable='gte(t,${range.start})*lt(t,${range.end})':eof_action=pass:repeatlast=0${still || clip.kind === "text" ? ":format=auto" : ""}[${output}]`,
+        `[${base}][${visual}]overlay=x='${width}*((${pose("x")})+(${transitionOffsetExpression(project, clip)}))-overlay_w/2':y='${height}*(${pose("y")})-overlay_h/2':enable='gte(t,${range.start})*lt(t,${range.end})':eof_action=pass:repeatlast=0${still || clip.kind === "text" || hasHingePerspective ? ":format=auto" : ""}[${output}]`,
       );
       base = output;
     }

@@ -103,7 +103,17 @@ for (const [index, media] of medias.entries()) {
   project.clips = [clip];
   await fs.writeFile(
     path.join(root, `${style}.troncut`),
-    JSON.stringify(project, null, 2),
+    JSON.stringify(
+      {
+        ...project,
+        assets: project.assets.map((asset) => ({
+          ...asset,
+          path: path.basename(asset.path),
+        })),
+      },
+      null,
+      2,
+    ),
   );
   const output = path.join(root, `segment-${index}.mp4`);
   await exportVideo(

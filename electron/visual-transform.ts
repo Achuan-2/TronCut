@@ -92,6 +92,14 @@ export function axisRotationFilters(angles: {
   z: string;
   skew?: string;
   maxSkew?: number;
+  hinge?: {
+    x: string;
+    y: string;
+    rotationX: string;
+    rotationY: string;
+    fps: number;
+    start: number;
+  };
 }) {
   const x = `(${angles.x})*PI/180`,
     y = `(${angles.y})*PI/180`,
@@ -102,6 +110,51 @@ export function axisRotationFilters(angles: {
   const c = `((${a})*${shear}+cos(${z})*sin(${y})*sin(${x})-sin(${z})*cos(${x}))`;
   const d = `((${b})*${shear}+sin(${z})*sin(${y})*sin(${x})+cos(${z})*cos(${x}))`;
   const determinant = `(cos(${x})*cos(${y}))`;
+  if (angles.hinge) {
+    // The old orthographic projection loses the sign of a hinge's angle.
+    // Evaluate the camera homography once per corner/frame, not per pixel.
+    const hinge = angles.hinge;
+    const sign = (value: string) =>
+      `if(gt(${value},0),1,if(lt(${value},0),-1,0))`;
+    const hx = `(${hinge.rotationX})*PI/180`,
+      hy = `(${hinge.rotationY})*PI/180`;
+    const sourceWidth = "((2*W-H)/3)",
+      sourceHeight = "((2*H-W)/3)";
+    const normalX = `(-sin(${y}))`;
+    const normalY = `(cos(${y})*sin(${x})-sin(${y})*${shear})`;
+    const cameraX = `(${hinge.x})`,
+      cameraY = `(${hinge.y})`;
+    const camera =
+      [
+        `st(0,max(abs(${cameraX})/${sourceWidth},abs(${cameraY})/${sourceHeight}))`,
+        `st(1,${sign(cameraX)}*(1-cos(${hy}))*${sourceWidth}/2)`,
+        `st(2,${sign(cameraY)}*(1-cos(${hx}))*${sourceHeight}/2)`,
+        `st(3,(${sign(cameraX)}*sin(${hy})*${sourceWidth}-${sign(cameraY)}*sin(${hx})*${sourceHeight})/2)`,
+        "st(4,1-ld(3)*ld(0))",
+      ].join(";") + ";";
+    const corners = [
+      [-1, -1],
+      [1, -1],
+      [-1, 1],
+      [1, 1],
+    ].flatMap(([sx, sy], index) => {
+      const prefix = `${camera}st(5,${sx}*W/2);st(6,${sy}*H/2);st(7,ld(4)-(${normalX}*ld(5)+${normalY}*ld(6))*ld(0));`;
+      const px = `${prefix}((${a})*ld(5)+(${c})*ld(6)+ld(1))/ld(7)-ld(1)/ld(4)+W/2`;
+      const py = `${prefix}((${b})*ld(5)+(${d})*ld(6)+ld(2))/ld(7)-ld(2)/ld(4)+H/2`;
+      // perspective increments its input counter before evaluating the corners.
+      const frameTime = `((in-1)/${hinge.fps}+${hinge.start})`;
+      return [
+        `x${index}='${px.replace(/\bT\b/g, frameTime)}'`,
+        `y${index}='${py.replace(/\bT\b/g, frameTime)}'`,
+      ];
+    });
+    return [
+      `fps=${hinge.fps}:start_time=${hinge.start}`,
+      // Recover pre-pad dimensions from W/H; leave room for the near edge and Z rotation.
+      "pad=w='2*iw+ih':h='iw+2*ih':x=(ow-iw)/2:y=(oh-ih)/2:color=black@0:eval=frame",
+      `perspective=${corners.join(":")}:sense=destination:eval=frame:interpolation=linear`,
+    ];
+  }
   const divisor = `if(gt(abs(${determinant}),0.000001),${determinant},1)`;
   return [
     `pad=w='ceil(sqrt(pow(iw+ih*${Math.abs(Math.tan(((angles.maxSkew ?? 0) * Math.PI) / 180))},2)+ih*ih)/2)*2':h=ow:x=(ow-iw)/2:y=(oh-ih)/2:color=black@0:eval=frame`,

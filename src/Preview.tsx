@@ -81,6 +81,7 @@ import { visualClipAt } from "../shared/visual-state";
 import { annotationMime, parseAnnotation } from "../shared/annotations";
 import { behaviorTransform, supportsBehaviors } from "../shared/behaviors";
 import { behaviorObjectSize } from "./behavior-object-size";
+import { behaviorProjectionCss } from "../shared/behavior-projection";
 import {
   supportsVisualEffect,
   visualEffectFromDragTypes,
@@ -132,8 +133,13 @@ import { LineSelection, RotationHandle } from "./CanvasSelection";
 
 type PreviewQuality = EditorPreferences["program"]["previewQuality"];
 
-function previewTransform(value: Transform, fallbackRotation = 0): string {
+function previewTransform(
+  value: Transform,
+  fallbackRotation = 0,
+  projection = "",
+): string {
   const parts = ["translate(-50%, -50%)"];
+  if (projection) parts.push(projection);
   const rotation = value.rotation ?? fallbackRotation;
   if (rotation) parts.push(`rotateZ(${rotation}deg)`);
   if (value.rotationY) parts.push(`rotateY(${value.rotationY}deg)`);
@@ -281,21 +287,28 @@ function PreviewLayerImpl({
     },
     [scheduleDragUpdate],
   );
+  const objectSize = behaviorObjectSize(clip, project);
   const displayed = editing
     ? (drag?.value ?? transform)
     : transitionTransform(
         project,
         clip,
-        behaviorTransform(clip, drag?.value ?? transform, localTime, behaviorObjectSize(clip, project)),
+        behaviorTransform(clip, drag?.value ?? transform, localTime, objectSize),
         playhead,
       );
   const textBox = clip.kind === "text" ? (drag?.box ?? textBoxFor(clip)) : null;
   const fill = textBox ? textFillGeometry(clip.style, textBox) : null;
+  const objectScale = scale * displayed.scale * depthScale(displayed.z);
+  const projection = editing ? "" : behaviorProjectionCss(
+    clip, localTime,
+    objectSize.width * project.canvas.width * objectScale * (displayed.scaleX ?? 1),
+    objectSize.height * project.canvas.height * objectScale * (displayed.scaleY ?? 1),
+  );
   const style: CSSProperties = {
     left: `${displayed.x * 100}%`,
     top: `${displayed.y * 100}%`,
     opacity: editing ? 1 : displayed.opacity * fadeOpacity(clip, localTime),
-    transform: previewTransform(displayed, clip.rotation ?? 0),
+    transform: previewTransform(displayed, clip.rotation ?? 0, projection),
     "--canvas-scale": scale,
   } as CSSProperties;
   if (textBox) {

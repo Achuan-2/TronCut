@@ -12,6 +12,7 @@ import { mediaFrameRadii, roundedRectanglePath } from "../shared/media-frame";
 import { visualClipAt } from "../shared/visual-state";
 import { textBoxFor, styledTextLayout } from "./text";
 import { behaviorObjectSize } from "./behavior-object-size";
+import { behaviorProjectionCss } from "../shared/behavior-projection";
 import { annotationSvgBody, drawingProgress, shapeSize } from "../shared/annotation-style";
 import { textLineHeight, textFillCss, textFillGeometry } from "../shared/text";
 import {
@@ -166,6 +167,11 @@ export default function MatteDefinition({
     ],
   );
   const size = pose.scale * depthScale(pose.z);
+  const projection = behaviorProjectionCss(
+    clip, local,
+    width * size * (pose.scaleX ?? 1),
+    height * size * (pose.scaleY ?? 1),
+  );
   const lines = (clip.text ?? "").split("\n");
   const font = (clip.style?.fontSize ?? 68) * scale;
   const fill = box ? textFillGeometry(clip.style, box) : null;
@@ -227,7 +233,7 @@ export default function MatteDefinition({
           <g filter={`url(#${modeId})`}>
             <g
               style={{
-                transform: `translate(${pose.x * project.canvas.width * scale}px, ${pose.y * project.canvas.height * scale}px) rotate(${pose.rotation ?? clip.rotation ?? 0}deg) rotateY(${pose.rotationY ?? 0}deg) rotateX(${pose.rotationX ?? 0}deg) scale(${size * (pose.scaleX ?? 1)}, ${size * (pose.scaleY ?? 1)}) skewX(${pose.skew ?? 0}deg) translate(${-width / 2}px, ${-height / 2}px)`,
+                transform: `translate(${pose.x * project.canvas.width * scale}px, ${pose.y * project.canvas.height * scale}px) ${projection} rotate(${pose.rotation ?? clip.rotation ?? 0}deg) rotateY(${pose.rotationY ?? 0}deg) rotateX(${pose.rotationX ?? 0}deg) scale(${size * (pose.scaleX ?? 1)}, ${size * (pose.scaleY ?? 1)}) skewX(${pose.skew ?? 0}deg) translate(${-width / 2}px, ${-height / 2}px)`,
                 opacity: pose.opacity * fadeOpacity(clip, local),
               }}
             >
