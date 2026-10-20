@@ -16,6 +16,9 @@
 .effect-preview-mask {
   width: 90px;
 }
+.effect-preview-matte {
+  transform-origin: 64px 36px;
+}
 .effect-preview-shadow {
   filter: drop-shadow(5px 6px 3px #000c);
 }
@@ -86,13 +89,11 @@
   0%,
   12%,
   100% {
-    r: 15px;
-    transform: translateX(-35px);
+    transform: scale(0.8);
   }
   48%,
   65% {
-    r: 35px;
-    transform: translateX(25px);
+    transform: scale(1.05);
   }
 }
 @keyframes effect-demo-speed {

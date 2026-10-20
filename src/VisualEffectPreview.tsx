@@ -166,7 +166,18 @@ export default function VisualEffectPreview({
           </g>
           <clipPath id={frame}>
             {effect === "media-matte" ? (
-              <circle className="effect-preview-matte" cx={64} cy={36} r={31} />
+              <text
+                className="effect-preview-matte"
+                x={64}
+                y={57}
+                textAnchor="middle"
+                fontSize={62}
+                fontWeight={900}
+                textLength={116}
+                lengthAdjust="spacingAndGlyphs"
+              >
+                文字
+              </text>
             ) : (
               <rect
                 className={
