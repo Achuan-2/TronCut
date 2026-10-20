@@ -270,7 +270,7 @@ try {
       AbortSignal.timeout(60000),
       () => {},
     );
-    for (const time of [0.2, 0.6, 1.2, 3, 4.8]) {
+    for (const time of [1 / 15, 0.2, 0.4, 3, 4.8]) {
       const frame = path.join(root, `${preset.id}-${time}.png`);
       await runProcess(findBinary("ffmpeg"), [
         "-y",
@@ -300,7 +300,7 @@ try {
   await fs.writeFile(reviewFile, JSON.stringify(review));
   page = await launch(reviewFile, null);
   for (const clip of review.clips) {
-    for (const time of [0.2, 0.6, 1.2, 3, 4.8]) {
+    for (const time of [1 / 15, 0.2, 0.4, 3, 4.8]) {
       await page
         .getByLabel("播放进度", { exact: true })
         .evaluate((input, time) => {

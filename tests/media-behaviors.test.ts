@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { newText, createProject, validateProject } from "../shared/model";
 import {
   behaviorFromPreset,
+  behaviorEase,
   behaviorTransform,
   behaviorWindows,
   changeBehaviorType,
@@ -10,6 +11,7 @@ import {
   mediaBehaviorPhase,
   mediaBehaviorPresets,
   mediaBehaviorStyles,
+  phaseSeconds,
 } from "../shared/behaviors";
 import {
   captureBehaviorPreset,
@@ -33,7 +35,7 @@ describe("媒体行为和文本的媒体模式", () => {
       "滑入",
     ]);
     expect(createBehavior("media-fade", 5, "image")).toMatchObject({
-      incoming: { style: "fade", duration: 0.65 },
+      incoming: { style: "fade", duration: 0.3 },
       during: { style: "none" },
       outgoing: { style: "fade", duration: 0.65 },
     });
@@ -70,6 +72,42 @@ describe("媒体行为和文本的媒体模式", () => {
         expect(behavior.during.intensity).toBeLessThanOrEqual(3);
       if (behavior.during.style === "drift")
         expect(behavior.during.rotation).toBeLessThanOrEqual(2);
+    }
+  });
+
+  it("所有进场在半秒内完成，弹簧压缩完整回弹轨迹而不在结束时大幅跳变", () => {
+    for (const preset of mediaBehaviorPresets) {
+      expect(phaseSeconds(preset.incoming), preset.id).toBeLessThanOrEqual(0.5);
+    }
+    for (const id of ["grow", "hinge", "cut"]) {
+      const behavior = createBehavior(`media-${id}`, 5)!;
+      const phase = behavior.incoming;
+      expect(phase.springDuration).toBeGreaterThan(phaseSeconds(phase));
+      for (const progress of [0.1, 0.25, 0.5, 0.75, 0.99]) {
+        const motion = glyphMotion(
+          { behaviors: [behavior] },
+          progress * phaseSeconds(phase),
+          0,
+          1,
+          "object",
+        );
+        const q = behaviorEase(
+          progress,
+          "spring",
+          phase.tension,
+          phase.springDuration,
+        );
+        if (id === "grow")
+          expect(motion.scale).toBeCloseTo(Math.max(0.01, q), 10);
+        if (id === "hinge")
+          expect(motion.rotationX).toBeCloseTo(90 * (1 - q), 10);
+        if (id === "cut") expect(motion.y).toBeCloseTo(-12.5 * (1 - q), 10);
+        if (progress === 0.99) {
+          expect(Math.abs(motion.scale - 1)).toBeLessThan(0.03);
+          expect(Math.abs(motion.rotationX)).toBeLessThan(2);
+          expect(Math.abs(motion.y)).toBeLessThan(0.15);
+        }
+      }
     }
   });
 
@@ -173,8 +211,8 @@ describe("媒体行为和文本的媒体模式", () => {
   });
 
   it("媒体分类随自定义预设及项目保存，旧库仍可读取", () => {
-    const behavior = createBehavior("media-implode", 5)!;
-    const preset = captureBehaviorPreset(behavior, "我的内爆");
+    const behavior = createBehavior("media-grow", 5)!;
+    const preset = captureBehaviorPreset(behavior, "我的增长");
     const state = presetLibrarySchema.parse({
       ...emptyPresetLibrary(),
       customBehaviors: [preset],
@@ -182,6 +220,7 @@ describe("媒体行为和文本的媒体模式", () => {
     expect(
       libraryBehaviors(state).find((value) => value.id === preset.id)?.category,
     ).toBe("media");
+    expect(state.customBehaviors[0].incoming.springDuration).toBe(0.9);
     const project = createProject();
     project.clips = [
       { ...newText(project.tracks[0].id, 0), behaviors: [behavior] },

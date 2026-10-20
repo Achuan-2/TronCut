@@ -92,7 +92,12 @@ function transition(
   const result = identity();
   if (phase.style === "none" || phase.type !== "whole") return result;
   const p = `clip(${progress},0,1)`;
-  const curve = eased(p, phase.easing, phase.tension, phaseSeconds(phase));
+  const curve = eased(
+    p,
+    phase.easing,
+    phase.tension,
+    phase.springDuration ?? phaseSeconds(phase),
+  );
   const q = entering ? curve : `(1-(${curve}))`;
   const hidden = `(1-(${q}))`;
   result.opacity = entering ? `gt(${p},0)` : `lt(${p},1)`;

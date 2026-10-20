@@ -78,6 +78,9 @@ export const behaviorPhaseSchema = z.object({
   shift: z.number().finite().min(0).max(100).default(5),
   // Exact phase lengths from authored presets; absent in older projects.
   duration: z.number().finite().min(0.001).max(60).optional(),
+  // Run a settled spring response within a shorter authored phase.
+  // Absent in existing projects, which retain their original spring clock.
+  springDuration: z.number().finite().min(0.001).max(60).optional(),
   rotation: z.number().finite().min(0).max(180).default(16),
   horizontal: z.number().finite().min(0).max(100).default(10),
   vertical: z.number().finite().min(0).max(100).default(10),
@@ -653,7 +656,12 @@ function transition(
 ): GlyphMotion {
   const value = neutralMotion();
   const p = Math.max(0, Math.min(1, progress)),
-    eased = behaviorEase(p, phase.easing, phase.tension, phaseSeconds(phase)),
+    eased = behaviorEase(
+      p,
+      phase.easing,
+      phase.tension,
+      phase.springDuration ?? phaseSeconds(phase),
+    ),
     q = entering ? eased : 1 - eased,
     hidden = 1 - q;
   if (phase.style === "none") return value;

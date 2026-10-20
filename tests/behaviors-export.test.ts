@@ -3,7 +3,7 @@ import path from "node:path";
 import fs from "node:fs/promises";
 import sharp from "sharp";
 import { createProject, newText } from "../shared/model";
-import { createBehavior } from "../shared/behaviors";
+import { createBehavior, phaseSeconds } from "../shared/behaviors";
 import { exportFrame, exportVideo } from "../electron/export";
 import { findBinary, runProcess } from "../electron/process";
 import { saveProject, openProject } from "../electron/project-store";
@@ -157,7 +157,10 @@ it("文本和图片的弹出在真实输出中沿边缘翻起，不再等比缩�
     clip.behaviors = [behavior];
     project.clips = [clip];
     const bounds = [];
-    for (const time of [0.1, 1]) {
+    for (const time of [
+      Math.min(0.1, phaseSeconds(behavior.incoming) / 10),
+      1,
+    ]) {
       const image = path.join(root, `${kind}-${time}.png`);
       await exportFrame(
         project,

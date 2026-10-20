@@ -289,7 +289,7 @@ try {
   );
   await expect(
     properties.getByLabel("行为速度（%）", { exact: true }),
-  ).toHaveValue("77");
+  ).toHaveValue("90");
   await properties.getByLabel("行为移动").selectOption("spring");
   await expect(properties.getByLabel("行为张力", { exact: true })).toHaveValue(
     "9.50",

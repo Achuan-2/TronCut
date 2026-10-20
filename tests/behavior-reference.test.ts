@@ -94,6 +94,7 @@ describe("用户 Camtasia 行为项目的参考时序与运动特征", () => {
         const legacy = { ...behavior[key] };
         for (const field of [
           "duration",
+          "springDuration",
           "rotation",
           "horizontal",
           "vertical",
