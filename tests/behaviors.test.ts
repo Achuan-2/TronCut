@@ -95,7 +95,7 @@ describe("行为的对象与逐字时序", () => {
     expect(video.incoming).toMatchObject({
       type: "whole",
       easing: "spring",
-      tension: 9,
+      tension: 7,
     });
     expect(video.during).toMatchObject({
       style: "cut",

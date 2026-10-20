@@ -35,7 +35,7 @@ describe("媒体行为和文本的媒体模式", () => {
       "滑入",
     ]);
     expect(createBehavior("media-fade", 5, "image")).toMatchObject({
-      incoming: { style: "fade", duration: 0.3 },
+      incoming: { style: "fade", duration: 1317928960 / 705600000 },
       during: { style: "none" },
       outgoing: { style: "fade", duration: 0.65 },
     });
@@ -67,7 +67,8 @@ describe("媒体行为和文本的媒体模式", () => {
       const short = behaviorWindows({ ...behavior, duration: 0.1 }, 1);
       expect(short.incoming + short.outgoing).toBeLessThanOrEqual(0.100001);
       const windows = behaviorWindows(behavior, 1);
-      expect(windows.incoming + windows.outgoing).toBeLessThanOrEqual(2);
+      // Even the longest entry leaves two seconds for presentation on a 5s clip.
+      expect(windows.incoming + windows.outgoing).toBeLessThanOrEqual(3);
       if (behavior.during.style === "pulse")
         expect(behavior.during.intensity).toBeLessThanOrEqual(3);
       if (behavior.during.style === "drift")
@@ -75,14 +76,17 @@ describe("媒体行为和文本的媒体模式", () => {
     }
   });
 
-  it("所有进场在半秒内完成，弹簧压缩完整回弹轨迹而不在结束时大幅跳变", () => {
+  it("按参考的秒级节奏进场，弹簧保留回摆且结束时没有明显视觉跳变", () => {
     for (const preset of mediaBehaviorPresets) {
-      expect(phaseSeconds(preset.incoming), preset.id).toBeLessThanOrEqual(0.5);
+      expect(phaseSeconds(preset.incoming), preset.id).toBeGreaterThanOrEqual(
+        0.8,
+      );
+      expect(phaseSeconds(preset.incoming), preset.id).toBeLessThanOrEqual(2.1);
     }
     for (const id of ["grow", "hinge", "cut"]) {
       const behavior = createBehavior(`media-${id}`, 5)!;
       const phase = behavior.incoming;
-      expect(phase.springDuration).toBeGreaterThan(phaseSeconds(phase));
+      expect(phase.springDuration).toBeGreaterThanOrEqual(1);
       for (const progress of [0.1, 0.25, 0.5, 0.75, 0.99]) {
         const motion = glyphMotion(
           { behaviors: [behavior] },
@@ -104,10 +108,31 @@ describe("媒体行为和文本的媒体模式", () => {
         if (id === "cut") expect(motion.y).toBeCloseTo(-12.5 * (1 - q), 10);
         if (progress === 0.99) {
           expect(Math.abs(motion.scale - 1)).toBeLessThan(0.03);
-          expect(Math.abs(motion.rotationX)).toBeLessThan(2);
+          // Orthographic hinge rotation changes projected height by cos(angle).
+          expect(1 - Math.cos((motion.rotationX * Math.PI) / 180)).toBeLessThan(
+            0.015,
+          );
+          expect(Math.abs(motion.pivotY)).toBeLessThan(0.008);
           expect(Math.abs(motion.y)).toBeLessThan(0.15);
         }
       }
+    }
+  });
+
+  it("显示的位移先缓动到位，透明度按参考时间线性增长", () => {
+    const behavior = createBehavior("media-reveal", 5)!;
+    const duration = phaseSeconds(behavior.incoming);
+    expect(duration).toBeCloseTo(2899443712 / 3 / 705600000, 10);
+    for (const progress of [0.25, 0.5, 0.75]) {
+      const motion = glyphMotion(
+        { behaviors: [behavior] },
+        duration * progress,
+        0,
+        1,
+        "object",
+      );
+      expect(motion.opacity).toBeCloseTo(progress, 10);
+      expect(motion.pivotX).toBeCloseTo(-0.08 * (1 - progress) ** 4, 10);
     }
   });
 
@@ -295,7 +320,7 @@ describe("媒体行为和文本的媒体模式", () => {
     expect(
       libraryBehaviors(state).find((value) => value.id === preset.id)?.category,
     ).toBe("media");
-    expect(state.customBehaviors[0].incoming.springDuration).toBe(0.9);
+    expect(state.customBehaviors[0].incoming.springDuration).toBe(2);
     const project = createProject();
     project.clips = [
       { ...newText(project.tracks[0].id, 0), behaviors: [behavior] },
@@ -305,5 +330,24 @@ describe("媒体行为和文本的媒体模式", () => {
         .behaviors![0],
     ).toEqual(behavior);
     expect(presetLibrarySchema.safeParse({ version: 1 }).success).toBe(true);
+  });
+
+  it("读取已有项目和自定义预设时保留用户保存的旧进场时钟", () => {
+    const behavior = createBehavior("media-grow", 5)!;
+    behavior.incoming.duration = 0.4;
+    behavior.incoming.springDuration = 0.9;
+    const project = createProject();
+    project.clips = [
+      { ...newText(project.tracks[0].id, 0), behaviors: [behavior] },
+    ];
+    expect(
+      validateProject(JSON.parse(JSON.stringify(project))).clips[0]
+        .behaviors![0].incoming,
+    ).toEqual(behavior.incoming);
+    const state = presetLibrarySchema.parse({
+      ...emptyPresetLibrary(),
+      customBehaviors: [captureBehaviorPreset(behavior, "旧时钟")],
+    });
+    expect(state.customBehaviors[0].incoming).toEqual(behavior.incoming);
   });
 });

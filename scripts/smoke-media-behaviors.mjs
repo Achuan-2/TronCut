@@ -356,12 +356,14 @@ try {
         height: 1,
       });
       const layer = page.locator(`.preview-layer[data-clip-id="${clip.id}"]`);
+      // CSSOM rounds large percentage positions to fewer decimal places.
+      // 0.005 percentage points is still less than 0.03px on this canvas.
       await expect
         .poll(() => layer.evaluate((node) => parseFloat(node.style.left)))
-        .toBeCloseTo(pose.x * 100, 4);
+        .toBeCloseTo(pose.x * 100, 2);
       await expect
         .poll(() => layer.evaluate((node) => parseFloat(node.style.top)))
-        .toBeCloseTo(pose.y * 100, 4);
+        .toBeCloseTo(pose.y * 100, 2);
       await expect
         .poll(() => layer.evaluate((node) => Number(node.style.opacity)))
         .toBeCloseTo(pose.opacity, 4);

@@ -1,7 +1,8 @@
 import type { BehaviorPhase } from "./behaviors";
 
 // Motion styles follow the Camtasia reference; these combinations and timings
-// are authored for everyday use rather than copied from its demonstration.
+// are authored for everyday use. Entry clocks are calibrated against the
+// 30 fps reference; see docs/media-behavior-timing.md for measured settling.
 const hold: Partial<BehaviorPhase> = { style: "none" };
 const softPulse: Partial<BehaviorPhase> = {
   style: "pulse",
@@ -23,8 +24,8 @@ export const mediaBehaviorDefinitions: {
       style: "bounce-in",
       easing: "back-out",
       direction: "top",
-      duration: 0.4,
-      speed: 90,
+      duration: 25 / 30,
+      speed: 77,
     },
     during: softPulse,
     outgoing: { style: "shrink", easing: "quad-in", duration: 0.35 },
@@ -36,8 +37,8 @@ export const mediaBehaviorDefinitions: {
       style: "drift",
       easing: "quad-out",
       direction: "bottom",
-      duration: 0.5,
-      speed: 85,
+      duration: 60 / 30,
+      speed: 77,
     },
     during: {
       style: "drift",
@@ -58,9 +59,9 @@ export const mediaBehaviorDefinitions: {
     name: "淡入",
     incoming: {
       style: "fade",
-      easing: "smoothstep",
-      duration: 0.3,
-      speed: 93,
+      easing: "linear",
+      duration: 1317928960 / 705600000,
+      speed: 77,
     },
     during: hold,
     outgoing: {
@@ -74,9 +75,9 @@ export const mediaBehaviorDefinitions: {
     name: "飞入",
     incoming: {
       style: "fly",
-      easing: "quad-out",
-      duration: 0.4,
-      speed: 90,
+      easing: "linear",
+      duration: 31 / 30,
+      speed: 77,
     },
     during: hold,
     outgoing: { style: "fly", easing: "quad-in", duration: 0.55 },
@@ -87,10 +88,10 @@ export const mediaBehaviorDefinitions: {
     incoming: {
       style: "grow",
       easing: "spring",
-      tension: 9,
-      duration: 0.4,
-      springDuration: 0.9,
-      speed: 90,
+      tension: 5,
+      duration: 44 / 30,
+      springDuration: 2,
+      speed: 77,
     },
     during: softPulse,
     outgoing: { style: "shrink", easing: "quad-in", duration: 0.45 },
@@ -101,11 +102,11 @@ export const mediaBehaviorDefinitions: {
     incoming: {
       style: "hinge",
       easing: "spring",
-      tension: 8,
+      tension: 5,
       direction: "bottom",
-      duration: 0.45,
-      springDuration: 1.05,
-      speed: 90,
+      duration: 52 / 30,
+      springDuration: 1,
+      speed: 77,
     },
     during: hold,
     outgoing: {
@@ -120,9 +121,9 @@ export const mediaBehaviorDefinitions: {
     name: "内爆",
     incoming: {
       style: "implode",
-      easing: "quad-out",
-      duration: 0.45,
-      speed: 88,
+      easing: "linear",
+      duration: 40 / 30,
+      speed: 77,
     },
     during: hold,
     outgoing: { style: "explode", easing: "quad-in", duration: 0.65 },
@@ -135,8 +136,8 @@ export const mediaBehaviorDefinitions: {
       easing: "quad-out",
       direction: "left",
       shift: 8,
-      duration: 0.3,
-      speed: 93,
+      duration: 2899443712 / 3 / 705600000,
+      speed: 77,
     },
     during: hold,
     outgoing: {
@@ -153,10 +154,10 @@ export const mediaBehaviorDefinitions: {
     incoming: {
       style: "cut",
       easing: "spring",
-      tension: 9,
-      duration: 0.4,
-      springDuration: 0.95,
-      speed: 90,
+      tension: 7,
+      duration: 52 / 30,
+      springDuration: 1.8,
+      speed: 77,
     },
     during: { style: "cut", easing: "smoothstep", shift: 2, loopTime: 3 },
     outgoing: { style: "cut", easing: "quad-in", duration: 0.35, speed: 93 },
@@ -168,8 +169,8 @@ export const mediaBehaviorDefinitions: {
       style: "slide",
       easing: "quad-out",
       direction: "left",
-      duration: 0.3,
-      speed: 93,
+      duration: 55 / 30,
+      speed: 77,
     },
     during: hold,
     outgoing: {

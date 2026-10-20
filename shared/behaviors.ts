@@ -78,7 +78,7 @@ export const behaviorPhaseSchema = z.object({
   shift: z.number().finite().min(0).max(100).default(5),
   // Exact phase lengths from authored presets; absent in older projects.
   duration: z.number().finite().min(0.001).max(60).optional(),
-  // Run a settled spring response within a shorter authored phase.
+  // Spring simulation clock, independent of the authored phase duration.
   // Absent in existing projects, which retain their original spring clock.
   springDuration: z.number().finite().min(0.001).max(60).optional(),
   rotation: z.number().finite().min(0).max(180).default(16),
@@ -672,6 +672,8 @@ function transition(
     value.y =
       (phase.type === "whole" ? -12.5 : (index % 2 ? 1 : -1) * 1.25) * hidden;
   if (phase.style === "reveal" && phase.type === "whole") {
+    // Reference reveal position eases out, while its entry alpha is linear.
+    if (entering) value.opacity = p;
     const axis = ["left", "right"].includes(phase.direction)
       ? "pivotX"
       : "pivotY";

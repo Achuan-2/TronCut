@@ -105,6 +105,7 @@ function transition(
     result.opacity = `clip(${q},0,1)`;
   if (phase.style === "cut") result.y = `(-12.5*${hidden})`;
   if (phase.style === "reveal") {
+    if (entering) result.opacity = p;
     const key = ["left", "right"].includes(phase.direction)
       ? "pivotX"
       : "pivotY";

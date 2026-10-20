@@ -427,7 +427,8 @@ it("图片和视频使用对象行为，实际导出包含入场与出场透明�
       () => {},
     );
     const counts: number[] = [];
-    for (const time of [0, 0.6, 1.1]) {
+    // On a short clip entry/exit compress proportionally; the peak is near 0.9s.
+    for (const time of [0, 0.9, 1.1]) {
       const image = path.join(root, `${kind}-${time}.png`);
       await runProcess(findBinary("ffmpeg"), [
         "-y",
