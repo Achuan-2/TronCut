@@ -1,6 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Crop, MousePointer2, Settings2, Undo2, X, PenTool } from "lucide-react";
+import {
+  Crop,
+  MousePointer2,
+  Settings2,
+  Undo2,
+  X,
+  PenTool,
+} from "lucide-react";
 import type { Project } from "../shared/model";
 import type { Editor } from "./useEditor";
 import { transformAt } from "../shared/editor";
@@ -17,17 +24,25 @@ const presets = [
   { width: 3840, height: 2160, name: "4K · 3840 × 2160" },
 ];
 
-function CanvasSettings({
+function ProjectSettings({
   canvas,
+  audio,
   onApply,
   onClose,
 }: {
   canvas: Project["canvas"];
-  onApply: (canvas: Project["canvas"]) => void;
+  audio: Project["audio"];
+  onApply: (
+    canvas: Project["canvas"],
+    audio: NonNullable<Project["audio"]>,
+  ) => void;
   onClose: () => void;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const [draft, setDraft] = useState(canvas);
+  const [normalize, setNormalize] = useState(
+    audio?.autoNormalizeLoudness ?? false,
+  );
   useEffect(() => {
     dialog.current?.showModal();
   }, []);
@@ -42,16 +57,16 @@ function CanvasSettings({
       <form
         onSubmit={(event) => {
           event.preventDefault();
-          onApply(draft);
+          onApply(draft, { autoNormalizeLoudness: normalize });
           onClose();
         }}
       >
         <div className="modal-heading">
           <div>
-            <h2 id="canvas-settings-title">画布大小设置</h2>
-            <p>设置工程和导出视频的画布尺寸</p>
+            <h2 id="canvas-settings-title">项目设置</h2>
+            <p>设置画布、帧率和声音</p>
           </div>
-          <button type="button" aria-label="关闭画布设置" onClick={onClose}>
+          <button type="button" aria-label="关闭项目设置" onClick={onClose}>
             <X size={19} />
           </button>
         </div>
@@ -136,6 +151,19 @@ function CanvasSettings({
               }
             />
           </label>
+        </div>
+        <div className="project-audio-settings">
+          <label className="check-field">
+            <input
+              type="checkbox"
+              checked={normalize}
+              onChange={(event) => setNormalize(event.target.checked)}
+            />
+            自动标准化响度
+          </label>
+          <p className="field-help">
+            统一素材响度至 -18 LUFS，可在素材的声音属性中单独关闭。
+          </p>
         </div>
         <div className="canvas-settings-actions">
           <button type="button" onClick={onClose}>
@@ -246,7 +274,7 @@ export default function CanvasToolbar({
               {percent}%
             </option>
           ))}
-          <option value="settings">画布大小设置…</option>
+          <option value="settings">项目设置…</option>
         </select>
         {mode === "crop" && (
           <button
@@ -260,8 +288,8 @@ export default function CanvasToolbar({
         )}
         <button
           className="canvas-size-button"
-          aria-label="画布大小设置"
-          title="画布大小设置"
+          aria-label="项目设置"
+          title="项目设置"
           onClick={() => {
             editor.setPlaying(false);
             if (editor.editingTextId) editor.endTextEdit(editor.editingTextId);
@@ -275,10 +303,11 @@ export default function CanvasToolbar({
         </button>
       </div>
       {settings && (
-        <CanvasSettings
+        <ProjectSettings
           canvas={editor.project.canvas}
-          onApply={(canvas) =>
-            editor.apply((project) => ({ ...project, canvas }))
+          audio={editor.project.audio}
+          onApply={(canvas, audio) =>
+            editor.apply((project) => ({ ...project, canvas, audio }))
           }
           onClose={() => setSettings(false)}
         />

@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { EditorPreferences } from "../shared/editor-preferences";
+import type { Asset } from "../shared/model";
 import { mediaAssetUrl } from "../shared/media-url";
 import {
   createPreviewMediaController,
@@ -9,9 +10,10 @@ import {
 export default function PreviewMedia(
   props: PreviewMediaState & {
     previewQuality: EditorPreferences["program"]["previewQuality"];
+    normalizedAudio?: Asset;
   },
 ) {
-  const { clip, asset, playing, previewQuality } = props;
+  const { clip, asset, playing, previewQuality, normalizedAudio } = props;
   const ref = useRef<HTMLVideoElement & HTMLAudioElement>(null);
   const controller =
     useRef<ReturnType<typeof createPreviewMediaController>>(undefined);
@@ -45,7 +47,12 @@ export default function PreviewMedia(
     if (available && (!playing || (ref.current?.readyState ?? 0) < 2))
       setRevision(1);
   }, [available, playing]);
-  const url = mediaAssetUrl(asset.id, preview, revision);
+  const audioOnly = clip.kind === "audio";
+  const url = mediaAssetUrl(
+    audioOnly && normalizedAudio ? normalizedAudio.id : asset.id,
+    preview,
+    revision,
+  );
   useLayoutEffect(() => {
     const media = ref.current;
     if (!media) return;
@@ -58,7 +65,10 @@ export default function PreviewMedia(
     };
   }, [url, asset.missing]);
   useLayoutEffect(() => {
-    controller.current?.update(props);
+    controller.current?.update({
+      ...props,
+      muted: props.muted || (!audioOnly && !!normalizedAudio),
+    });
   });
   if (asset.missing)
     return (
@@ -75,6 +85,12 @@ export default function PreviewMedia(
       {clip.kind === "audio" ? (
         <audio
           ref={ref}
+          crossOrigin="anonymous"
+          data-normalized-audio={
+            normalizedAudio || asset.id.startsWith("loudness-")
+              ? "1"
+              : undefined
+          }
           src={url}
           preload="auto"
           onError={() => setFailed(true)}
@@ -88,6 +104,14 @@ export default function PreviewMedia(
           playsInline
           loop={clip.loop}
           onError={() => setFailed(true)}
+        />
+      )}
+      {!audioOnly && normalizedAudio && (
+        <PreviewMedia
+          {...props}
+          normalizedAudio={undefined}
+          clip={{ ...clip, kind: "audio", podcast: false }}
+          asset={normalizedAudio}
         />
       )}
       {failed && (

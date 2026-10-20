@@ -71,6 +71,7 @@ const bridge: FrameCraftBridge = {
   mediaTimelineThumbnail: (id, time) =>
     ipcRenderer.invoke("media:timeline-thumbnail", id, time),
   mediaWaveform: (id) => ipcRenderer.invoke("media:waveform", id),
+  normalizeAudio: (id, podcast) => ipcRenderer.invoke("media:normalize-audio", id, podcast),
   mediaUrl: (id) => ipcRenderer.invoke("media:url", id),
   previewProxyAvailable: (id) =>
     ipcRenderer.invoke("media:preview-proxy", id),

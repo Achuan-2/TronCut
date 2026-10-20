@@ -1,5 +1,13 @@
 # 验证记录（含历史与 TronCut 0.3）
 
+## 项目设置与自动标准化响度（2026-10-20）
+
+原“画布大小设置”入口和弹窗统一更名为“项目设置”，增加项目级自动标准化响度开关；有声视频和音频的“声音”页支持单素材排除、多选混合态、撤销重做和保存重开。缺省关闭以保留原工程声音。参考[响度标准化的交互说明](https://www.luping.net.cn/faq/camtasia-xddx.html)，使用 [FFmpeg loudnorm](https://ffmpeg.org/ffmpeg-filters.html#loudnorm) 双遍处理完整源音频，以 -18 LUFS、-1.5 dBTP 为处理目标，预览、试听、导出及时间线音频复用同一本地缓存，不改动原件。
+
+`tests/loudness.test.ts` 使用真实 FFmpeg 生成不同音量、静音和带声音的视频，检查处理结果、缓存复用与失效、人声增强变体、原件 SHA256、手动音量与单素材排除、实际视频导出，以及裁剪、二倍速和帧定格区间的声音及输出时长。不同输入的标准化音轨测得均为约 -18.05 LUFS，导出后两段响度一致，误差在 0.8 LU 内；另有预览控制器的音量与淡入淡出测试，以及组合内项目设置写回测试。
+
+Rust/Wasm、TypeScript、Vite 和 Electron 构建通过，完整 Vitest 的 116 个文件、588 项测试通过。开发构建运行 `scripts/test-project-settings-ui.mjs`，通过新入口、画布参数校验、取消、项目和素材两级开关、同源多片段独立排除、多选横杠、标准化音轨实际播放、原视频静音、撤销重做与保存重开；前端运行错误为零。已检查 `test-output/project-settings-ui/run-1792503359739/project-settings.png` 和混合态截图。组合完整进度与播放范围回归 `scripts/test-group-improvements-ui.mjs` 通过，结果位于 `test-output/group-improvements-ui/run-1792503372267`。验证覆盖本地开发构建及合成媒体，未进行人工听感评估。
+
 ## 组合中的完整工程进度（2026-10-20）
 
 预览进度条和总时长继续使用主工程完整时长，组合边界只约束可定位区间及实际播放终点。开发构建运行 `scripts/test-group-improvements-ui.mjs`：完整 29 秒工程打开 12～20 秒组合后，进度条仍为 0～29 秒、总时长显示 29 秒；鼠标点击两端、键盘 Home/End、重复越界及直接输入均停在 12～20 秒，播放到 20 秒停止，返回主时间线后维持完整时长。跨轨、锁定、撤销重做、灰区、保存重开回归同时通过，前端运行错误为零。已检查 `test-output/group-improvements-ui/run-1792501578267/group-progress.png` 中 15/29 秒的完整进度显示。

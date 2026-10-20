@@ -152,6 +152,31 @@ it("拆分后视频即使调整音量仍保持静音，独立音频正常发声"
   expect(media.volume).toBe(0.6);
 });
 
+it("处理后的音轨仍应用手动音量和时间线淡入淡出", () => {
+  const media = new Media(),
+    controller = controllerFor(media);
+  const s = {
+    ...state(),
+    muted: false,
+    clip: {
+      ...state().clip,
+      kind: "audio" as const,
+      speed: 1,
+      volume: 0.8,
+      duration: 4,
+      fadeIn: 1,
+      fadeOut: 1,
+    },
+  };
+  controller.update({ ...s, localTime: 0.5 });
+  expect(media.volume).toBeCloseTo(0.4);
+  controller.update({ ...s, localTime: 1 });
+  expect(media.volume).toBeCloseTo(0.8);
+  controller.update({ ...s, localTime: 3.5 });
+  expect(media.volume).toBeCloseTo(0.4);
+  controller.dispose();
+});
+
 it("异步加载使用最新定位，并在解码器繁忙时合并连续 seek", () => {
   const media = new Media(),
     controller = controllerFor(media),

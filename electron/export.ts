@@ -9,6 +9,8 @@ import {
   projectDuration,
 } from "../shared/model";
 import { findBinary, runProcess } from "./process";
+import { normalizesClip } from "../shared/loudness";
+import { prepareNormalizedAudio } from "./loudness";
 import { defaultCrop, fadeDurations, visualFilters } from "../shared/effects";
 import { cursorFilters } from "./cursor-export";
 import { staticFrameMaskFilters } from "./static-frame-mask";
@@ -907,11 +909,24 @@ async function renderProject(
       clip.volume > 0
     ) {
       const label = `a${layer}`;
-      const audioSource = clip.stitch ? `stitcha${layer}` : `${index}:a`;
+      const normalized = normalizesClip(project, clip)
+        ? await prepareNormalizedAudio(asset, clip.podcast, resourcesPath, signal)
+        : null;
+      let audioIndex = index;
+      if (normalized) {
+        audioIndex = input++;
+        args.push(
+          ...(clip.loop ? ["-stream_loop", "-1"] : []),
+          ...(seekInput && sourceSeek > 0 ? ["-ss", String(sourceSeek)] : []),
+          "-i", normalized.path,
+        );
+      }
+      const audioClip = normalized ? { ...clip, podcast: false } : clip;
+      const audioSource = clip.stitch ? `stitcha${layer}` : `${audioIndex}:a`;
       if (clip.stitch)
-        filters.push(...stitchInputFilters(clip, `${index}:a`, audioSource, true));
+        filters.push(...stitchInputFilters(clip, `${audioIndex}:a`, audioSource, true));
       filters.push(
-        `[${audioSource}]atrim=start=${sourceIn}:duration=${clip.duration * clip.speed},asetpts=PTS-STARTPTS,${audioFilters(clip, rubberband).join(",")},adelay=${Math.round(clip.start * 1000)}:all=1[${label}]`,
+        `[${audioSource}]atrim=start=${sourceIn}:duration=${clip.duration * clip.speed},asetpts=PTS-STARTPTS,${audioFilters(audioClip, rubberband).join(",")},adelay=${Math.round(clip.start * 1000)}:all=1[${label}]`,
       );
       audioLabels.push(`[${label}]`);
     }

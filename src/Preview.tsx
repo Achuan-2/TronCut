@@ -75,6 +75,8 @@ import CanvasToolbar, {
   type CanvasZoom,
 } from "./CanvasToolbar";
 import { useEditorPlayhead, type Editor } from "./useEditor";
+import { useNormalizedAudio } from "./useNormalizedAudio";
+import { normalizationKey, normalizesClip } from "../shared/loudness";
 import { visualClipAt } from "../shared/visual-state";
 import { annotationMime, parseAnnotation } from "../shared/annotations";
 import { behaviorTransform, supportsBehaviors } from "../shared/behaviors";
@@ -164,6 +166,7 @@ function PreviewLayerImpl({
   playhead,
   animated,
   preloading = false,
+  normalizedAudio,
 }: {
   clip: Clip;
   project: Project;
@@ -180,6 +183,7 @@ function PreviewLayerImpl({
   playhead: number;
   animated: boolean;
   preloading?: boolean;
+  normalizedAudio?: Project["assets"][number];
 }) {
   const localTime = Math.max(0, Math.min(clip.duration, playhead - clip.start));
   const filterId = `visual-effect-${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
@@ -835,6 +839,7 @@ function PreviewLayerImpl({
               <PreviewMedia
                 clip={clip}
                 asset={asset}
+                normalizedAudio={normalizedAudio}
                 fps={project.canvas.fps}
                 localTime={
                   held
@@ -848,7 +853,7 @@ function PreviewLayerImpl({
                     : localTime
                 }
                 playing={editor.playing && !held}
-                muted={muted || held}
+                muted={muted || held || (normalizesClip(project, clip) && !normalizedAudio)}
                 previewQuality={previewQuality}
               />
               {cursor && (
@@ -1131,6 +1136,7 @@ const PreviewLayer = memo(
     previous.previewQuality === next.previewQuality &&
     previous.animated === next.animated &&
     previous.preloading === next.preloading &&
+    previous.normalizedAudio === next.normalizedAudio &&
     (!next.animated || previous.playhead === next.playhead),
 );
 
@@ -1141,6 +1147,7 @@ export function ScenePreview({
   applyCamera = true,
   applyVideoZoomPan = true,
   mode = "select",
+  normalizedAudio,
 }: {
   editor: Editor;
   scale: number;
@@ -1148,6 +1155,7 @@ export function ScenePreview({
   applyCamera?: boolean;
   applyVideoZoomPan?: boolean;
   mode?: CanvasMode;
+  normalizedAudio?: ReadonlyMap<string, Project["assets"][number]>;
 }) {
   const { playhead } = editor;
   const previewQuality = editor.preferences.program.previewQuality;
@@ -1262,6 +1270,7 @@ export function ScenePreview({
           track={tracksById.get(clip.trackId) ?? track}
           previewQuality={previewQuality}
           preloading={preloading}
+          normalizedAudio={normalizesClip(project, clip) ? normalizedAudio?.get(normalizationKey(clip)) : undefined}
           playhead={playhead}
           animated={
             !preloading &&
@@ -1299,6 +1308,7 @@ export default function Preview({
   onPreviewQualityChange: (quality: PreviewQuality) => void;
 }) {
   const playhead = useEditorPlayhead(editor);
+  const normalizedAudio = useNormalizedAudio(editor.documentProject);
   const panel = useRef<HTMLElement>(null);
   const holder = useRef<HTMLDivElement>(null),
     [size, setSize] = useState({ width: 700, height: 400 });
@@ -1355,6 +1365,9 @@ export default function Preview({
   );
   const duration = editor.timelineBounds?.end ?? totalDuration;
   const startTime = editor.timelineBounds?.start ?? 0;
+  useEffect(() => {
+    if ((normalizedAudio.pending || normalizedAudio.error) && playing) setPlaying(false);
+  }, [normalizedAudio.pending, normalizedAudio.error, playing, setPlaying]);
   useEffect(() => {
     const element = holder.current;
     if (!element) return;
@@ -1582,7 +1595,7 @@ export default function Preview({
               background: project.canvas.background,
             }}
           >
-            <ScenePreview editor={editor} scale={scale} mode={mode} />
+            <ScenePreview editor={editor} scale={scale} mode={mode} normalizedAudio={normalizedAudio.assets} />
             {mode === "draw" && !fullscreen && (
               <CanvasDrawingOverlay editor={editor} />
             )}
@@ -1629,7 +1642,7 @@ export default function Preview({
           <button
             className="play-button"
             title="播放 / 暂停（空格）"
-            disabled={!duration}
+            disabled={!duration || normalizedAudio.pending || !!normalizedAudio.error}
             onClick={() => {
               if (!playing && playhead >= duration) seek(startTime);
               setPlaying(!playing);
@@ -1675,6 +1688,12 @@ export default function Preview({
         <span className="timecode">
           {timeLabel(playhead)} <span>/ {timeLabel(totalDuration)}</span>
         </span>
+        {(normalizedAudio.pending || normalizedAudio.error) && (
+          <span className="loudness-status" role="status" title={normalizedAudio.error}>
+            {normalizedAudio.pending ? "正在标准化响度…" : "响度处理失败"}
+            {normalizedAudio.error && <button onClick={normalizedAudio.retry}>重试</button>}
+          </span>
+        )}
         <label className="preview-quality" title="预览画质设置">
           <select
             aria-label="预览画质"

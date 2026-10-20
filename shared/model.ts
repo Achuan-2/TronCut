@@ -144,6 +144,7 @@ export const projectSchema = z.object({
     background: z.string().regex(/^#[\da-f]{6}$/i),
   }),
   camera: cameraSchema.optional(),
+  audio: z.object({ autoNormalizeLoudness: z.boolean() }).optional(),
   mediaFolders: z
     .array(z.object({
       id: identifier,
@@ -247,6 +248,7 @@ export const projectSchema = z.object({
         autoResizeText: z.boolean().optional(),
         lockAspectRatio: z.boolean().optional(),
         volume: finite.min(0).max(4),
+        autoNormalizeLoudness: z.boolean().optional(),
         audioDetached: z.boolean().optional(),
         podcast: z.boolean(),
         shape: annotationShapeSchema.optional(),

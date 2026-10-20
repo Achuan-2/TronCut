@@ -1,4 +1,5 @@
 import type { Asset, Clip } from "../shared/model";
+import { fadeOpacity } from "../shared/effects";
 import {
   sourceTimeAt,
   mediaSegments,
@@ -53,7 +54,7 @@ export function createPreviewMediaController(media: HTMLMediaElement) {
     const frozen = frozenAt(clip, localTime);
     if (media.playbackRate !== clip.speed) media.playbackRate = clip.speed;
     if (!media.preservesPitch) media.preservesPitch = true;
-    const volume = Math.min(1, Math.max(0, clip.volume));
+    const volume = Math.min(1, Math.max(0, clip.volume * fadeOpacity(clip, localTime)));
     if (media.volume !== volume) media.volume = volume;
     const silent = muted || !!clip.audioDetached || frozen;
     if (media.muted !== silent) media.muted = silent;

@@ -45,6 +45,8 @@ import { closeOnnxSessions } from "./onnx-session";
 import { ClonedVoices, validateVoiceReference } from "./cloned-voices";
 import { createClonedVoiceSchema } from "../shared/cloned-voices";
 import { mediaThumbnail, mediaWaveform } from "./thumbnails";
+import { prepareNormalizedAudio, setLoudnessCacheDirectory } from "./loudness";
+import { normalizesClip } from "../shared/loudness";
 import { randomUUID } from "node:crypto";
 import {
   resolveProjectMediaAsset,
@@ -227,6 +229,7 @@ const recordingControls = new RecordingControls((command) => {
     window.webContents.send("shortcut", command === "pause" ? "pauseRecording" : "stopRecording");
 });
 const assets = new Map<string, Asset>();
+setLoudnessCacheDirectory(path.join(app.getPath("userData"), "normalized-audio"));
 setProjectMediaHistoryDirectory(
   path.join(app.getPath("userData"), "media-undo", randomUUID()),
 );
@@ -587,7 +590,10 @@ function installHandlers() {
       const info = await capabilities(process.resourcesPath);
       notify(0, "正在处理试听音频（最多 15 秒）");
       const previewClip = { ...clip, duration: Math.min(15, clip.duration) };
-      const effects = [...audioFilters(clip, info.rubberband), "alimiter=limit=0.95"].join(",");
+      const normalized = normalizesClip(project, clip)
+        ? await prepareNormalizedAudio(asset, clip.podcast, process.resourcesPath, task.signal)
+        : null;
+      const effects = [...audioFilters(normalized ? { ...clip, podcast: false } : clip, info.rubberband), "alimiter=limit=0.95"].join(",");
       await runProcess(
         findBinary("ffmpeg", process.resourcesPath),
         [
@@ -597,7 +603,7 @@ function installHandlers() {
             "-t", String(previewClip.duration * clip.speed),
           ]),
           "-i",
-          asset.path,
+          normalized?.path ?? asset.path,
           "-vn",
           ...(clip.stitch ? [
             "-filter_complex",
@@ -854,6 +860,9 @@ function installHandlers() {
     const proxy = !!asset.animated && !!previewProxies.path(asset.id);
     return mediaAssetUrl(asset.id, proxy, proxy ? 1 : 0);
   });
+  handle("media:normalize-audio", async (id: unknown, podcast: unknown) =>
+    register(await prepareNormalizedAudio(assetById(id), z.boolean().parse(podcast), process.resourcesPath)),
+  );
   handle("media:preview-proxy", (id: unknown) =>
     !!previewProxies.path(assetById(id).id),
   );

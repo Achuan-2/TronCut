@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   FolderOpen,
   Type,
@@ -392,6 +392,49 @@ function CursorProperties({
   );
 }
 
+function LoudnessProperties({ editor }: { editor: Editor }) {
+  const input = useRef<HTMLInputElement>(null);
+  const selected = new Set(editor.selectedIds);
+  const audio = new Set(
+    editor.project.assets.filter(asset => asset.hasAudio).map(asset => asset.id),
+  );
+  const clips = editor.project.clips.filter(clip =>
+    selected.has(clip.id) && audio.has(clip.assetId ?? "") &&
+    !clip.audioDetached && (clip.kind === "audio" || clip.kind === "video"),
+  );
+  const enabled = editor.project.audio?.autoNormalizeLoudness === true;
+  const allOn = clips.every(clip => clip.autoNormalizeLoudness !== false);
+  const mixed = !allOn && clips.some(clip => clip.autoNormalizeLoudness !== false);
+  const locked = clips.some(clip =>
+    editor.project.tracks.find(track => track.id === clip.trackId)?.locked,
+  );
+  useEffect(() => {
+    if (input.current) input.current.indeterminate = mixed;
+  }, [mixed]);
+  return (
+    <label className="check-field" title={enabled ? undefined : "请先在项目设置中启用自动标准化响度"}>
+      <input
+        ref={input}
+        type="checkbox"
+        checked={allOn}
+        aria-checked={mixed ? "mixed" : allOn}
+        disabled={!enabled || locked || !clips.length}
+        onChange={event => {
+          const ids = new Set(clips.map(clip => clip.id));
+          const checked = event.target.checked;
+          editor.apply(project => ({
+            ...project,
+            clips: project.clips.map(clip =>
+              ids.has(clip.id) ? { ...clip, autoNormalizeLoudness: checked } : clip,
+            ),
+          }));
+        }}
+      />
+      自动标准化响度
+    </label>
+  );
+}
+
 export function Inspector({ editor }: { editor: Editor }) {
   const playhead = useEditorPlayhead(editor);
   const c = editor.selected,
@@ -442,7 +485,7 @@ export function Inspector({ editor }: { editor: Editor }) {
     ...(c && hasBehaviors(c)
       ? [{ name: "behaviors", label: "行为", icon: Paintbrush }]
       : []),
-    ...(c?.kind === "audio"
+    ...(c && !c.audioDetached && selectedAsset?.hasAudio && (c.kind === "video" || c.kind === "audio")
       ? [{ name: "audio", label: "声音", icon: Music2 }]
       : []),
   ];
@@ -890,6 +933,7 @@ export function Inspector({ editor }: { editor: Editor }) {
                   ?.hasAudio && (
                   <>
                     <h3 className="section-title">声音</h3>
+                    <LoudnessProperties editor={editor} />
                     <label className="field">
                       音量
                       <input

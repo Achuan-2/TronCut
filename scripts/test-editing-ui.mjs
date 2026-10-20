@@ -460,8 +460,8 @@ try {
   await expect(page.getByLabel("旋转 Z (度)", { exact: true })).toHaveValue("0");
   await page.screenshot({ path: path.join(root, "scale-rotation-controls.png") });
 
-  await page.getByRole("button", { name: "画布大小设置", exact: true }).click();
-  const canvasSettings = page.getByRole("dialog", { name: "画布大小设置", exact: true });
+  await page.getByRole("button", { name: "项目设置", exact: true }).click();
+  const canvasSettings = page.getByRole("dialog", { name: "项目设置", exact: true });
   await expect(canvasSettings).toBeVisible();
   await canvasSettings.getByLabel("宽度（像素）", { exact: true }).fill("0");
   await canvasSettings.getByRole("button", { name: "应用", exact: true }).click();
@@ -471,9 +471,9 @@ try {
   await page.screenshot({ path: path.join(root, "canvas-settings.png") });
   await canvasSettings.getByRole("button", { name: "应用", exact: true }).click();
   await expect(canvasSettings).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "画布大小设置", exact: true })).toContainText("1080 × 1920");
+  await expect(page.getByRole("button", { name: "项目设置", exact: true })).toContainText("1080 × 1920");
   await page.getByTitle("撤销 Ctrl+Z", { exact: true }).click();
-  await expect(page.getByRole("button", { name: "画布大小设置", exact: true })).toContainText("1920 × 1080");
+  await expect(page.getByRole("button", { name: "项目设置", exact: true })).toContainText("1920 × 1080");
   await viewZoom.selectOption("settings");
   await expect(canvasSettings).toBeVisible();
   await page.keyboard.press("Escape");
@@ -969,7 +969,7 @@ try {
   await expect(page.getByLabel("画布缩放百分比", { exact: true })).toHaveValue(
     "100",
   );
-  await page.getByRole("button", { name: "画布大小设置", exact: true }).click();
+  await page.getByRole("button", { name: "项目设置", exact: true }).click();
   await canvasSettings.getByLabel("宽度（像素）", { exact: true }).fill("1300");
   await canvasSettings.getByLabel("高度（像素）", { exact: true }).fill("740");
   await canvasSettings.getByRole("button", { name: "应用", exact: true }).click();

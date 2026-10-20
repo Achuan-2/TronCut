@@ -259,6 +259,7 @@ export function mergeGroupProject(
     ...document,
     name: edited.name,
     canvas: edited.canvas,
+    audio: edited.audio,
     assets: retainedAssets.length
       ? [...edited.assets, ...retainedAssets]
       : edited.assets,

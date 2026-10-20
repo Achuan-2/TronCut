@@ -48,6 +48,7 @@ const appearanceKeys = [
   "mediaFrame",
   "volume",
   "podcast",
+  "autoNormalizeLoudness",
   "cursorStyle",
 ] as const;
 const textKeys = ["style", "textBox", "autoResizeText"] as const;

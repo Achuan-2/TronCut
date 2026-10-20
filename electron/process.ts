@@ -23,6 +23,7 @@ export function runProcess(
     onLine?: (line: string) => void;
     /** Consume binary output without buffering or decoding it as text. */
     onStdout?: (chunk: Buffer) => void;
+    onStderr?: (chunk: string) => void;
     cwd?: string;
     timeout?: number;
     env?: NodeJS.ProcessEnv;
@@ -97,6 +98,7 @@ export function runProcess(
     });
     child.stderr.on("data", (chunk) => {
       error = (error + chunk).slice(-16000);
+      options.onStderr?.(String(chunk));
     });
     child.once("error", (err) => {
       clean();

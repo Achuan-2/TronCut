@@ -5,6 +5,8 @@ import { audioFilters } from "./export";
 import { findBinary, runProcess } from "./process";
 import { isTrackActive } from "../shared/tracks";
 import { stitchInputFilters } from "./stitch-input";
+import { normalizesClip } from "../shared/loudness";
+import { prepareNormalizedAudio } from "./loudness";
 
 /** Render the same audible tracks as video export, in project time for ASR. */
 export async function renderTimelineAudio(
@@ -51,14 +53,18 @@ export async function renderTimelineAudio(
   const filters: string[] = [];
   const labels = ["[0:a]"];
   for (const [index, { clip, asset }] of clips.entries()) {
-    args.push("-i", asset.path);
+    const normalized = normalizesClip(project, clip)
+      ? await prepareNormalizedAudio(asset, clip.podcast, resources, signal)
+      : null;
+    args.push("-i", normalized?.path ?? asset.path);
+    const audioClip = normalized ? { ...clip, podcast: false } : clip;
     const label = `audio${index}`;
     const source = clip.stitch ? `stitchaudio${index}` : `${index + 1}:a`;
     if (clip.stitch)
       filters.push(...stitchInputFilters(clip, `${index + 1}:a`, source, true));
     filters.push(
       `[${source}]atrim=start=${clip.stitch ? 0 : clip.sourceIn}:duration=${clip.duration * clip.speed},` +
-        `asetpts=PTS-STARTPTS,${audioFilters(clip, rubberband).join(",")},` +
+        `asetpts=PTS-STARTPTS,${audioFilters(audioClip, rubberband).join(",")},` +
         `atrim=duration=${clip.duration},adelay=${Math.round(clip.start * 1000)}:all=1[${label}]`,
     );
     labels.push(`[${label}]`);

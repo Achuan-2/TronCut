@@ -128,6 +128,7 @@ export interface FrameCraftBridge {
   mediaThumbnail(assetId: string, waveform: boolean): Promise<string | null>;
   mediaTimelineThumbnail(assetId: string, sourceTime: number): Promise<string | null>;
   mediaWaveform(assetId: string): Promise<AudioWaveform | null>;
+  normalizeAudio(assetId: string, podcast: boolean): Promise<Asset>;
   mediaUrl(assetId: string): Promise<string>;
   previewProxyAvailable(assetId: string): Promise<boolean>;
   onPreviewProxyReady(callback: (assetId: string) => void): () => void;

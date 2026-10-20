@@ -1943,6 +1943,13 @@ fieldset:disabled {
   gap: 10px;
   margin-top: 20px;
 }
+.project-audio-settings {
+  border-top: 1px solid #46534b;
+  margin-top: 18px;
+  padding-top: 14px;
+}
+.loudness-status { color: #a9bbae; font-size: 11px; white-space: nowrap; }
+.loudness-status button { margin-left: 6px; color: var(--accent); }
 .canvas-settings-actions .primary {
   background: var(--accent);
   color: #14372a;
