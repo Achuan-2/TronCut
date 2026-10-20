@@ -115,12 +115,13 @@ export function moveClips(
 
 type Range = { start: number; end: number };
 
-/** Move a collapsed group as one item while preserving its internal layer spacing. */
+/** Move a collapsed group, preserving its layers. Overlapping drafts commit via timeline-overwrite. */
 export function moveClipGroup(
   project: Project,
   id: string,
   wanted: number,
   targetTrackId: string,
+  options: { allowOverlap?: boolean } = {},
 ): Project {
   const members = groupMembers(project, id);
   const selected = new Set(members.map((clip) => clip.id));
@@ -133,7 +134,8 @@ export function moveClipGroup(
   const target = project.tracks.findIndex((track) => track.id === targetTrackId);
   if (anchor < 0 || target < 0 || project.tracks[target].locked) return project;
   const shift = target - anchor;
-  if (!shift) return moveClips(project, [...selected], wanted);
+  if (!shift && !options.allowOverlap)
+    return moveClips(project, [...selected], wanted);
   const tracks = [...project.tracks];
   const last = Math.max(...members.map((clip) => trackIndices.get(clip.trackId)!)) + shift;
   if (last >= 128) return project;
@@ -147,7 +149,9 @@ export function moveClipGroup(
       return track.locked || Boolean(track.captionTrack) !== Boolean(clip.caption);
     })
   ) return project;
-  const delta = constrainTimelineMove(project, [...selected], wanted, targetTrackId);
+  const delta = options.allowOverlap
+    ? Math.max(-Math.min(...members.map((clip) => clip.start)), wanted)
+    : constrainTimelineMove(project, [...selected], wanted, targetTrackId);
   const result = {
     ...project,
     tracks: numberTracks(tracks),
@@ -157,7 +161,9 @@ export function moveClipGroup(
         : clip,
     ),
   };
-  return hasProjectTimelineOverlap(result) ? project : result;
+  return !options.allowOverlap && hasProjectTimelineOverlap(result)
+    ? project
+    : result;
 }
 function union(ranges: Range[]): Range[] {
   const result: Range[] = [];

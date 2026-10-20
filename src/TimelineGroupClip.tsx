@@ -3,13 +3,15 @@ import { FolderOpen } from "lucide-react";
 import { type Clip } from "../shared/model";
 import { type TimelineGroup } from "../shared/clip-groups";
 import {
-  moveClips,
   moveClipGroup,
   selectionWithGroups,
 } from "../shared/timeline";
 import { snapTime } from "../shared/editor";
 import type { Editor } from "./useEditor";
-import { constrainTimelineMove } from "../shared/timeline-collision";
+import {
+  moveTimelineClips,
+  moveTimelineGroup,
+} from "../shared/timeline-overwrite";
 
 export default function TimelineGroupClip({
   editor,
@@ -121,6 +123,7 @@ export default function TimelineGroupClip({
             group.id,
             time - clip.start,
             targetId,
+            { allowOverlap: true },
           );
           const nextMembers = next.clips.filter((member) =>
             gesture.ids.includes(member.id),
@@ -131,11 +134,7 @@ export default function TimelineGroupClip({
             (member) => member.id === clip.id,
           )!.trackId;
         } else {
-          gesture.delta = constrainTimelineMove(
-            editor.project,
-            gesture.ids,
-            Math.max(-earliest, time - clip.start),
-          );
+          gesture.delta = Math.max(-earliest, time - clip.start);
         }
         const origin = lanes.find(
           (lane) => lane.dataset.track === clip.trackId,
@@ -154,11 +153,21 @@ export default function TimelineGroupClip({
       }}
       onPointerUp={() => {
         const gesture = drag.current;
+        const delta = gesture
+          ? Math.round(
+              (clip.start + gesture.delta) * editor.project.canvas.fps,
+            ) / editor.project.canvas.fps - clip.start
+          : 0;
         if (gesture && (gesture.delta || gesture.trackId !== clip.trackId))
           editor.apply((project) =>
             gesture.single
-              ? moveClipGroup(project, group.id, gesture.delta, gesture.trackId)
-              : moveClips(project, gesture.ids, gesture.delta),
+              ? moveTimelineGroup(
+                  project,
+                  group.id,
+                  delta,
+                  gesture.trackId,
+                )
+              : moveTimelineClips(project, gesture.ids, delta),
           );
         drag.current = null;
         setDraft({ delta: 0, y: 0 });

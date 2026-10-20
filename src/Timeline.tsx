@@ -63,12 +63,12 @@ import { snapTime, splitClip, transformAt } from "../shared/editor";
 import { editableCanvasIds } from "../shared/canvas-actions";
 import { mediaSegments, stitchBoundaries } from "../shared/media-segments";
 import {
-  moveClips,
   splitSelection,
   selectionWithGroups,
   clipsInTimelineRange,
   editableIds,
 } from "../shared/timeline";
+import { moveTimelineClips } from "../shared/timeline-overwrite";
 import TimelineWaveform from "./TimelineWaveform";
 import TimelineFilmstrip from "./TimelineFilmstrip";
 import { TimelineAnimations } from "./TimelineAnimations";
@@ -140,10 +140,7 @@ import { groupName, groupedTimeline, rootGroupId } from "../shared/clip-groups";
 import GroupTimelineNavigation from "./GroupTimelineNavigation";
 import GroupTimelineMask from "./GroupTimelineMask";
 import TimelineGroupClip from "./TimelineGroupClip";
-import {
-  constrainTimelineMove,
-  timelineTrimBounds,
-} from "../shared/timeline-collision";
+import { timelineTrimBounds } from "../shared/timeline-collision";
 import {
   timelineZoomMax,
   timelineFitZoom,
@@ -277,6 +274,7 @@ export default function Timeline({
     } | null>(null);
 
   // RAF-throttled drag updates for smooth 60fps performance
+  const latestDrag = useRef<Drag | null>(null);
   const scheduleDragUpdate = useRAFThrottle<Drag | null>(setDrag);
   const panel = useRef<HTMLElement>(null);
   useEffect(
@@ -790,14 +788,10 @@ export default function Timeline({
         c.start - earliest,
         snap ? snapTime(t, snapProject, c.id, 8 / zoom) : t,
       );
-      const offset = constrainTimelineMove(
-        project, d.ids, wanted - c.start,
-        d.ids.length === 1 ? d.trackId : undefined,
-      );
       return {
         ...c,
         trackId: d.trackId,
-        start: c.start + offset,
+        start: wanted,
       };
     }
     if (d.mode === "left") {
@@ -1821,7 +1815,7 @@ export default function Timeline({
                             const captureTarget = (event.target as HTMLElement)
                               .closest<HTMLElement>(".frame-extension-region") ?? event.currentTarget;
                             captureTarget.setPointerCapture(event.pointerId);
-                            setDrag({
+                            const gesture: Drag = {
                               id: c.id,
                               mode: mode ?? "move",
                               x: event.clientX,
@@ -1829,10 +1823,13 @@ export default function Timeline({
                               delta: 0,
                               trackId: c.trackId,
                               ids,
-                            });
+                            };
+                            latestDrag.current = gesture;
+                            setDrag(gesture);
                           }}
                           onPointerMove={(event) => {
-                            if (!drag || drag.id !== c.id) return;
+                            const gesture = latestDrag.current;
+                            if (!gesture || gesture.id !== c.id) return;
                             // The translated clip stays under its original lane
                             // in the DOM. Hit-testing it would alternate between
                             // that lane and the destination on every pointer move.
@@ -1850,34 +1847,42 @@ export default function Timeline({
                             const target = project.tracks.find(
                               (t) => t.id === hit?.dataset.track,
                             );
-                            scheduleDragUpdate({
-                              ...drag,
-                              delta: (event.clientX - drag.x) / zoom,
+                            const next: Drag = {
+                              ...gesture,
+                              delta: (event.clientX - gesture.x) / zoom,
                               trackId:
-                                drag.mode === "move" &&
-                                drag.ids.length === 1 &&
+                                gesture.mode === "move" &&
+                                gesture.ids.length === 1 &&
                                 target &&
                                 !target.locked &&
                                 (c.caption
                                   ? target.captionTrack
                                   : !target.captionTrack)
                                   ? target.id
-                                  : drag.trackId,
-                            });
+                                  : gesture.trackId,
+                            };
+                            latestDrag.current = next;
+                            scheduleDragUpdate(next);
                           }}
                           onPointerUp={() => {
+                            // Commit the last pointer sample even before the RAF preview runs.
+                            const drag = latestDrag.current;
                             if (
                               drag &&
                               (drag.delta !== 0 ||
                                 drag.trackId !== drag.original.trackId)
                             ) {
                               const next = dragClip(drag);
-                              if (drag.mode === "move" && drag.ids.length > 1)
+                              if (drag.mode === "move")
                                 apply((p) =>
-                                  moveClips(
+                                  moveTimelineClips(
                                     p,
                                     drag.ids,
-                                    next.start - drag.original.start,
+                                    Math.round(next.start * project.canvas.fps) /
+                                      project.canvas.fps - drag.original.start,
+                                    drag.ids.length === 1
+                                      ? next.trackId
+                                      : undefined,
                                   ),
                                 );
                               else if (
@@ -1889,9 +1894,13 @@ export default function Timeline({
                                 );
                               else editor.updateClip(drag.id, next);
                             }
-                            setDrag(null);
+                            latestDrag.current = null;
+                            scheduleDragUpdate(null);
                           }}
-                          onPointerCancel={() => setDrag(null)}
+                          onPointerCancel={() => {
+                            latestDrag.current = null;
+                            scheduleDragUpdate(null);
+                          }}
                           onDoubleClick={(event) => {
                             const groupId = rootGroupId(project, c.groupId);
                             if (groupId) {

@@ -29,7 +29,19 @@ export function deleteTimelineRange(
     project.canvas.fps,
   );
   if (!normalized) return project;
-  const { start, end } = normalized;
+  return exciseTimelineRange(project, normalized, ripple);
+}
+
+/** Preserve exact placement boundaries when another clip overwrites this interval. */
+export function exciseTimelineRange(
+  project: Project,
+  { start, end }: TimelineRange,
+  ripple = false,
+): Project {
+  if (
+    !Number.isFinite(start) || !Number.isFinite(end) || start < 0 || end <= start
+  )
+    return project;
   const originalIds = project.clips.map((clip) => clip.id);
   const editable = editableIds(project, originalIds);
   const affected = project.clips.some(

@@ -3,6 +3,7 @@ import { build } from "esbuild";
 import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import path from "node:path";
+import { setTimelineZoom } from "./timeline-zoom.mjs";
 
 const root = path.resolve(`test-output/timeline-collision/run-${Date.now()}`);
 await fs.mkdir(root, { recursive: true });
@@ -49,6 +50,7 @@ try {
   await group.dblclick();
   await expect(page.locator(".timeline-clip")).toHaveCount(2);
   await expect(page.locator(".track-lane")).toHaveCount(2);
+  await setTimelineZoom(page, 80);
   const member = page.locator(
     `.timeline-clip[data-clip-id="${project.clips[0].id}"]`,
   );
@@ -63,8 +65,9 @@ try {
   );
   await expect
     .poll(() => member.evaluate((element) => parseFloat(element.style.width)))
-    .toBe(195);
+    .toBeCloseTo(240, 0);
   await page.getByRole("tab", { name: "主时间线", exact: true }).click();
+  await setTimelineZoom(page, 80);
 
   const tail = page.locator(
     `.timeline-clip[data-clip-id="${project.clips[2].id}"]`,
@@ -72,25 +75,27 @@ try {
   const bounds = await tail.boundingBox();
   await page.mouse.move(bounds.x + 20, bounds.y + 18);
   await page.mouse.down();
-  await page.mouse.move(bounds.x + 20 - 260, bounds.y + 18, { steps: 12 });
+  // Place at the group's end; overwrite dragging has its own UI regression.
+  await page.mouse.move(bounds.x + 20 - 160, bounds.y + 18, { steps: 12 });
   await page.mouse.up();
   await expect
     .poll(() => tail.evaluate((element) => parseFloat(element.style.left)))
-    .toBe(260);
+    .toBeCloseTo(320, 0);
 
   const right = await tail.locator(".trim-handle.right").boundingBox();
   await page.mouse.move(right.x + right.width / 2, right.y + 10);
   await page.mouse.down();
-  await page.mouse.move(right.x + 455, right.y + 10, { steps: 15 });
+  await page.mouse.move(right.x + 560, right.y + 10, { steps: 15 });
   await page.mouse.up();
   await expect
     .poll(() => tail.evaluate((element) => parseFloat(element.style.width)))
-    .toBe(520);
+    .toBeCloseTo(640, 0);
   await tail.click();
   await command("duplicate");
   await expect(page.locator(".timeline-clip")).toHaveCount(4);
   await command("save");
   await expect(page.getByRole("status")).toContainText("项目已保存");
+  await expect(page.locator(".busy-overlay")).toHaveCount(0);
   const saved = JSON.parse(await fs.readFile(file, "utf8"));
   assert.equal(saved.clips.length, 5);
   assert.equal(
@@ -119,7 +124,7 @@ try {
   assert.deepEqual(errors, []);
   await page.screenshot({ path: path.join(root, "no-overlap.png") });
   console.log(
-    `旧重叠自动组合与分轨、组内延长保护、移动和裁剪碰撞限制、拷贝自动避让及保存通过：${root}`,
+    `旧重叠自动组合与分轨、组内延长保护、首尾衔接与裁剪碰撞限制、拷贝自动避让及保存通过：${root}`,
   );
 } catch (error) {
   await (
