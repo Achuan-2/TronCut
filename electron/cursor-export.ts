@@ -149,8 +149,8 @@ export async function cursorFilters(
       : -10000;
   return {
     args: [
-      ...loopImageInput(cursor, fps, clip.start + clip.duration),
-      ...loopImageInput(ring, fps, clip.start + clip.duration),
+      ...loopImageInput(cursor, fps, clip.start + clip.duration, still),
+      ...loopImageInput(ring, fps, clip.start + clip.duration, still),
     ],
     filters: [
       `null[cursorclock${layer}]`,

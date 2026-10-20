@@ -4,14 +4,15 @@ export function loopImageInput(
   file: string,
   fps: number,
   duration: number,
+  still = false,
 ): string[] {
   return [
-    "-loop",
-    "1",
+    // A capture consumes just the first image. Looping makes FFmpeg probe and
+    // decode repeated PNG packets before it can start the composition.
+    ...(still ? [] : ["-loop", "1"]),
     "-framerate",
     String(fps),
-    "-t",
-    String(duration),
+    ...(still ? [] : ["-t", String(duration)]),
     "-threads",
     "1",
     "-i",

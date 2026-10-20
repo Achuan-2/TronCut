@@ -116,6 +116,7 @@ export default function App() {
     [toastMessage, setToast] = useState(""),
     [busy, setBusy] = useState(false),
     [mediaImporting, setMediaImporting] = useState(false),
+    [capturingFrame, setCapturingFrame] = useState(false),
     [progress, setProgress] = useState<{
       percent: number;
       label: string;
@@ -517,15 +518,20 @@ export default function App() {
     });
   const captureFrame = () =>
     importMediaInput(async () => {
-      editor.setPlaying(false);
-      const time = editor.playhead;
-      const asset = await bridge().captureFrame(
-        editor.project,
-        time,
-        editor.selectedKeyframe?.clipId,
-      );
-      editor.addAssets([asset], true, { time, newTrackForImages: true });
-      toast("当前帧已作为图片插入新轨道");
+      setCapturingFrame(true);
+      try {
+        editor.setPlaying(false);
+        const time = editor.playback.getSnapshot();
+        const asset = await bridge().captureFrame(
+          editor.project,
+          time,
+          editor.selectedKeyframe?.clipId,
+        );
+        editor.addAssets([asset], true, { time, newTrackForImages: true });
+        toast("当前帧已作为图片插入新轨道");
+      } finally {
+        setCapturingFrame(false);
+      }
     });
   const pasteHandler = useRef<(event: ClipboardEvent) => void>(() => {});
   pasteHandler.current = (event) => {
@@ -1147,9 +1153,14 @@ export default function App() {
           )}
         </div>
         {mediaImporting && (
-          <span className="workspace-status" title="正在添加素材…">
+          <span
+            className="workspace-status"
+            title={capturingFrame ? "正在截取当前帧…" : "正在添加素材…"}
+          >
             <i className="importing" />
-            <span className="import-label">正在添加素材…</span>
+            <span className="import-label">
+              {capturingFrame ? "正在截取当前帧…" : "正在添加素材…"}
+            </span>
           </span>
         )}
         <div className="header-actions" hidden={screen === "home"}>
@@ -1276,6 +1287,7 @@ export default function App() {
             onDropFiles={dropFiles}
             onDropLibraryAsset={dropLibraryAsset}
             onCaptureFrame={() => void captureFrame()}
+            capturingFrame={capturingFrame}
             dropDisabled={busy || recordingModalOpen || mediaImporting}
           />
         </>

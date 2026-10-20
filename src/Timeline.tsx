@@ -221,6 +221,7 @@ export default function Timeline({
   onDropFiles,
   onDropLibraryAsset,
   onCaptureFrame,
+  capturingFrame = false,
   onCommand,
   dropDisabled = false,
 }: {
@@ -237,6 +238,7 @@ export default function Timeline({
     trackId?: string,
   ) => void;
   onCaptureFrame: () => void;
+  capturingFrame?: boolean;
   onCommand: (command: ClipCommand) => void;
   dropDisabled?: boolean;
 }) {
@@ -906,10 +908,11 @@ export default function Timeline({
           <button
             title="将当前画面截为图片并插入新轨道"
             disabled={dropDisabled}
+            aria-busy={capturingFrame}
             onClick={onCaptureFrame}
           >
             <Camera size={17} />
-            截取当前帧
+            {capturingFrame ? "正在截取…" : "截取当前帧"}
           </button>
           <button
             title="添加区域标记（Shift+拖动标尺）"

@@ -122,6 +122,12 @@ await fs.writeFile(
   path.join(profile, "recovery.json"),
   JSON.stringify({ project, file: null }),
 );
+// Saving now uses the configured project directory without a directory dialog.
+// Keep the regression's archived media and project in its isolated fixture.
+await fs.writeFile(
+  path.join(profile, "preferences.json"),
+  JSON.stringify({ storage: { projectDirectory: root } }),
+);
 const env = {
   ...process.env,
   FRAMECRAFT_SMOKE: "1",

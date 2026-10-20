@@ -576,7 +576,7 @@ async function renderProject(
         args.push("-f", "concat", "-safe", "0", "-i", size.input!);
       else
         args.push(
-          ...loopImageInput(image, fps, sourceIn + clip.duration * clip.speed),
+          ...loopImageInput(image, fps, sourceIn + clip.duration * clip.speed, still),
         );
     } else if (clip.kind === "image")
       args.push(
@@ -584,6 +584,7 @@ async function renderProject(
           asset!.path,
           fps,
           sourceIn + clip.duration * clip.speed,
+          still,
         ),
       );
     // Multiple retimed overlays can also stall frame-threaded video decoding.
@@ -952,7 +953,8 @@ async function renderProject(
   }
   const major = cachedFfmpegMajor;
   const encoder = still
-    ? ["-c:v", "png"]
+    // Captures favor latency over file size; PNG compression remains lossless.
+    ? ["-c:v", "png", "-compression_level", "1"]
     : await chooseEncoder(project, settings, resourcesPath, signal);
   args.push(
     major >= 7 ? "-/filter_complex" : "-filter_complex_script",
