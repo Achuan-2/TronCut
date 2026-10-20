@@ -217,7 +217,21 @@ describe("行为的对象与逐字时序", () => {
           [key]: mediaBehaviorPhase(style, key as BehaviorPhaseKey),
         })),
     );
-    for (const preset of [...behaviorPresets, ...phaseCases])
+    const revealDirections = (["left", "right", "top", "bottom"] as const).map(
+      (direction) => ({
+        id: `reveal-${direction}`,
+        name: direction,
+        category: "media" as const,
+        incoming: { ...mediaBehaviorPhase("reveal", "incoming"), direction },
+        during: { ...mediaBehaviorPhase("reveal", "during"), direction },
+        outgoing: { ...mediaBehaviorPhase("reveal", "outgoing"), direction },
+      }),
+    );
+    for (const preset of [
+      ...behaviorPresets,
+      ...phaseCases,
+      ...revealDirections,
+    ])
       for (const easing of [
         "linear",
         "smoothstep",

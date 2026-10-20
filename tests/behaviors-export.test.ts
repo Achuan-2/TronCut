@@ -446,3 +446,104 @@ it("图片和视频使用对象行为，实际导出包含入场与出场透明�
     expect(counts[2]).toBeLessThan(counts[1] / 2);
   }
 }, 45000);
+
+it("媒体显示真实导出包含四方向移动和同步透明度变化", async () => {
+  const root = path.resolve(`test-output/reveal-directions-${Date.now()}`);
+  await fs.mkdir(root, { recursive: true });
+  const source = path.join(root, "source.png");
+  await sharp({
+    create: { width: 80, height: 60, channels: 3, background: "#ffffff" },
+  })
+    .png()
+    .toFile(source);
+  const stats = async (image: string) => {
+    const { data, info } = await sharp(image)
+      .removeAlpha()
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+    let light = 0,
+      x = 0,
+      y = 0;
+    for (let row = 0; row < info.height; row++)
+      for (let col = 0; col < info.width; col++) {
+        const value = data[(row * info.width + col) * info.channels];
+        light += value;
+        x += col * value;
+        y += row * value;
+      }
+    expect(light).toBeGreaterThan(0);
+    return { light, x: x / light, y: y / light };
+  };
+  for (const direction of ["left", "right", "top", "bottom"] as const) {
+    const project = createProject();
+    project.canvas = {
+      width: 320,
+      height: 180,
+      fps: 20,
+      background: "#000000",
+    };
+    project.exportSettings = { encoder: "software" };
+    project.assets = [
+      {
+        id: "image",
+        name: "image",
+        kind: "image",
+        path: source,
+        width: 80,
+        height: 60,
+        duration: 0,
+        hasAudio: false,
+      },
+    ];
+    const clip = {
+      ...newText(project.tracks[0].id, 0),
+      kind: "image" as const,
+      assetId: "image",
+      duration: 4,
+    };
+    clip.transform.scale = 0.5;
+    const behavior = createBehavior("media-reveal", 4, "image")!;
+    for (const key of ["incoming", "outgoing"] as const)
+      behavior[key] = {
+        ...behavior[key],
+        direction,
+        easing: "linear",
+        duration: 1,
+      };
+    clip.behaviors = [behavior];
+    project.clips = [clip];
+    const output = path.join(root, `${direction}.mp4`);
+    await exportVideo(
+      project,
+      output,
+      path.join(root, `render-${direction}`),
+      false,
+      AbortSignal.timeout(20000),
+      () => {},
+    );
+    const samples = [];
+    for (const time of [0.25, 0.75, 3.25, 3.75]) {
+      const image = path.join(root, `${direction}-${time}.png`);
+      await runProcess(findBinary("ffmpeg"), [
+        "-y",
+        "-ss",
+        String(time),
+        "-i",
+        output,
+        "-frames:v",
+        "1",
+        image,
+      ]);
+      samples.push(await stats(image));
+    }
+    const axis = ["left", "right"].includes(direction) ? "x" : "y";
+    const other = axis === "x" ? "y" : "x";
+    const sign = ["left", "top"].includes(direction) ? -1 : 1;
+    expect((samples[1][axis] - samples[0][axis]) * sign).toBeLessThan(-2);
+    expect((samples[3][axis] - samples[2][axis]) * sign).toBeGreaterThan(2);
+    expect(Math.abs(samples[1][other] - samples[0][other])).toBeLessThan(1.5);
+    expect(Math.abs(samples[3][other] - samples[2][other])).toBeLessThan(1.5);
+    expect(samples[0].light).toBeLessThan(samples[1].light * 0.55);
+    expect(samples[2].light).toBeGreaterThan(samples[3].light * 1.8);
+  }
+}, 45000);

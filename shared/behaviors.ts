@@ -517,7 +517,7 @@ export interface GlyphMotion {
   rotationX: number;
   rotationY: number;
   opacity: number;
-  // Hinge pivot displacement in fractions of the object's own dimensions.
+  // Size-relative offsets for edge hinges and directional media reveals.
   pivotX: number;
   pivotY: number;
 }
@@ -671,6 +671,15 @@ function transition(
   if (phase.style === "cut")
     value.y =
       (phase.type === "whole" ? -12.5 : (index % 2 ? 1 : -1) * 1.25) * hidden;
+  if (phase.style === "reveal" && phase.type === "whole") {
+    const axis = ["left", "right"].includes(phase.direction)
+      ? "pivotX"
+      : "pivotY";
+    value[axis] =
+      (phase.shift / 100) *
+      hidden *
+      (["left", "top"].includes(phase.direction) ? -1 : 1);
+  }
   if (phase.style === "float") {
     const distance = (phase.shift / 100) * hidden;
     if (phase.direction === "left" || phase.direction === "right")
@@ -825,9 +834,18 @@ export function glyphMotion(
       } else if (phase.style === "drift") {
         value.y = -intensity * wave;
         value.rotation = phase.rotation * wave;
-      } else if (phase.style === "fade" || phase.style === "reveal")
+      } else if (phase.style === "fade" || phase.style === "reveal") {
         value.opacity = 1 - intensity * envelope;
-      else if (phase.style === "cut")
+        if (phase.style === "reveal" && phase.type === "whole") {
+          const axis = ["left", "right"].includes(phase.direction)
+            ? "pivotX"
+            : "pivotY";
+          value[axis] =
+            intensity *
+            envelope *
+            (["left", "top"].includes(phase.direction) ? -1 : 1);
+        }
+      } else if (phase.style === "cut")
         value.y =
           (phase.shift / 100) *
           wave *

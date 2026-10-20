@@ -3,14 +3,17 @@ import { shapeSize } from "../shared/annotation-style";
 import { defaultCrop } from "../shared/effects";
 import { textBoxFor } from "./text";
 
-/** Normalized, unscaled object dimensions used by edge-pivot media behaviors. */
+/** Normalized object dimensions for edge pivots and directional media reveals. */
 export function behaviorObjectSize(clip: Clip, project: Project) {
   if (
     !clip.behaviors?.some(
       (behavior) =>
         behavior.enabled &&
-        (behavior.incoming.style === "hinge" ||
-          behavior.outgoing.style === "hinge"),
+        [behavior.incoming, behavior.during, behavior.outgoing].some(
+          (phase) =>
+            phase.style === "hinge" ||
+            (phase.style === "reveal" && phase.type === "whole"),
+        ),
     )
   )
     return { width: 0.08, height: 0.08 };

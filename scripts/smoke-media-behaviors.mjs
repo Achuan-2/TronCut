@@ -126,6 +126,15 @@ const save = async (page) => {
   await expect(page.locator(".busy-overlay")).toHaveCount(0);
   return JSON.parse(await fs.readFile(file, "utf8"));
 };
+const seek = (page, time) =>
+  page.getByLabel("播放进度", { exact: true }).evaluate((input, value) => {
+    Object.getOwnPropertyDescriptor(
+      HTMLInputElement.prototype,
+      "value",
+    ).set.call(input, String(value));
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+  }, time);
 try {
   let page = await launch();
   await page.getByRole("tab", { name: "媒体", exact: true }).click();
@@ -137,7 +146,12 @@ try {
     await card.hover();
     const preview = card.locator(".behavior-card-media");
     const initial = await preview.getAttribute("style");
-    await expect.poll(() => preview.getAttribute("style")).not.toBe(initial);
+    await expect
+      .poll(() => preview.getAttribute("style"), {
+        intervals: [16, 32, 50],
+        timeout: 6000,
+      })
+      .not.toBe(initial);
   }
   await page.locator(".timeline-clip.image").click();
   await page.getByRole("button", { name: "漂移", exact: true }).dblclick();
@@ -165,9 +179,44 @@ try {
     );
   await page.getByTitle("撤销 Ctrl+Z").click();
   await expect(page.locator(".clip-behavior-effect")).toHaveCount(1);
+  // Reveal must combine movement and fading through the actual direction UI.
+  await page.locator(".timeline-clip.image .clip-behavior-effect").click();
+  await page.getByRole("tab", { name: "进", exact: true }).click();
+  await page.getByLabel("行为样式").selectOption("reveal");
+  for (const direction of ["left", "right", "top", "bottom"]) {
+    await page.getByLabel("行为方向", { exact: true }).selectOption(direction);
+    await seek(page, 1 / 15);
+    const behavior = createBehavior("media-reveal", 5, "image");
+    behavior.incoming.direction = direction;
+    const clip = { ...project.clips[1], behaviors: [behavior] };
+    const pose = behaviorTransform(clip, clip.transform, 1 / 15, {
+      width: 360 / 640,
+      height: 1,
+    });
+    const layer = page.locator('.preview-layer[data-clip-id="image"]');
+    await expect
+      .poll(() => layer.evaluate((node) => parseFloat(node.style.left)))
+      .toBeCloseTo(pose.x * 100, 3);
+    await expect
+      .poll(() => layer.evaluate((node) => parseFloat(node.style.top)))
+      .toBeCloseTo(pose.y * 100, 3);
+    await expect
+      .poll(() => layer.evaluate((node) => Number(node.style.opacity)))
+      .toBeCloseTo(pose.opacity, 4);
+  }
+  const revealSaved = await save(page);
+  expect(revealSaved.clips[1].behaviors[0].incoming).toMatchObject({
+    style: "reveal",
+    direction: "bottom",
+  });
+  await page.screenshot({ path: path.join(root, "reveal-direction.png") });
+  await page.getByLabel("行为更多选项").click();
+  await page.getByRole("menuitem", { name: "重置行为", exact: true }).click();
+  await expect(page.getByLabel("行为样式")).toHaveValue("drift");
   // Exercise an actual drag from the media library onto video.
   await page.getByRole("tab", { name: "媒体", exact: true }).click();
   await page
+    .locator(".behavior-grid")
     .getByRole("button", { name: "漂移", exact: true })
     .dragTo(page.locator(".timeline-clip.video"));
   await expect(page.locator(".clip-behavior-effect")).toHaveCount(2);
@@ -301,16 +350,7 @@ try {
   page = await launch(reviewFile, null);
   for (const clip of review.clips) {
     for (const time of [1 / 15, 0.2, 0.4, 3, 4.8]) {
-      await page
-        .getByLabel("播放进度", { exact: true })
-        .evaluate((input, time) => {
-          Object.getOwnPropertyDescriptor(
-            HTMLInputElement.prototype,
-            "value",
-          ).set.call(input, String(time));
-          input.dispatchEvent(new Event("input", { bubbles: true }));
-          input.dispatchEvent(new Event("change", { bubbles: true }));
-        }, clip.start + time);
+      await seek(page, clip.start + time);
       const pose = behaviorTransform(clip, clip.transform, time, {
         width: 270 / 480,
         height: 1,

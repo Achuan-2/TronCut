@@ -134,6 +134,7 @@ export const mediaBehaviorDefinitions: {
       style: "reveal",
       easing: "quad-out",
       direction: "left",
+      shift: 8,
       duration: 0.3,
       speed: 93,
     },
@@ -141,6 +142,7 @@ export const mediaBehaviorDefinitions: {
     outgoing: {
       style: "reveal",
       direction: "right",
+      shift: 8,
       easing: "quad-in",
       duration: 0.6,
     },

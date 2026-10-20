@@ -210,6 +210,81 @@ describe("媒体行为和文本的媒体模式", () => {
     );
   });
 
+  it("媒体显示在进出时同时移动并渐变，四个方向按素材尺寸计算", () => {
+    for (const direction of ["left", "right", "top", "bottom"] as const) {
+      const horizontal = direction === "left" || direction === "right";
+      const sign = direction === "left" || direction === "top" ? -1 : 1;
+      const behavior = createBehavior("media-reveal", 4)!;
+      for (const key of ["incoming", "outgoing"] as const)
+        behavior[key] = {
+          ...behavior[key],
+          direction,
+          duration: 1,
+          easing: "linear",
+        };
+      const clip = {
+        ...newText("titles", 0),
+        duration: 4,
+        behaviors: [behavior],
+      };
+      clip.transform.scale = 0.5;
+      for (const [time, opacity, hidden] of [
+        [0.25, 0.25, 0.75],
+        [0.75, 0.75, 0.25],
+        [3.25, 0.75, 0.25],
+        [3.75, 0.25, 0.75],
+      ]) {
+        const pose = behaviorTransform(clip, clip.transform, time, {
+          width: 0.4,
+          height: 0.6,
+        });
+        expect(pose.opacity).toBeCloseTo(opacity);
+        expect(pose.x - clip.transform.x).toBeCloseTo(
+          horizontal ? sign * 0.08 * hidden * 0.4 * 0.5 : 0,
+        );
+        expect(pose.y - clip.transform.y).toBeCloseTo(
+          horizontal ? 0 : sign * 0.08 * hidden * 0.6 * 0.5,
+        );
+        expect(pose.scale).toBe(clip.transform.scale);
+      }
+      const midway = glyphMotion(clip, 2, 0, 1, "object");
+      expect(midway.pivotX).toBe(0);
+      expect(midway.pivotY).toBe(0);
+      expect(midway.opacity).toBe(1);
+    }
+    const text = createBehavior("reveal", 4)!;
+    expect(glyphMotion({ behaviors: [text] }, 0.1, 0, 1, "text").pivotX).toBe(
+      0,
+    );
+  });
+
+  it("期间的显示沿所选方向轻移淡出并返回，方向不会成为无效设置", () => {
+    for (const direction of ["left", "right", "top", "bottom"] as const) {
+      const behavior = createBehavior("media-reveal", 4)!;
+      behavior.incoming.style = behavior.outgoing.style = "none";
+      behavior.during = {
+        ...mediaBehaviorPhase("reveal", "during"),
+        direction,
+        easing: "linear",
+        loopTime: 1,
+        intensity: 20,
+      };
+      const mid = glyphMotion({ behaviors: [behavior] }, 0.5, 0, 1, "object");
+      const sign = ["left", "top"].includes(direction) ? -1 : 1;
+      expect(mid.opacity).toBeCloseTo(0.8);
+      expect(mid.pivotX).toBeCloseTo(
+        ["left", "right"].includes(direction) ? sign * 0.2 : 0,
+      );
+      expect(mid.pivotY).toBeCloseTo(
+        ["top", "bottom"].includes(direction) ? sign * 0.2 : 0,
+      );
+      const end = glyphMotion({ behaviors: [behavior] }, 1, 0, 1, "object");
+      expect(end.opacity).toBe(1);
+      expect(end.pivotX).toBe(0);
+      expect(end.pivotY).toBe(0);
+    }
+  });
+
   it("媒体分类随自定义预设及项目保存，旧库仍可读取", () => {
     const behavior = createBehavior("media-grow", 5)!;
     const preset = captureBehaviorPreset(behavior, "我的增长");

@@ -104,6 +104,13 @@ function transition(
   if (["fade", "reveal", "float"].includes(phase.style))
     result.opacity = `clip(${q},0,1)`;
   if (phase.style === "cut") result.y = `(-12.5*${hidden})`;
+  if (phase.style === "reveal") {
+    const key = ["left", "right"].includes(phase.direction)
+      ? "pivotX"
+      : "pivotY";
+    result[key] =
+      `(${hidden}*${(phase.shift / 100) * (["left", "top"].includes(phase.direction) ? -1 : 1)})`;
+  }
   if (phase.style === "float") {
     const key = ["left", "right"].includes(phase.direction) ? "x" : "y";
     result[key] =
@@ -185,9 +192,16 @@ function during(phase: BehaviorPhase, time: string): MotionExpressions {
   } else if (phase.style === "drift") {
     result.y = `(-${intensity}*${wave})`;
     result.rotation = `(${phase.rotation}*${wave})`;
-  } else if (["fade", "reveal"].includes(phase.style))
+  } else if (["fade", "reveal"].includes(phase.style)) {
     result.opacity = `(1-${intensity}*${envelope})`;
-  else if (phase.style === "cut") result.y = `(${phase.shift / 100}*${wave})`;
+    if (phase.style === "reveal") {
+      const key = ["left", "right"].includes(phase.direction)
+        ? "pivotX"
+        : "pivotY";
+      result[key] =
+        `(${intensity * (["left", "top"].includes(phase.direction) ? -1 : 1)}*${envelope})`;
+    }
+  } else if (phase.style === "cut") result.y = `(${phase.shift / 100}*${wave})`;
   else if (phase.style === "bounce") result.y = `(-${intensity}*${envelope})`;
   else if (phase.style !== "none") result.y = `(-${intensity}*${wave})`;
   for (const key of Object.keys(result) as (keyof MotionExpressions)[]) {
