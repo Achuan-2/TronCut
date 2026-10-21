@@ -32,7 +32,9 @@ type FrameSize = { width: number; height: number };
 
 export function roundedRectanglePath(width: number, height: number, radii: number[]) {
   const [tl, tr, br, bl] = radii.map((radius) => Math.min(radius, width / 2, height / 2));
-  return `M${tl} 0H${width - tr}Q${width} 0 ${width} ${tr}V${height - br}Q${width} ${height} ${width - br} ${height}H${bl}Q0 ${height} 0 ${height - bl}V${tl}Q0 0 ${tl} 0Z`;
+  const corner = (radius: number, x: number, y: number) =>
+    radius ? `A${radius} ${radius} 0 0 1 ${x} ${y}` : `L${x} ${y}`;
+  return `M${tl} 0H${width - tr}${corner(tr, width, tr)}V${height - br}${corner(br, width - br, height)}H${bl}${corner(bl, 0, height - bl)}V${tl}${corner(tl, tl, 0)}Z`;
 }
 
 // Percentages use a circular radius: 100% is half the viewport's short edge.

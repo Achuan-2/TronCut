@@ -1,5 +1,10 @@
 import { type Clip, textFillDefaults } from "./model";
 import {
+  mediaFrameRadii,
+  roundedRectanglePath,
+  supportsMediaFrame,
+} from "./media-frame";
+import {
   effectAmount,
   keyAlpha,
   rgb,
@@ -177,7 +182,14 @@ export function visualEffectSvg(
   if (border && amount(border) && border.width) {
     let source = current;
     if (!border.useAlpha) {
-      const rect = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}"><rect width="100%" height="100%" fill="white"/></svg>`;
+      const radii = supportsMediaFrame(clip)
+        ? mediaFrameRadii(
+            clip,
+            { width: width / scale, height: height / scale },
+            time,
+          ).map((radius) => radius * scale)
+        : [0, 0, 0, 0];
+      const rect = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}"><path d="${roundedRectanglePath(width, height, radii)}" fill="white"/></svg>`;
       source = add(
         "feImage",
         `href="data:image/svg+xml,${encodeURIComponent(rect)}" x="0" y="0" width="${width}" height="${height}"`,

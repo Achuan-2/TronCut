@@ -389,8 +389,10 @@ function PreviewLayerImpl({
     { width: mediaWidth, height: mediaHeight },
     contentView,
   );
-  const effectTime = Object.values(clip.visualEffects ?? {}).some(
-    (effect) => effect?.easeIn || effect?.easeOut || effect?.window,
+  const effectTime = (
+    clip.mediaFrame?.window || Object.values(clip.visualEffects ?? {}).some(
+      (effect) => effect?.easeIn || effect?.easeOut || effect?.window,
+    )
   )
     ? localTime
     : 0;
@@ -417,6 +419,8 @@ function PreviewLayerImpl({
       ),
     [
       clip.visualEffects,
+      clip.mediaFrame,
+      clip.kind,
       clip.style,
       clip.duration,
       style.width,

@@ -148,8 +148,10 @@ export default function MatteDefinition({
   const effectId = `${id}-effect`,
     modeId = `${id}-mode`,
     cropId = `${id}-crop`;
-  const effectTime = Object.values(clip.visualEffects ?? {}).some(
-    (effect) => effect?.easeIn || effect?.easeOut || effect?.window,
+  const effectTime = (
+    clip.mediaFrame?.window || Object.values(clip.visualEffects ?? {}).some(
+      (effect) => effect?.easeIn || effect?.easeOut || effect?.window,
+    )
   )
     ? local
     : 0;
@@ -157,6 +159,8 @@ export default function MatteDefinition({
     () => visualEffectSvg(clip, width, height, scale, effectTime, effectId),
     [
       clip.visualEffects,
+      clip.mediaFrame,
+      clip.kind,
       clip.style,
       clip.duration,
       width,

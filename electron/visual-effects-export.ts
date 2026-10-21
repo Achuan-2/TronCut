@@ -8,6 +8,33 @@ import { hasMaskAnimation, maskClipAt } from "../shared/mask-state";
 import { transformAt } from "../shared/editor";
 import { rasterizeMaskAnimation } from "./mask-export";
 import { effectActiveExpression, originalEffectWindow } from "../shared/effect-timing";
+import { mediaFrameRadii, supportsMediaFrame } from "../shared/media-frame";
+
+/** Frame geometry stays independent of holes in the source alpha channel. */
+function borderFrameAlpha(
+  clip: Clip,
+  width: number,
+  height: number,
+  fit: number,
+  padding: number,
+) {
+  const rectangle = `between(X,${padding},${padding + width - 1})*between(Y,${padding},${padding + height - 1})`;
+  const frame = clip.mediaFrame;
+  if (
+    !supportsMediaFrame(clip) || !frame || frame.enabled === false || !frame.radius
+  )
+    return `255*${rectangle}`;
+  // The window is evaluated per output frame, including split-clip offsets.
+  const radii = mediaFrameRadii(
+    { ...clip, mediaFrame: { ...frame, window: undefined } },
+    { width: width * fit, height: height * fit },
+  ).map((radius) => Math.min(radius / fit, width / 2, height / 2));
+  const [tl, tr, br, bl] = radii;
+  if (!radii.some(Boolean)) return `255*${rectangle}`;
+  const radius = `if(lt(X,${padding + width / 2}),if(lt(Y,${padding + height / 2}),${tl},${bl}),if(lt(Y,${padding + height / 2}),${tr},${br}))`;
+  const rounded = `lte(pow(max(abs(X+0.5-${padding + width / 2})-${width / 2}+ld(0),0),2)+pow(max(abs(Y+0.5-${padding + height / 2})-${height / 2}+ld(0),0),2),ld(0)*ld(0))`;
+  return `st(0,${radius});255*${rectangle}*if(${effectActiveExpression(frame, clip)},${rounded},1)`;
+}
 
 export function effectAmountExpression(
   effect: EffectTiming,
@@ -189,9 +216,9 @@ export async function visualEffectFilters(options: {
       ring = label(),
       colored = label(),
       output = label();
-    const rectangle = `255*between(X,${padding},${padding + width - 1})*between(Y,${padding},${padding + height - 1})`;
+    const frameAlpha = borderFrameAlpha(clip, width, height, fit, padding);
     filters.push(
-      `[${seed}]format=gbrap,geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='${e.useAlpha ? "alpha(X,Y)" : rectangle}',alphaextract,split=2[${grow}][${inside}]`,
+      `[${seed}]format=gbrap,geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='${e.useAlpha ? "alpha(X,Y)" : frameAlpha}',alphaextract,split=2[${grow}][${inside}]`,
     );
     const dilations = Array.from(
       { length: Math.max(1, Math.ceil(e.width / fit)) },
