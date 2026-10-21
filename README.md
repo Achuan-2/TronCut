@@ -10,10 +10,10 @@
     <img src="https://img.shields.io/badge/status-release-71b896" alt="Release" />
   </p>
   <p><strong>简体中文</strong> · <a href="README.en.md">English</a></p>
-  <p><a href="https://github.com/Achuan-2/TronCut/releases">下载安装</a> · <a href="#亮点">功能亮点</a> · <a href="docs/FEATURES.md">开发进度</a> · <a href="https://github.com/Achuan-2/TronCut/issues">反馈问题</a></p>
+  <p><a href="https://github.com/Achuan-2/TronCut/releases">下载安装</a> · <a href="#亮点">功能亮点</a> · <a href="#功能截图">功能截图</a> · <a href="docs/FEATURES.md">开发进度</a> · <a href="https://github.com/Achuan-2/TronCut/issues">反馈问题</a></p>
 </div>
 
-![TronCut Windows 编辑器](docs/images/editor.png)
+![TronCut Windows 编辑器：项目媒体、画布预览与多轨时间线](docs/images/editor.png)
 
 TronCut 集成录屏、剪辑、文字、字幕和声音处理，大大提升教程、演示和文字视频的制作效率。
 
@@ -43,6 +43,58 @@ TronCut 集成录屏、剪辑、文字、字幕和声音处理，大大提升教
 当前版本为 **[v0.6.1](https://github.com/Achuan-2/TronCut/releases/tag/v0.6.1)**，新增媒体行为预设、视频帧定格、时间线连续画面预览和自动响度标准化，并改进组合编辑与项目存储。详见[发布说明](docs/releases/v0.6.1.md)。
 
 使用方法按功能模块整理在 [使用文档](docs/README.md) 中，包括素材与录屏鼠标、时间线、文本、画布动画和项目管理。首次使用可阅读 [开始使用](docs/GETTING-STARTED.md)。
+
+## 功能截图
+
+以下均为 Windows 桌面版实际界面，使用同一个演示项目展示编辑流程。
+
+### 录屏自动美化
+
+录制前选择背景、留白、圆角和鼠标样式，开启根据鼠标点击自动缩放与跟随。录制完成后，还能继续修改录屏对象的外观与缩放设置。[录屏与鼠标说明](docs/MEDIA.md)
+
+<img src="docs/images/feature-recording.png" width="800" alt="录屏美化设置：渐变背景、留白、圆角、鼠标样式与自动缩放" />
+
+### 文字与标注
+
+拖入文字模板，在画布上直接编辑内容；调整字体、颜色、描边和局部文字样式，也能把常用样式保存为模板。标注面板还提供形状、箭头、模糊高亮、草图运动和涂鸦笔。[文本与标注说明](docs/TEXT.md)
+
+![文字模板与文本属性：在画布上编辑标题](docs/images/feature-text.png)
+
+### 媒体与文字行为
+
+悬停预览动效，拖入或双击应用，再分别调整“进／期间／出”的样式、方向、速度与循环。添加新的媒体行为会自动替换旧行为，方便快速比较效果。[行为说明](docs/BEHAVIORS.md)
+
+![媒体行为预设与三阶段属性：为标题添加漂移动效](docs/images/feature-behaviors.png)
+
+### 关键帧动画
+
+为片段添加自定义动画，在时间线上调整动画范围，再修改起止位置、缩放和透明度；也可开启自动动画，或通过取景框设置视频的缩放与平移。[画布与动画说明](docs/CANVAS.md)
+
+![自定义动画面板、时间线动画箭头与画面属性](docs/images/feature-animations.png)
+
+### 视觉效果
+
+为画面添加圆角、边框、阴影、遮罩、着色或局部模糊。多个效果可组合使用，圆角与边框同时启用时，边框跟随圆角轮廓。[视觉效果说明](docs/VISUAL-EFFECTS.md)
+
+![视觉效果库与圆角边框组合：在画布中查看效果](docs/images/feature-effects.png)
+
+### 字幕编辑
+
+字幕列表与播放位置联动，可逐条修改文字、查找替换，或统一设置字体、描边和背景。字幕保存在独立轨道，支持本地语音识别及字幕文件导入导出。[字幕使用说明](docs/GETTING-STARTED.md)
+
+![字幕列表、画布字幕预览与独立字幕轨道](docs/images/feature-captions.png)
+
+### 本地配音
+
+在旁白面板输入文稿，选择模型、音色和语速，试听后生成音频并加入时间线。支持 Windows 系统音色、Kokoro／VITS ONNX，以及 LuxTTS ONNX 声音克隆；图中展示本机 Windows 音色设置。[本地配音说明](docs/TTS.md)
+
+<img src="docs/images/feature-narration.png" width="560" alt="AI 配音设置：Windows 本机音色、配音语速与试听" />
+
+### 视频导出
+
+设置保存位置、文件名、分辨率、质量与格式，导出前查看输出尺寸、帧率和时长。项目文件保留可编辑内容，方便继续修改。[视频导出说明](docs/EXPORT.md)
+
+<img src="docs/images/feature-export.png" width="760" alt="视频导出设置：保存位置、分辨率、质量、格式与输出信息" />
 
 
 ## 本地开发
@@ -78,9 +130,7 @@ pnpm test:smoke     # Electron 桌面回归，先执行 build 和 test
 - [功能清单与路线图](docs/FEATURES.md) · [架构与项目协议](docs/ARCHITECTURE.md)
 - [构建与发布](docs/BUILDING.md) · [验证记录](docs/VALIDATION.md)
 - [本地语音字幕](docs/SENSEVOICE.md) · [真实 Camtasia 项目测试](docs/CAMTASIA-REAL-PROJECT-TEST.md)
-- [性能优化总结](docs/PERFORMANCE-IMPROVEMENTS.md) ⚡ **新增**
-  - [视频导出性能优化方案](docs/EXPORT-OPTIMIZATION.md) 🚀 **2-3倍速度提升**
-  - [导出优化实施报告](docs/EXPORT-OPTIMIZATION-REPORT.md) 📊 **详细数据**
+- [性能优化总结](docs/PERFORMANCE-IMPROVEMENTS.md)
 - [贡献指南](CONTRIBUTING.md) · [提交问题](https://github.com/Achuan-2/TronCut/issues/new/choose)
 
 欢迎提供可复现的问题、兼容样本、测试结果和改进代码。提交项目或日志前，请移除私人素材与敏感信息。

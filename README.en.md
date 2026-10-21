@@ -10,10 +10,10 @@
     <img src="https://img.shields.io/badge/status-release-71b896" alt="Release" />
   </p>
   <p><a href="README.md">简体中文</a> · <strong>English</strong></p>
-  <p><a href="https://github.com/Achuan-2/TronCut/releases">Download</a> · <a href="#highlights">Highlights</a> · <a href="docs/FEATURES.md">Roadmap</a> · <a href="https://github.com/Achuan-2/TronCut/issues">Report an issue</a></p>
+  <p><a href="https://github.com/Achuan-2/TronCut/releases">Download</a> · <a href="#highlights">Highlights</a> · <a href="#screenshots">Screenshots</a> · <a href="docs/FEATURES.md">Roadmap</a> · <a href="https://github.com/Achuan-2/TronCut/issues">Report an issue</a></p>
 </div>
 
-![TronCut Windows editor — Chinese UI](docs/images/editor.png)
+![TronCut Windows editor: project media, canvas preview, and multitrack timeline — Chinese UI](docs/images/editor.png)
 
 TronCut brings screen recording, editing, text, captions, and audio processing into one workspace. Its media library, canvas, inspector, and multitrack timeline use a familiar desktop editing layout, with particular attention to adding text, creating animations, positioning captions, and moving projects between machines.
 
@@ -46,6 +46,58 @@ The current version is **[v0.6.1](https://github.com/Achuan-2/TronCut/releases/t
 Packages include the matching media engine and speech environment manager; Windows also includes native recording helpers. End users do not need to install Node.js, FFmpeg, or uv. **The first speech-caption task needs internet access to download Python, dependencies, and models**; speech recognition then runs locally. Windows and macOS builds are unsigned, and the macOS packages are neither notarized nor validated on real hardware.
 
 See the [user documentation](docs/README.md) for media, recording cursors, timeline editing, text, canvas animation, and project management. Start with [Getting started](docs/GETTING-STARTED.md). These guides currently use Chinese to match the application UI.
+
+## Screenshots
+
+These are actual Windows desktop screenshots using one demonstration project. The application UI shown here is Chinese.
+
+### Recording styles and automatic zoom
+
+Choose a background, padding, corners, and cursor style before recording. Enable click-based zoom and cursor follow, then adjust the recording object's appearance after capture. [Recording and cursor guide](docs/MEDIA.md)
+
+<img src="docs/images/feature-recording.png" width="800" alt="Recording styles: gradient background, padding, rounded corners, cursor style, and automatic zoom" />
+
+### Text and annotations
+
+Drag in a text preset and edit its content on the canvas. Adjust fonts, colors, outlines, or selected characters, and save styles as reusable presets. Annotations also include shapes, arrows, blur and highlights, sketch motion, and freehand drawing. [Text and annotations](docs/TEXT.md)
+
+![Text presets and properties with an editable title on the canvas](docs/images/feature-text.png)
+
+### Media and text behaviors
+
+Preview a preset on hover, drag it onto a clip, then adjust its incoming, during, and outgoing phases. Applying a new media behavior replaces the previous behaviors on that clip. [Behavior guide](docs/BEHAVIORS.md)
+
+![Media behavior presets and three-phase controls for a drifting title](docs/images/feature-behaviors.png)
+
+### Keyframe animation
+
+Add a custom animation, adjust its range on the timeline, and edit the start and end position, scale, and opacity. Auto animation and the zoom-and-pan viewport provide additional ways to create motion. [Canvas and animation](docs/CANVAS.md)
+
+![Custom animation panel, timeline animation arrow, and transform properties](docs/images/feature-animations.png)
+
+### Visual effects
+
+Combine rounded corners, borders, shadows, masks, tint, and regional blur. When corners and a border are enabled together, the border follows the rounded outline. [Visual effects](docs/VISUAL-EFFECTS.md)
+
+![Visual effects library and a rounded border applied to the canvas content](docs/images/feature-effects.png)
+
+### Caption editing
+
+Edit captions in a list linked to the playhead, find and replace text, or apply a consistent font, outline, and background. Captions occupy a separate track, with local speech recognition and subtitle file import and export available. [Getting started](docs/GETTING-STARTED.md)
+
+![Caption list, on-canvas preview, and a separate caption track](docs/images/feature-captions.png)
+
+### Local narration
+
+Enter a script, choose a model, voice, and speed, then preview or generate narration for the timeline. Supported engines include Windows voices, Kokoro/VITS ONNX, and LuxTTS ONNX voice cloning. The screenshot shows local Windows voice settings. [Local narration](docs/TTS.md)
+
+<img src="docs/images/feature-narration.png" width="560" alt="Narration settings: local Windows voices, speech rate, and voice preview" />
+
+### Video export
+
+Choose the destination, filename, resolution, quality, and format, and review output dimensions, frame rate, and duration before export. Keep the editable project for later revisions. [Export guide](docs/EXPORT.md)
+
+<img src="docs/images/feature-export.png" width="760" alt="Video export settings: destination, resolution, quality, format, and output summary" />
 
 ## Compatibility
 
