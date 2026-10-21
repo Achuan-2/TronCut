@@ -471,7 +471,7 @@ function PreviewLayerImpl({
                 editor.preferences.timing.animation,
               )
             : behavior
-              ? supportsBehaviors(clip) && (clip.behaviors?.length ?? 0) < 32
+              ? supportsBehaviors(clip)
               : supportsVisualEffect(
                   clip,
                   visualEffectFromDragTypes(event.dataTransfer.types),

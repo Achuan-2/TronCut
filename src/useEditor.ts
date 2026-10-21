@@ -1428,7 +1428,6 @@ export function useEditor(
         if (
           !ids.includes(clip.id) ||
           !supportsBehaviors(clip) ||
-          (clip.behaviors?.length ?? 0) >= 32 ||
           p.tracks.find((track) => track.id === clip.trackId)?.locked
         )
           return clip;
@@ -1436,8 +1435,13 @@ export function useEditor(
           ...behaviorFromPreset(preset, clip.duration, clip.kind),
           name: preset.name,
         };
+        const replace = behavior.category === "media";
+        if (!replace && (clip.behaviors?.length ?? 0) >= 32) return clip;
         added = { clipId: clip.id, behaviorId: behavior.id };
-        return { ...clip, behaviors: [...(clip.behaviors ?? []), behavior] };
+        return {
+          ...clip,
+          behaviors: replace ? [behavior] : [...(clip.behaviors ?? []), behavior],
+        };
       });
       if (added) {
         apply({ ...p, clips });
