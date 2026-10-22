@@ -1,4 +1,5 @@
 import { trimClip } from "../shared/clip-trim";
+import { displayShortcut, type ShortcutMap } from "../shared/shortcuts";
 import {
   TimelineRangeHandles,
   TimelineRangeOverlay,
@@ -187,11 +188,13 @@ function TimelinePlayheadCursor({
 
 function TimelineAddAnimationButton({
   editor,
+  shortcut,
   project,
   editableSelection,
   animationIds,
 }: {
   editor: Editor;
+  shortcut: string;
   project: Project;
   editableSelection: Clip[];
   animationIds: Set<string>;
@@ -208,7 +211,7 @@ function TimelineAddAnimationButton({
   return (
     <button
       className="keyframe-add"
-      title={`为选中的对象添加默认 ${editor.preferences.timing.animation} 秒动画（Shift+A）`}
+      title={`为选中的对象添加默认 ${editor.preferences.timing.animation} 秒动画（${shortcut}）`}
       disabled={!enabled}
       onClick={() => editor.addSelectedAnimation()}
     >
@@ -220,6 +223,7 @@ function TimelineAddAnimationButton({
 
 export default function Timeline({
   editor,
+  shortcuts,
   onCopyAnimation,
   onDropFiles,
   onDropLibraryAsset,
@@ -229,6 +233,7 @@ export default function Timeline({
   dropDisabled = false,
 }: {
   editor: Editor;
+  shortcuts: ShortcutMap;
   onCopyAnimation: (
     clipId: string,
     range: AnimationRange,
@@ -247,6 +252,7 @@ export default function Timeline({
 }) {
   // Performance monitoring in development
   usePerformanceMonitor("Timeline");
+  const formatShortcut = (value: string) => displayShortcut(value, window.framecraft?.platform);
 
   const { project, apply, seek, selected, selectedId, select } = editor;
   const timeline = useMemo(
@@ -838,15 +844,15 @@ export default function Timeline({
     >
       <div className="timeline-toolbar">
         <div className="tool-group">
-          <button title="撤销 Ctrl+Z" onClick={editor.undo}>
+          <button title={`撤销 ${formatShortcut(shortcuts.undo)}`} onClick={editor.undo}>
             <Undo2 size={17} />
           </button>
-          <button title="重做 Ctrl+Shift+Z" onClick={editor.redo}>
+          <button title={`重做 ${formatShortcut(shortcuts.redo)}`} onClick={editor.redo}>
             <Redo2 size={17} />
           </button>
           <span className="tool-divider" />
           <button
-            title="在播放头处拆分（Ctrl/⌘+K）"
+            title={`在播放头处拆分（${formatShortcut(shortcuts.split)}）`}
             disabled={!selected || !!locked}
             onClick={() =>
               selected &&
@@ -920,7 +926,7 @@ export default function Timeline({
           </div>
           <button
             className="text-add"
-            title="添加文本（Shift+T）"
+            title={`添加文本（${formatShortcut(shortcuts.addText)}）`}
             onClick={() => editor.addText()}
           >
             <Type size={17} />
@@ -928,6 +934,7 @@ export default function Timeline({
           </button>
           <TimelineAddAnimationButton
             editor={editor}
+            shortcut={formatShortcut(shortcuts.addAnimation)}
             project={project}
             editableSelection={editableSelection}
             animationIds={animationIds}
@@ -2291,7 +2298,7 @@ export default function Timeline({
       </div>
       <div className="timeline-footer">
         <span>
-          空格 播放 / 暂停<span className="separator-dot">·</span>Ctrl/⌘+K 拆分
+          {formatShortcut(shortcuts.playPause)} 播放 / 暂停<span className="separator-dot">·</span>{formatShortcut(shortcuts.split)} 拆分
           <span className="separator-dot">·</span>右键动画 编辑动画
           <span className="separator-dot">·</span>Shift+拖动标尺 区域标记
         </span>
@@ -2453,7 +2460,7 @@ export default function Timeline({
                 }}
               >
                 在播放头拆分
-                <span className="menu-shortcut">Ctrl/⌘+K</span>
+                <span className="menu-shortcut">{formatShortcut(shortcuts.split)}</span>
               </button>
             </ClipContextMenu>
           );

@@ -1535,6 +1535,10 @@ fieldset:disabled {
   border-bottom: 1px solid var(--line);
 }
 .preferences-shortcuts kbd { color: var(--muted); }
+.preferences-shortcuts > div > span { flex: 1; }
+.preferences-shortcuts > div > button { min-width: 94px; }
+.preferences-shortcuts > div > button:last-child { min-width: 32px; padding: 5px; }
+.preferences-shortcuts > div > button[aria-pressed="true"] { border-color: var(--accent); }
 .ai-manual-model { display: flex; gap: 8px; }
 .ai-manual-model input { flex: 1; min-width: 0; }
 .ai-model-catalog { padding: 12px; border: 1px solid var(--line); border-radius: 6px; }

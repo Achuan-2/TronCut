@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { captionProcessingSchema } from "./caption-processing";
 import { recordingSettingsSchema } from "./recording";
+import { shortcutOverridesSchema, type ShortcutMap } from "./shortcuts";
 import { storagePreferencesSchema, type StoragePreferences } from "./storage";
 import {
   programPreferencesSchema,
@@ -68,6 +69,7 @@ export interface AiModelProfile {
   hasApiKey: boolean;
 }
 export interface Preferences extends EditorPreferences {
+  shortcuts: ShortcutMap;
   storage: StoragePreferences;
   storageDefaults: StoragePreferences;
   ai: { baseUrl: string; model: string };
@@ -109,6 +111,7 @@ export const preferencesUpdateSchema = z
     project: projectPreferencesSchema.optional(),
     recording: recordingSettingsSchema.optional(),
     storage: storagePreferencesSchema.optional(),
+    shortcuts: shortcutOverridesSchema.optional(),
   })
   .strict();
 export type PreferencesUpdate = z.input<typeof preferencesUpdateSchema>;

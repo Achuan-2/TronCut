@@ -80,6 +80,7 @@ import { findCaptureSource } from "./capture-source";
 import { videoExportRequestSchema } from "../shared/export-settings";
 import { assertExportTarget, videoExportTarget } from "./video-export-target";
 import { editCommands, editCommandEnabled, editMenuStateSchema, textEditSchema } from "../shared/edit-menu";
+import { type ShortcutMap } from "../shared/shortcuts";
 import {
   recordingBackgroundSchema,
   recordingSettingsSchema,
@@ -109,6 +110,8 @@ if (!app.isPackaged || process.env.FRAMECRAFT_SMOKE)
     path.resolve(process.env.FRAMECRAFT_USER_DATA || ".framecraft-dev"),
   );
 let window: BrowserWindow;
+let updateShortcutMenu: (shortcuts: ShortcutMap) => void = () => {};
+let currentEditMenuState: z.infer<typeof editMenuStateSchema> | null = null;
 let recordingMinimizedWindow = false;
 function minimizeForRecording(sourceId: string) {
   if (!window || window.isDestroyed() || window.isMinimized()) return;
@@ -355,6 +358,7 @@ function installHandlers() {
     if (update.storage && task) throw new Error("请等待后台任务完成后再更改存储位置");
     const previous = await preferences.storageDirectories();
     const saved = await preferences.save(update);
+    if (update.shortcuts) updateShortcutMenu(saved.shortcuts);
     const next = await preferences.storageDirectories();
     if (
       previous.previewProxyDirectory !== next.previewProxyDirectory ||
@@ -525,6 +529,7 @@ function installHandlers() {
   });
   handle("window:edit-menu", (input: unknown) => {
     const state = editMenuStateSchema.parse(input);
+    currentEditMenuState = state;
     for (const command of editCommands) {
       const item = Menu.getApplicationMenu()?.getMenuItemById(`edit-${command.id}`);
       if (item) item.enabled = editCommandEnabled(command.id, state);
@@ -1563,6 +1568,7 @@ async function createWindow() {
   window.on("closed", () => recordingControls.close());
   const shortcut = (command: string) =>
     window.webContents.send("shortcut", command);
+  updateShortcutMenu = (shortcuts) => {
   Menu.setApplicationMenu(
     Menu.buildFromTemplate([
       ...(process.platform === "darwin"
@@ -1578,34 +1584,40 @@ async function createWindow() {
         submenu: [
           {
             label: "新建项目",
-            accelerator: "CmdOrCtrl+N",
+            accelerator: shortcuts.new,
+            registerAccelerator: false,
             click: () => shortcut("new"),
           },
           {
             label: "导入项目",
-            accelerator: "CmdOrCtrl+O",
+            accelerator: shortcuts.open,
+            registerAccelerator: false,
             click: () => shortcut("open"),
           },
           {
             label: "保存项目",
-            accelerator: "CmdOrCtrl+S",
+            accelerator: shortcuts.save,
+            registerAccelerator: false,
             click: () => shortcut("save"),
           },
           {
             label: "另存为",
-            accelerator: "CmdOrCtrl+Shift+S",
+            accelerator: shortcuts.saveAs,
+            registerAccelerator: false,
             click: () => shortcut("saveAs"),
           },
           { type: "separator" },
           {
             label: "导入素材",
-            accelerator: "CmdOrCtrl+I",
+            accelerator: shortcuts.import,
+            registerAccelerator: false,
             click: () => shortcut("import"),
           },
           { label: "导入 Camtasia 项目", click: () => shortcut("camtasia") },
           {
             label: "导出视频",
-            accelerator: "CmdOrCtrl+E",
+            accelerator: shortcuts.export,
+            registerAccelerator: false,
             click: () => shortcut("export"),
           },
         ],
@@ -1616,15 +1628,21 @@ async function createWindow() {
           ...(index && editCommands[index - 1].group !== command.group ? [{ type: "separator" as const }] : []),
           {
             id: `edit-${command.id}`, label: command.label,
-            // Single-key timeline shortcuts must not intercept typing into text fields.
-            accelerator: command.shortcut,
-            registerAccelerator: command.shortcut.includes("CmdOrCtrl"),
+            // Renderer handles accelerators so recording a new binding and text input remain safe.
+            accelerator: shortcuts[command.id],
+            registerAccelerator: false,
             click: () => shortcut(command.id),
           },
         ]),
       },
     ]),
   );
+  if (currentEditMenuState) for (const command of editCommands) {
+    const item = Menu.getApplicationMenu()?.getMenuItemById(`edit-${command.id}`);
+    if (item) item.enabled = editCommandEnabled(command.id, currentEditMenuState);
+  }
+  };
+  updateShortcutMenu((await preferences.get()).shortcuts);
   window.setMenuBarVisibility(false);
   const devUrl = process.env.FRAMECRAFT_DEV_URL;
   if (devUrl) await window.loadURL(devUrl);

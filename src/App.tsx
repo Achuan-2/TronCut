@@ -45,7 +45,8 @@ import {
   defaultEditorPreferences,
   type EditorPreferences,
 } from "../shared/editor-preferences";
-import { textEditSchema } from "../shared/edit-menu";
+import { editCommands, editCommandEnabled, textEditSchema } from "../shared/edit-menu";
+import { defaultShortcuts, shortcutCommandForEvent, type ShortcutMap } from "../shared/shortcuts";
 import { stitchSelectionError } from "../shared/stitch";
 import { stitchBoundaries } from "../shared/media-segments";
 import PresetLibraryOverlays from "./PresetLibraryOverlays";
@@ -104,6 +105,7 @@ export default function App() {
   const [editorPreferences, setEditorPreferences] = useState<EditorPreferences>(
     defaultEditorPreferences,
   );
+  const [shortcuts, setShortcuts] = useState<ShortcutMap>(defaultShortcuts);
   const editor = useEditor(editorPreferences),
     [screen, setScreen] = useState<"home" | "editor">("home"),
     [hasSession, setHasSession] = useState(false),
@@ -208,7 +210,7 @@ export default function App() {
   useEffect(() => {
     void window.framecraft
       ?.preferences()
-      .then(setEditorPreferences)
+      .then((value) => { setEditorPreferences(value); setShortcuts(value.shortcuts); })
       .catch((error) => toast(String(error)));
     const focused = () =>
       setEditingInput(
@@ -241,9 +243,9 @@ export default function App() {
       editable: selected.filter((clip) => !locked.has(clip.trackId)),
     };
   }, [editor.project.clips, editor.project.tracks, editor.selectedIds]);
-  const syncNativeEditMenu = useCallback(() => {
+  const getEditMenuState = useCallback(() => {
     const { selected, editable } = menuSelection;
-    const state = {
+    return {
       blocked:
         busy ||
         mediaImporting ||
@@ -268,13 +270,6 @@ export default function App() {
       canStitch: !stitchSelectionError(editor.project, editor.selectedIds),
       canUnstitch: editable.some((clip) => stitchBoundaries(clip).length > 0),
     };
-    const signature = JSON.stringify(state);
-    if (nativeEditMenu.current === signature) return;
-    nativeEditMenu.current = signature;
-    void window.framecraft?.updateEditMenu(state).catch((error) => {
-      nativeEditMenu.current = "";
-      toast(String(error));
-    });
   }, [
     menuSelection,
     editor.canUndo,
@@ -288,6 +283,18 @@ export default function App() {
     editingInput,
     screen,
     !!editor.narrationRecording,
+  ]);
+  const syncNativeEditMenu = useCallback(() => {
+    const state = getEditMenuState();
+    const signature = JSON.stringify(state);
+    if (nativeEditMenu.current === signature) return;
+    nativeEditMenu.current = signature;
+    void window.framecraft?.updateEditMenu(state).catch((error) => {
+      nativeEditMenu.current = "";
+      toast(String(error));
+    });
+  }, [
+    getEditMenuState,
     toast,
   ]);
   useEffect(() => {
@@ -772,6 +779,13 @@ export default function App() {
           });
           if (ids.length) editor.selectMany(ids);
         },
+        addText: () => editor.addText(),
+        addAnimation: () => editor.addSelectedAnimation(),
+        playPause: () => editor.setPlaying(!editor.playing),
+        previousFrame: () => editor.stepFrame(-1),
+        nextFrame: () => editor.stepFrame(1),
+        previousMedia: () => editor.jumpMedia(-1),
+        nextMedia: () => editor.jumpMedia(1),
       }) as Record<string, () => void>
     )[command]?.();
   };
@@ -782,171 +796,22 @@ export default function App() {
   const keys = useRef<(e: KeyboardEvent) => void>(() => { });
   keys.current = (event) => {
     const target = event.target as HTMLElement;
+    const command = shortcutCommandForEvent(event, shortcuts);
+    const inInput = target.closest('input, textarea, select, [contenteditable="true"]');
     if (
-      target.closest('input, textarea, select, [contenteditable="true"]') ||
+      (inInput && !["new", "open", "save", "saveAs", "import", "export", "preferences"].includes(command ?? "")) ||
       actionsBlocked ||
       preferencesOpen ||
-      screen === "home"
+      event.isComposing ||
+      target.closest('[role="dialog"], [role="menu"], [role="listbox"]')
     )
       return;
-    if (
-      event.shiftKey &&
-      !event.ctrlKey &&
-      !event.metaKey &&
-      !event.altKey &&
-      !event.isComposing &&
-      !event.repeat &&
-      !target.closest('[role="dialog"], [role="menu"], [role="listbox"]')
-    ) {
-      if (event.key.toLowerCase() === "t") {
-        event.preventDefault();
-        editor.addText();
-        return;
-      }
-      if (event.key.toLowerCase() === "a") {
-        event.preventDefault();
-        editor.addSelectedAnimation();
-        return;
-      }
-    }
-    const selected = editor.selected,
-      locked = editor.project.tracks.find(
-        (t) => t.id === selected?.trackId,
-      )?.locked;
-    const animation = editor.selectedAnimation;
-    if (editor.timelineRange && ["Delete", "Backspace"].includes(event.key)) {
-      event.preventDefault();
-      editor.deleteTimeSelection(event.shiftKey);
-      return;
-    }
-    if (
-      (event.ctrlKey || event.metaKey) &&
-      ((event.altKey && !event.shiftKey && event.key.toLowerCase() === "i") ||
-        (event.shiftKey && !event.altKey && event.code === "Backslash"))
-    ) {
-      event.preventDefault();
-      commands.current(event.altKey ? "stitch" : "unstitch");
-      return;
-    }
-    if (
-      (event.ctrlKey || event.metaKey) &&
-      ["d", "x", "y"].includes(event.key.toLowerCase())
-    ) {
-      event.preventDefault();
-      commands.current(
-        ({ d: "duplicate", x: "cut", y: "redo" } as Record<string, string>)[
-        event.key.toLowerCase()
-        ],
-      );
-      return;
-    }
-    if (
-      editor.selectedTransition &&
-      ["Delete", "Backspace"].includes(event.key)
-    ) {
-      event.preventDefault();
-      if (!locked) editor.updateTransition(editor.selectedTransition, null);
-    } else if (
-      editor.selectedBehavior &&
-      ["Delete", "Backspace"].includes(event.key)
-    ) {
-      event.preventDefault();
-      if (!locked)
-        editor.removeBehavior(
-          editor.selectedBehavior.clipId,
-          editor.selectedBehavior.behaviorId,
-        );
-    } else if (
-      editor.selectedBehavior &&
-      (event.ctrlKey || event.metaKey) &&
-      event.key.toLowerCase() === "c"
-    ) {
-      event.preventDefault();
-      editor.copyBehavior(
-        editor.selectedBehavior.clipId,
-        editor.selectedBehavior.behaviorId,
-      );
-    } else if (
-      animation &&
-      selected &&
-      (event.ctrlKey || event.metaKey) &&
-      ["c", "x"].includes(event.key.toLowerCase())
-    ) {
-      event.preventDefault();
-      if (event.key.toLowerCase() === "c" || !locked)
-        copyAnimation(selected.id, animation, event.key.toLowerCase() === "x");
-    } else if (
-      animation &&
-      selected &&
-      ["Delete", "Backspace"].includes(event.key)
-    ) {
-      event.preventDefault();
-      if (!locked) editor.deleteAnimation(selected.id, animation);
-    } else if (
-      (event.ctrlKey || event.metaKey) &&
-      event.key.toLowerCase() === "a"
-    ) {
-      event.preventDefault();
-      editor.selectMany(editor.project.clips.map((c) => c.id));
-    } else if (
-      (event.ctrlKey || event.metaKey) &&
-      event.key.toLowerCase() === "g"
-    ) {
-      event.preventDefault();
-      editor.apply((p) =>
-        groupSelection(p, editor.selectedIds, event.shiftKey),
-      );
-    } else if (event.key === "Escape") {
-      editor.setTimelineRange(null);
-      editor.select(null);
-    } else if (event.code === "Space") {
-      event.preventDefault();
-      editor.setPlaying(!editor.playing);
-    } else if (
-      event.key.toLowerCase() === "k" &&
-      (event.ctrlKey || event.metaKey) &&
-      !event.shiftKey &&
-      !event.altKey &&
-      selected &&
-      !locked
-    ) {
-      event.preventDefault();
-      commands.current("split");
-    } else if (
-      ["Delete", "Backspace"].includes(event.key) &&
-      selected &&
-      !locked
-    ) {
-      event.preventDefault();
-      editor.deleteSelectedClips(event.shiftKey);
-    } else if (
-      (event.ctrlKey || event.metaKey) &&
-      event.key.toLowerCase() === "c" &&
-      selected
-    ) {
-      event.preventDefault();
-      editor.clearAnimationClipboard();
-      editor.clearBehaviorClipboard();
-      clipClipboard.current = structuredClone(
-        editor.project.clips.filter((c) => editor.selectedIds.includes(c.id)),
-      );
-      clipClipboardToken.current = uid();
-      void window.framecraft
-        ?.copyClipClipboard(clipClipboardToken.current)
-        .catch((error) => toast(String(error)));
-      toast(`已复制 ${clipClipboard.current.length} 个片段`);
-    } else if (
-      (event.ctrlKey || event.metaKey) &&
-      event.key.toLowerCase() === "v"
-    ) {
-      event.preventDefault();
-      void paste();
-    } else if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
-      event.preventDefault();
-      const direction = event.key === "ArrowLeft" ? -1 : 1;
-      if (event.ctrlKey || event.metaKey) editor.jumpMedia(direction);
-      else editor.stepFrame(direction);
-    }
+    if (!command || (screen === "home" && !["new", "open", "preferences"].includes(command))) return;
+    const editCommand = editCommands.find((item) => item.id === command);
+    if (editCommand && !editCommandEnabled(editCommand.id, getEditMenuState())) return;
+    if (event.repeat && ["addText", "addAnimation", "new", "open", "saveAs", "import", "export", "preferences"].includes(command)) return;
+    event.preventDefault();
+    commands.current(command);
   };
   useEffect(() => {
     const listener = (event: KeyboardEvent) => keys.current(event);
@@ -1300,6 +1165,7 @@ export default function App() {
           <Timeline
             key={`${editor.documentProject.id}:${editor.activeGroupId ?? "main"}`}
             editor={editor}
+            shortcuts={shortcuts}
             onCommand={(command) => commands.current(command)}
             onCopyAnimation={copyAnimation}
             onDropFiles={dropFiles}
@@ -1326,6 +1192,7 @@ export default function App() {
           initialTab={preferencesTab}
           onSaved={(value) => {
             setEditorPreferences(value);
+            setShortcuts(value.shortcuts);
           }}
           onClose={() => setPreferencesOpen(false)}
           toast={toast}

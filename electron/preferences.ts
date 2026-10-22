@@ -14,6 +14,7 @@ import {
 } from "../shared/preferences";
 import { editorPreferencesSchema } from "../shared/editor-preferences";
 import { recordingSettingsSchema } from "../shared/recording";
+import { resolveShortcuts, shortcutOverridesSchema } from "../shared/shortcuts";
 import {
   storagePreferencesSchema,
   type StoragePreferences,
@@ -43,6 +44,7 @@ const storedProviderSchema = z.object({
   encryptedKey: z.string().default(""),
 });
 const storedSchema = z.object({
+  shortcuts: shortcutOverridesSchema.default({}),
   storage: storagePreferencesSchema.default({}),
   ...editorPreferencesSchema.shape,
   ai: z
@@ -151,6 +153,7 @@ export class PreferencesStore {
       (model) => model.id === data.activeAiModelId,
     );
     return {
+      shortcuts: resolveShortcuts(data.shortcuts),
       storage: data.storage,
       storageDefaults: this.storageDefaults,
       ai: active
@@ -371,6 +374,7 @@ export class PreferencesStore {
           if (!provider.models.length) providers.push(provider);
     }
     const data = {
+      shortcuts: update.shortcuts ?? stored.shortcuts,
       storage: update.storage ?? stored.storage,
       aiProviders: providers,
       activeAiModelId: active?.id ?? "",

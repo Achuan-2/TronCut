@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { X, FolderOpen, RotateCcw } from "lucide-react";
 import {
   storagePreferencesSchema,
@@ -14,7 +14,7 @@ import {
   defaultEditorPreferences,
   type EditorPreferences,
 } from "../shared/editor-preferences";
-import { editCommands } from "../shared/edit-menu";
+import { defaultShortcuts, displayShortcut, reservedShortcuts, shortcutCommands, shortcutFromEvent, type ShortcutCommand, type ShortcutMap } from "../shared/shortcuts";
 import CursorStyleSelect from "./CursorStyleSelect";
 import AiProvidersFields, {
   providerUpdate,
@@ -57,6 +57,9 @@ export default function PreferencesDialog({
   const [working, setWorking] = useState(false);
   const [error, setError] = useState("");
   const [shortcutQuery, setShortcutQuery] = useState("");
+  const [shortcuts, setShortcuts] = useState<ShortcutMap>(defaultShortcuts);
+  const [capturing, setCapturing] = useState<ShortcutCommand | null>(null);
+  const [shortcutError, setShortcutError] = useState("");
   const dialog = useRef<HTMLFormElement>(null);
   useEffect(() => {
     let active = true;
@@ -76,6 +79,7 @@ export default function PreferencesDialog({
       .then((value) => {
         if (!active) return;
         setStorage(value.storage);
+        setShortcuts(value.shortcuts);
         savedStorage.current = value.storage;
         setStorageDefaults(value.storageDefaults);
         setSettings({
@@ -112,6 +116,7 @@ export default function PreferencesDialog({
   const update: PreferencesUpdate = {
     ...settings,
     storage,
+    shortcuts: Object.fromEntries(Object.entries(shortcuts).filter(([id, binding]) => binding !== defaultShortcuts[id as ShortcutCommand])),
     aiProviders: providers.map(providerUpdate),
     activeAiModelId: activeId,
   };
@@ -188,11 +193,20 @@ export default function PreferencesDialog({
       </div>
     </div>
   );
-  const shortcut = (value: string) =>
-    value.replace(
-      "CmdOrCtrl",
-      window.framecraft?.platform === "darwin" ? "⌘" : "Ctrl",
-    );
+  const shortcut = (value: string) => displayShortcut(value, window.framecraft?.platform);
+  const captureShortcut = (command: ShortcutCommand, event: ReactKeyboardEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (event.key === "Escape") { setCapturing(null); return; }
+    const binding = shortcutFromEvent(event.nativeEvent);
+    if (!binding) { setShortcutError("请按下有效组合键；字母和数字需搭配修饰键"); return; }
+    if (reservedShortcuts.has(binding)) { setShortcutError(`${shortcut(binding)} 已用于停止录屏`); return; }
+    const other = shortcutCommands.find((item) => item.id !== command && shortcuts[item.id] === binding);
+    if (other) { setShortcutError(`${shortcut(binding)} 已用于“${other.label}”`); return; }
+    setShortcuts((current) => ({ ...current, [command]: binding }));
+    setCapturing(null);
+    setShortcutError("");
+  };
   const presets = [
     [1920, 1080],
     [2560, 1440],
@@ -701,42 +715,43 @@ export default function PreferencesDialog({
               )}
               {tab === "shortcuts" && (
                 <>
-                  <h3>快捷键一览</h3>
+                  <h3>自定义快捷键</h3>
                   <input
                     aria-label="搜索快捷键"
-                    placeholder="搜索编辑命令…"
+                    placeholder="搜索命令或按键…"
                     value={shortcutQuery}
                     onChange={(e) => setShortcutQuery(e.target.value)}
                   />
                   <div className="preferences-shortcuts">
-                    {[
-                      ...editCommands.map((item) => ({
-                        name: item.label,
-                        key: shortcut(item.shortcut),
-                      })),
-                      { name: "播放 / 暂停", key: "Space" },
-                      { name: "添加文本", key: "Shift+T" },
-                      { name: "添加动画", key: "Shift+A" },
-                      { name: "前一帧 / 后一帧", key: "← / →" },
-                      {
-                        name: "前一个 / 后一个媒体",
-                        key: shortcut("CmdOrCtrl") + "+← / →",
-                      },
-                      { name: "保存项目", key: shortcut("CmdOrCtrl+S") },
-                      { name: "导出视频", key: shortcut("CmdOrCtrl+E") },
-                    ]
+                    {shortcutCommands
                       .filter((item) =>
-                        `${item.name} ${item.key}`
+                        `${item.label} ${shortcut(shortcuts[item.id])}`
                           .toLowerCase()
                           .includes(shortcutQuery.toLowerCase()),
                       )
                       .map((item) => (
-                        <div key={item.name}>
-                          <span>{item.name}</span>
-                          <kbd>{item.key}</kbd>
+                        <div key={item.id}>
+                          <span>{item.label}</span>
+                          <button type="button" aria-label={`${item.label}快捷键`} aria-pressed={capturing === item.id}
+                            onClick={() => { setCapturing(item.id); setShortcutError(""); }}
+                            onKeyDown={(event) => { if (capturing === item.id) captureShortcut(item.id, event); }}>
+                            <kbd>{capturing === item.id ? "请按新快捷键…" : shortcut(shortcuts[item.id])}</kbd>
+                          </button>
+                          <button type="button" aria-label={`${item.label}恢复默认`} title="恢复默认"
+                            disabled={shortcuts[item.id] === defaultShortcuts[item.id]}
+                            onClick={() => {
+                              const other = shortcutCommands.find((entry) => entry.id !== item.id && shortcuts[entry.id] === defaultShortcuts[item.id]);
+                              if (other) { setShortcutError(`${shortcut(defaultShortcuts[item.id])} 已用于“${other.label}”`); return; }
+                              setShortcuts((current) => ({ ...current, [item.id]: defaultShortcuts[item.id] }));
+                              setShortcutError("");
+                            }}>
+                            <RotateCcw size={15} />
+                          </button>
                         </div>
                       ))}
                   </div>
+                  {shortcutError && <p role="alert">{shortcutError}</p>}
+                  <button type="button" onClick={() => { setShortcuts(defaultShortcuts); setCapturing(null); setShortcutError(""); }}>全部恢复默认</button>
                 </>
               )}
               {tab === "ai" && (

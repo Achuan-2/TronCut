@@ -211,6 +211,7 @@ try {
   ).toBe(1280);
   await command("preferences");
   await page.getByRole("tab", { name: "快捷键", exact: true }).click();
+  await page.screenshot({ path: path.join(root, "shortcuts.png") });
   await page.getByLabel("搜索快捷键", { exact: true }).fill("添加文本");
   await expect(page.locator(".preferences-shortcuts > div")).toContainText(
     "Shift+T",
@@ -227,10 +228,32 @@ try {
   await expect(page.locator(".preferences-shortcuts > div")).toContainText(
     "Ctrl+K",
   );
-  await page.getByRole("button", { name: "取消", exact: true }).click();
+  await page.getByLabel("搜索快捷键", { exact: true }).fill("添加文本");
+  await page.getByRole("button", { name: "添加文本快捷键" }).click();
+  await page.keyboard.press("Shift+A");
+  await expect(page.getByRole("alert")).toContainText("已用于“添加动画”");
+  await page.keyboard.press("Shift+Y");
+  await expect(page.getByRole("button", { name: "添加文本快捷键" })).toContainText("Shift+Y");
+  await page.getByLabel("搜索快捷键", { exact: true }).fill("分割");
+  await page.getByRole("button", { name: "在播放头处分割快捷键" }).click();
+  await page.keyboard.press("Control+J");
+  await page.getByRole("button", { name: "确定", exact: true }).click();
+  await expect(page.getByRole("dialog", { name: "首选项" })).toHaveCount(0);
+  expect((await page.evaluate(() => window.framecraft.preferences())).shortcuts.addText).toBe("Shift+Y");
+  await expect.poll(() => app.evaluate(({ Menu }) => Menu.getApplicationMenu().getMenuItemById("edit-split").accelerator)).toBe("CmdOrCtrl+J");
+  const beforeRemappedText = await page.locator(".timeline-clip").count();
+  await page.keyboard.press("Shift+T");
+  await expect(page.locator(".timeline-clip")).toHaveCount(beforeRemappedText);
+  await page.keyboard.press("Shift+Y");
+  await expect(page.locator(".timeline-clip")).toHaveCount(beforeRemappedText + 1);
+  await command("preferences");
+  await page.getByRole("tab", { name: "快捷键", exact: true }).click();
+  await page.getByRole("button", { name: "全部恢复默认" }).click();
+  await page.getByRole("button", { name: "确定", exact: true }).click();
+  expect((await page.evaluate(() => window.framecraft.preferences())).shortcuts.addText).toBe("Shift+T");
   expect(errors).toEqual([]);
   console.log(
-    `分组首选项保存与取消、新项目设置、Shift+T 添加文本、Shift+A 添加动画、原生编辑菜单及常用编辑命令通过：${root}`,
+    `首选项、原生编辑菜单及自定义快捷键通过：${root}`,
   );
 } catch (error) {
   await app
