@@ -96,7 +96,8 @@ try {
   await expect(
     page.getByRole("button", { name: "吸附", exact: true }),
   ).not.toHaveClass(/active-tool/);
-  await page.getByRole("button", { name: "添加文本", exact: true }).click();
+  await page.keyboard.press("Shift+T");
+  await expect(page.locator(".timeline-clip.text")).toHaveCount(1);
   await expect
     .poll(
       async () =>
@@ -110,7 +111,7 @@ try {
     height: 720,
     fps: 60,
   });
-  await page.getByRole("button", { name: "添加动画", exact: true }).click();
+  await page.keyboard.press("Shift+A");
   await expect
     .poll(
       async () =>
@@ -210,6 +211,17 @@ try {
   ).toBe(1280);
   await command("preferences");
   await page.getByRole("tab", { name: "快捷键", exact: true }).click();
+  await page.getByLabel("搜索快捷键", { exact: true }).fill("添加文本");
+  await expect(page.locator(".preferences-shortcuts > div")).toContainText(
+    "Shift+T",
+  );
+  await page.getByLabel("搜索快捷键", { exact: true }).fill("添加动画");
+  await expect(page.locator(".preferences-shortcuts > div")).toContainText(
+    "Shift+A",
+  );
+  const clipCount = await page.locator(".timeline-clip").count();
+  await page.getByLabel("搜索快捷键", { exact: true }).press("Shift+T");
+  await expect(page.locator(".timeline-clip")).toHaveCount(clipCount);
   await page.getByLabel("搜索快捷键", { exact: true }).fill("分割");
   await expect(page.locator(".preferences-shortcuts > div")).toHaveCount(1);
   await expect(page.locator(".preferences-shortcuts > div")).toContainText(
@@ -218,7 +230,7 @@ try {
   await page.getByRole("button", { name: "取消", exact: true }).click();
   expect(errors).toEqual([]);
   console.log(
-    `分组首选项保存与取消、新项目画布帧率、文字图片时长、原生编辑菜单、复制剪切粘贴、组合与分割通过：${root}`,
+    `分组首选项保存与取消、新项目设置、Shift+T 添加文本、Shift+A 添加动画、原生编辑菜单及常用编辑命令通过：${root}`,
   );
 } catch (error) {
   await app

@@ -715,6 +715,8 @@ export default function PreferencesDialog({
                         key: shortcut(item.shortcut),
                       })),
                       { name: "播放 / 暂停", key: "Space" },
+                      { name: "添加文本", key: "Shift+T" },
+                      { name: "添加动画", key: "Shift+A" },
                       { name: "前一帧 / 后一帧", key: "← / →" },
                       {
                         name: "前一个 / 后一个媒体",

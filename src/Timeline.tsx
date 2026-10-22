@@ -208,7 +208,7 @@ function TimelineAddAnimationButton({
   return (
     <button
       className="keyframe-add"
-      title={`为选中的对象添加默认 ${editor.preferences.timing.animation} 秒动画`}
+      title={`为选中的对象添加默认 ${editor.preferences.timing.animation} 秒动画（Shift+A）`}
       disabled={!enabled}
       onClick={() => editor.addSelectedAnimation()}
     >
@@ -918,7 +918,11 @@ export default function Timeline({
                 document.body,
               )}
           </div>
-          <button className="text-add" onClick={() => editor.addText()}>
+          <button
+            className="text-add"
+            title="添加文本（Shift+T）"
+            onClick={() => editor.addText()}
+          >
             <Type size={17} />
             添加文本
           </button>

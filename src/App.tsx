@@ -784,13 +784,31 @@ export default function App() {
     const target = event.target as HTMLElement;
     if (
       target.closest('input, textarea, select, [contenteditable="true"]') ||
-      busy ||
+      actionsBlocked ||
       preferencesOpen ||
-      exportOpen ||
-      recordingModalOpen ||
       screen === "home"
     )
       return;
+    if (
+      event.shiftKey &&
+      !event.ctrlKey &&
+      !event.metaKey &&
+      !event.altKey &&
+      !event.isComposing &&
+      !event.repeat &&
+      !target.closest('[role="dialog"], [role="menu"], [role="listbox"]')
+    ) {
+      if (event.key.toLowerCase() === "t") {
+        event.preventDefault();
+        editor.addText();
+        return;
+      }
+      if (event.key.toLowerCase() === "a") {
+        event.preventDefault();
+        editor.addSelectedAnimation();
+        return;
+      }
+    }
     const selected = editor.selected,
       locked = editor.project.tracks.find(
         (t) => t.id === selected?.trackId,
