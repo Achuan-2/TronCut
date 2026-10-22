@@ -78,6 +78,36 @@ try {
       .screenshot({ path: path.join(root, `first-arrow-${zoom}.png`) });
   }
   await setTimelineZoom(page, 65);
+  // Context menus target the animation without moving the preview clock.
+  const progress = page.getByLabel("播放进度", { exact: true });
+  const menu = page.getByRole("menu", { name: "动画菜单", exact: true });
+  const first = arrows.first();
+  await progress.fill("8.5");
+  for (const target of [
+    first.locator(".animation-arrow"),
+    first.locator(".animation-point.start"),
+    first.locator(".animation-point.end"),
+  ]) {
+    await target.click({ button: "right" });
+    await expect(menu).toBeVisible();
+    await expect(progress).toHaveValue("8.5");
+    await expect(first).toHaveClass(/selected-animation/);
+    await page.keyboard.press("Escape");
+    await expect(menu).toHaveCount(0);
+    await expect(progress).toHaveValue("8.5");
+  }
+  await first.locator(".animation-arrow").click({ button: "right" });
+  await menu.getByRole("menuitem", { name: /^复制/ }).click();
+  await expect(progress).toHaveValue("8.5");
+  await first.locator(".animation-arrow").click({ button: "right" });
+  await menu.getByRole("menuitem", { name: "启用缓冲" }).hover();
+  await page.getByRole("menuitemradio", { name: "线性", exact: true }).click();
+  await expect(progress).toHaveValue("8.5");
+  await page.getByTitle("撤销 Ctrl+Z", { exact: true }).click();
+  await expect(progress).toHaveValue("8.5");
+  // A normal left click still locates the corresponding endpoint.
+  await first.locator(".animation-arrow").click();
+  await expect(progress).toHaveValue("1");
   const end = arrows.nth(0).locator(".animation-point.end");
   const start = arrows.nth(1).locator(".animation-point.start");
   // Coincident endpoints keep distinct left/right hit targets at the same time.
@@ -139,7 +169,7 @@ try {
   await aligned();
   expect(errors).toEqual([]);
   console.log(
-    `相邻及近邻动画端点、两档缩放、独立命中、选中脉冲、拖动及撤销通过：${root}`,
+    `动画箭头/端点右键及菜单操作保持播放头、左键定位、相邻端点对齐、两档缩放、选中脉冲、拖动及撤销通过：${root}`,
   );
 } catch (error) {
   await (

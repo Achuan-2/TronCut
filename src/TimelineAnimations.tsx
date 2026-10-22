@@ -284,11 +284,12 @@ export const TimelineAnimations = memo(function TimelineAnimations({
           return (
             <div
               key={index}
-              className={`clip-animation ${startSelected || endSelected ? "selected-animation" : ""}`}
+              className={`clip-animation ${startSelected || endSelected || context?.range === range ? "selected-animation" : ""}`}
               onContextMenu={(event) => {
                 event.preventDefault();
                 event.stopPropagation();
-                locate(end, "end", range.kind);
+                editor.setPlaying(false);
+                editor.select(clip.id);
                 setContext({ x: event.clientX, y: event.clientY, range });
               }}
               data-start={start}
