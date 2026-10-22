@@ -20,6 +20,7 @@ import { stitchBoundaries } from "../shared/media-segments";
 import "./CanvasContextMenu.css";
 import { groupMembers, rootGroupId } from "../shared/clip-groups";
 import { canvasAlignmentTargets } from "../shared/canvas-alignment";
+import { hasClipSpeed, supportsClipSpeed } from "../shared/clip-speed";
 import {
   frameExtensionAt,
   frameExtensionError,
@@ -344,6 +345,22 @@ export default function ClipContextMenu({
           }}
         >
           粘贴效果
+        </button>
+      )}
+      {source && supportsClipSpeed(source) && (
+        <button
+          role="menuitem"
+          disabled={
+            !canEdit ||
+            !selected.some((clip) => supportsClipSpeed(clip) && !hasClipSpeed(clip))
+          }
+          onPointerEnter={() => setSubmenu(null)}
+          onClick={() => {
+            editor.addSpeedEffect();
+            onClose();
+          }}
+        >
+          添加剪辑速度
         </button>
       )}
       <hr />
