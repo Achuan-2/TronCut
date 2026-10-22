@@ -2,6 +2,7 @@ import { z } from "zod";
 import type { Clip, Transform } from "./model";
 import { referenceBehaviorPhases } from "./behavior-reference";
 import { mediaBehaviorDefinitions } from "./media-behavior-presets";
+import { mathTextBehaviorSource } from "./math-text";
 
 export const behaviorStyles = [
   "none",
@@ -477,7 +478,7 @@ export const hasBehaviors = (clip: Clip) =>
   supportsBehaviors(clip) && !!clip.behaviors?.length;
 export const behaviorGlyphCount = (clip: Pick<Clip, "kind" | "text">) =>
   clip.kind === "text"
-    ? Math.max(1, textGlyphs((clip.text ?? "").replace(/\n/g, "")).length)
+    ? Math.max(1, textGlyphs(mathTextBehaviorSource(clip.text ?? "").replace(/\n/g, "")).length)
     : 1;
 export const shiftBehaviors = (clip: Clip, delta: number) =>
   clip.behaviors?.map((behavior) => ({

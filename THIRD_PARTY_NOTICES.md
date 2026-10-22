@@ -35,6 +35,8 @@ The macOS binaries are downloaded by CI from immutable release tags and verified
 
 ## Application dependencies / 应用依赖
 
+MathJax 3.2.2 ([upstream](https://github.com/mathjax/MathJax-src), Apache-2.0, [bundled license](resources/licenses/mathjax-LICENSE.txt)) renders editable LaTeX expressions into self-contained SVG paths for text previews and exports.
+
 Dependency versions are locked in `pnpm-lock.yaml`. Notable components include React (MIT), lucide-react (ISC), Zod (MIT), sharp (Apache-2.0), libvips (LGPL-2.1-or-later), and fflate (MIT, [bundled license](resources/licenses/fflate-LICENSE.txt)) for streaming media-library ZIP archives. Their original package notices are retained where supplied. Build-time tools include Vite, TypeScript, esbuild, electron-builder, Playwright, and Vitest; consult each upstream project for its license.
 
 ## Optional speech dependencies and models / 可选语音组件

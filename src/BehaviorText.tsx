@@ -3,6 +3,7 @@ import type { Clip } from "../shared/model";
 import { textFormatCss } from "../shared/text-format";
 import { clipsBehaviorText, glyphMotion } from "../shared/behaviors";
 import { styledTextLayout, textBoxFor } from "./text";
+import { formulaDataUrl } from "../shared/math-text";
 
 export default function BehaviorText({
   clip,
@@ -53,7 +54,21 @@ export default function BehaviorText({
               transform: `translate(-50%, -50%) rotateZ(${motion.rotation}deg) rotateY(${motion.rotationY}deg) rotateX(${motion.rotationX}deg) scale(${motion.scale})`,
             }}
           >
-            {glyph.text}
+            {glyph.formula ? (
+              <img
+                className="text-formula"
+                src={formulaDataUrl(glyph.formula)}
+                alt={glyph.text}
+                draggable={false}
+                style={{
+                  display: "block",
+                  width: glyph.formula.width * scale,
+                  height: glyph.formula.height * scale,
+                }}
+              />
+            ) : (
+              glyph.text
+            )}
           </span>
         );
       })}

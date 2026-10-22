@@ -735,6 +735,8 @@ export function Inspector({ editor }: { editor: Editor }) {
                 <h3 className="section-title">文本内容</h3>
                 <textarea
                   aria-label="文本内容"
+                  title={"支持 $公式$（行内）和 $$公式$$（独立一行）；公式跟随文字颜色，也可用 \\textcolor{red}{x} 局部着色"}
+                  placeholder="输入文字或公式，例如 $E=mc^2$"
                   value={c.text ?? ""}
                   maxLength={10000}
                   onSelect={(event) => {

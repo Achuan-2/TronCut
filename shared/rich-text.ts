@@ -1,5 +1,11 @@
 import type { CharacterStyle, Clip, TextStyle } from "./model";
 import { textGlyphs } from "./behaviors";
+import {
+  mathTextTokens,
+  renderFormula,
+  type FormulaGraphic,
+  type MathTextToken,
+} from "./math-text";
 
 export type TextRange = { start: number; end: number };
 type TextRun = NonNullable<Clip["textRuns"]>[number];
@@ -136,12 +142,16 @@ export type StyledGlyph = {
   width: number;
   index: number;
   style: TextStyle;
+  formula?: FormulaGraphic;
 };
 /** Shared geometry for normal text, per-character motion and exported textures. */
 export function layoutStyledText(
   clip: Clip,
   measure: (text: string, style: TextStyle) => number,
 ) {
+  const tokens = mathTextTokens(clip.text ?? "");
+  if (tokens.some((token) => token.tex !== undefined))
+    return layoutMathText(clip, measure, tokens);
   const glyphs: StyledGlyph[] = [];
   const rows: { glyphs: StyledGlyph[]; width: number; height: number }[] = [];
   let offset = 0,
@@ -181,6 +191,106 @@ export function layoutStyledText(
     offset++;
   }
   const width = Math.max(16, ...rows.map((row) => row.width));
+  let height = 0;
+  for (const row of rows) {
+    for (const glyph of row.glyphs)
+      glyphs.push({
+        ...glyph,
+        x: glyph.x + (width - row.width) / 2,
+        y: height + row.height / 2,
+      });
+    height += row.height;
+  }
+  return { width, height: Math.max(16, height), glyphs, count: index };
+}
+
+/** A formula is one visual unit for text behaviors; raw source offsets stay intact. */
+function layoutMathText(
+  clip: Clip,
+  measure: (text: string, style: TextStyle) => number,
+  tokens: MathTextToken[],
+) {
+  const text = clip.text ?? "";
+  const rows: { glyphs: StyledGlyph[]; width: number; height: number }[] = [];
+  const newRow = () => ({
+    glyphs: [] as StyledGlyph[],
+    width: 0,
+    height: (clip.style?.fontSize ?? 68) * 1.25,
+  });
+  let row = newRow(),
+    index = 0,
+    prefix = "",
+    runLeft = 0;
+  let previous: TextStyle | undefined,
+    afterDisplay = false;
+  const flush = () => {
+    rows.push(row);
+    row = newRow();
+    prefix = "";
+    previous = undefined;
+    runLeft = 0;
+  };
+  const plain = (start: number, end: number) => {
+    let offset = start;
+    for (const character of textGlyphs(text.slice(start, end))) {
+      if (character === "\n") {
+        if (!afterDisplay) flush();
+        afterDisplay = false;
+      } else {
+        afterDisplay = false;
+        const style = characterStyleAt(clip, offset);
+        if (!previous || !sameStyle(previous, style)) {
+          prefix = "";
+          runLeft = row.width;
+        }
+        const width = measure(character, style);
+        row.glyphs.push({
+          text: character,
+          x: runLeft + measure(prefix, style) + width / 2,
+          y: 0,
+          width,
+          index: index++,
+          style,
+        });
+        prefix += character;
+        row.width = runLeft + measure(prefix, style);
+        row.height = Math.max(row.height, style.fontSize * 1.25);
+        previous = style;
+      }
+      offset += character.length;
+    }
+  };
+  for (const token of tokens) {
+    const style = characterStyleAt(clip, token.contentStart ?? token.start);
+    const formula =
+      token.tex === undefined
+        ? null
+        : renderFormula(token.tex, !!token.display, style);
+    if (!formula) {
+      plain(token.start, token.end);
+      continue;
+    }
+    if (token.display && row.glyphs.length) flush();
+    row.glyphs.push({
+      text: text.slice(token.start, token.end),
+      x: row.width + formula.width / 2,
+      y: 0,
+      width: formula.width,
+      index: index++,
+      style,
+      formula,
+    });
+    row.width += formula.width;
+    row.height = Math.max(row.height, formula.height + style.fontSize * 0.15);
+    previous = undefined;
+    if (token.display) {
+      flush();
+      afterDisplay = true;
+    }
+  }
+  if (row.glyphs.length || !rows.length || !afterDisplay) rows.push(row);
+  const width = Math.max(16, ...rows.map((row) => row.width));
+  const glyphs: StyledGlyph[] = [];
   let height = 0;
   for (const row of rows) {
     for (const glyph of row.glyphs)

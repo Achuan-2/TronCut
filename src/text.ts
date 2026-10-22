@@ -2,6 +2,7 @@ import type { Clip, TextStyle } from "../shared/model";
 import { fitTextFont, textFrameSize, type TextBox } from "../shared/text";
 import { layoutStyledText } from "../shared/rich-text";
 import { textCanvasFont } from "../shared/text-format";
+import { hasMathText } from "../shared/math-text";
 
 let context: CanvasRenderingContext2D | null;
 export function measureStyledText(text: string, style: TextStyle) {
@@ -21,12 +22,12 @@ function textMeasure(clip: Clip, fontSize: number) {
 
 export function textBoxFor(clip: Clip): TextBox {
   if (clip.textBox) return clip.textBox;
-  if (clip.textRuns?.length) {
+  if (clip.textRuns?.length || hasMathText(clip.text)) {
     const layout = styledTextLayout(clip);
     const padding =
       Math.max(
         clip.style?.outlineWidth ?? 0,
-        ...clip.textRuns.map((run) => run.style.outlineWidth ?? 0),
+        ...(clip.textRuns ?? []).map((run) => run.style.outlineWidth ?? 0),
       ) * 2;
     return {
       width: Math.min(32768, layout.width + padding),
@@ -43,12 +44,12 @@ export function textBoxFor(clip: Clip): TextBox {
 }
 
 export function fittedTextFont(clip: Clip, box: TextBox): number {
-  if (clip.textRuns?.length) {
+  if (clip.textRuns?.length || hasMathText(clip.text)) {
     const layout = styledTextLayout(clip);
     const padding =
       Math.max(
         clip.style?.outlineWidth ?? 0,
-        ...clip.textRuns.map((run) => run.style.outlineWidth ?? 0),
+        ...(clip.textRuns ?? []).map((run) => run.style.outlineWidth ?? 0),
       ) * 2;
     return Math.max(
       8,

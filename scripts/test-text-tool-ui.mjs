@@ -5,6 +5,10 @@ import path from "node:path";
 const root = path.resolve("test-output/text-tool-ui", `run-${Date.now()}`);
 const profile = path.join(root, "profile");
 await fs.mkdir(profile, { recursive: true });
+await fs.writeFile(
+  path.join(profile, "preferences.json"),
+  JSON.stringify({ storage: { projectDirectory: root } }),
+);
 const project = {
   format: "troncut",
   version: 1,

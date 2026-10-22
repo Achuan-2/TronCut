@@ -12,6 +12,7 @@ import { textFillRectangle } from "./text-fill";
 import { outlinedText } from "./text-outline";
 import { layoutStyledText } from "../shared/rich-text";
 import { textPangoFont, textPangoMarkup } from "../shared/text-format";
+import { hasMathText } from "../shared/math-text";
 
 /** Rasterize only changing glyph poses. Long stationary sections share one PNG
  * in the concat input rather than producing thousands of identical frames. */
@@ -90,6 +91,27 @@ export async function rasterizeBehaviorText(
   for (const glyph of layout.glyphs) {
     if (images.has(glyphKey(glyph)) || !glyph.text.trim()) continue;
     checkCancelled();
+    if (glyph.formula) {
+      const margin = 2;
+      const png = await sharp(Buffer.from(glyph.formula.svg))
+        .resize(
+          Math.max(1, Math.ceil(glyph.formula.width * resolution)),
+          Math.max(1, Math.ceil(glyph.formula.height * resolution)),
+        )
+        .extend({
+          top: margin, bottom: margin, left: margin, right: margin,
+          background: "#00000000",
+        })
+        .png()
+        .toBuffer();
+      const info = await sharp(png).metadata();
+      images.set(glyphKey(glyph), {
+        width: info.width! / resolution,
+        height: info.height! / resolution,
+        data: png.toString("base64"),
+      });
+      continue;
+    }
     const mask = await textBuffer(glyph.text, glyph.style, resolution),
       info = await sharp(mask).metadata();
     const margin = Math.ceil(glyph.style.outlineWidth * resolution) + 2;
@@ -111,7 +133,7 @@ export async function rasterizeBehaviorText(
   const maxFont = Math.max(fontSize, ...layout.glyphs.map((glyph) => glyph.style.fontSize));
   const maxOutline = Math.max(style.outlineWidth, ...layout.glyphs.map((glyph) => glyph.style.outlineWidth));
   const padding = Math.ceil(maxFont * (clip.behaviors?.some((behavior) => behavior.enabled) ? 6 : 0) + maxOutline * 2 + 12);
-  const box = clip.textRuns?.length && !clip.textBox ? { width: layout.width + maxOutline * 2, height: layout.height + maxOutline * 2 } : textFrameSize(clip, layout.width);
+  const box = (clip.textRuns?.length || hasMathText(clip.text)) && !clip.textBox ? { width: layout.width + maxOutline * 2, height: layout.height + maxOutline * 2 } : textFrameSize(clip, layout.width);
   const background = textFillGeometry(style, box);
   const width = Math.ceil(
       Math.max(layout.width, background.width) + padding * 2,

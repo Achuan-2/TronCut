@@ -35,6 +35,7 @@ import { rasterizeAnnotation, rasterizeDrawing, regionAnnotationFilters } from "
 import { textFillRectangle } from "./text-fill";
 import { outlinedText } from "./text-outline";
 import { textFrameSize, textFillGeometry } from "../shared/text";
+import { hasMathText } from "../shared/math-text";
 import { textPangoFont, textPangoMarkup } from "../shared/text-format";
 import { isTrackActive } from "../shared/tracks";
 import { visualEffectFilters, effectAmountExpression } from "./visual-effects-export";
@@ -469,7 +470,7 @@ async function renderProject(
     if (clip.kind === "text" || clip.kind === "shape") {
       const animatedText =
         clip.kind === "text" &&
-        (!!clip.textRuns?.length || !!clip.behaviors?.some(
+        (hasMathText(clip.text) || !!clip.textRuns?.length || !!clip.behaviors?.some(
           (behavior) =>
             behavior.enabled &&
             [behavior.incoming, behavior.during, behavior.outgoing].some(
@@ -517,7 +518,7 @@ async function renderProject(
     // inputs start at zero; their source timestamp only matters to cursor data.
     const animatedText =
       clip.kind === "text" &&
-      (!!clip.textRuns?.length || !!clip.behaviors?.some(
+      (hasMathText(clip.text) || !!clip.textRuns?.length || !!clip.behaviors?.some(
         (behavior) =>
           behavior.enabled &&
           [behavior.incoming, behavior.during, behavior.outgoing].some(

@@ -102,6 +102,7 @@ import { effectActive } from "../shared/effect-timing";
 import BehaviorText from "./BehaviorText";
 import RichTextEditor from "./RichTextEditor";
 import { textFormatCss } from "../shared/text-format";
+import { hasMathText } from "../shared/math-text";
 import {
   annotationSvgBody,
   drawingProgress,
@@ -925,7 +926,7 @@ function PreviewLayerImpl({
               // Decorations propagate through descendants and cannot be cancelled
               // by a run, so styled/editor spans own their underlines.
               textDecoration:
-                editing || clip.behaviors?.length || clip.textRuns?.length
+                editing || clip.behaviors?.length || clip.textRuns?.length || hasMathText(clip.text)
                   ? "none"
                   : textFormatCss(clip.style).textDecoration,
               fontSize: (drag?.fontSize ?? clip.style?.fontSize ?? 68) * scale,
@@ -956,7 +957,7 @@ function PreviewLayerImpl({
                 onUndo={editor.undo}
                 onRedo={editor.redo}
               />
-            ) : clip.behaviors?.length || clip.textRuns?.length ? (
+            ) : clip.behaviors?.length || clip.textRuns?.length || hasMathText(clip.text) ? (
               <BehaviorText clip={clip} time={localTime} scale={scale} />
             ) : (
               clip.text || " "

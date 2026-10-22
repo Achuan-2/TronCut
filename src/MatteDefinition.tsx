@@ -11,6 +11,7 @@ import { contentLayout, defaultContentTransform } from "../shared/crop";
 import { mediaFrameRadii, roundedRectanglePath } from "../shared/media-frame";
 import { visualClipAt } from "../shared/visual-state";
 import { textBoxFor, styledTextLayout } from "./text";
+import { formulaDataUrl, hasMathText } from "../shared/math-text";
 import { behaviorObjectSize } from "./behavior-object-size";
 import { behaviorProjectionCss } from "../shared/behavior-projection";
 import { annotationSvgBody, drawingProgress, shapeSize } from "../shared/annotation-style";
@@ -122,8 +123,7 @@ export default function MatteDefinition({
     original.kind,
     original.text,
     original.textRuns,
-    original.style?.fontSize,
-    original.style?.fontFamily,
+    original.style,
   ]);
   const sourceWidth = asset
     ? asset.width * fit * scale
@@ -286,7 +286,7 @@ export default function MatteDefinition({
                     paintOrder="stroke fill"
                     textAnchor="middle"
                   >
-                    {glyphs && (clip.behaviors?.length || clip.textRuns?.length) ? (
+                    {glyphs && (clip.behaviors?.length || clip.textRuns?.length || hasMathText(clip.text)) ? (
                       <g
                         clipPath={
                           clipsBehaviorText(clip, local, glyphs.count)
@@ -302,6 +302,20 @@ export default function MatteDefinition({
                             glyphs.count,
                             "text",
                           );
+                          const transform = `translate(${(width - glyphs.width * scale) / 2 + (glyph.x + motion.x * (clip.style?.fontSize ?? 68)) * scale}px, ${(height - glyphs.height * scale) / 2 + (glyph.y + motion.y * (clip.style?.fontSize ?? 68)) * scale}px) rotate(${motion.rotation}deg) rotateY(${motion.rotationY}deg) rotateX(${motion.rotationX}deg) scale(${motion.scale})`;
+                          if (glyph.formula)
+                            return (
+                              <image
+                                key={glyph.index}
+                                href={formulaDataUrl(glyph.formula)}
+                                x={(-glyph.formula.width * scale) / 2}
+                                y={(-glyph.formula.height * scale) / 2}
+                                width={glyph.formula.width * scale}
+                                height={glyph.formula.height * scale}
+                                opacity={motion.opacity}
+                                style={{ transform }}
+                              />
+                            );
                           return (
                             <text
                               key={glyph.index}
@@ -312,9 +326,7 @@ export default function MatteDefinition({
                               strokeWidth={glyph.style.outlineWidth * scale}
                               dominantBaseline="central"
                               opacity={motion.opacity}
-                              style={{
-                                transform: `translate(${(width - glyphs.width * scale) / 2 + (glyph.x + motion.x * (clip.style?.fontSize ?? 68)) * scale}px, ${(height - glyphs.height * scale) / 2 + (glyph.y + motion.y * (clip.style?.fontSize ?? 68)) * scale}px) rotate(${motion.rotation}deg) rotateY(${motion.rotationY}deg) rotateX(${motion.rotationX}deg) scale(${motion.scale})`,
-                              }}
+                              style={{ transform }}
                             >
                               {glyph.text}
                             </text>
