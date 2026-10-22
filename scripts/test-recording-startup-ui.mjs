@@ -11,6 +11,10 @@ const root = path.resolve(
   `run-${Date.now()}`,
 );
 await fs.mkdir(root, { recursive: true });
+await fs.mkdir(path.join(root, "profile"), { recursive: true });
+await fs.writeFile(path.join(root, "profile", "preferences.json"), JSON.stringify({
+  storage: { projectDirectory: path.join(root, "Projects") },
+}));
 const env = {
   ...process.env,
   FRAMECRAFT_SMOKE: "1",
@@ -196,6 +200,20 @@ try {
   });
   await expect.poll(async () => (await page.evaluate(() => window.framecraft.readRecovery()))?.project.assets.some((asset) => asset.kind === "video")).toBe(true);
   const asset = (await page.evaluate(() => window.framecraft.readRecovery())).project.assets.find((asset) => asset.kind === "video");
+  const projectFile = (await page.evaluate(() => window.framecraft.recentProjects()))[0].file;
+  const media = path.join(path.dirname(projectFile), "media");
+  expect(path.dirname(asset.path)).toBe(media);
+  expect(path.basename(asset.path)).toBe(`${asset.id}-${asset.name}`);
+  const filesBeforeSave = (await fs.readdir(media)).sort();
+  expect(filesBeforeSave).toContain(`${asset.id}-cursor.json`);
+  await page.getByRole("button", { name: "保存", exact: true }).click();
+  await expect(page.locator(".busy-overlay")).toHaveCount(0);
+  await expect(page.locator(".project-save-state")).not.toContainText("*");
+  const filesAfterSave = await fs.readdir(media);
+  expect(filesAfterSave.filter((file) => file.startsWith(asset.id)).sort())
+    .toEqual(filesBeforeSave.filter((file) => file.startsWith(asset.id)));
+  expect(filesAfterSave.filter((file) => file.endsWith(".mp4"))).toHaveLength(1);
+  expect(await fs.readdir(path.join(root, "profile", "recordings")).catch(() => [])).toEqual([]);
   const firstFrame = path.join(root, "first-frame.png");
   await promisify(execFile)(path.resolve("resources/bin/ffmpeg.exe"), ["-y", "-i", asset.path, "-frames:v", "1", firstFrame], { windowsHide: true });
   const { data, info } = await sharp(firstFrame).removeAlpha().raw().toBuffer({ resolveWithObject: true });

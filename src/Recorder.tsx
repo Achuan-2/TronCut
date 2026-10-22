@@ -40,6 +40,7 @@ export default function Recorder({
   onRecorded,
   toast,
   onCaptureActiveChange,
+  prepareStorage,
 }: {
   onClose: () => void;
   onRecorded: (
@@ -48,6 +49,7 @@ export default function Recorder({
   ) => Promise<string | void>;
   toast: (text: string) => void;
   onCaptureActiveChange: (active: boolean) => void;
+  prepareStorage: () => Promise<void>;
 }) {
   const [sources, setSources] = useState<CaptureSource[]>([]),
     [sourceId, setSourceId] = useState(""),
@@ -253,6 +255,7 @@ export default function Recorder({
       recordingSettings.current = savedSettings;
       if (!info.ffmpeg)
         throw new Error("录制保存需要 FFmpeg / FFprobe，请先在设置中配置引擎");
+      await prepareStorage();
       const acquire = async (
         kind: Session["kind"],
         request: Promise<MediaStream>,

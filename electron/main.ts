@@ -30,6 +30,7 @@ import { parseSrt, toSrt } from "../shared/subtitles";
 import { capabilities, probeMedia } from "./media";
 import { findBinary, runProcess } from "./process";
 import { openProject, saveProject, saveProjectInDirectory, renameProjectStorage } from "./project-store";
+import { projectRecordingDirectory } from "./recording-storage";
 import { importCamtasia } from "./camtasia";
 import { audioFilters, exportVideo, exportFrame } from "./export";
 import { stitchInputFilters } from "./stitch-input";
@@ -206,7 +207,7 @@ function prepareNativeRecording(sourceId: string, fps: number, systemAudio: bool
       displayW: bounds.width, displayH: bounds.height,
       hasDisplayBounds: true, fps, captureSystemAudio: systemAudio,
       ...(crop ? { cropX: crop.x, cropY: crop.y, cropWidth: crop.width, cropHeight: crop.height } : {}),
-    }, path.join(app.getPath("userData"), "recordings"), process.resourcesPath, captureBounds, () => {
+    }, await projectRecordingDirectory(projectFile), process.resourcesPath, captureBounds, () => {
       void recordingBorder.stop();
       requestRecordingStop();
     });
@@ -243,7 +244,7 @@ const temporaryReferences = new Set<string>();
 const approvedPaths = new Set<string>();
 const recordings = new Map<
   string,
-  { file: string; handle: FileHandle; bytes: number; kind: string; crop?: CaptureRegion; displaySize?: { width: number; height: number } }
+  { file: string; name: string; handle: FileHandle; bytes: number; kind: string; crop?: CaptureRegion; displaySize?: { width: number; height: number } }
 >();
 const currentProjectAssets = new Map<string, Asset>();
 const createPreviewProxies = () => new PreviewProxyService(
@@ -1406,10 +1407,15 @@ function installHandlers() {
   handle("recording:start", async (kind: unknown) => {
     const label = z.enum(["screen", "camera", "microphone", "voice-reference"]).parse(kind);
     const id = uid(),
-      folder = path.join(app.getPath("userData"), "recordings");
+      folder = label === "voice-reference"
+        ? path.join(app.getPath("userData"), "recordings")
+        : await projectRecordingDirectory(projectFile);
     await fs.mkdir(folder, { recursive: true });
     const name = label === "screen" ? recordingName() : `${label}-${id}`;
-    const file = path.join(folder, `${name}.raw.webm`),
+    const temporaryName = label === "voice-reference"
+      ? `${name}.raw.webm`
+      : `.recording-${id}-${name}.raw.webm`;
+    const file = path.join(folder, temporaryName),
       handle = await fs.open(file, "wx");
     try {
       if (label === "screen" && process.platform === "win32") {
@@ -1431,7 +1437,7 @@ function installHandlers() {
         );
       }
       recordings.set(id, {
-        file, handle, bytes: 0, kind: label,
+        file, name: `${name}.webm`, handle, bytes: 0, kind: label,
         ...(label === "screen" ? { crop: captureSelection?.region, displaySize: captureSelection?.displaySize } : {}),
       });
     } catch (error) {
@@ -1472,7 +1478,8 @@ function installHandlers() {
     recordings.delete(id);
     await rec.handle.close();
     if (!rec.bytes) throw new Error("录屏没有产生数据");
-    const output = rec.file.replace(".raw.webm", ".webm");
+    const outputName = rec.kind === "voice-reference" ? rec.name : `${id}-${rec.name}`;
+    const output = path.join(path.dirname(rec.file), outputName);
     // The compatible engine may scale a display stream. Express the crop in
     // source-relative coordinates so DPI/Chromium scaling cannot shift it.
     const crop = rec.crop, size = rec.displaySize;
@@ -1490,7 +1497,13 @@ function installHandlers() {
       ...videoOptions,
       output,
     ]);
-    const asset = register(await probeMedia(output, process.resourcesPath));
+    // Keep the completed recording at saveProject's canonical archive path,
+    // so saving reuses it instead of creating a second full recording copy.
+    const asset = register({
+      ...await probeMedia(output, process.resourcesPath),
+      id,
+      name: rec.name,
+    });
     if (path.basename(rec.file).startsWith("voice-reference-")) temporaryReferences.add(asset.id);
     await fs.rm(rec.file, { force: true });
     return asset;

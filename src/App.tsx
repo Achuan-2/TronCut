@@ -1239,6 +1239,13 @@ export default function App() {
       )}
       {recording && (
         <Recorder
+          prepareStorage={async () => {
+            if (file) return;
+            const result = await bridge().saveProject(editor.documentProject, false);
+            if (!result) throw new Error("无法创建录制项目文件夹");
+            editor.markSaved(result.project);
+            setFile(result.file);
+          }}
           onClose={() => setRecording(false)}
           onRecorded={recorded}
           toast={toast}

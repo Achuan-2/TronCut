@@ -2,7 +2,7 @@ import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import fs from "node:fs/promises";
 import path from "node:path";
 import type { Asset } from "../shared/model";
-import { cursorRecordingSchema } from "../shared/model";
+import { cursorRecordingSchema, uid } from "../shared/model";
 import { findBinary } from "./process";
 import { probeMedia } from "./media";
 import type { CursorSample } from "../shared/cursor";
@@ -20,6 +20,8 @@ export class NativeRecording {
   private completion?: Promise<void>;
   private completed = false;
   private output = "";
+  private readonly assetId = uid();
+  private name = "";
   private aborted = false;
   private startReady?: Promise<void>;
   private startSampling?: () => void;
@@ -33,7 +35,9 @@ export class NativeRecording {
   ) {
     await fs.mkdir(folder, { recursive: true });
     if (this.aborted) throw new Error("录制准备已取消");
-    this.output = path.join(folder, `${recordingName()}.mp4`);
+    this.name = `${recordingName()}.mp4`;
+    // Unfinished files stay recoverable when project-media cleanup runs.
+    this.output = path.join(folder, `.recording-${this.assetId}-${this.name}`);
     const capture = spawn(
       findBinary("wgc-capture", resourcesPath),
       [
@@ -240,15 +244,23 @@ export class NativeRecording {
         }),
       ]);
       const asset = await probeMedia(this.output, resourcesPath);
+      asset.id = this.assetId;
+      asset.name = this.name;
       asset.cursor = cursorRecordingSchema.parse({
         samples: this.samples
           .filter((s) => s.time <= asset.duration)
           .sort((a, b) => a.time - b.time),
       });
       await fs.writeFile(
-        `${this.output}.cursor.json`,
+        path.join(path.dirname(this.output), `${this.assetId}-cursor.json`),
         JSON.stringify(asset.cursor),
       );
+      const finalized = path.join(
+        path.dirname(this.output), `${this.assetId}-${this.name}`,
+      );
+      await fs.rename(this.output, finalized);
+      this.output = finalized;
+      asset.path = finalized;
       return asset;
     } finally {
       clearTimeout(timer);

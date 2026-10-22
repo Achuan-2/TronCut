@@ -1,4 +1,5 @@
 import { _electron as electron, expect } from "@playwright/test";
+import { build } from "esbuild";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { execFile } from "node:child_process";
@@ -10,6 +11,18 @@ const root = path.resolve(
   `run-${Date.now()}`,
 );
 await fs.mkdir(root, { recursive: true });
+await fs.mkdir(path.join(root, "profile"), { recursive: true });
+await fs.writeFile(path.join(root, "profile", "preferences.json"), JSON.stringify({
+  storage: { projectDirectory: path.join(root, "Projects") },
+}));
+const bundle = await build({
+  stdin: { contents: 'export { createProject } from "./shared/model";', resolveDir: process.cwd() },
+  bundle: true, platform: "node", format: "esm", write: false,
+});
+const { createProject } = await import(`data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text).toString("base64")}`);
+await fs.writeFile(path.join(root, "profile", "recovery.json"), JSON.stringify({
+  project: createProject("摄像头存储测试"), file: null,
+}));
 const env = {
   ...process.env,
   FRAMECRAFT_SMOKE: "1",
@@ -102,7 +115,8 @@ try {
       return original(constraints);
     };
   });
-  await page.getByRole("button", { name: "新建录制", exact: true }).click();
+  await page.getByRole("button", { name: "恢复编辑", exact: true }).click();
+  await page.getByRole("button", { name: "录制", exact: true }).click();
   await page.getByLabel("摄像头", { exact: true }).check();
   const preview = page.locator(".camera-preview video");
   await expect
@@ -300,13 +314,21 @@ try {
     timeout: 30000,
   });
   await expect.poll(previewDetails).toBeNull();
+  const projectFile = (await page.evaluate(() => window.framecraft.recentProjects()))[0].file;
+  const media = path.join(path.dirname(projectFile), "media");
+  const filesBeforeSave = (await fs.readdir(media)).sort();
+  expect(filesBeforeSave.filter((file) => file.endsWith(".webm"))).toHaveLength(2);
+  expect(filesBeforeSave.some((file) => file.includes(".raw.webm"))).toBe(false);
+  expect(await fs.readdir(path.join(root, "profile", "recordings")).catch(() => [])).toEqual([]);
   await page.getByRole("button", { name: "保存", exact: true }).click();
   await expect(page.locator(".toast")).toContainText("项目已保存", {
     timeout: 20000,
   });
   const saved = JSON.parse(
-    await fs.readFile(path.join(root, "camera", "camera.troncut"), "utf8"),
+    await fs.readFile(projectFile, "utf8"),
   );
+  expect((await fs.readdir(media)).filter((file) => file.endsWith(".webm")).sort())
+    .toEqual(filesBeforeSave.filter((file) => file.endsWith(".webm")));
   const webcam = saved.clips.find((clip) => clip.recordingRole === "camera");
   expect(webcam.groupId).toBeUndefined();
   expect(webcam.visualEffects.mask).toMatchObject({
