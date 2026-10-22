@@ -116,14 +116,19 @@ it("自定义目录持久化、复制备份和模型且保留目标文件，所�
 it("预览代理默认跟随项目文件夹，也可统一存放到指定位置", () => {
   const defaults = defaultStorageDirectories(path.join(os.tmpdir(), "troncut-profile"));
   const file = path.join(os.tmpdir(), "作品", "作品.troncut");
-  expect(resolvePreviewProxyDirectory(defaults, file)).toBe(
-    path.join(os.tmpdir(), "作品", "preview-proxies"),
-  );
+  const projectCache = resolvePreviewProxyDirectory(defaults, file);
+  expect(path.dirname(projectCache)).toBe(path.join(os.tmpdir(), "作品", "preview-proxies"));
+  expect(path.basename(projectCache)).toMatch(/^作品-[a-f0-9]{12}$/);
   expect(resolvePreviewProxyDirectory(defaults, null)).toBe(
     path.join(defaults.projectDirectory, ".preview-proxies-unsaved"),
   );
-  expect(resolvePreviewProxyDirectory({ ...defaults, previewProxyDirectory: "D:/Proxy" }, file))
-    .toBe("D:/Proxy");
+  const customCache = resolvePreviewProxyDirectory(
+    { ...defaults, previewProxyDirectory: "D:/Proxy" }, file,
+  );
+  expect(path.dirname(customCache)).toBe(path.normalize("D:/Proxy"));
+  expect(path.basename(customCache)).toBe(path.basename(projectCache));
+  expect(resolvePreviewProxyDirectory(defaults, path.join(os.tmpdir(), "其他", "作品.troncut")))
+    .not.toBe(projectCache);
 });
 
 it("目录不可写、相对路径和嵌套模型位置保存失败时保留当前设置", async () => {

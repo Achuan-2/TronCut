@@ -54,7 +54,7 @@ import {
 } from "./project-media-cleanup";
 import { serveMediaFile } from "./media-protocol";
 import { mediaAssetUrl } from "../shared/media-url";
-import { PreviewProxyService, removeLegacyPreviewProxies } from "./preview-proxies";
+import { PreviewProxyService, prunePreviewProxyCache, removeLegacyPreviewProxies } from "./preview-proxies";
 import { NativeRecording } from "./native-recording";
 import { recordingName } from "./recording-name";
 import { RecordingBorder } from "./recording-border";
@@ -273,6 +273,23 @@ const registerProject = (project: Project, file: string | null) => {
   projectFile = file;
   currentProjectAssets.clear();
   if (changed) restartPreviewProxies();
+  project.assets.forEach(register);
+  return project;
+};
+const registerSavedProject = async (project: Project, file: string) => {
+  // A save can replace or remove archived media. Stop writers before sweeping
+  // this project's cache, then register the saved paths for fresh proxies.
+  previewProxies.dispose();
+  await previewProxies.waitForIdle();
+  try {
+    const directory = resolvePreviewProxyDirectory(await preferences.storageDirectories(), file);
+    await prunePreviewProxyCache(directory, project.assets);
+  } catch (error) {
+    console.warn("无法清理预览代理缓存", error);
+  }
+  previewProxies = createPreviewProxies();
+  currentProjectAssets.clear();
+  projectFile = file;
   project.assets.forEach(register);
   return project;
 };
@@ -964,7 +981,7 @@ function installHandlers() {
         ? { project: await saveProject(project, projectFile, projectIcon()), file: projectFile }
         : await saveProjectInDirectory(project, await defaultProjectDirectory(), projectIcon());
     if (!result) return null;
-    const saved = registerProject(result.project, result.file);
+    const saved = await registerSavedProject(result.project, result.file);
     await rememberProject(saved, result.file);
     await clearRecovery();
     return { project: saved, file: result.file };
@@ -977,14 +994,35 @@ function installHandlers() {
       ? path.join(process.resourcesPath, "project.ico")
       : path.resolve("resources/icon.ico");
     const oldFile = projectFile;
-    const result = await renameProjectStorage(project, oldFile, newName, icon);
+    const directories = await preferences.storageDirectories();
+    previewProxies.dispose();
+    await previewProxies.waitForIdle();
+    let result: Awaited<ReturnType<typeof renameProjectStorage>>;
+    try {
+      result = await renameProjectStorage(project, oldFile, newName, icon);
+    } catch (error) {
+      restartPreviewProxies();
+      throw error;
+    }
+
+    const oldCache = resolvePreviewProxyDirectory(directories, oldFile);
+    const newCache = resolvePreviewProxyDirectory(directories, result.file);
+    if (oldCache !== newCache) {
+      const relative = path.relative(result.oldRoot, oldCache);
+      const movedCache = relative && !relative.startsWith("..") && !path.isAbsolute(relative)
+        ? path.join(result.newRoot, relative)
+        : oldCache;
+      await prunePreviewProxyCache(movedCache, []).catch((error) =>
+        console.warn("无法清理重命名前的预览代理缓存", error),
+      );
+    }
 
     // 移除旧路径的授权，并注册新项目素材
     for (const asset of project.assets) {
       approvedPaths.delete(path.resolve(asset.path));
       if (asset.cursorPath) approvedPaths.delete(path.resolve(asset.cursorPath));
     }
-    const saved = registerProject(result.project, result.file);
+    const saved = await registerSavedProject(result.project, result.file);
     if (
       path.resolve(oldFile).toLowerCase() !==
       path.resolve(result.file).toLowerCase()

@@ -161,7 +161,7 @@ export default function Panels(props: Props) {
                 editor.editProjectMedia((p) =>
                   removeLibraryAssets(p, assets.map((asset) => asset.id)),
                 );
-                toast(`已移除 ${assets.length} 个素材及引用片段，保存后清理项目副本，可撤销`);
+                toast(`已移除 ${assets.length} 个素材及引用片段，保存后清理项目副本和预览代理，可撤销`);
               }
             })}
             onMoveToFolder={(ids, folderId) => run(async () => {
@@ -196,7 +196,7 @@ export default function Panels(props: Props) {
                 editor.selectAssetClips(asset.id);
               } else if (command === "delete") {
                 editor.editLibraryAsset(asset.id);
-                toast("已移除素材及引用片段，保存后清理项目副本，可撤销");
+                toast("已移除素材及引用片段，保存后清理项目副本和预览代理，可撤销");
               } else {
                 const consumed = requiredMediaDuration(
                   assetClips(editor.documentProject, asset.id),

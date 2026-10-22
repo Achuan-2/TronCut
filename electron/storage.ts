@@ -2,7 +2,7 @@ import fs from "node:fs/promises";
 import { constants } from "node:fs";
 import path from "node:path";
 import os from "node:os";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import {
   storagePreferencesSchema,
   type StoragePreferences,
@@ -43,9 +43,18 @@ export function resolvePreviewProxyDirectory(
   directories: StoragePreferences,
   projectFile: string | null,
 ) {
-  return directories.previewProxyDirectory || (projectFile
-    ? path.join(path.dirname(projectFile), "preview-proxies")
-    : path.join(directories.projectDirectory, ".preview-proxies-unsaved"));
+  if (!projectFile) return path.join(
+    directories.previewProxyDirectory || directories.projectDirectory,
+    ".preview-proxies-unsaved",
+  );
+  const absolute = path.resolve(projectFile);
+  const identity = process.platform === "win32" ? absolute.toLowerCase() : absolute;
+  const hash = createHash("sha256").update(identity).digest("hex").slice(0, 12);
+  const name = path.basename(projectFile, path.extname(projectFile));
+  return path.join(
+    directories.previewProxyDirectory || path.join(path.dirname(projectFile), "preview-proxies"),
+    `${name}-${hash}`,
+  );
 }
 
 /** Used by both desktop speech tasks and the standalone CLI. */

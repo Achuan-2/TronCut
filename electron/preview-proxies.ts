@@ -10,6 +10,39 @@ const proxyHeight = 720;
 // decode work when cuts jump to a distant sourceIn or the user scrubs.
 const proxyVersion = "seekable-v2";
 const proxyExtensions = new Set([".mp4", ".m4v", ".mov"]);
+const proxyFilePattern = /^[a-f0-9]{64}\.(?:mp4|webm)(?:\.\d+\.partial\.(?:mp4|webm))?$/;
+
+async function proxyFilename(asset: Asset) {
+  const info = await fs.stat(asset.path);
+  const key = createHash("sha256")
+    .update(
+      `${proxyVersion}|${asset.path}|${info.size}|${info.mtimeMs}|${proxyWidth}x${proxyHeight}`,
+    )
+    .digest("hex");
+  return `${key}.${asset.animated ? "webm" : "mp4"}`;
+}
+
+/** Sweep only TronCut proxy files in this project's dedicated cache folder. */
+export async function prunePreviewProxyCache(directory: string, assets: readonly Asset[]) {
+  const stat = await fs.lstat(directory).catch((error: NodeJS.ErrnoException) => {
+    if (error.code === "ENOENT") return null;
+    throw error;
+  });
+  if (!stat?.isDirectory() || stat.isSymbolicLink()) return [];
+  const retained = new Set(await Promise.all(
+    assets.filter(needsPreviewProxy).map(async (asset) =>
+      proxyFilename(asset).catch(() => null),
+    ),
+  ));
+  const removed: string[] = [];
+  for (const entry of await fs.readdir(directory, { withFileTypes: true })) {
+    if (!entry.isFile() || !proxyFilePattern.test(entry.name) || retained.has(entry.name))
+      continue;
+    await fs.unlink(path.join(directory, entry.name));
+    removed.push(entry.name);
+  }
+  return removed;
+}
 
 /** Remove only files created by older versions in the app-data cache. */
 export async function removeLegacyPreviewProxies(directory: string) {
@@ -42,6 +75,7 @@ export class PreviewProxyService {
   private readonly queue: Asset[] = [];
   private readonly abort = new AbortController();
   private active = 0;
+  private readonly idleWaiters: Array<() => void> = [];
 
   constructor(
     private readonly cacheDir: string | (() => Promise<string>),
@@ -57,6 +91,11 @@ export class PreviewProxyService {
   dispose() {
     this.queue.length = 0;
     this.abort.abort();
+  }
+
+  async waitForIdle() {
+    if (!this.active) return;
+    await new Promise<void>((resolve) => this.idleWaiters.push(resolve));
   }
 
   request(asset: Asset) {
@@ -80,25 +119,21 @@ export class PreviewProxyService {
         .finally(() => {
           this.active--;
           this.pump();
+          if (!this.active) this.idleWaiters.splice(0).forEach((resolve) => resolve());
         });
     }
   }
 
   private async prepare(asset: Asset): Promise<string> {
     const fingerprint = `${asset.path}|${asset.width}x${asset.height}`;
-    const info = await fs.stat(asset.path);
-    const key = createHash("sha256")
-      .update(
-        `${proxyVersion}|${asset.path}|${info.size}|${info.mtimeMs}|${proxyWidth}x${proxyHeight}`,
-      )
-      .digest("hex");
+    const filename = await proxyFilename(asset);
     const cacheDir = typeof this.cacheDir === "string"
       ? this.cacheDir
       : await this.cacheDir();
     if (this.abort.signal.aborted) throw new Error("任务已取消");
     await fs.mkdir(cacheDir, { recursive: true });
     const extension = asset.animated ? "webm" : "mp4";
-    const file = path.join(cacheDir, `${key}.${extension}`);
+    const file = path.join(cacheDir, filename);
     if (
       !(await fs.access(file).then(
         () => true,

@@ -102,6 +102,11 @@ project.assets.push({
 });
 const file = path.join(root, "project.troncut");
 await fs.writeFile(file, JSON.stringify(project));
+const projectProxyRoot = path.join(root, "preview-proxies");
+const projectProxyFiles = async () => {
+  const folders = await fs.readdir(projectProxyRoot);
+  return fs.readdir(path.join(projectProxyRoot, folders[0]));
+};
 const env = {
   ...process.env,
   FRAMECRAFT_SMOKE: "1",
@@ -137,7 +142,7 @@ try {
   await expect
     .poll(
       async () =>
-        (await fs.readdir(path.join(root, "preview-proxies"))).some(
+        (await projectProxyFiles()).some(
           (name) => name.endsWith(".mp4") && !name.includes("partial"),
         ),
       { timeout: 30000 },
@@ -163,7 +168,7 @@ try {
   await expect
     .poll(
       async () =>
-        (await fs.readdir(path.join(root, "preview-proxies"))).some(
+        (await projectProxyFiles()).some(
           (name) => name.endsWith(".webm") && !name.includes("partial"),
         ),
       { timeout: 30000 },
@@ -212,11 +217,28 @@ try {
   await page.getByRole("button", { name: "确定", exact: true }).click();
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await expect.poll(async () =>
-    (await fs.readdir(customCache)).some((name) => name.endsWith(".mp4")),
+    (await fs.readdir(path.join(customCache, (await fs.readdir(customCache))[0])))
+      .some((name) => name.endsWith(".mp4")),
     { timeout: 30000 },
   ).toBe(true);
   expect((await page.evaluate(() => window.framecraft.preferences())).storage.previewProxyDirectory)
     .toBe(customCache);
+  const cacheFolder = path.join(customCache, (await fs.readdir(customCache))[0]);
+  expect((await fs.readdir(cacheFolder)).some((name) => name.endsWith(".mp4"))).toBe(true);
+  const retainedProject = {
+    ...project,
+    assets: project.assets.filter((asset) => asset.id === "animated")
+      .map((asset) => ({ ...asset, path: path.join(root, asset.path) })),
+    clips: [],
+  };
+  await page.evaluate((value) => window.framecraft.saveProject(value), retainedProject);
+  await expect.poll(async () =>
+    (await fs.readdir(cacheFolder)).some((name) => name.endsWith(".mp4")),
+  ).toBe(false);
+  await expect.poll(async () =>
+    (await fs.readdir(cacheFolder)).some((name) => name.endsWith(".webm")),
+    { timeout: 30000 },
+  ).toBe(true);
   console.log(
     JSON.stringify({
       root,
