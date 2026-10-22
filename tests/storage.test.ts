@@ -4,7 +4,7 @@ import path from "node:path";
 import { expect, it } from "vitest";
 import { PreferencesStore } from "../electron/preferences";
 import { onnxEnvironment } from "../electron/onnx";
-import { defaultStorageDirectories } from "../electron/storage";
+import { defaultStorageDirectories, resolvePreviewProxyDirectory } from "../electron/storage";
 
 const secrets = {
   isEncryptionAvailable: () => false,
@@ -45,6 +45,7 @@ it("自定义目录持久化、复制备份和模型且保留目标文件，所�
       backupDirectory: path.join(root, "备份"),
       onnxModelsDirectory: path.join(root, "模型"),
       projectDirectory: path.join(root, "项目"),
+      previewProxyDirectory: path.join(root, "预览缓存"),
     };
     await fs.mkdir(storage.onnxModelsDirectory);
     await fs.writeFile(
@@ -100,6 +101,7 @@ it("自定义目录持久化、复制备份和模型且保留目标文件，所�
         backupDirectory: "",
         onnxModelsDirectory: "",
         projectDirectory: "",
+        previewProxyDirectory: "",
       },
     });
     expect(await store.storageDirectories()).toEqual(defaults);
@@ -109,6 +111,19 @@ it("自定义目录持久化、复制备份和模型且保留目标文件，所�
   } finally {
     await fs.rm(root, { recursive: true, force: true });
   }
+});
+
+it("预览代理默认跟随项目文件夹，也可统一存放到指定位置", () => {
+  const defaults = defaultStorageDirectories(path.join(os.tmpdir(), "troncut-profile"));
+  const file = path.join(os.tmpdir(), "作品", "作品.troncut");
+  expect(resolvePreviewProxyDirectory(defaults, file)).toBe(
+    path.join(os.tmpdir(), "作品", "preview-proxies"),
+  );
+  expect(resolvePreviewProxyDirectory(defaults, null)).toBe(
+    path.join(defaults.projectDirectory, ".preview-proxies-unsaved"),
+  );
+  expect(resolvePreviewProxyDirectory({ ...defaults, previewProxyDirectory: "D:/Proxy" }, file))
+    .toBe("D:/Proxy");
 });
 
 it("目录不可写、相对路径和嵌套模型位置保存失败时保留当前设置", async () => {

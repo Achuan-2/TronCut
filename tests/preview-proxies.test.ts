@@ -5,6 +5,7 @@ import { afterEach, expect, it, vi } from "vitest";
 import {
   needsPreviewProxy,
   PreviewProxyService,
+  removeLegacyPreviewProxies,
 } from "../electron/preview-proxies";
 import { runProcess } from "../electron/process";
 import type { Asset } from "../shared/model";
@@ -72,4 +73,17 @@ it("预览 URL 带独立版本参数，原片 URL 保持兼容", () => {
   expect(mediaAssetUrl("clip", true, 2)).toBe(
     "framecraft-media://asset/clip?preview=1&revision=2",
   );
+});
+
+it("旧版应用数据目录只清理生成的代理文件", async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "troncut-proxy-clean-"));
+  try {
+    const key = "a".repeat(64);
+    for (const name of [`${key}.mp4`, `${key}.webm.123.partial.webm`, "notes.mp4"])
+      await fs.writeFile(path.join(root, name), name);
+    await removeLegacyPreviewProxies(root);
+    expect(await fs.readdir(root)).toEqual(["notes.mp4"]);
+  } finally {
+    await fs.rm(root, { recursive: true, force: true });
+  }
 });

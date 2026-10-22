@@ -54,7 +54,7 @@ import {
 } from "./project-media-cleanup";
 import { serveMediaFile } from "./media-protocol";
 import { mediaAssetUrl } from "../shared/media-url";
-import { PreviewProxyService } from "./preview-proxies";
+import { PreviewProxyService, removeLegacyPreviewProxies } from "./preview-proxies";
 import { NativeRecording } from "./native-recording";
 import { recordingName } from "./recording-name";
 import { RecordingBorder } from "./recording-border";
@@ -67,7 +67,7 @@ import { AssetLibraries } from "./asset-libraries";
 import { libraryNameSchema } from "../shared/asset-libraries";
 import { runCli } from "./cli";
 import { PreferencesStore } from "./preferences";
-import { defaultStorageDirectories } from "./storage";
+import { defaultStorageDirectories, resolvePreviewProxyDirectory } from "./storage";
 import { preferencesUpdateSchema, aiProviderUpdateSchema } from "../shared/preferences";
 import { captionProcessingSchema, cueSchema } from "../shared/caption-processing";
 import { processCaptionCues } from "./caption-processing";
@@ -242,22 +242,37 @@ const recordings = new Map<
   string,
   { file: string; handle: FileHandle; bytes: number; kind: string; crop?: CaptureRegion; displaySize?: { width: number; height: number } }
 >();
-const previewProxies = new PreviewProxyService(
-  path.join(app.getPath("userData"), "preview-proxies"),
+const currentProjectAssets = new Map<string, Asset>();
+const createPreviewProxies = () => new PreviewProxyService(
+  async () => {
+    const directories = await preferences.storageDirectories();
+    return resolvePreviewProxyDirectory(directories, projectFile);
+  },
   process.resourcesPath,
   (assetId) => {
     if (window && !window.isDestroyed() && !window.webContents.isDestroyed())
       window.webContents.send("media:preview-proxy-ready", assetId);
   },
 );
+let previewProxies = createPreviewProxies();
+const restartPreviewProxies = () => {
+  previewProxies.dispose();
+  previewProxies = createPreviewProxies();
+  currentProjectAssets.forEach((asset) => previewProxies.request(asset));
+};
 app.on("before-quit", () => previewProxies.dispose());
 const register = (asset: Asset) => {
   assets.set(asset.id, asset);
   approvedPaths.add(path.resolve(asset.path));
+  currentProjectAssets.set(asset.id, asset);
   previewProxies.request(asset);
   return asset;
 };
-const registerProject = (project: Project) => {
+const registerProject = (project: Project, file: string | null) => {
+  const changed = projectFile !== file;
+  projectFile = file;
+  currentProjectAssets.clear();
+  if (changed) restartPreviewProxies();
   project.assets.forEach(register);
   return project;
 };
@@ -323,23 +338,33 @@ function installHandlers() {
     if (update.storage && task) throw new Error("请等待后台任务完成后再更改存储位置");
     const previous = await preferences.storageDirectories();
     const saved = await preferences.save(update);
-    if (previous.onnxModelsDirectory !== (await preferences.storageDirectories()).onnxModelsDirectory)
+    const next = await preferences.storageDirectories();
+    if (
+      previous.previewProxyDirectory !== next.previewProxyDirectory ||
+      (!projectFile && previous.projectDirectory !== next.projectDirectory)
+    )
+      restartPreviewProxies();
+    if (previous.onnxModelsDirectory !== next.onnxModelsDirectory)
       await closeOnnxSessions();
     return saved;
   });
-  const storageKind = z.enum(["backupDirectory", "onnxModelsDirectory", "projectDirectory"]);
+  const storageKind = z.enum(["backupDirectory", "onnxModelsDirectory", "projectDirectory", "previewProxyDirectory"]);
   handle("preferences:storage:select", async (input: unknown, inputPath: unknown) => {
     const kind = storageKind.parse(input);
     const defaultPath = z.string().max(32768).parse(inputPath);
     const result = await dialog.showOpenDialog(window, {
-      title: { backupDirectory: "选择备份文件夹", onnxModelsDirectory: "选择 ONNX 模型文件夹", projectDirectory: "选择默认项目创建位置" }[kind],
-      defaultPath: defaultPath || (await preferences.storageDirectories())[kind],
+      title: { backupDirectory: "选择备份文件夹", onnxModelsDirectory: "选择 ONNX 模型文件夹", projectDirectory: "选择默认项目创建位置", previewProxyDirectory: "选择预览代理缓存文件夹" }[kind],
+      defaultPath: defaultPath || (await preferences.storageDirectories())[kind] || (projectFile ? path.dirname(projectFile) : await defaultProjectDirectory()),
       properties: ["openDirectory", "createDirectory"],
     });
     return result.canceled ? null : result.filePaths[0] ?? null;
   });
   handle("preferences:storage:open", async (input: unknown) => {
-    const directory = (await preferences.storageDirectories())[storageKind.parse(input)];
+    const kind = storageKind.parse(input);
+    const directories = await preferences.storageDirectories();
+    const directory = kind === "previewProxyDirectory"
+      ? resolvePreviewProxyDirectory(directories, projectFile)
+      : directories[kind];
     await fs.mkdir(directory, { recursive: true });
     const error = await shell.openPath(directory);
     if (error) throw new Error(error);
@@ -568,8 +593,7 @@ function installHandlers() {
     if (!pendingProject) return null;
     const file = pendingProject;
     pendingProject = null;
-    const project = registerProject(await openProject(file));
-    projectFile = file;
+    const project = registerProject(await openProject(file), file);
     await rememberProject(project, file);
     return { project, file };
   });
@@ -630,8 +654,7 @@ function installHandlers() {
     const project = createProject();
     project.canvas = { ...(await preferences.get()).project };
     const result = await saveProjectInDirectory(project, await defaultProjectDirectory(), projectIcon());
-    projectFile = result.file;
-    registerProject(result.project);
+    registerProject(result.project, result.file);
     await rememberProject(result.project, result.file);
     await clearRecovery();
     return result;
@@ -660,8 +683,8 @@ function installHandlers() {
           () => true,
           () => false,
         ));
-      projectFile = typeof result.file === "string" ? result.file : null;
-      return { project: registerProject(project), file: projectFile };
+      const file = typeof result.file === "string" ? result.file : null;
+      return { project: registerProject(project, file), file };
     } catch {
       return null;
     }
@@ -696,8 +719,7 @@ function installHandlers() {
   handle("project:recent:open", async (input: unknown) => {
     const file = z.string().min(1).max(32768).parse(input);
     if (!(await recentProjects.list()).some((entry) => entry.file === file)) throw new Error("项目不在最近项目列表中，请使用打开项目");
-    const project = registerProject(await openProject(file));
-    projectFile = file;
+    const project = registerProject(await openProject(file), file);
     await rememberProject(project, file);
     return { project, file };
   });
@@ -930,8 +952,7 @@ function installHandlers() {
       "json",
     ]);
     if (!file) return null;
-    const project = registerProject(await openProject(file));
-    projectFile = file;
+    const project = registerProject(await openProject(file), file);
     await rememberProject(project, file);
     return { project, file };
   });
@@ -943,8 +964,7 @@ function installHandlers() {
         ? { project: await saveProject(project, projectFile, projectIcon()), file: projectFile }
         : await saveProjectInDirectory(project, await defaultProjectDirectory(), projectIcon());
     if (!result) return null;
-    const saved = registerProject(result.project);
-    projectFile = result.file;
+    const saved = registerProject(result.project, result.file);
     await rememberProject(saved, result.file);
     await clearRecovery();
     return { project: saved, file: result.file };
@@ -964,8 +984,7 @@ function installHandlers() {
       approvedPaths.delete(path.resolve(asset.path));
       if (asset.cursorPath) approvedPaths.delete(path.resolve(asset.cursorPath));
     }
-    const saved = registerProject(result.project);
-    projectFile = result.file;
+    const saved = registerProject(result.project, result.file);
     if (
       path.resolve(oldFile).toLowerCase() !==
       path.resolve(result.file).toLowerCase()
@@ -1000,8 +1019,7 @@ function installHandlers() {
         );
       }
     }
-    projectFile = null;
-    return registerProject(validateProject(project));
+    return registerProject(validateProject(project), null);
   });
   handle("subtitles:import", async () => {
     const file = await chooseFile("导入字幕", ["srt", "vtt"]);
@@ -1593,6 +1611,11 @@ app
       app.exit(code);
       return;
     }
+    const legacyProxyDirectory = path.join(app.getPath("userData"), "preview-proxies");
+    if ((await preferences.storageDirectories()).previewProxyDirectory !== legacyProxyDirectory)
+      await removeLegacyPreviewProxies(legacyProxyDirectory).catch((error) =>
+        console.warn("无法清理旧版预览代理缓存", error),
+      );
     protocol.handle("framecraft-media", (request) => {
       const url = new URL(request.url),
         id = decodeURIComponent(url.pathname.slice(1)),

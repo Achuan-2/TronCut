@@ -137,7 +137,7 @@ try {
   await expect
     .poll(
       async () =>
-        (await fs.readdir(path.join(profile, "preview-proxies"))).some(
+        (await fs.readdir(path.join(root, "preview-proxies"))).some(
           (name) => name.endsWith(".mp4") && !name.includes("partial"),
         ),
       { timeout: 30000 },
@@ -163,7 +163,7 @@ try {
   await expect
     .poll(
       async () =>
-        (await fs.readdir(path.join(profile, "preview-proxies"))).some(
+        (await fs.readdir(path.join(root, "preview-proxies"))).some(
           (name) => name.endsWith(".webm") && !name.includes("partial"),
         ),
       { timeout: 30000 },
@@ -194,6 +194,29 @@ try {
   expect(
     Math.abs((await video.evaluate((v) => v.currentTime)) - playing.time),
   ).toBeLessThan(0.2);
+  const customCache = path.join(root, "custom-proxies");
+  await app.evaluate(({ dialog }, directory) => {
+    dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [directory] });
+  }, customCache);
+  await app.evaluate(({ Menu, BrowserWindow }) =>
+    Menu.getApplicationMenu()
+      .getMenuItemById("edit-preferences")
+      .click(null, BrowserWindow.getAllWindows()[0], {}),
+  );
+  const cacheField = page.locator(".storage-directory-field").filter({
+    has: page.getByLabel("预览代理缓存位置", { exact: true }),
+  });
+  await expect(cacheField.getByRole("textbox")).toHaveValue("跟随项目文件夹");
+  await cacheField.getByRole("button", { name: "选择文件夹" }).click();
+  await expect(cacheField.getByRole("textbox")).toHaveValue(customCache);
+  await page.getByRole("button", { name: "确定", exact: true }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect.poll(async () =>
+    (await fs.readdir(customCache)).some((name) => name.endsWith(".mp4")),
+    { timeout: 30000 },
+  ).toBe(true);
+  expect((await page.evaluate(() => window.framecraft.preferences())).storage.previewProxyDirectory)
+    .toBe(customCache);
   console.log(
     JSON.stringify({
       root,

@@ -11,6 +11,21 @@ const proxyHeight = 720;
 const proxyVersion = "seekable-v2";
 const proxyExtensions = new Set([".mp4", ".m4v", ".mov"]);
 
+/** Remove only files created by older versions in the app-data cache. */
+export async function removeLegacyPreviewProxies(directory: string) {
+  let entries;
+  try {
+    entries = await fs.readdir(directory, { withFileTypes: true });
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return;
+    throw error;
+  }
+  for (const entry of entries) {
+    if (entry.isFile() && /^[a-f0-9]{64}\.(?:mp4|webm)(?:\.\d+\.partial\.(?:mp4|webm))?$/.test(entry.name))
+      await fs.rm(path.join(directory, entry.name), { force: true });
+  }
+}
+
 export function needsPreviewProxy(asset: Asset): boolean {
   return (
     asset.kind === "video" &&
@@ -29,7 +44,7 @@ export class PreviewProxyService {
   private active = 0;
 
   constructor(
-    private readonly cacheDir: string,
+    private readonly cacheDir: string | (() => Promise<string>),
     private readonly resourcesPath: string | undefined,
     private readonly onReady: (assetId: string) => void,
     private readonly maxConcurrency = 1,
@@ -77,9 +92,13 @@ export class PreviewProxyService {
         `${proxyVersion}|${asset.path}|${info.size}|${info.mtimeMs}|${proxyWidth}x${proxyHeight}`,
       )
       .digest("hex");
-    await fs.mkdir(this.cacheDir, { recursive: true });
+    const cacheDir = typeof this.cacheDir === "string"
+      ? this.cacheDir
+      : await this.cacheDir();
+    if (this.abort.signal.aborted) throw new Error("任务已取消");
+    await fs.mkdir(cacheDir, { recursive: true });
     const extension = asset.animated ? "webm" : "mp4";
-    const file = path.join(this.cacheDir, `${key}.${extension}`);
+    const file = path.join(cacheDir, `${key}.${extension}`);
     if (
       !(await fs.access(file).then(
         () => true,
@@ -157,7 +176,7 @@ export class PreviewProxyService {
         await fs.rm(temporary, { force: true });
       }
     }
-    if (this.known.get(asset.id) !== fingerprint) return file;
+    if (this.abort.signal.aborted || this.known.get(asset.id) !== fingerprint) return file;
     const existing = this.ready.get(asset.id);
     if (existing === file) return file;
     this.ready.set(asset.id, file);

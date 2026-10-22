@@ -145,8 +145,8 @@ export default function PreferencesDialog({
         <input
           aria-label={label}
           readOnly
-          value={storage[kind] || storageDefaults[kind]}
-          title={storage[kind] || storageDefaults[kind]}
+          value={storage[kind] || storageDefaults[kind] || "跟随项目文件夹"}
+          title={storage[kind] || storageDefaults[kind] || "跟随项目文件夹"}
         />
       </label>
       <div className="preferences-actions">
@@ -416,6 +416,10 @@ export default function PreferencesDialog({
                   {storageField("onnxModelsDirectory", "ONNX 模型文件夹")}
                   <p className="field-help">
                     保存时复制已有模型，保留源文件；目标文件夹中已有文件优先。模型较大时请等待复制完成。
+                  </p>
+                  {storageField("previewProxyDirectory", "预览代理缓存位置")}
+                  <p className="field-help">
+                    默认保存在每个项目文件夹的 preview-proxies 中；可选择其他磁盘统一存放。更换自定义位置后，旧目录中的代理可在退出软件后删除。
                   </p>
                   <button
                     type="button"

@@ -20,6 +20,7 @@ export function defaultStorageDirectories(
       "TronCut",
       "Projects",
     ),
+    previewProxyDirectory: "",
   };
 }
 
@@ -36,6 +37,15 @@ export function resolveStorageDirectories(
     directories[key] = path.resolve(settings[key]);
   }
   return directories;
+}
+
+export function resolvePreviewProxyDirectory(
+  directories: StoragePreferences,
+  projectFile: string | null,
+) {
+  return directories.previewProxyDirectory || (projectFile
+    ? path.join(path.dirname(projectFile), "preview-proxies")
+    : path.join(directories.projectDirectory, ".preview-proxies-unsaved"));
 }
 
 /** Used by both desktop speech tasks and the standalone CLI. */
@@ -68,6 +78,10 @@ export async function prepareStorageDirectories(
     const source = previous[key],
       destination = next[key];
     if (source === destination) continue;
+    if (key === "previewProxyDirectory") {
+      if (destination) await writableDirectory(destination);
+      continue;
+    }
     if (key === "onnxModelsDirectory") {
       const relative = path.relative(source, destination);
       if (!relative) continue;

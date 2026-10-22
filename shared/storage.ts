@@ -10,6 +10,7 @@ export const storagePreferencesSchema = z.object({
   backupDirectory: directory.default(""),
   onnxModelsDirectory: directory.default(""),
   projectDirectory: directory.default(""),
+  previewProxyDirectory: directory.default(""),
 });
 export type StoragePreferences = z.infer<typeof storagePreferencesSchema>;
 export type StorageDirectoryKind = keyof StoragePreferences;
