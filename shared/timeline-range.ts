@@ -1,5 +1,6 @@
 import type { Project } from "./model";
 import { editableIds, splitSelection } from "./timeline";
+import { stitchClipsAtTime } from "./stitch";
 
 export interface TimelineRange {
   start: number;
@@ -22,6 +23,7 @@ export function deleteTimelineRange(
   project: Project,
   range: TimelineRange,
   ripple = false,
+  autoStitch = false,
 ): Project {
   const normalized = normalizeTimelineRange(
     range.start,
@@ -29,7 +31,10 @@ export function deleteTimelineRange(
     project.canvas.fps,
   );
   if (!normalized) return project;
-  return exciseTimelineRange(project, normalized, ripple);
+  const next = exciseTimelineRange(project, normalized, ripple);
+  return next !== project && ripple && autoStitch
+    ? stitchClipsAtTime(next, normalized.start)
+    : next;
 }
 
 /** Preserve exact placement boundaries when another clip overwrites this interval. */

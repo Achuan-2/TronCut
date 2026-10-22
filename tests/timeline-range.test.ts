@@ -11,6 +11,8 @@ import {
 } from "../shared/timeline-range";
 import { transformAt } from "../shared/editor";
 import { fadeOpacity } from "../shared/effects";
+import { mediaSegments, sourceTimeAt } from "../shared/media-segments";
+import { unstitchClips } from "../shared/stitch";
 
 function fixture() {
   const project = createProject();
@@ -131,6 +133,193 @@ describe("时间范围删除", () => {
     expect(validateProject(result)).toBeDefined();
     expect(deleteTimelineRange(project, { start: 0, end: 30 }).clips).toEqual(
       [],
+    );
+  });
+});
+
+describe("范围波纹删除自动拼接", () => {
+  function videoProject() {
+    const { project, video } = fixture();
+    project.clips = [{ ...video, fadeIn: 0, fadeOut: 0, keyframes: [] }];
+    return project;
+  }
+
+  it("开启后合并接口，保留变速源区间；连续删除及移除拼接不恢复被删内容", () => {
+    const project = videoProject();
+    const original = structuredClone(project);
+    const result = deleteTimelineRange(
+      project,
+      { start: 3, end: 5 },
+      true,
+      true,
+    );
+    expect(result.clips).toHaveLength(1);
+    expect(result.clips[0]).toMatchObject({
+      id: project.clips[0].id,
+      start: 1,
+      duration: 6,
+      speed: 2,
+      stitch: [
+        { sourceIn: 2, duration: 4 },
+        { sourceIn: 10, duration: 8 },
+      ],
+    });
+    expect(sourceTimeAt(result.clips[0], 2)).toBe(10);
+    const repeated = deleteTimelineRange(
+      result,
+      { start: 4, end: 5 },
+      true,
+      true,
+    );
+    expect(repeated.clips).toHaveLength(1);
+    expect(repeated.clips[0].duration).toBe(5);
+    expect(
+      mediaSegments(repeated.clips[0]).map(({ sourceIn, duration }) => [
+        sourceIn,
+        duration,
+      ]),
+    ).toEqual([
+      [2, 4],
+      [10, 2],
+      [14, 4],
+    ]);
+    expect(
+      unstitchClips(repeated, [repeated.clips[0].id]).clips.map((clip) => [
+        clip.start,
+        clip.duration,
+        clip.sourceIn,
+      ]),
+    ).toEqual([
+      [1, 2, 2],
+      [3, 1, 10],
+      [4, 2, 14],
+    ]);
+    expect(
+      validateProject(JSON.parse(JSON.stringify(repeated))).clips,
+    ).toHaveLength(1);
+    expect(project).toEqual(original);
+  });
+
+  it("关闭时及普通删除保留两个片段，删除首尾或无效范围不凭空拼接", () => {
+    const project = videoProject();
+    const range = { start: 3, end: 5 };
+    expect(deleteTimelineRange(project, range, true).clips).toHaveLength(2);
+    expect(deleteTimelineRange(project, range, false, true).clips).toHaveLength(
+      2,
+    );
+    for (const range of [
+      { start: 0, end: 3 },
+      { start: 5, end: 10 },
+    ]) {
+      const result = deleteTimelineRange(project, range, true, true);
+      expect(result.clips).toHaveLength(1);
+      expect(result.clips[0].stitch).toBeUndefined();
+    }
+    expect(deleteTimelineRange(project, { start: 3, end: 3 }, true, true)).toBe(
+      project,
+    );
+  });
+
+  it("标记位于已有片段边界时也拼接同源片段", () => {
+    const project = videoProject();
+    const video = project.clips[0];
+    project.clips = [
+      { ...video, duration: 2 },
+      { ...video, id: "right", start: 5, duration: 3, sourceIn: 10 },
+    ];
+    const result = deleteTimelineRange(
+      project,
+      { start: 3, end: 5 },
+      true,
+      true,
+    );
+    expect(result.clips).toHaveLength(1);
+    expect(result.clips[0]).toMatchObject({
+      start: 1,
+      duration: 5,
+      stitch: [
+        { sourceIn: 2, duration: 4 },
+        { sourceIn: 10, duration: 6 },
+      ],
+    });
+  });
+
+  it("只拼接各轨删除接口处的片段，不连带合并其他相邻片段", () => {
+    const project = videoProject();
+    const video = project.clips[0];
+    project.clips.push(
+      { ...video, id: "later", start: 9, duration: 1, sourceIn: 18 },
+      { ...video, id: "audio", kind: "audio", trackId: "audio" },
+    );
+    const result = deleteTimelineRange(
+      project,
+      { start: 3, end: 5 },
+      true,
+      true,
+    );
+    expect(result.clips).toHaveLength(3);
+    expect(result.clips.find((clip) => clip.id === "later")).toMatchObject({
+      start: 7,
+      duration: 1,
+    });
+    expect(
+      result.clips.find((clip) => clip.id === "later")?.stitch,
+    ).toBeUndefined();
+    for (const id of [video.id, "audio"])
+      expect(result.clips.find((clip) => clip.id === id)?.stitch).toHaveLength(
+        2,
+      );
+  });
+
+  it("不同源、属性不兼容、组合和锁定轨道不强行拼接", () => {
+    for (const change of [
+      (clip: Clip) => {
+        clip.assetId = "other";
+      },
+      (clip: Clip) => {
+        clip.volume = 0.5;
+      },
+      (clip: Clip) => {
+        clip.groupId = "group";
+      },
+      (clip: Clip) => {
+        clip.transitions = {
+          incoming: {
+            type: "fade",
+            duration: 0.5,
+            reverse: false,
+            enabled: true,
+          },
+        };
+      },
+    ]) {
+      const project = videoProject();
+      const left = { ...project.clips[0], duration: 2 };
+      const right = { ...left, id: "right", start: 5, sourceIn: 10 };
+      change(right);
+      project.clips = [left, right];
+      const result = deleteTimelineRange(
+        project,
+        { start: 3, end: 5 },
+        true,
+        true,
+      );
+      expect(result.clips).toHaveLength(2);
+      expect(result.clips[1].stitch).toBeUndefined();
+    }
+    const animated = fixture().project;
+    expect(
+      deleteTimelineRange(
+        animated,
+        { start: 3, end: 5 },
+        true,
+        true,
+      ).clips.filter((clip) => clip.kind === "video"),
+    ).toHaveLength(2);
+    const locked = videoProject();
+    locked.tracks.find((track) => track.id === "video")!.locked = true;
+    expect(deleteTimelineRange(locked, { start: 3, end: 5 }, true, true)).toBe(
+      locked,
     );
   });
 });

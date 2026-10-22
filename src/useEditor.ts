@@ -516,7 +516,12 @@ export function useEditor(
   const deleteTimeSelection = useCallback((ripple = false) => {
     if (!timelineRange) return false;
     const before = current.current;
-    const next = deleteTimelineRange(before, timelineRange, ripple);
+    const next = deleteTimelineRange(
+      before,
+      timelineRange,
+      ripple,
+      defaults.current.program.autoStitch,
+    );
     setPlaying(false);
     if (next !== before) {
       apply(next);

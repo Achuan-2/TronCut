@@ -141,6 +141,23 @@ export function stitchClips(project: Project, ids: readonly string[]): Project {
   };
 }
 
+/** Join only the two sides of a range deletion, leaving other seams untouched. */
+export function stitchClipsAtTime(project: Project, time: number): Project {
+  let result = project;
+  for (const track of project.tracks) {
+    if (track.locked) continue;
+    const clips = project.clips.filter((clip) => clip.trackId === track.id);
+    const left = clips.filter(
+      (clip) => Math.abs(clip.start + clip.duration - time) < 1e-6,
+    );
+    const right = clips.filter((clip) => Math.abs(clip.start - time) < 1e-6);
+    // Ambiguous overlapping boundaries must not choose an arbitrary pair.
+    if (left.length === 1 && right.length === 1)
+      result = stitchClips(result, [left[0].id, right[0].id]);
+  }
+  return result;
+}
+
 /** Remove one seam or all seams, retaining the current animation and source cuts. */
 export function unstitchClips(
   project: Project,

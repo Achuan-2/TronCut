@@ -373,6 +373,15 @@ export default function PreferencesDialog({
                   <label className="check-field">
                     <input
                       type="checkbox"
+                      checked={settings.program.autoStitch}
+                      onChange={(e) => program("autoStitch", e.target.checked)}
+                      title="范围波纹删除后，自动拼接接口处同轨、同源且属性兼容的音视频片段"
+                    />
+                    自动拼接
+                  </label>
+                  <label className="check-field">
+                    <input
+                      type="checkbox"
                       checked={settings.program.waveforms}
                       onChange={(e) => program("waveforms", e.target.checked)}
                     />

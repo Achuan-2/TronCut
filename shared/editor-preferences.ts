@@ -6,6 +6,7 @@ export const programPreferencesSchema = z.object({
   autoRecovery: z.boolean().default(true),
   recoveryDelay: z.number().finite().min(1).max(600).default(2),
   snapping: z.boolean().default(true),
+  autoStitch: z.boolean().default(false),
   waveforms: z.boolean().default(true),
   selectionFollowsPlayhead: z.boolean().default(false),
   defaultTool: z.enum(["select", "crop"]).default("select"),

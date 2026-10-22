@@ -291,10 +291,12 @@ it("分组首选项串行合并保存，旧配置补全默认值，配置损坏�
       animation: 1,
     });
     expect((await store.get()).program.previewQuality).toBe("smooth");
+    expect((await store.get()).program.autoStitch).toBe(false);
     await Promise.all([
       store.save({
         program: {
           snapping: false,
+          autoStitch: true,
           waveforms: false,
           selectionFollowsPlayhead: true,
           previewQuality: "original",
@@ -306,6 +308,7 @@ it("分组首选项串行合并保存，旧配置补全默认值，配置损坏�
     const saved = await new PreferencesStore(file, secrets).get();
     expect(saved.program).toMatchObject({
       snapping: false,
+      autoStitch: true,
       waveforms: false,
       selectionFollowsPlayhead: true,
       previewQuality: "original",
