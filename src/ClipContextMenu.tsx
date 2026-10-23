@@ -64,6 +64,7 @@ export default function ClipContextMenu({
   onClose,
   onCommand,
   onRename,
+  onSetColor,
   onExtendFrame,
   portalTarget,
   surface = "canvas",
@@ -74,6 +75,7 @@ export default function ClipContextMenu({
   onClose: () => void;
   onCommand: (command: ClipCommand) => void;
   onRename?: (id: string) => void;
+  onSetColor?: (ids: string[]) => void;
   onExtendFrame?: (id: string, local: number) => void;
   portalTarget: HTMLElement | null;
   surface?: "canvas" | "timeline";
@@ -298,6 +300,19 @@ export default function ClipContextMenu({
           }}
         >
           重命名
+        </button>
+      )}
+      {surface === "timeline" && onSetColor && (
+        <button
+          role="menuitem"
+          disabled={!canEdit}
+          onPointerEnter={() => setSubmenu(null)}
+          onClick={() => {
+            onSetColor([...ids]);
+            onClose();
+          }}
+        >
+          设置颜色
         </button>
       )}
       {item("剪切", "cut", "Ctrl+X")}

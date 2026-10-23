@@ -4069,6 +4069,14 @@ fieldset:disabled {
   font-size: 9px;
   color: #c0dbdd;
 }
+.timeline-clip[data-timeline-color] .clip-label {
+  background: var(--clip-color);
+  color: var(--clip-color-text);
+}
+.timeline-clip[data-timeline-color] .clip-label .clip-duration,
+.timeline-clip[data-timeline-color] .clip-group-count {
+  color: inherit;
+}
 .has-filmstrip .clip-detail { display: none; }
 .has-filmstrip .clip-waveform { background: #0a3e42; opacity: 0.85; }
 .compact-track .has-filmstrip .clip-label { height: 15px; display: flex; }

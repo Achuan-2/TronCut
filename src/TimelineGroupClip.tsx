@@ -8,6 +8,7 @@ import {
 } from "../shared/timeline";
 import { snapTime } from "../shared/editor";
 import type { Editor } from "./useEditor";
+import { timelineClipColorStyle } from "./timeline-clip-color";
 import {
   moveTimelineClips,
   moveTimelineGroup,
@@ -51,10 +52,12 @@ export default function TimelineGroupClip({
   return (
     <div
       data-clip-id={clip.id}
+      data-timeline-color={clip.timelineColor}
       data-group-id={group.id}
       className={`timeline-clip clip-group ${selected ? "selected" : ""} ${locked ? "locked" : ""}`}
       title={`${group.name} · ${group.members.length} 个媒体 · 双击打开组`}
       style={{
+        ...timelineClipColorStyle(clip.timelineColor),
         left: (clip.start + draft.delta) * zoom,
         width: Math.max(4, clip.duration * zoom),
         top: top - Number(selected),

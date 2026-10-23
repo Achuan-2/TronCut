@@ -1,0 +1,58 @@
+.clip-color-dialog {
+  width: 300px;
+  padding: 20px;
+  border: 1px solid #465a4c;
+  border-radius: 10px;
+  background: #242b27;
+  color: #d9dde0;
+  box-shadow: 0 15px 60px #0008;
+}
+.clip-color-dialog::backdrop {
+  background: #0007;
+}
+.clip-color-presets {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 10px;
+  margin: 20px 0;
+}
+.clip-color-presets button {
+  display: grid;
+  place-items: center;
+  height: 34px;
+  padding: 0;
+  border: 1px solid #ffffff25;
+}
+.clip-color-presets button[aria-pressed="true"] {
+  outline: 2px solid #b4e8c3;
+  outline-offset: 2px;
+}
+.clip-custom-color {
+  display: flex;
+  gap: 16px;
+}
+.clip-custom-color label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 11px;
+  min-width: 0;
+}
+.clip-custom-color input[type="color"] {
+  width: 72px;
+  height: 32px;
+}
+.clip-custom-color input[type="text"] {
+  width: 100%;
+  height: 32px;
+}
+.clip-custom-color input[aria-invalid="true"] {
+  border-color: #ed7777;
+}
+.clip-color-default {
+  margin-top: 16px;
+  width: 100%;
+}
+.clip-color-default[aria-pressed="true"] {
+  border-color: #9bd6af;
+}

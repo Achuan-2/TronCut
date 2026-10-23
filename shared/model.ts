@@ -195,6 +195,7 @@ export const projectSchema = z.object({
         assetId: identifier.optional(),
         kind: z.enum(["video", "audio", "image", "text", "shape"]),
         name: z.string(),
+        timelineColor: z.string().regex(/^#[\da-f]{6}$/i).optional(),
         start: finite.nonnegative(),
         duration: finite.positive().max(86400),
         sourceIn: finite.nonnegative(),

@@ -121,6 +121,8 @@ import TrackResizeHandle from "./TrackResizeHandle";
 import TrackContextMenu, { type TrackMenuPosition } from "./TrackContextMenu";
 import ClipContextMenu, { type ClipCommand } from "./ClipContextMenu";
 import ClipRenameDialog from "./ClipRenameDialog";
+import ClipColorDialog from "./ClipColorDialog";
+import { timelineClipColorStyle } from "./timeline-clip-color";
 import FrameExtensionDialog from "./FrameExtensionDialog";
 import TimelineFrameExtension from "./TimelineFrameExtension";
 import { frameExtensions } from "../shared/frame-extension";
@@ -363,6 +365,8 @@ export default function Timeline({
   const [trackMenu, setTrackMenu] = useState<TrackMenuPosition | null>(null);
   const [markerEditor, setMarkerEditor] = useState<Marker | null>(null);
   const [renamingClip, setRenamingClip] = useState<string | null>(null);
+  const [coloringClips, setColoringClips] = useState<string[] | null>(null);
+  useEffect(() => setColoringClips(null), [project.id, editor.activeGroupId]);
   const [extendingFrame, setExtendingFrame] = useState<{
     id: string;
     local: number;
@@ -1592,8 +1596,10 @@ export default function Timeline({
                       <Fragment key={c.id}>
                         <div
                           data-clip-id={c.id}
+                          data-timeline-color={c.timelineColor}
                           className={`timeline-clip ${c.kind} ${hasFilmstrip ? "has-filmstrip" : ""} ${isRecording ? "recording-object" : ""} ${c.caption ? "caption" : ""} ${hasTransformAnimation || hasDrawingAnimation ? "has-animation" : ""} ${hasTransformAnimation && hasDrawingAnimation ? "has-drawing-and-transform" : ""} ${selectedIdSet.has(c.id) ? "selected" : ""} ${track.locked ? "locked" : ""} ${effectDrop === c.id ? "effect-drop-target" : ""} ${transitionHighlights.some((item) => item.clipId === c.id) ? "transition-drop-target" : ""}`}
                           style={{
+                            ...timelineClipColorStyle(c.timelineColor),
                             left: c.start * zoom,
                             width: Math.max(4, c.duration * zoom),
                             top:
@@ -2355,6 +2361,7 @@ export default function Timeline({
                 portalTarget={panel.current}
                 surface="timeline"
                 onRename={setRenamingClip}
+                onSetColor={setColoringClips}
                 onExtendFrame={editFrameExtension}
               >
                 <hr />
@@ -2437,6 +2444,7 @@ export default function Timeline({
               portalTarget={panel.current}
               surface="timeline"
               onRename={setRenamingClip}
+              onSetColor={setColoringClips}
               onExtendFrame={editFrameExtension}
             >
               <button
@@ -2480,6 +2488,13 @@ export default function Timeline({
           editor={editor}
           id={renamingClip}
           onClose={() => setRenamingClip(null)}
+        />
+      )}
+      {coloringClips && (
+        <ClipColorDialog
+          editor={editor}
+          ids={coloringClips}
+          onClose={() => setColoringClips(null)}
         />
       )}
       <TrackContextMenu
