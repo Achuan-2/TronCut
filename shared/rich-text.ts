@@ -262,10 +262,26 @@ function layoutMathText(
   };
   for (const token of tokens) {
     const style = characterStyleAt(clip, token.contentStart ?? token.start);
+    const contentStart = token.contentStart ?? token.start;
+    const contentEnd = contentStart + (token.tex?.length ?? 0);
+    const colors = (clip.textRuns ?? [])
+      .filter((run) =>
+        run.style.color !== undefined && run.end > contentStart && run.start < contentEnd,
+      )
+      .map((run) => ({
+        start: Math.max(contentStart, run.start) - contentStart,
+        end: Math.min(contentEnd, run.end) - contentStart,
+        color: run.style.color!,
+      }));
     const formula =
       token.tex === undefined
         ? null
-        : renderFormula(token.tex, !!token.display, style);
+        : renderFormula(
+            token.tex,
+            !!token.display,
+            { ...style, color: clip.style!.color },
+            colors,
+          );
     if (!formula) {
       plain(token.start, token.end);
       continue;

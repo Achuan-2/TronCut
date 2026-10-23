@@ -94,13 +94,14 @@ try {
   await expect.poll(() => svg(1)).toContain('fill="#00ff00"');
   await content.focus();
   await content.press("Control+Home");
-  for (let i = 0; i < 4; i++) await content.press("ArrowRight");
-  for (let i = 0; i < 6; i++) await content.press("Shift+ArrowRight");
+  for (let i = 0; i < 7; i++) await content.press("ArrowRight");
+  await content.press("Shift+ArrowRight");
   await expect(page.locator(".text-selection-status")).toContainText(
-    "已选中 6 个字符",
+    "已选中 1 个字符",
   );
   await setColor("#0000ff");
   await expect.poll(() => svg(0)).toContain('fill="#0000ff"');
+  await expect.poll(() => svg(0)).toContain('fill="#00ff00"');
   await expect.poll(() => svg(1)).toContain('fill="#00ff00"');
   await page.getByTitle("撤销 Ctrl+Z", { exact: true }).click();
   await expect.poll(() => svg(0)).toContain('fill="#00ff00"');
@@ -115,21 +116,36 @@ try {
     exact: true,
   });
   await expect(canvas).toHaveText(source);
-  await canvas.press("Control+Enter");
+  await canvas.press("Control+Home");
+  for (let i = 0; i < 6; i++) await canvas.press("ArrowRight");
+  await canvas.press("Shift+ArrowRight");
+  await expect(page.locator(".text-selection-status")).toContainText(
+    "已选中 1 个字符",
+  );
+  await color.focus();
+  await setColor("#ff0000");
   await expect(formulas).toHaveCount(2);
+  await expect.poll(() => svg(0)).toContain('fill="#ff0000"');
+  await expect.poll(() => svg(0)).toContain('fill="#0000ff"');
+  await expect.poll(() => svg(0)).toContain('fill="#00ff00"');
   await page.getByRole("button", { name: "保存", exact: true }).click();
   await expect(page.locator(".busy-overlay")).toHaveCount(0);
   await expect(page.locator(".project-save-state")).not.toContainText("*");
   const saved = JSON.parse(await fs.readFile(file, "utf8"));
   expect(saved.clips[0].text).toBe(source);
   expect(saved.clips[0].style.color).toBe("#00ff00");
-  expect(saved.clips[0].textRuns[0].style.color).toBe("#0000ff");
+  expect(saved.clips[0].textRuns).toEqual([
+    { start: 6, end: 7, style: { color: "#ff0000" } },
+    { start: 7, end: 8, style: { color: "#0000ff" } },
+  ]);
   await page.getByRole("button", { name: "返回首页", exact: true }).click();
   await page.locator(".recent-project").first().click();
   await page.locator(".timeline-clip.text").click();
   await expect(content).toHaveValue(source);
   await expect(formulas).toHaveCount(2);
   await expect.poll(() => svg(0)).toContain('fill="#0000ff"');
+  await expect.poll(() => svg(0)).toContain('fill="#ff0000"');
+  await expect.poll(() => svg(0)).toContain('fill="#00ff00"');
 
   await content.fill(String.raw`$\textcolor{red}{x}+y$`);
   await content.blur();

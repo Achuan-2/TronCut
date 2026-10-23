@@ -7,6 +7,7 @@ import "mathjax-full/js/input/tex/ams/AmsConfiguration.js";
 import "mathjax-full/js/input/tex/color/ColorConfiguration.js";
 import "mathjax-full/js/input/tex/newcommand/NewcommandConfiguration.js";
 import type { TextStyle } from "./model";
+import { applyFormulaColors, type FormulaColor } from "./math-color";
 
 export type MathTextToken = {
   start: number;
@@ -77,17 +78,19 @@ export const hasMathText = (text = "") =>
 function createRenderer() {
   const adaptor = liteAdaptor();
   RegisterHTMLHandler(adaptor);
-  const convert = (tex: string, display: boolean) => {
+  const convert = (tex: string, display: boolean, colors: FormulaColor[]) => {
     // Each expression has its own macro/color definitions, independent of cache order.
+    const input = new TeX({
+      packages: ["base", "ams", "color", "newcommand"],
+      maxBuffer: 10000,
+      maxMacros: 1000,
+      formatError: (_jax: unknown, error: Error) => {
+        throw error;
+      },
+    });
+    if (colors.length) applyFormulaColors(input.parseOptions, colors);
     const document = mathjax.document("", {
-      InputJax: new TeX({
-        packages: ["base", "ams", "color", "newcommand"],
-        maxBuffer: 10000,
-        maxMacros: 1000,
-        formatError: (_jax: unknown, error: Error) => {
-          throw error;
-        },
-      }),
+      InputJax: input,
       OutputJax: new SVG({ fontCache: "none" }),
     });
     return document.convert(tex, {
@@ -105,14 +108,18 @@ const formulaCache = new Map<
   { svg: string; viewBox: number[] } | null
 >();
 
-function formulaShape(tex: string, display: boolean) {
-  const key = JSON.stringify([tex, display]);
+function formulaShape(
+  tex: string,
+  display: boolean,
+  colors: FormulaColor[] = [],
+) {
+  const key = JSON.stringify([tex, display, colors]);
   if (!formulaCache.has(key)) {
     let value: { svg: string; viewBox: number[] } | null = null;
     try {
       renderer ??= createRenderer();
       const { adaptor, convert } = renderer;
-      const node = convert(tex, display);
+      const node = convert(tex, display, colors);
       const container = adaptor.outerHTML(node);
       const svg = container.slice(
         container.indexOf("<svg"),
@@ -156,8 +163,9 @@ export function renderFormula(
   tex: string,
   display: boolean,
   style: TextStyle,
+  colors: FormulaColor[] = [],
 ): FormulaGraphic | null {
-  const value = formulaShape(tex, display);
+  const value = formulaShape(tex, display, colors);
   if (!value) return null;
   const [x, y, width, height] = value.viewBox;
   const padding = (style.outlineWidth / style.fontSize) * 1000 + 2;

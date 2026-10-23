@@ -29,12 +29,7 @@ it("公式源码和局部颜色保存重开，截帧与逐字行为视频导出�
   const project = createProject("公式导出");
   project.canvas = { width: 480, height: 270, fps: 10, background: "#000000" };
   project.exportSettings = { encoder: "software" };
-  let clip = newText(
-    "titles",
-    0,
-    0,
-    "$x^2$ + $y_1$\n$$\\frac{a}{b}+\\textcolor{red}{\\sqrt{x}}$$",
-  );
+  let clip = newText("titles", 0, 0, "$x^2+y_1$\n$$\\frac{a}{b}+\\sqrt{x}$$");
   clip.duration = 1;
   clip.style = {
     ...clip.style!,
@@ -44,7 +39,8 @@ it("公式源码和局部颜色保存重开，截帧与逐字行为视频导出�
     outline: "#111111",
     fillEnabled: false,
   };
-  clip = applyCharacterStyle(clip, { start: 1, end: 4 }, { color: "#ff0000" });
+  // Only y is red inside one expression; the default green must survive.
+  clip = applyCharacterStyle(clip, { start: 5, end: 6 }, { color: "#ff0000" });
   for (const animated of [false, true]) {
     const current = structuredClone(clip);
     if (animated) {

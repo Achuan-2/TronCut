@@ -124,4 +124,52 @@ describe("Markdown 公式文字", () => {
     expect(formulas[1].x).toBeCloseTo(layout.width / 2);
     expect(behaviorGlyphCount(colored)).toBe(layout.count);
   });
+
+  it.each([
+    ["$x+y$", "x"],
+    ["$x+y$", "y"],
+    [String.raw`$\frac{x}{x+y}$`, "y"],
+    [String.raw`$\frac xy+z$`, "y"],
+    [String.raw`$\sqrt[3]{x}+y$`, "3"],
+    [String.raw`$\sqrt[3]{x}+y$`, "x"],
+    ["$x^2+y_1$", "1"],
+    [String.raw`$\alpha+\beta$`, String.raw`\beta`],
+    [String.raw`$\alpha+\beta$`, "beta"],
+    ["$12345+x$", "34"],
+    [String.raw`$\text{hello}+x$`, "ell"],
+    [String.raw`$\newcommand{\mine}{x}\mine+y$`, "y"],
+    [String.raw`$\newcommand{\mine}{x}\mine+y$`, String.raw`\mine`],
+    [String.raw`$\frac{x}{y}+z$`, String.raw`\frac{x}`],
+    [String.raw`$\textcolor{blue}{x+y}+z$`, "y"],
+  ])("源码选区局部着色且保留其他符号颜色：%s / %s", async (text, selected) => {
+    const clip = { ...newText("titles", 0, 0, text), style };
+    const start = text.lastIndexOf(selected);
+    const colored = applyCharacterStyle(
+      clip,
+      { start, end: start + selected.length },
+      { color: "#ff0000" },
+    );
+    const layout = layoutStyledText(colored, measure);
+    const formula = layout.glyphs[0].formula;
+    expect(formula).toBeDefined();
+    const { data } = await sharp(Buffer.from(formula!.svg))
+      .ensureAlpha()
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+    let red = 0,
+      green = 0;
+    for (let i = 0; i < data.length; i += 4) {
+      if (data[i + 3] < 150) continue;
+      if (data[i] > 180 && data[i + 1] < 30 && data[i + 2] < 30) red++;
+      if (data[i + 1] > 180 && data[i] < 30 && data[i + 2] < 30) green++;
+    }
+    expect(red).toBeGreaterThan(10);
+    expect(green).toBeGreaterThan(10);
+    expect(colored.text).toBe(text);
+    expect(behaviorGlyphCount(colored)).toBe(layout.count);
+    // A differently colored conversion must not reuse a stale cached shape.
+    expect(
+      layoutStyledText(clip, measure).glyphs[0].formula!.svg,
+    ).not.toContain('fill="#ff0000"');
+  });
 });
