@@ -7,6 +7,7 @@ import {
   type MaskGeometry,
 } from "./mask-state";
 import type { VisualEdit } from "./crop-animation";
+import { setAllAnimationTransforms } from "./animation-properties";
 
 /** Mask geometry uses the same animation endpoints as object transforms. */
 export function animateMask(
@@ -35,8 +36,7 @@ export function animateMask(
     ]),
   );
   if (
-    !edit.auto &&
-    !edit.endpoint &&
+    (edit.all || (!edit.auto && !edit.endpoint)) &&
     !maskKeys.some(
       (key) =>
         clip.transform[key] !== undefined ||
@@ -70,12 +70,14 @@ export function animateMask(
       value: normalize(frame.value),
     })),
   };
-  return edit.endpoint
-    ? setKeyframeTransform(
-        source,
-        values,
-        edit.endpoint.time,
-        edit.endpoint.side === "start",
-      )
-    : setTransform(source, values, edit.time, edit.auto, edit.duration);
+  return edit.all
+    ? setAllAnimationTransforms(source, values, edit.time)
+    : edit.endpoint
+      ? setKeyframeTransform(
+          source,
+          values,
+          edit.endpoint.time,
+          edit.endpoint.side === "start",
+        )
+      : setTransform(source, values, edit.time, edit.auto, edit.duration);
 }

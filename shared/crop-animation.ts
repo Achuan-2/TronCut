@@ -1,5 +1,6 @@
 import type { Clip, Transform } from "./model";
 import { setTransform, setKeyframeTransform, transformAt } from "./editor";
+import { setAllAnimationTransforms } from "./animation-properties";
 import {
   cropClip,
   croppedContent,
@@ -20,6 +21,7 @@ export interface VisualEdit {
   auto: boolean;
   endpoint?: { time: number; side: "start" | "end" };
   duration?: number;
+  all?: boolean;
 }
 function setVisual(
   clip: Clip,
@@ -40,14 +42,16 @@ function setVisual(
       value: normalize(frame.value),
     })),
   };
-  const next = edit.endpoint
-    ? setKeyframeTransform(
-        source,
-        patch,
-        edit.endpoint.time,
-        edit.endpoint.side === "start",
-      )
-    : setTransform(source, patch, edit.time, edit.auto, edit.duration);
+  const next = edit.all
+    ? setAllAnimationTransforms(source, patch, edit.time)
+    : edit.endpoint
+      ? setKeyframeTransform(
+          source,
+          patch,
+          edit.endpoint.time,
+          edit.endpoint.side === "start",
+        )
+      : setTransform(source, patch, edit.time, edit.auto, edit.duration);
   return next;
 }
 export function animateContent(
@@ -56,7 +60,7 @@ export function animateContent(
   edit: VisualEdit,
 ): Clip {
   if (!["image", "video"].includes(clip.kind)) return clip;
-  if (!edit.auto && !edit.endpoint && !hasVisualAnimation(clip))
+  if ((edit.all || (!edit.auto && !edit.endpoint)) && !hasVisualAnimation(clip))
     return setContentTransform(clip, patch);
   const value = transformAt(clip, edit.time),
     sampled = visualClipAt(clip, value);
@@ -81,11 +85,14 @@ export function animateCrop(
   resetContent = false,
 ): Clip {
   if (!["image", "video"].includes(clip.kind)) return clip;
-  if (!edit.auto && !edit.endpoint && !hasVisualAnimation(clip)) {
+  if (
+    (edit.all || (!edit.auto && !edit.endpoint)) &&
+    !hasVisualAnimation(clip)
+  ) {
     const changed = cropClip(clip, crop, size, canvas);
     return resetContent ? { ...changed, contentTransform: undefined } : changed;
   }
-  if (!edit.auto && !edit.endpoint) {
+  if (edit.all || (!edit.auto && !edit.endpoint)) {
     const change = (value: Transform) => {
       const sampled = visualClipAt(clip, value);
       const position = croppedTransform(sampled, value, crop, size, canvas);

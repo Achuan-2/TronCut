@@ -63,6 +63,7 @@ import RecordingObjectProperties from "./RecordingObjectProperties";
 import AnnotationProperties from "./AnnotationProperties";
 import { shapeSize } from "../shared/annotation-style";
 import { recordingMaster } from "../shared/recording-objects";
+import { animationRanges } from "../shared/animation-ranges";
 
 export type Tab =
   | "favorites"
@@ -467,6 +468,7 @@ export function Inspector({ editor }: { editor: Editor }) {
     return <TransitionProperties editor={editor} />;
   const hasCursor = c?.kind === "video" && !!selectedAsset?.cursor;
   const hasText = c?.kind === "text";
+  const hasAnimations = c && c.kind !== "audio" && animationRanges(c).length > 0;
   const textSelection = editor.textSelection?.clipId === c?.id ? editor.textSelection : null;
   const characterStyle = c && textSelection ? characterStyleAt(c, textSelection.start) : c?.style;
   const hasAnnotation = c?.kind === "shape";
@@ -653,17 +655,43 @@ export function Inspector({ editor }: { editor: Editor }) {
         ) : (
           <fieldset disabled={!!locked}>
             <div className="inspector-selection">
-              <span className={`selection-icon ${isRecording ? "recording-object-selection" : c.kind}`}>
-                {isRecording ? (
-                  <MonitorDot size={20} className="recording-object-icon" role="img" aria-label="录屏组合" />
-                ) : c.kind === "text" ? (
-                  <Type size={20} />
-                ) : c.kind === "audio" ? (
-                  <AudioLines size={20} />
-                ) : (
-                  <Film size={20} />
-                )}
-              </span>
+              {hasAnimations && (
+                <button
+                  type="button"
+                  className="edit-all-animations"
+                  aria-label="编辑所有动画"
+                  aria-pressed={editor.editAllAnimations}
+                  title={
+                    editor.editAllAnimations
+                      ? "编辑所有动画：属性更改影响整个素材的所有动画。点击切换为编辑单个动画。"
+                      : "属性更改影响单个动画。点击开启编辑所有动画。"
+                  }
+                  onClick={() => editor.setEditAllAnimations(!editor.editAllAnimations)}
+                >
+                  <svg width="44" height="20" viewBox="0 0 44 20" aria-hidden="true">
+                    <path d="M8 10h9m9 0h9" stroke="currentColor" strokeWidth="2" />
+                    <path d="m12 5 6 5-6 5zm17 0 6 5-6 5z" fill="currentColor" />
+                    <g className="animation-scope-dots" fill="currentColor">
+                      <circle cx="5" cy="10" r="3" />
+                      <circle cx="22" cy="10" r="3" />
+                      <circle cx="39" cy="10" r="3" />
+                    </g>
+                  </svg>
+                </button>
+              )}
+              {!hasAnimations && (
+                <span className={`selection-icon ${isRecording ? "recording-object-selection" : c.kind}`}>
+                  {isRecording ? (
+                    <MonitorDot size={20} className="recording-object-icon" role="img" aria-label="录屏组合" />
+                  ) : c.kind === "text" ? (
+                    <Type size={20} />
+                  ) : c.kind === "audio" ? (
+                    <AudioLines size={20} />
+                  ) : (
+                    <Film size={20} />
+                  )}
+                </span>
+              )}
               <div>
                 <b title={c.name}>{isRecording ? "录屏对象" : c.name}</b>
                 <small>
@@ -696,7 +724,7 @@ export function Inspector({ editor }: { editor: Editor }) {
                 编辑字幕所有文字
               </label>
             )}
-            {editor.selectedKeyframe && (
+            {editor.selectedKeyframe && !editor.editAllAnimations && (
               <div className="keyframe-edit-status" role="status">
                 <span>
                   编辑动画

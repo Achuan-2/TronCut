@@ -2525,6 +2525,22 @@ fieldset:disabled {
   min-width: 0;
   overflow: hidden;
 }
+.edit-all-animations {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 50px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  color: #d5dce0;
+}
+.edit-all-animations:hover { background: #343c36; }
+.edit-all-animations[aria-pressed="true"] { background: #343c36; border-color: #68796c; }
+.edit-all-animations[aria-pressed="true"] .animation-scope-dots { fill: #fa5d62; }
+.edit-all-animations:focus-visible { outline: 2px solid #a9d99c; outline-offset: 2px; }
 .inspector-selection b {
   font-size: 11px;
   font-weight: 550;

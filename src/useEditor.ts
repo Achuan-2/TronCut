@@ -9,6 +9,7 @@ import {
 import type { VisualEffectId } from "../shared/visual-effect-drag";
 import type { RangedVisualEffectId } from "../shared/visual-effect-range";
 import { animateMask } from "../shared/mask-animation";
+import { setAllAnimationTransforms } from "../shared/animation-properties";
 import type { MaskGeometry } from "../shared/mask-state";
 import {
   useCallback,
@@ -363,6 +364,18 @@ export function useEditor(
   const [dirty, setDirty] = useState(false);
   const [timelineConflict, setTimelineConflict] = useState(0);
   const [autoAnimate, setAutoAnimate] = useState(false);
+  const [allAnimationsClipId, setAllAnimationsClipId] =
+    useState<string | null>(null);
+  const animationClip = clipsById.get(selectedId ?? "");
+  const editAllAnimations = allAnimationsClipId === selectedId &&
+    !!animationClip && animationRanges(animationClip).length > 0;
+  const setEditAllAnimations = useCallback(
+    (all: boolean) => setAllAnimationsClipId(all ? selectedId : null),
+    [selectedId],
+  );
+  useEffect(() => {
+    if (allAnimationsClipId !== selectedId) setAllAnimationsClipId(null);
+  }, [allAnimationsClipId, selectedId]);
   const [timelineFocus, setTimelineFocus] = useState<{ time: number } | null>(null);
 
   useEffect(() => {
@@ -800,12 +813,13 @@ export function useEditor(
         animateContent(clip, patch, {
           time: playback.getSnapshot() - clip.start,
           auto: autoAnimate,
+          all: editAllAnimations,
           duration: defaults.current.timing.animation,
           endpoint: frame?.clipId === id ? frame : undefined,
         }),
       );
     },
-    [updateClip, playback, autoAnimate],
+    [updateClip, playback, autoAnimate, editAllAnimations],
   );
   const updateMask = useCallback(
     (id: string, patch: Partial<MaskGeometry>) => {
@@ -814,12 +828,13 @@ export function useEditor(
         animateMask(clip, patch, {
           time: playback.getSnapshot() - clip.start,
           auto: autoAnimate,
+          all: editAllAnimations,
           duration: defaults.current.timing.animation,
           endpoint: frame?.clipId === id ? frame : undefined,
         }),
       );
     },
-    [updateClip, playback, autoAnimate],
+    [updateClip, playback, autoAnimate, editAllAnimations],
   );
   const updateCrop = useCallback(
     (id: string, crop: Crop, resetContent = false) => {
@@ -840,6 +855,7 @@ export function useEditor(
           {
             time: playback.getSnapshot() - clip.start,
             auto: autoAnimate,
+            all: editAllAnimations,
             duration: defaults.current.timing.animation,
             endpoint: frame?.clipId === id ? frame : undefined,
           },
@@ -847,7 +863,7 @@ export function useEditor(
         );
       });
     },
-    [updateClip, playback, autoAnimate],
+    [updateClip, playback, autoAnimate, editAllAnimations],
   );
   const editKeyframe = useCallback(
     (
@@ -948,7 +964,7 @@ export function useEditor(
     (id: string, patch: Partial<Transform>, clipPatch: Partial<Clip> = {}) => {
       const frame = keyframeRef.current;
       const clip = current.current.clips.find((clip) => clip.id === id);
-      if (clip?.caption && frame?.clipId !== id) {
+      if (clip?.caption && frame?.clipId !== id && !editAllAnimations) {
         const sampled = transformAt(
           clip,
           playback.getSnapshot() - clip.start,
@@ -970,23 +986,29 @@ export function useEditor(
       }
       updateClip(id, (clip) => {
         const source = { ...clip, ...clipPatch };
-        return frame?.clipId === id
-          ? setKeyframeTransform(
-              source,
-              patch,
-              frame.time,
-              frame.side === "start",
-            )
-          : setTransform(
+        return editAllAnimations
+          ? setAllAnimationTransforms(
               source,
               patch,
               playback.getSnapshot() - clip.start,
-              autoAnimate,
-              defaults.current.timing.animation,
-            );
+            )
+          : frame?.clipId === id
+            ? setKeyframeTransform(
+                source,
+                patch,
+                frame.time,
+                frame.side === "start",
+              )
+            : setTransform(
+                source,
+                patch,
+                playback.getSnapshot() - clip.start,
+                autoAnimate,
+                defaults.current.timing.animation,
+              );
       });
     },
-    [updateClip, updateTextAppearance, playback, autoAnimate],
+    [updateClip, updateTextAppearance, playback, autoAnimate, editAllAnimations],
   );
   const copyClipProperties = useCallback(
     (id: string) => {
@@ -1869,6 +1891,8 @@ export function useEditor(
     selectedKeyframe,
     selectedDrawing,
     selectedAnimation,
+    editAllAnimations,
+    setEditAllAnimations,
     copyAnimation,
     deleteAnimation,
     pasteCopiedAnimation,
