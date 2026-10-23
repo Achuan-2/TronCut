@@ -492,6 +492,7 @@ export function Inspector({ editor }: { editor: Editor }) {
       : []),
   ];
   const activeTab =
+    editor.selectedVisualEffect?.clipId === c?.id && c?.kind !== "audio" ? "video" :
     editor.selectedKeyframe?.clipId === c?.id ? "video" :
       editor.selectedDrawing?.clipId === c?.id ? "annotation" :
         editor.selectedBehavior?.clipId === c?.id

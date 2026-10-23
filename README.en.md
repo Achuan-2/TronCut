@@ -39,7 +39,7 @@ TronCut also provides multitrack editing, multiple selection, grouping, synchron
 
 Download from **[GitHub Releases](https://github.com/Achuan-2/TronCut/releases)**:
 
-The current version is **[v0.6.2](https://github.com/Achuan-2/TronCut/releases/tag/v0.6.2)**, adding Markdown formulas with local colors, Edit All Animations, timeline clip colors, and customizable shortcuts, with improvements to recording storage, preview proxies, and timeline editing. See the [release notes](docs/releases/v0.6.2.md).
+The current version is **[v0.6.2](https://github.com/Achuan-2/TronCut/releases/tag/v0.6.2)**, adding Markdown formulas with local colors, Edit All Animations, timeline clip colors, and customizable shortcuts, with improvements to recording storage, preview proxies, and timeline editing. This rebuild adds effect removal and copy/paste, and fixes property editing during animation holds. See the [release notes](docs/releases/v0.6.2.md).
 
 
 

@@ -165,14 +165,7 @@ export default function VisualEffectProperties({
             },
           }))
         }
-        onRemove={() => {
-          const next = { ...clip.visualEffects };
-          delete next[id];
-          editor.updateClip(clip.id, (source) => ({
-            ...(id === "mask" ? clearMaskChannels(source) : source),
-            visualEffects: next,
-          }));
-        }}
+        onRemove={() => editor.removeTimelineEffect(clip.id, id)}
       >
         <fieldset className="visual-effect-fields" disabled={!settings.enabled}>
           {id === "media-matte" && (

@@ -37,7 +37,7 @@ export default function RoundedCornersProperties({
           corners: { ...defaultFrameCorners },
         })
       }
-      onRemove={() => editor.updateClip(clip.id, { mediaFrame: undefined })}
+      onRemove={() => editor.removeTimelineEffect(clip.id, "rounded-corners")}
     >
       <fieldset disabled={frame.enabled === false}>
         <div className="corner-picker-row">

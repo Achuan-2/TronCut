@@ -89,6 +89,8 @@ import {
 } from "../shared/visual-effect-drag";
 import TimelineSpeedEffect from "./TimelineSpeedEffect";
 import TimelineVisualEffect from "./TimelineVisualEffect";
+import TimelineEffectContextMenu from "./TimelineEffectContextMenu";
+import type { TimelineEffectSelection } from "../shared/timeline-effect-edit";
 import { visualEffectEntries } from "../shared/visual-effect-range";
 import TimelineBehaviorEffect from "./TimelineBehaviorEffect";
 import BehaviorContextMenu from "./BehaviorContextMenu";
@@ -420,7 +422,10 @@ export default function Timeline({
   const [speedDraft, setSpeedDraft] = useState<Clip | null>(null);
   const [visualDraft, setVisualDraft] = useState<Clip | null>(null);
   const activeVisual = editor.selectedVisualEffect;
-  const [activeSpeed, setActiveSpeed] = useState<string | null>(null);
+  const [effectMenu, setEffectMenu] = useState<
+    (TimelineEffectSelection & { x: number; y: number }) | null
+  >(null);
+  useEffect(() => setEffectMenu(null), [project.id, editor.activeGroupId]);
   const [effectDrop, setEffectDrop] = useState<string | null>(null);
   const [animationDrop, setAnimationDrop] = useState<{
     clipId: string;
@@ -584,11 +589,7 @@ export default function Timeline({
     ];
   };
   const selectSpeed = (id: string) => {
-    editor.clearKeyframeEdit();
-    editor.setPlaying(false);
-    select(id);
-    editor.setSelectedVisualEffect(null);
-    setActiveSpeed(id);
+    editor.setSelectedVisualEffect({ clipId: id, id: "clip-speed" });
   };
   useEffect(() => {
     if (editor.selectedBehavior)
@@ -1790,7 +1791,10 @@ export default function Timeline({
                             }
                             if (!supportsClipSpeed(c)) return;
                             editor.addSpeedEffect(c.id);
-                            setActiveSpeed(c.id);
+                            editor.setSelectedVisualEffect({
+                              clipId: c.id,
+                              id: "clip-speed",
+                            });
                             setExpandedEffects((previous) => ({
                               ...previous,
                               [c.id]: true,
@@ -2206,13 +2210,17 @@ export default function Timeline({
                                   fps={project.canvas.fps}
                                   locked={track.locked}
                                   selected={
-                                    activeSpeed === c.id &&
+                                    activeVisual?.clipId === c.id &&
+                                    activeVisual.id === "clip-speed" &&
                                     selectedId === c.id &&
                                     !editor.selectedBehavior &&
                                     !editor.selectedTransition &&
                                     !editor.selectedKeyframe
                                   }
                                   select={() => selectSpeed(c.id)}
+                                  onContextMenu={(x, y) =>
+                                    setEffectMenu({ x, y, clipId: c.id, id: "clip-speed" })
+                                  }
                                   preview={setSpeedDraft}
                                   commit={(next) =>
                                     editor.updateClip(next.id, next)
@@ -2246,15 +2254,14 @@ export default function Timeline({
                                     !editor.selectedKeyframe
                                   }
                                   select={() => {
-                                    select(c.id);
-                                    editor.clearKeyframeEdit();
-                                    editor.setPlaying(false);
-                                    setActiveSpeed(null);
                                     editor.setSelectedVisualEffect({
                                       clipId: c.id,
                                       id,
                                     });
                                   }}
+                                  onContextMenu={(x, y) =>
+                                    setEffectMenu({ x, y, clipId: c.id, id })
+                                  }
                                   preview={setVisualDraft}
                                   commit={(next) =>
                                     editor.updateClip(next.id, next)
@@ -2474,6 +2481,14 @@ export default function Timeline({
           );
         })()}
       <BehaviorContextMenu editor={editor} />
+      {effectMenu && (
+        <TimelineEffectContextMenu
+          editor={editor}
+          menu={effectMenu}
+          shortcuts={shortcuts}
+          onClose={() => setEffectMenu(null)}
+        />
+      )}
       {extendingFrame && (
         <FrameExtensionDialog
           key={`${extendingFrame.id}:${extendingFrame.local}`}

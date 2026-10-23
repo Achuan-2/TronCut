@@ -14,7 +14,11 @@ export default function SpeedProperties({
   const fps = editor.project.canvas.fps;
   const parts = durationParts(clip.duration, fps);
   return (
-    <EffectSection title="剪辑速度" onReset={() => editor.changeClipSpeed(clip.id, 1)} onRemove={() => editor.removeSpeedEffect(clip.id)}>
+    <EffectSection
+      title="剪辑速度"
+      onReset={() => editor.changeClipSpeed(clip.id, 1)}
+      onRemove={() => editor.removeTimelineEffect(clip.id, "clip-speed")}
+    >
       <label className="field">
         速度
         <div className="speed-number">

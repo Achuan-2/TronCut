@@ -347,15 +347,18 @@ export default function ClipContextMenu({
       >
         粘贴属性
       </button>
-      {surface === "timeline" && source && editor.hasBehaviorClipboard() && (
+      {source && (editor.hasTimelineEffectClipboard() || editor.hasBehaviorClipboard()) && (
         <button
           role="menuitem"
           disabled={
-            !!project.tracks.find((track) => track.id === source.trackId)?.locked
+            !canEdit ||
+            (editor.hasTimelineEffectClipboard() && !editor.canPasteTimelineEffect(ids))
           }
           onPointerEnter={() => setSubmenu(null)}
           onClick={() => {
-            editor.pasteBehavior(source.id);
+            if (editor.hasTimelineEffectClipboard())
+              editor.pasteTimelineEffect(ids);
+            else editor.pasteBehavior(source.id);
             onClose();
           }}
         >

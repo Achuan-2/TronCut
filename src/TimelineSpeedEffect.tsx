@@ -9,6 +9,7 @@ export default function TimelineSpeedEffect({
   locked,
   selected,
   select,
+  onContextMenu,
   preview,
   commit,
 }: {
@@ -18,6 +19,7 @@ export default function TimelineSpeedEffect({
   locked: boolean;
   selected: boolean;
   select: () => void;
+  onContextMenu: (x: number, y: number) => void;
   preview: (clip: Clip | null) => void;
   commit: (clip: Clip) => void;
 }) {
@@ -26,6 +28,10 @@ export default function TimelineSpeedEffect({
   );
   return (
     <div
+      role="button"
+      tabIndex={0}
+      aria-label="效果 剪辑速度"
+      aria-pressed={selected}
       className={`clip-speed-effect ${selected ? "selected" : ""} ${locked ? "locked" : ""}`}
       onPointerDown={(event) => event.stopPropagation()}
       onClick={(event) => {
@@ -33,6 +39,19 @@ export default function TimelineSpeedEffect({
         select();
       }}
       onDoubleClick={(event) => event.stopPropagation()}
+      onContextMenu={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        select();
+        onContextMenu(event.clientX, event.clientY);
+      }}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          event.stopPropagation();
+          select();
+        }
+      }}
     >
       <span>剪辑速度 · {Number(clip.speed.toFixed(2))}×</span>
       <button

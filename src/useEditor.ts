@@ -7,7 +7,15 @@ import {
   isAdditionalVisualEffect,
 } from "../shared/visual-effects";
 import type { VisualEffectId } from "../shared/visual-effect-drag";
-import type { RangedVisualEffectId } from "../shared/visual-effect-range";
+import {
+  hasTimelineEffect,
+  copyTimelineEffect as snapshotTimelineEffect,
+  removeTimelineEffect as removeEffectFromClip,
+  pasteTimelineEffects,
+  canPasteTimelineEffect,
+  type CopiedTimelineEffect,
+  type TimelineEffectSelection,
+} from "../shared/timeline-effect-edit";
 import { animateMask } from "../shared/mask-animation";
 import { setAllAnimationTransforms } from "../shared/animation-properties";
 import type { MaskGeometry } from "../shared/mask-state";
@@ -44,6 +52,7 @@ import {
   deleteClips,
   findClipAtPlayhead,
   selectionWithGroups,
+  editableIds,
 } from "../shared/timeline";
 import { recordingMaster } from "../shared/recording-objects";
 import { detachVideoAudio } from "../shared/detach-audio";
@@ -98,6 +107,7 @@ import {
 import { annotationClip, type AnnotationTemplate } from "../shared/annotations";
 import {
   animationEditTarget,
+  heldAnimationEndpoint,
   animationRanges,
   compactAnimationFrames,
   drawingAnimationRanges,
@@ -241,10 +251,10 @@ export function useEditor(
     }
   }, [canvasMode]);
   const [clipProperties, setClipProperties] = useState<Clip | null>(null);
-  const [selectedVisualEffect, setSelectedVisualEffect] = useState<{
-    clipId: string;
-    id: RangedVisualEffectId;
-  } | null>(null);
+  const [visualEffectSelection, setSelectedVisualEffect] =
+    useState<TimelineEffectSelection | null>(null);
+  const effectClipboard = useRef<CopiedTimelineEffect | null>(null);
+  const effectClipboardToken = useRef<string | null>(null);
   type KeyframeSelection = {
     clipId: string;
     time: number;
@@ -806,9 +816,24 @@ export function useEditor(
     },
     [select],
   );
+  // Resolve from the live playback clock: seeking does not rerender this hook
+  // on every tick. Explicit endpoint selection keeps priority over a held pose.
+  const propertyEditFrame = useCallback(
+    (id: string) => {
+      const frame = keyframeRef.current;
+      if (frame?.clipId === id) return frame;
+      if (autoAnimate || editAllAnimations) return null;
+      const clip = current.current.clips.find((clip) => clip.id === id);
+      const endpoint = clip && heldAnimationEndpoint(
+        clip, playback.getSnapshot() - clip.start,
+      );
+      return endpoint ? { ...endpoint, clipId: id } : null;
+    },
+    [playback, autoAnimate, editAllAnimations],
+  );
   const updateContentTransform = useCallback(
     (id: string, patch: Partial<ContentTransform>) => {
-      const frame = keyframeRef.current;
+      const frame = propertyEditFrame(id);
       updateClip(id, (clip) =>
         animateContent(clip, patch, {
           time: playback.getSnapshot() - clip.start,
@@ -819,11 +844,11 @@ export function useEditor(
         }),
       );
     },
-    [updateClip, playback, autoAnimate, editAllAnimations],
+    [updateClip, playback, autoAnimate, editAllAnimations, propertyEditFrame],
   );
   const updateMask = useCallback(
     (id: string, patch: Partial<MaskGeometry>) => {
-      const frame = keyframeRef.current;
+      const frame = propertyEditFrame(id);
       updateClip(id, (clip) =>
         animateMask(clip, patch, {
           time: playback.getSnapshot() - clip.start,
@@ -834,11 +859,11 @@ export function useEditor(
         }),
       );
     },
-    [updateClip, playback, autoAnimate, editAllAnimations],
+    [updateClip, playback, autoAnimate, editAllAnimations, propertyEditFrame],
   );
   const updateCrop = useCallback(
     (id: string, crop: Crop, resetContent = false) => {
-      const frame = keyframeRef.current;
+      const frame = propertyEditFrame(id);
       updateClip(id, (clip) => {
         const project = current.current;
         const asset = project.assets.find((asset) => asset.id === clip.assetId);
@@ -863,7 +888,7 @@ export function useEditor(
         );
       });
     },
-    [updateClip, playback, autoAnimate, editAllAnimations],
+    [updateClip, playback, autoAnimate, editAllAnimations, propertyEditFrame],
   );
   const editKeyframe = useCallback(
     (
@@ -962,7 +987,7 @@ export function useEditor(
   );
   const updateTransform = useCallback(
     (id: string, patch: Partial<Transform>, clipPatch: Partial<Clip> = {}) => {
-      const frame = keyframeRef.current;
+      const frame = propertyEditFrame(id);
       const clip = current.current.clips.find((clip) => clip.id === id);
       if (clip?.caption && frame?.clipId !== id && !editAllAnimations) {
         const sampled = transformAt(
@@ -1008,7 +1033,7 @@ export function useEditor(
               );
       });
     },
-    [updateClip, updateTextAppearance, playback, autoAnimate, editAllAnimations],
+    [updateClip, updateTextAppearance, playback, autoAnimate, editAllAnimations, propertyEditFrame],
   );
   const copyClipProperties = useCallback(
     (id: string) => {
@@ -1444,6 +1469,61 @@ export function useEditor(
     },
     [select, clearKeyframeEdit, setPlaying],
   );
+  const selectTimelineEffect = useCallback(
+    (selection: TimelineEffectSelection | null) => {
+      if (selection) {
+        select(selection.clipId);
+        clearKeyframeEdit();
+        setPlaying(false);
+      }
+      setSelectedVisualEffect(selection);
+    },
+    [select, clearKeyframeEdit, setPlaying],
+  );
+  const removeTimelineEffect = useCallback(
+    (clipId: string, id: VisualEffectId) => {
+      if (!editableIds(current.current, [clipId]).has(clipId)) return;
+      updateClip(clipId, (clip) => removeEffectFromClip(clip, id));
+      setSelectedVisualEffect((selection) =>
+        selection?.clipId === clipId && selection.id === id ? null : selection,
+      );
+    },
+    [updateClip],
+  );
+  const copyTimelineEffect = useCallback(
+    (clipId: string, id: VisualEffectId) => {
+      const clip = current.current.clips.find((clip) => clip.id === clipId);
+      const value = clip &&
+        snapshotTimelineEffect(clip, id, playback.getSnapshot() - clip.start);
+      if (!value) return false;
+      effectClipboard.current = value;
+      effectClipboardToken.current = uid();
+      behaviorClipboard.current = null;
+      behaviorClipboardToken.current = null;
+      animationClipboard.current = null;
+      void window.framecraft
+        ?.copyClipClipboard(effectClipboardToken.current)
+        .catch(() => {});
+      return true;
+    },
+    [playback],
+  );
+  const pasteTimelineEffect = useCallback(
+    (ids: readonly string[]) => {
+      const copied = effectClipboard.current;
+      if (!copied) return false;
+      const before = current.current;
+      const next = pasteTimelineEffects(before, ids, copied);
+      if (next === before) return false;
+      apply(next);
+      const target = next.clips.find(
+        (clip) => ids.includes(clip.id) && canPasteTimelineEffect(clip, copied),
+      );
+      if (target) selectTimelineEffect({ clipId: target.id, id: copied.id });
+      return true;
+    },
+    [apply, selectTimelineEffect],
+  );
   const addBehavior = useCallback(
     (presetId: string, clipId?: string) => {
       const preset = presetLibrary.findBehavior(presetId);
@@ -1506,6 +1586,8 @@ export function useEditor(
       .find((clip) => clip.id === clipId)
       ?.behaviors?.find((behavior) => behavior.id === behaviorId);
     if (value) {
+      effectClipboard.current = null;
+      effectClipboardToken.current = null;
       behaviorClipboard.current = structuredClone(value);
       behaviorClipboardToken.current = uid();
       void window.framecraft
@@ -1756,6 +1838,12 @@ export function useEditor(
     return true;
   }, [selectedId, playback, updateClip, editKeyframe, editDrawing]);
   const selected = selectedId ? clipsById.get(selectedId) : undefined;
+  const selectedVisualEffect =
+    visualEffectSelection &&
+    selected?.id === visualEffectSelection.clipId &&
+    hasTimelineEffect(selected, visualEffectSelection.id)
+      ? visualEffectSelection
+      : null;
   const editingTrack = project.tracks.find(
     (track) => track.id === selected?.trackId,
   );
@@ -1844,7 +1932,22 @@ export function useEditor(
     selectedIds,
     editAllCaptions,
     selectedVisualEffect,
-    setSelectedVisualEffect,
+    setSelectedVisualEffect: selectTimelineEffect,
+    removeTimelineEffect,
+    copyTimelineEffect,
+    pasteTimelineEffect,
+    hasTimelineEffectClipboard: () => !!effectClipboard.current,
+    timelineEffectClipboardToken: () => effectClipboardToken.current,
+    canPasteTimelineEffect: (ids: readonly string[]) => {
+      const copied = effectClipboard.current;
+      return !!copied && current.current.clips.some(
+        (clip) => ids.includes(clip.id) && canPasteTimelineEffect(clip, copied),
+      );
+    },
+    clearTimelineEffectClipboard: () => {
+      effectClipboard.current = null;
+      effectClipboardToken.current = null;
+    },
     setEditAllCaptions,
     selectMany,
     select,

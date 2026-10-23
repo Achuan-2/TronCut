@@ -40,7 +40,7 @@ TronCut 集成录屏、剪辑、文字、字幕和声音处理，大大提升教
 
 前往 **[GitHub Releases](https://github.com/Achuan-2/TronCut/releases)** 下载：
 
-当前版本为 **[v0.6.2](https://github.com/Achuan-2/TronCut/releases/tag/v0.6.2)**，新增 Markdown 公式与局部颜色、编辑所有动画、时间线素材颜色和自定义快捷键，并改进录屏、代理文件存储与时间线剪辑。详见[发布说明](docs/releases/v0.6.2.md)。
+当前版本为 **[v0.6.2](https://github.com/Achuan-2/TronCut/releases/tag/v0.6.2)**，新增 Markdown 公式与局部颜色、编辑所有动画、时间线素材颜色和自定义快捷键，并改进录屏、代理文件存储与时间线剪辑。本次重新发布加入效果移除与复制粘贴，并修复动画静止区间的属性编辑。详见[发布说明](docs/releases/v0.6.2.md)。
 
 使用方法按功能模块整理在 [使用文档](docs/README.md) 中，包括素材与录屏鼠标、时间线、文本、画布动画和项目管理。首次使用可阅读 [开始使用](docs/GETTING-STARTED.md)。
 

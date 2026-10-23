@@ -421,6 +421,7 @@ export default function App() {
     cut = false,
   ) => {
     editor.clearBehaviorClipboard();
+    editor.clearTimelineEffectClipboard();
     const token = editor.copyAnimation(clipId, range, cut);
     if (!token) return;
     clipClipboard.current = [];
@@ -437,6 +438,7 @@ export default function App() {
         : {
           assets: [],
           clipToken:
+            editor.timelineEffectClipboardToken() ??
             editor.behaviorClipboardToken() ??
             editor.animationClipboardToken() ??
             clipClipboardToken.current,
@@ -445,6 +447,12 @@ export default function App() {
         editor.setPlaying(false);
         editor.addAssets(result.assets, true, { pasteToTop: true });
         toast(`已粘贴 ${result.assets.length} 个素材到时间线`);
+      } else if (
+        result.clipToken &&
+        result.clipToken === editor.timelineEffectClipboardToken()
+      ) {
+        if (editor.pasteTimelineEffect(editor.selectedIds)) toast("已粘贴效果");
+        else toast("请选中可编辑且支持该效果的素材");
       } else if (
         result.clipToken &&
         result.clipToken === editor.behaviorClipboardToken()
@@ -662,7 +670,9 @@ export default function App() {
         !selected ||
         (command === "cut" &&
           locked &&
-          (editor.selectedBehavior || editor.selectedAnimation))
+          (editor.selectedVisualEffect ||
+            editor.selectedBehavior ||
+            editor.selectedAnimation))
       )
         return;
       if (
@@ -675,7 +685,11 @@ export default function App() {
         )
       )
         return;
-      if (editor.selectedBehavior) {
+      if (editor.selectedVisualEffect) {
+        const { clipId, id } = editor.selectedVisualEffect;
+        editor.copyTimelineEffect(clipId, id);
+        if (command === "cut") editor.removeTimelineEffect(clipId, id);
+      } else if (editor.selectedBehavior) {
         const { clipId, behaviorId } = editor.selectedBehavior;
         editor.copyBehavior(clipId, behaviorId);
         if (command === "cut") editor.removeBehavior(clipId, behaviorId);
@@ -684,6 +698,7 @@ export default function App() {
       else {
         editor.clearAnimationClipboard();
         editor.clearBehaviorClipboard();
+        editor.clearTimelineEffectClipboard();
         clipClipboard.current = structuredClone(
           editor.project.clips.filter(
             (clip) =>
@@ -706,6 +721,11 @@ export default function App() {
       return;
     }
     if (["delete", "rippleDelete"].includes(command)) {
+      if (editor.selectedVisualEffect) {
+        const { clipId, id } = editor.selectedVisualEffect;
+        editor.removeTimelineEffect(clipId, id);
+        return;
+      }
       if (editor.deleteTimeSelection(command === "rippleDelete")) return;
       if (editor.selectedTransition)
         editor.updateTransition(editor.selectedTransition, null);

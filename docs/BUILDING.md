@@ -59,6 +59,8 @@ To rebuild an existing release, open **Actions → Build release → Run workflo
 
 已有版本补包：在 **Actions → Build release → Run workflow** 中选择 `main`，输入标签即可。取消 **Upload packages** 可只构建而不发附件，保留明确的“不发版”入口。工作流不会创建或修改提交、标签、Release 文案或预发布状态。同名附件会被替换，校验文件会同步更新；上传过程失败可能留下部分附件，重跑失败任务可以继续上传。
 
+重新发布已有版本并纳入新改动时，先完成验证和提交，将原版本标签更新到该完整提交 SHA，并同步更新 Release 的目标提交和说明，再触发上述工作流。构建完成后确认 Windows 安装包与免安装包、macOS 两种架构的 DMG 及统一校验文件均已替换；只重跑旧标签的工作流不会包含工作区新代码。
+
 The first `v0.2.0` tag omitted `index.html`. Only this tag may restore that existing entry from the workflow commit. The Actions run records the source checkout and restoration step. Subsequent tags must contain their complete source. Windows and macOS CI packages remain unsigned; the Mac packages are also unnotarized. CI success does not replace installation, permission, capture, export, or performance acceptance on actual devices.
 
 首次 `v0.2.0` 标签漏收了 `index.html`，仅该版本补包允许从工作流提交恢复现有入口，源码检出与恢复步骤保留在 Actions 运行记录中。后续版本缺少入口会直接报错。当前工作流发布 Windows x64 与 Mac arm64/x64，所有平台仍未配置代码签名，Mac 真机验收由使用者完成。

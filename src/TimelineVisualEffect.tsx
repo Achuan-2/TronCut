@@ -16,6 +16,7 @@ export default function TimelineVisualEffect({
   locked,
   selected,
   select,
+  onContextMenu,
   preview,
   commit,
 }: {
@@ -27,6 +28,7 @@ export default function TimelineVisualEffect({
   locked: boolean;
   selected: boolean;
   select: () => void;
+  onContextMenu: (x: number, y: number) => void;
   preview: (clip: Clip | null) => void;
   commit: (clip: Clip) => void;
 }) {
@@ -64,6 +66,12 @@ export default function TimelineVisualEffect({
           select();
         }}
         onDoubleClick={(event) => event.stopPropagation()}
+        onContextMenu={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          select();
+          onContextMenu(event.clientX, event.clientY);
+        }}
         onPointerDown={(event) => {
           event.stopPropagation();
           if (event.button !== 0) return;
@@ -104,6 +112,12 @@ export default function TimelineVisualEffect({
         onPointerCancel={cancel}
         onLostPointerCapture={cancel}
         onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            event.stopPropagation();
+            select();
+            return;
+          }
           if (event.key === "Escape") {
             event.preventDefault();
             event.stopPropagation();

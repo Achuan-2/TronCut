@@ -6,6 +6,10 @@ import sharp from "sharp";
 
 const root = path.resolve(`test-output/visual-effect-range-ui-${Date.now()}`);
 await fs.mkdir(root, { recursive: true });
+await fs.mkdir(path.join(root, "profile"), { recursive: true });
+await fs.writeFile(path.join(root, "profile", "preferences.json"), JSON.stringify({
+  storage: { projectDirectory: path.join(root, "Documents", "Projects") },
+}));
 await sharp({
   create: { width: 320, height: 180, channels: 3, background: "#00ff00" },
 })
@@ -117,7 +121,7 @@ try {
     if (finish) await page.mouse.up();
   };
   const seek = async (time) => {
-    await page.locator(".ruler").click({ position: { x: time * 65, y: 12 } });
+    await page.locator(".ruler").click({ position: { x: time * 65, y: 28 } });
     await expect
       .poll(async () =>
         Number(await page.getByLabel("播放进度", { exact: true }).inputValue()),
@@ -140,19 +144,20 @@ try {
   await expect(page.locator(".clip-visual-effect-row")).toHaveCount(3);
   const lane = page.locator(".track-lane").first(),
     header = page.locator(".track-header").first();
-  await expect.poll(() => height(lane)).toBe(118);
-  await expect.poll(() => height(header)).toBe(118);
+  const expandedHeight = await height(lane);
+  await expect.poll(() => height(header)).toBe(expandedHeight);
   await page
     .getByRole("button", { name: "收起片段效果", exact: true })
     .first()
     .click();
-  await expect.poll(() => height(lane)).toBe(70);
+  await expect.poll(() => height(lane)).toBeLessThan(expandedHeight);
+  await expect.poll(() => height(header)).toBe(await height(lane));
   await expect(bar("mask")).toHaveCount(0);
   await page
     .getByRole("button", { name: "展开片段效果", exact: true })
     .first()
     .click();
-  await expect.poll(() => height(lane)).toBe(118);
+  await expect.poll(() => height(lane)).toBe(expandedHeight);
   await drag(bar("mask").locator('[data-edge="start"]'), 1);
   await range("mask", 1, 4);
   await expect(bar("mask")).toHaveClass(/selected/);
@@ -213,7 +218,8 @@ try {
   await page.getByRole("button", { name: "视觉效果", exact: true }).click();
   await page.locator('.visual-effect-card[data-effect="border"]').dblclick();
   await expect(bar("border")).toBeVisible();
-  await expect.poll(() => height(header)).toBe(142);
+  await expect.poll(() => height(header)).toBeGreaterThan(expandedHeight);
+  await expect.poll(() => height(header)).toBe(await height(lane));
   const contained = await lane
     .locator(".clip-visual-effect-row")
     .evaluateAll((nodes) =>

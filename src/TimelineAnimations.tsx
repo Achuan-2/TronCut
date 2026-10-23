@@ -15,6 +15,7 @@ import {
 import { AnimationContextMenu } from "./AnimationContextMenu";
 import {
   animationRanges,
+  heldAnimationEndpoint,
   drawingAnimationRanges,
   visibleAnimationRanges,
   retimeAnimation,
@@ -58,6 +59,12 @@ export const TimelineAnimations = memo(function TimelineAnimations({
   channel?: "transform" | "drawing";
 }) {
   const playhead = useEditorPlayhead(editor, selected);
+  const editFrame = editor.editAllAnimations ? null : selectedFrame ?? (
+    selected && channel === "transform" && !editor.autoAnimate && !editor.playing &&
+    !editor.selectedDrawing && !locked
+      ? heldAnimationEndpoint(clip, playhead - clip.start)
+      : null
+  );
   type Gesture = {
     x: number;
     original: Clip;
@@ -86,9 +93,9 @@ export const TimelineAnimations = memo(function TimelineAnimations({
     null,
   );
   const editedEnd =
-    selectedFrame?.side === "end"
+    editFrame?.side === "end"
       ? clip.keyframes.find(
-          (frame) => Math.abs(frame.time - selectedFrame.time) < 1e-6,
+          (frame) => Math.abs(frame.time - editFrame.time) < 1e-6,
         )
       : undefined;
   useEffect(() => {
@@ -121,8 +128,8 @@ export const TimelineAnimations = memo(function TimelineAnimations({
     );
     pulse.current = { point, animation };
   }, [
-    selectedFrame?.time,
-    selectedFrame?.side,
+    editFrame?.time,
+    editFrame?.side,
     editedEnd?.value.x,
     editedEnd?.value.y,
     editedEnd?.value.scale,
@@ -270,16 +277,17 @@ export const TimelineAnimations = memo(function TimelineAnimations({
             index + 1 < ranges.length &&
             (ranges[index + 1].start - range.end) * zoom < 12;
           const head = range.hasEnd ? Math.min(12, width * 0.4) : 0;
-          const active = selected && Math.abs(playhead - end) <= 0.5 / fps;
+          const active = selected && !editor.editAllAnimations &&
+            Math.abs(playhead - end) <= 0.5 / fps;
           const startSelected =
-            selectedFrame?.side === "start" &&
+            editFrame?.side === "start" &&
             Math.abs(
-              selectedFrame.time - range.start - (clip.animationOffset ?? 0),
+              editFrame.time - range.start - (clip.animationOffset ?? 0),
             ) < 1e-6;
           const endSelected =
-            selectedFrame?.side === "end" &&
+            editFrame?.side === "end" &&
             Math.abs(
-              selectedFrame.time - range.end - (clip.animationOffset ?? 0),
+              editFrame.time - range.end - (clip.animationOffset ?? 0),
             ) < 1e-6;
           return (
             <div
@@ -377,6 +385,10 @@ export const TimelineAnimations = memo(function TimelineAnimations({
   if (prev.selected || next.selected) {
     if (prev.selected !== next.selected) return false;
     if (prev.selectedFrame !== next.selectedFrame) return false;
+    if (prev.editor.autoAnimate !== next.editor.autoAnimate ||
+        prev.editor.editAllAnimations !== next.editor.editAllAnimations ||
+        prev.editor.playing !== next.editor.playing ||
+        prev.editor.selectedDrawing !== next.editor.selectedDrawing) return false;
   }
   return (
     prev.clip === next.clip &&

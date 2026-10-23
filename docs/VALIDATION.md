@@ -1,5 +1,19 @@
 # 验证记录（含历史与 TronCut 0.3）
 
+## v0.6.2 重新发布检查（2026-10-23）
+
+重新发布包含效果条移除与复制粘贴、动画静止区间的末尾属性编辑。Rust 的 2 项测试、媒体引擎及 worker 打包预检、TypeScript、Vite 和 Electron 构建通过；`vitest run --retry=1` 完整通过 128 个文件、676 项测试，其中转场真实导出测试重试后通过。日志位于 `test-output/republish-v0.6.2-vitest.log` 和 `test-output/republish-v0.6.2-build.log`。
+
+隔离配置下的效果编辑与动画末尾编辑界面回归通过，包含时间线/画布粘贴、快捷键、速度移除、锁定、最近动画末尾与静止区间同步、编辑所有动画和自动动画优先级、撤销重做及保存重开。对应证据为 `test-output/timeline-effect-edit-1792770813777/` 和 `test-output/animation-hold-edit/run-1792770799735/`。
+
+本地 Windows x64 解包应用重新构建，打包版桌面回归通过文本编辑、自动关键帧、动画右键缓动、素材导入、项目归档与 MP4 导出，前端运行错误为零，证据为 `test-output/smoke/run-1792770888488/`，日志为 `test-output/republish-v0.6.2-packaged-smoke.log`。本轮未执行真实录屏或 macOS 真机验收；各平台发布包由更新后的版本标签锁定构建。
+
+## 时间线效果移除与复制粘贴（2026-10-23，v0.6.2 发布后）
+
+效果条选中状态统一接入 Delete、剪切与复制命令，视觉效果和剪辑速度支持右键移除、复制，时间线与画布对象右键可粘贴。复制保留独立参数快照，效果范围随目标时长缩放；遮罩复制播放头处的参数，替换或移除时清理遮罩通道并保留素材运动。锁定轨道允许复制，拒绝修改。
+
+构建通过。新增效果编辑专项与视觉效果范围、遮罩动画、剪辑速度专项共 22 项测试通过。`scripts/smoke-timeline-effect-edit.mjs` 在隔离存储配置下验证 Delete 保留素材及其他效果、右键移除/复制、时间线与画布粘贴、范围缩放、快捷键剪切复制粘贴、撤销重做、锁定、速度恢复源区间、类型限制、剪贴板替换及保存重开，前端运行错误为零，证据位于 `test-output/timeline-effect-edit-1792770537866/`。旧范围脚本更新固定高度断言和标尺点击位置后，拖动、取消、逐帧调整、动画保留、画布像素与保存重开回归通过，证据位于 `test-output/visual-effect-range-ui-1792770410930/`。`scripts/smoke-behaviors.mjs` 的原有行为复制粘贴、Delete、撤销与保存回归也通过，前端运行错误为零。本轮使用本地开发构建，未打包或发布。
+
 ## v0.6.2 发布前检查（2026-10-23）
 
 Rust/Wasm、TypeScript、Vite 与 Electron 构建通过，Rust 的 2 项测试及安装包媒体引擎、许可与 worker 预检通过。`vitest run --retry=1` 完整通过 126 个文件、659 项测试，包含公式局部颜色、整段动画属性、时间线颜色、录屏存储、代理清理及真实 FFmpeg 截帧和视频导出；日志为 `test-output/release-v0.6.2-vitest.log`。

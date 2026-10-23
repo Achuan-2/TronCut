@@ -121,6 +121,30 @@ export function animationEditTarget(
     : { time, side };
 }
 
+/** A hold after an animation belongs to its end pose. Do not target an older
+ * endpoint while the playhead is inside a later animation or outside the clip.
+ * Input uses clip-local time; the returned time uses the keyframe clock.
+ */
+export function heldAnimationEndpoint(clip: Clip, localTime: number) {
+  if (!Number.isFinite(localTime) || localTime < 0 || localTime > clip.duration)
+    return null;
+  const ranges = animationRanges(clip);
+  if (
+    ranges.some(
+      (range) =>
+        localTime > range.start + 1e-6 &&
+        (localTime < range.end - 1e-6 || !range.hasEnd),
+    )
+  )
+    return null;
+  const previous = ranges
+    .filter((range) => range.hasEnd && range.end <= localTime + 1e-6)
+    .at(-1);
+  return previous
+    ? { time: previous.end + (clip.animationOffset ?? 0), side: "end" as const }
+    : null;
+}
+
 export interface AnimationRange {
   start: number;
   end: number;
