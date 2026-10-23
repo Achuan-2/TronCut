@@ -39,7 +39,7 @@ TronCut also provides multitrack editing, multiple selection, grouping, synchron
 
 Download from **[GitHub Releases](https://github.com/Achuan-2/TronCut/releases)**:
 
-The current version is **[v0.6.1](https://github.com/Achuan-2/TronCut/releases/tag/v0.6.1)**, adding media behavior presets, video freeze frames, continuous timeline thumbnails, and automatic loudness normalization, with improvements to group editing and project storage. See the [release notes](docs/releases/v0.6.1.md).
+The current version is **[v0.6.2](https://github.com/Achuan-2/TronCut/releases/tag/v0.6.2)**, adding Markdown formulas with local colors, Edit All Animations, timeline clip colors, and customizable shortcuts, with improvements to recording storage, preview proxies, and timeline editing. See the [release notes](docs/releases/v0.6.2.md).
 
 
 
