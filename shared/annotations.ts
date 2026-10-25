@@ -12,6 +12,7 @@ import {
   shapeStyleSchema,
   drawingSchema,
   annotationEffectSchema,
+  linePointsSchema,
   type ShapeStyle,
 } from "./annotation-style";
 
@@ -32,6 +33,7 @@ const templateSchema = z.discriminatedUnion("kind", [
     shape: annotationShapeSchema,
     style: shapeStyleSchema.optional(),
     drawing: drawingSchema.optional(),
+    linePoints: linePointsSchema.optional(),
     size: z
       .object({
         width: z.number().finite().min(1).max(32768),
@@ -98,6 +100,7 @@ export function annotationClip(
     cross: "叉号",
     "curved-arrow": "手绘箭头",
     freehand: "涂鸦",
+    polygon: "自定义形状",
   };
   return {
     id: uid(),
@@ -116,6 +119,7 @@ export function annotationClip(
           shapeStyle: template.style,
           drawing: template.drawing,
           shapeSize: template.size,
+          linePoints: template.linePoints,
         }
       : {
           annotationEffect: annotationEffectSchema.parse({

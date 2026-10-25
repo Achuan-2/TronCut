@@ -1747,6 +1747,13 @@ fieldset:disabled {
   font-size: 10px;
   color: #acc7b3;
 }
+.shape-presets button[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: #34493c;
+}
+.polygon-pen-icon {
+  color: #00b5ef;
+}
 .preview-panel {
   background: #141719;
   display: flex;
@@ -2872,6 +2879,48 @@ fieldset:disabled {
   background: var(--panel);
   white-space: nowrap;
   font-size: 12px;
+}
+.canvas-polygon-draft {
+  pointer-events: none;
+}
+.canvas-polygon-segment-hit {
+  fill: none;
+  stroke: transparent;
+  pointer-events: stroke;
+  cursor: copy;
+}
+.canvas-polygon-vertex {
+  fill: var(--accent);
+  stroke: #14211a;
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+  pointer-events: all;
+  cursor: pointer;
+}
+.canvas-polygon-vertex.selected {
+  fill: #ffffff;
+  stroke: var(--accent);
+  stroke-width: 2;
+}
+.canvas-polygon-start {
+  fill: #00b5ef44;
+  stroke: #00b5ef;
+  stroke-width: 2;
+  pointer-events: none;
+}
+.canvas-polygon-handle-line {
+  stroke: #ffffffaa;
+  pointer-events: none;
+}
+.canvas-polygon-handle {
+  fill: #ffffff;
+  stroke: #00b5ef;
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+  cursor: move;
+}
+.canvas-polygon-error {
+  color: #ff9d9d;
 }
 .pen-brushes {
   display: grid;

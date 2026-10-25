@@ -1,9 +1,28 @@
 import { z } from "zod";
 import type { Clip } from "./model";
 import { animationEasings, easeProgress } from "./easing";
+import {
+  cubicAtDistance,
+  cubicLength,
+  penSegments,
+  samplePenSegment,
+  splitCubic,
+  type PenSegment,
+} from "./bezier";
 
 const finite = z.number().finite();
 const color = z.string().regex(/^#[\da-f]{6}$/i);
+const normalizedPointSchema = z.object({
+  x: finite.min(0).max(1),
+  y: finite.min(0).max(1),
+});
+export const penAnchorSchema = normalizedPointSchema.extend({
+  in: normalizedPointSchema.optional(),
+  out: normalizedPointSchema.optional(),
+  handleMode: z.enum(["aligned", "independent"]).optional(),
+});
+export const linePointsSchema = z.array(penAnchorSchema).min(2).max(128);
+export type PenAnchor = z.infer<typeof penAnchorSchema>;
 export const annotationShapeSchema = z.enum([
   "rectangle",
   "rounded-rectangle",
@@ -18,6 +37,7 @@ export const annotationShapeSchema = z.enum([
   "cross",
   "curved-arrow",
   "freehand",
+  "polygon",
 ]);
 export const shapeStyleSchema = z.object({
   stroke: color.default("#00b5ef"),
@@ -97,6 +117,7 @@ export function drawingProgress(
 
 type ShapePath = {
   points: Point[];
+  segments?: PenSegment[];
   closed?: boolean;
   fill?: string;
   stroke?: string;
@@ -187,6 +208,30 @@ export function annotationPaths(
       }
       return point((x * width) / 600, (y * height) / 300);
     });
+  if (clip.shape === "polygon") {
+    const anchors =
+      clip.linePoints?.map((p) => ({
+        ...p,
+        x: p.x * width,
+        y: p.y * height,
+        in: p.in ? point(p.in.x * width, p.in.y * height) : undefined,
+        out: p.out ? point(p.out.x * width, p.out.y * height) : undefined,
+      })) ?? [];
+    if (anchors.length < 3) return [];
+    return [
+      {
+        points: anchors.map((p) => point(p.x, p.y)),
+        segments: anchors.some((p) => p.in || p.out)
+          ? penSegments(anchors, true)
+          : undefined,
+        closed: true,
+        fill: style.fillEnabled ? (clip.fill ?? "#00b5ef") : undefined,
+        stroke: style.strokeWidth ? style.stroke : undefined,
+        width: style.strokeWidth,
+        brush: style.brush,
+      },
+    ];
+  }
   if (clip.shape === "freehand")
     return (
       clip.drawing?.strokes ?? [{ points: clip.drawing?.points ?? [] }]
@@ -363,7 +408,20 @@ export function annotationPaths(
     },
   ];
 }
+function segmentLength(segment: PenSegment) {
+  return segment.kind === "cubic"
+    ? cubicLength(segment)
+    : Math.hypot(
+        segment.end.x - segment.start.x,
+        segment.end.y - segment.start.y,
+      );
+}
 function pathLength(path: ShapePath) {
+  if (path.segments)
+    return path.segments.reduce(
+      (sum, segment) => sum + segmentLength(segment),
+      0,
+    );
   const points = path.closed ? [...path.points, path.points[0]] : path.points;
   return points
     .slice(1)
@@ -372,9 +430,35 @@ function pathLength(path: ShapePath) {
       0,
     );
 }
-function partialPath(path: ShapePath, distance: number) {
+function partialPath(path: ShapePath, distance: number): ShapePath {
+  const points = path.points.length ? [path.points[0]] : [];
+  if (path.segments) {
+    const segments: PenSegment[] = [];
+    for (const segment of path.segments) {
+      if (distance <= 0) break;
+      const length = segmentLength(segment),
+        ratio = length ? Math.min(1, distance / length) : 1;
+      if (ratio >= 1) {
+        segments.push(segment);
+        points.push(segment.end);
+      } else if (segment.kind === "line") {
+        const end = point(
+          segment.start.x + (segment.end.x - segment.start.x) * ratio,
+          segment.start.y + (segment.end.y - segment.start.y) * ratio,
+        );
+        segments.push({ kind: "line", start: segment.start, end });
+        points.push(end);
+      } else {
+        const t = cubicAtDistance(segment, length * ratio),
+          left = splitCubic(segment, t).left;
+        segments.push({ kind: "cubic", ...left });
+        points.push(left.end);
+      }
+      distance -= length;
+    }
+    return { points, segments };
+  }
   const source = path.closed ? [...path.points, path.points[0]] : path.points;
-  const points = source.length ? [source[0]] : [];
   for (let i = 1; i < source.length && distance > 0; i++) {
     const a = source[i - 1],
       b = source[i],
@@ -383,7 +467,37 @@ function partialPath(path: ShapePath, distance: number) {
     points.push(point(a.x + (b.x - a.x) * ratio, a.y + (b.y - a.y) * ratio));
     distance -= length;
   }
-  return points;
+  return { points };
+}
+function pathData(path: ShapePath, closed: boolean) {
+  const points = path.points;
+  if (!points.length) return "";
+  if (path.segments) {
+    const d = points[0];
+    return (
+      `M${d.x.toFixed(3)},${d.y.toFixed(3)}` +
+      path.segments
+        .map((segment) =>
+          segment.kind === "cubic"
+            ? ` C${segment.c1.x.toFixed(3)},${segment.c1.y.toFixed(3)} ${segment.c2.x.toFixed(3)},${segment.c2.y.toFixed(3)} ${segment.end.x.toFixed(3)},${segment.end.y.toFixed(3)}`
+            : ` L${segment.end.x.toFixed(3)},${segment.end.y.toFixed(3)}`,
+        )
+        .join("") +
+      (closed ? " Z" : "")
+    );
+  }
+  return (
+    points
+      .map((p, i) => `${i ? "L" : "M"}${p.x.toFixed(3)},${p.y.toFixed(3)}`)
+      .join(" ") + (closed ? " Z" : "")
+  );
+}
+function outlinePoints(path: ShapePath) {
+  if (!path.segments) return path.points;
+  return path.segments.reduce<Point[]>(
+    (points, segment) => [...points, ...samplePenSegment(segment).slice(1)],
+    path.points.slice(0, 1),
+  );
 }
 /** Identical vector geometry is used by canvas, mattes and PNG export frames. */
 export function annotationSvgBody(
@@ -404,13 +518,10 @@ export function annotationSvgBody(
     .map((path) => {
       const length = pathLength(path),
         complete = remaining >= length - 1e-6;
-      const points = partialPath(path, remaining);
+      const partial = partialPath(path, remaining);
       remaining = Math.max(0, remaining - length);
-      if (points.length < 2) return "";
-      const d =
-        points
-          .map((p, i) => `${i ? "L" : "M"}${p.x.toFixed(3)},${p.y.toFixed(3)}`)
-          .join(" ") + (complete && path.closed ? " Z" : "");
+      if (partial.points.length < 2 && !partial.segments?.length) return "";
+      const d = pathData(partial, complete && !!path.closed);
       const dash =
         style.lineStyle === "solid" || path.solid
           ? ""
@@ -425,10 +536,11 @@ export function annotationSvgBody(
           return `<g opacity="0.72">${[-0.22, 0, 0.22].map((shift, i) => ink(width * (i === 1 ? 0.28 : 0.13), path.stroke, ` transform="translate(${shift * width},${-shift * width})" opacity="${i === 1 ? 0.8 : 0.5}"`)).join("")}</g>`;
         case "calligraphy": {
           // A flat nib keeps a fixed diagonal orientation as the path changes direction.
-          const half = width * 0.42;
+          const half = width * 0.42,
+            outlineSource = outlinePoints(partial);
           const outline = [
-            ...points.map((p) => point(p.x - half, p.y + half)),
-            ...points
+            ...outlineSource.map((p) => point(p.x - half, p.y + half)),
+            ...outlineSource
               .slice()
               .reverse()
               .map((p) => point(p.x + half, p.y - half)),

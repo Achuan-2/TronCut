@@ -132,7 +132,8 @@ export default function App() {
     [importReport, setImportReport] = useState<string[] | null>(null);
   const [preferencesOpen, setPreferencesOpen] = useState(false);
   useEffect(() => {
-    if (editor.canvasMode === "draw") setTab("annotations");
+    if (["draw", "polygon"].includes(editor.canvasMode))
+      setTab("annotations");
   }, [editor.canvasMode, editor.penToolRequest]);
   const [preferencesTab, setPreferencesTab] = useState("program");
   const [editingInput, setEditingInput] = useState(false);

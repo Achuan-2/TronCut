@@ -132,7 +132,7 @@ try {
   await reset();
 
   await page.getByRole("tab", { name: "形状标注", exact: true }).click();
-  await expect(page.locator(".shape-presets > button")).toHaveCount(8);
+  await expect(page.locator(".shape-presets > button")).toHaveCount(9);
   await page.getByRole("button", { name: "五角星", exact: true }).click();
   assert((await save()).clips.some((clip) => clip.shape === "star"));
   await page.screenshot({ path: path.join(root, "shapes.png") });

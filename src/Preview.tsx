@@ -110,6 +110,7 @@ import {
 } from "../shared/annotation-style";
 import AnnotationEffectLayer from "./AnnotationEffectLayer";
 import CanvasDrawingOverlay from "./CanvasDrawingOverlay";
+import CanvasPolygonOverlay from "./CanvasPolygonOverlay";
 import ClipContextMenu, {
   type ClipCommand,
   type ClipMenuPosition,
@@ -365,7 +366,11 @@ function PreviewLayerImpl({
   if (effects.flipX) radii = [radii[1], radii[0], radii[3], radii[2]];
   if (effects.flipY) radii = [radii[3], radii[2], radii[1], radii[0]];
   const selectable =
-    interactive && !track?.locked && clip.kind !== "audio" && mode !== "draw";
+    interactive &&
+    !track?.locked &&
+    clip.kind !== "audio" &&
+    mode !== "draw" &&
+    mode !== "polygon";
   const [effectDrop, setEffectDrop] = useState(false);
   useEffect(() => {
     if (!effectDrop) return;
@@ -1624,6 +1629,9 @@ export default function Preview({
             <ScenePreview editor={editor} scale={scale} mode={mode} normalizedAudio={normalizedAudio.assets} />
             {mode === "draw" && !fullscreen && (
               <CanvasDrawingOverlay editor={editor} />
+            )}
+            {mode === "polygon" && !fullscreen && (
+              <CanvasPolygonOverlay editor={editor} />
             )}
             {!project.clips.length && (
               <div className="canvas-empty">

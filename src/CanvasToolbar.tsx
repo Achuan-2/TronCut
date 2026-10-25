@@ -13,7 +13,7 @@ import type { Editor } from "./useEditor";
 import { transformAt } from "../shared/editor";
 import { visualClipAt } from "../shared/visual-state";
 
-export type CanvasMode = "select" | "crop" | "draw";
+export type CanvasMode = "select" | "crop" | "draw" | "polygon";
 export type CanvasZoom = "fit" | number;
 const zoomPresets = [25, 50, 75, 100, 200, 300, 800, 1200, 1600, 2000];
 const presets = [

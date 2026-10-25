@@ -27,8 +27,8 @@ export default function AnnotationsPanel({ editor }: { editor: Editor }) {
   >("text");
   const categories = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    if (editor.canvasMode !== "draw") return;
-    setCategory("pen");
+    if (!["draw", "polygon"].includes(editor.canvasMode)) return;
+    setCategory(editor.canvasMode === "draw" ? "pen" : "shapes");
     const frame = requestAnimationFrame(() =>
       categories.current?.scrollIntoView({ block: "nearest" }),
     );
@@ -252,29 +252,52 @@ export default function AnnotationsPanel({ editor }: { editor: Editor }) {
           )}
         </div>
       ) : (
-        <div className="shape-presets">
-          {(category === "arrows"
-            ? arrowPresets
-            : category === "shapes"
-              ? shapePresets
-              : category === "sketch"
-                ? sketchPresets
-                : annotationEffectPresets
-          ).map((preset) => (
-            <button
-              key={preset.id}
-              aria-label={preset.name}
-              title={preset.name}
-              data-annotation={preset.id}
-              draggable
-              onDragStart={(event) => drag(event, preset.template)}
-              onClick={() => editor.addAnnotation(preset.template)}
-            >
-              <AnnotationPresetPreview template={preset.template} />
-              <span>{preset.name}</span>
-            </button>
-          ))}
-        </div>
+        <>
+          {category === "shapes" && (
+            <p className="small-note">
+              单击创建角点，按住拖动绘制曲线；Ctrl/Cmd 移动锚点，Alt 独立调整手柄。
+            </p>
+          )}
+          <div className="shape-presets">
+            {category === "shapes" && (
+              <button
+                aria-label="钢笔"
+                title="钢笔：逐点绘制自定义闭合形状"
+                data-annotation="polygon-pen"
+                aria-pressed={editor.canvasMode === "polygon"}
+                onClick={editor.activatePolygon}
+              >
+                <PenTool
+                  className="polygon-pen-icon"
+                  size={40}
+                  aria-hidden="true"
+                />
+                <span>钢笔</span>
+              </button>
+            )}
+            {(category === "arrows"
+              ? arrowPresets
+              : category === "shapes"
+                ? shapePresets
+                : category === "sketch"
+                  ? sketchPresets
+                  : annotationEffectPresets
+            ).map((preset) => (
+              <button
+                key={preset.id}
+                aria-label={preset.name}
+                title={preset.name}
+                data-annotation={preset.id}
+                draggable
+                onDragStart={(event) => drag(event, preset.template)}
+                onClick={() => editor.addAnnotation(preset.template)}
+              >
+                <AnnotationPresetPreview template={preset.template} />
+                <span>{preset.name}</span>
+              </button>
+            ))}
+          </div>
+        </>
       )}
     </div>
   );

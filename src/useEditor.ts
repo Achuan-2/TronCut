@@ -139,14 +139,19 @@ import {
 } from "../shared/playback";
 import { usePresetLibrary } from "./usePresetLibrary";
 import { animationDropTarget } from "../shared/animation-drag";
-import { shapeSize } from "../shared/annotation-style";
-import type { DrawingStroke } from "../shared/annotation-style";
+import { shapeSize, type DrawingStroke } from "../shared/annotation-style";
 import {
   drawingStrokesToCanvas,
   fitFreehandStrokes,
   freehandAnnotation,
   type PenSettings,
 } from "../shared/freehand";
+import {
+  fitPolygonAnnotation,
+  polygonAnnotation,
+} from "../shared/polygon";
+import type { BezierAnchor } from "../shared/bezier";
+import type { CanvasMode } from "./CanvasToolbar";
 import { createPlaybackStore } from "./playback-store";
 import { stitchClips, stitchSelectionError, unstitchClips } from "../shared/stitch";
 import {
@@ -229,9 +234,7 @@ export function useEditor(
   );
   const [textSelection, setTextSelection] = useState<(TextRange & { clipId: string }) | null>(null);
   const [zoomPanDraft, setZoomPanDraft] = useState<Transform | null>(null);
-  const [canvasMode, setCanvasMode] = useState<"select" | "crop" | "draw">(
-    "select",
-  );
+  const [canvasMode, setCanvasMode] = useState<CanvasMode>("select");
   const [penToolRequest, setPenToolRequest] = useState(0);
   const [penSettings, setPenSettings] = useState<PenSettings>({
     color: "#ff2020",
@@ -242,6 +245,7 @@ export function useEditor(
   });
   const [penDraft, setPenDraft] = useState<DrawingStroke[]>([]);
   const [penTargetId, setPenTargetId] = useState<string | null>(null);
+  const [polygonTargetId, setPolygonTargetId] = useState<string | null>(null);
   const penStart = useRef<number | null>(null);
   useEffect(() => {
     if (canvasMode !== "draw") {
@@ -249,6 +253,7 @@ export function useEditor(
       setPenTargetId(null);
       penStart.current = null;
     }
+    if (canvasMode !== "polygon") setPolygonTargetId(null);
   }, [canvasMode]);
   const [clipProperties, setClipProperties] = useState<Clip | null>(null);
   const [visualEffectSelection, setSelectedVisualEffect] =
@@ -1264,7 +1269,11 @@ export function useEditor(
       }
       const clip = annotationClip(template, track.id, time);
       clip.duration = duration;
-      if (clip.kind === "shape" && clip.shape !== "freehand")
+      if (
+        clip.kind === "shape" &&
+        clip.shape !== "freehand" &&
+        clip.shape !== "polygon"
+      )
         clip.transform.scale = Math.max(
           0.05,
           Math.min(
@@ -1282,6 +1291,55 @@ export function useEditor(
     },
     [apply, playback, select, setPlaying, seek],
   );
+  const activatePolygon = () => {
+    setPlaying(false);
+    if (editingTextId) endTextEdit(editingTextId);
+    if (canvasMode === "polygon") return;
+    const target = selectedId
+      ? current.current.clips.find((clip) => clip.id === selectedId)
+      : undefined;
+    const track = target
+      ? current.current.tracks.find((item) => item.id === target.trackId)
+      : undefined;
+    const editable =
+      target?.kind === "shape" &&
+      target.shape === "polygon" &&
+      target.linePoints &&
+      !track?.locked &&
+      !track?.hidden;
+    if (editable) {
+      const time =
+        playhead >= target.start && playhead < target.start + target.duration
+          ? playhead
+          : target.start;
+      if (time !== playhead) seek(time);
+    }
+    setPolygonTargetId(editable ? target.id : null);
+    setCanvasMode("polygon");
+  };
+  const finishPolygon = (points: readonly BezierAnchor[], time: number) => {
+    const target = polygonTargetId
+      ? current.current.clips.find((clip) => clip.id === polygonTargetId)
+      : undefined;
+    if (target) {
+      const next = fitPolygonAnnotation(
+        target,
+        points,
+        current.current.canvas,
+        Math.max(0, Math.min(target.duration, playhead - target.start)),
+      );
+      if (!next) return false;
+      updateClip(target.id, next);
+      select(target.id);
+      setCanvasMode("select");
+      return true;
+    }
+    const result = polygonAnnotation(points, current.current.canvas);
+    if (!result) return false;
+    addAnnotation(result.template, time, undefined, result.position);
+    setCanvasMode("select");
+    return true;
+  };
   const addPenStroke = (stroke: DrawingStroke) => {
     penStart.current ??= playback.getSnapshot();
     setPenDraft((strokes) => [...strokes, stroke]);
@@ -1976,6 +2034,9 @@ export function useEditor(
     canvasMode,
     penToolRequest,
     activatePen,
+    activatePolygon,
+    finishPolygon,
+    polygonTargetId,
     setCanvasMode,
     penSettings,
     penDraft,

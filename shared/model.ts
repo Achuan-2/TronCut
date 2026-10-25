@@ -7,7 +7,7 @@ import { transitionSchema } from "./transitions";
 import { exportSettingsSchema } from "./export-settings";
 import { visualEffectsSchema } from "./visual-effects";
 import { effectWindowSchema, effectOriginSchema } from "./effect-timing";
-import { annotationShapeSchema, shapeStyleSchema, drawingSchema, annotationEffectSchema } from "./annotation-style";
+import { annotationShapeSchema, shapeStyleSchema, drawingSchema, annotationEffectSchema, linePointsSchema } from "./annotation-style";
 
 const finite = z.number().finite();
 const identifier = z
@@ -255,11 +255,8 @@ export const projectSchema = z.object({
         shape: annotationShapeSchema.optional(),
         shapeStyle: shapeStyleSchema.optional(),
         shapeSize: z.object({ width: finite.min(1).max(32768), height: finite.min(1).max(32768) }).optional(),
-        // Normalized shaft samples keep endpoint/curve edits editable at any size.
-        linePoints: z.array(z.object({
-          x: finite.min(0).max(1),
-          y: finite.min(0).max(1),
-        })).min(2).max(128).optional(),
+        // Normalized line samples and pen anchors remain editable at any size.
+        linePoints: linePointsSchema.optional(),
         drawing: drawingSchema.optional(),
         annotationEffect: annotationEffectSchema.optional(),
         fill: z
