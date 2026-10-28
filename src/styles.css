@@ -2069,6 +2069,23 @@ fieldset:disabled {
   overflow: hidden;
   touch-action: none;
 }
+.timeline-camera-header, .timeline-camera {
+  height: 44px;
+  box-sizing: border-box;
+  border-bottom: 1px solid var(--border);
+  background: #20312b;
+}
+.timeline-camera-header { display: flex; align-items: center; justify-content: space-between; padding: 0 10px; color: var(--accent); font-size: 12px; }
+.timeline-camera-header button { padding: 3px; display: flex; }
+.timeline-camera { position: relative; }
+.camera-animation { position: absolute; top: 10px; height: 24px; }
+.camera-animation button { position: absolute; padding: 0; border: 1px solid #76e5b5; background: #39765c; color: white; touch-action: none; }
+.camera-animation-move { inset: 0; width: 100%; cursor: grab; }
+.camera-animation-start, .camera-animation-end { top: 3px; height: 18px; width: 9px; border-radius: 50%; cursor: ew-resize; }
+.camera-animation-start { left: -4px; }
+.camera-animation-end { right: -4px; }
+.camera-animation button:focus-visible { outline: 2px solid white; z-index: 2; }
+.camera-animation-remove { position: absolute; top: 4px; z-index: 20; }
 .zoom-pan-overview .canvas-scene {
   pointer-events: none;
 }

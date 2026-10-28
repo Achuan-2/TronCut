@@ -51,7 +51,8 @@ import {
   rotationDragStep,
   type DragAxis,
 } from "../shared/canvas";
-import { setVideoZoomPan, unzoomVideoPreview } from "../shared/video-zoom-pan";
+import { unzoomVideoPreview } from "../shared/video-zoom-pan";
+import { updateCanvasCamera } from "../shared/canvas-camera";
 import {
   resizeTextBox,
   textLineHeight,
@@ -1193,7 +1194,7 @@ export function ScenePreview({
   const project = !applyVideoZoomPan
     ? unzoomVideoPreview(editor.project, playhead)
     : editor.zoomPanDraft
-      ? setVideoZoomPan(editor.project, editor.zoomPanDraft, playhead)
+      ? updateCanvasCamera(editor.project, editor.zoomPanDraft, playhead)
       : editor.project;
   const camera = applyCamera ? cameraAt(project, playhead) : null;
   const active = projectIndex(editor.project).active(

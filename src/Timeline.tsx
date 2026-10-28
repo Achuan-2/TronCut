@@ -59,6 +59,7 @@ import {
   removeMarker,
 } from "../shared/markers";
 import TimelineMarkers from "./TimelineMarkers";
+import TimelineCamera, { cameraLaneHeight } from "./TimelineCamera";
 import MarkerDialog from "./MarkerDialog";
 import { snapTime, splitClip, transformAt } from "../shared/editor";
 import { editableCanvasIds } from "../shared/canvas-actions";
@@ -574,8 +575,9 @@ export default function Timeline({
     const bottom = Math.max(next.startY, next.y);
     const trackIds = timelineTracks.flatMap((track, index) => {
       const inset = trackLayouts[index].clipInset;
-      const clipTop = 36 + trackTop(track.id) + inset - 1;
-      const clipBottom = 36 + trackTop(track.id) + trackHeights[index] - inset;
+      const clipTop = 36 + cameraLaneHeight + trackTop(track.id) + inset - 1;
+      const clipBottom =
+        36 + cameraLaneHeight + trackTop(track.id) + trackHeights[index] - inset;
       return clipTop <= bottom && clipBottom >= top ? [track.id] : [];
     });
     const hits = clipsInTimelineRange(
@@ -672,13 +674,13 @@ export default function Timeline({
     );
     if (!element || index < 0) return;
     const height = trackHeights[index];
-    const top = 36 + trackTop(selectedTrackId!);
+    const top = 36 + cameraLaneHeight + trackTop(selectedTrackId!);
     if (top < element.scrollTop + 36) element.scrollTop = Math.max(0, top - 36);
     else if (top + height > element.scrollTop + element.clientHeight)
       element.scrollTop = top + height - element.clientHeight;
   }, [selectedTrackId, project.tracks.length, layoutKey, trackHeightDraft]);
   const trackOffsets = useMemo(() => {
-    let top = 36;
+    let top = 36 + cameraLaneHeight;
     return trackHeights.map((height) => {
       const offset = top;
       top += height;
@@ -1085,6 +1087,20 @@ export default function Timeline({
               </button>
             </div>
           </div>
+          <div
+            className="timeline-camera-header"
+            style={{ height: cameraLaneHeight }}
+          >
+            <span title="作用于整个画布">画布运镜</span>
+            <button
+              aria-label="添加画布运镜"
+              title="在主时间轴播放头添加画布缩放与平移"
+              disabled={!!editor.timelineBounds || !project.clips.length}
+              onClick={editor.addCanvasZoomPan}
+            >
+              <Plus size={15} />
+            </button>
+          </div>
           {timelineTracks.map((track, index) => (
             <div
               className={`track-header ${trackLayouts[index].compact ? "compact-track" : ""} ${track.locked ? "locked" : ""} ${track.captionTrack ? "caption-track" : ""} ${track.solo ? "solo-track" : ""} ${project.tracks.some((item) => item.solo) && !track.solo ? "inactive-solo-track" : ""}`}
@@ -1277,7 +1293,7 @@ export default function Timeline({
               width,
               minHeight: Math.max(
                 editor.timelineBounds ? viewport.height : 0,
-                trackHeights.reduce((sum, height) => sum + height, 36),
+                trackHeights.reduce((sum, height) => sum + height, 36 + cameraLaneHeight),
               ),
             }}
             onPointerDown={(event) => {
@@ -1419,6 +1435,7 @@ export default function Timeline({
                 onRevealTime={revealRangeTime}
               />
             </div>
+            <TimelineCamera editor={editor} zoom={zoom} />
             {fileDrop && (
               <div
                 className="external-drop-marker"

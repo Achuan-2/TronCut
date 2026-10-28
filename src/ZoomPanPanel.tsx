@@ -1,11 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { clampCamera, resizeHandles, resizeTransform } from "../shared/canvas";
-import type { Transform } from "../shared/model";
-import {
-  zoomPanAt,
-  zoomPanVideos,
-  clearVideoZoomPan,
-} from "../shared/video-zoom-pan";
+import { cameraAt, clampCamera, resizeHandles, resizeTransform } from "../shared/canvas";
+import { projectDuration, type Transform } from "../shared/model";
 import { useEditorPlayhead, type Editor } from "./useEditor";
 import { ScenePreview } from "./Preview";
 import NumberInput from "./NumberInput";
@@ -25,8 +20,8 @@ export default function ZoomPanPanel({ editor }: { editor: Editor }) {
     handle?: { x: number; y: number };
   } | null>(null);
   const camera =
-    editor.zoomPanDraft ?? zoomPanAt(editor.project, playhead);
-  const available = zoomPanVideos(editor.project, playhead).length > 0;
+    editor.zoomPanDraft ?? cameraAt(editor.project, playhead);
+  const available = !editor.timelineBounds && projectDuration(editor.project) > 0;
   useEffect(() => {
     const element = overview.current;
     if (!element) return;
@@ -39,11 +34,14 @@ export default function ZoomPanPanel({ editor }: { editor: Editor }) {
       editor.setZoomPanDraft(null);
     };
   }, [editor.setZoomPanDraft]);
+  if (editor.timelineBounds)
+    return <p className="panel-intro">请返回主时间轴编辑全局画布运镜。</p>;
   return (
     <>
       <p className="panel-intro">
-        移动播放头，再拖动取景框或调整缩放，为当前时间的视频自动添加动画。
+        在时间轴添加全局运镜，移动播放头后拖动取景框或调整缩放。效果作用于整个画布，可在独立运镜行拖动动画和端点。
       </p>
+      <button disabled={!available} onClick={editor.addCanvasZoomPan}>添加画布缩放与平移</button>
       <div
         className="zoom-pan-overview"
         ref={overview}
@@ -115,7 +113,7 @@ export default function ZoomPanPanel({ editor }: { editor: Editor }) {
         }}
         onPointerUp={() => {
           if (drag.current)
-            editor.updateVideoZoomPan(drag.current.value, drag.current.time);
+            editor.updateCanvasZoomPan(drag.current.value, drag.current.time);
           drag.current = null;
           editor.setZoomPanDraft(null);
         }}
@@ -129,7 +127,6 @@ export default function ZoomPanPanel({ editor }: { editor: Editor }) {
           scale={width / editor.project.canvas.width}
           interactive={false}
           applyCamera={false}
-          applyVideoZoomPan={false}
         />
         <div
           className="camera-viewport"
@@ -160,24 +157,14 @@ export default function ZoomPanPanel({ editor }: { editor: Editor }) {
         <button
           disabled={!available}
           onClick={() =>
-            editor.updateVideoZoomPan({ x: 0.5, y: 0.5, scale: 1 })
+            editor.updateCanvasZoomPan({ x: 0.5, y: 0.5, scale: 1 })
           }
         >
           全画面
         </button>
         <button
-          disabled={
-            !editor.project.camera &&
-            !editor.project.clips.some(
-              (clip) =>
-                clip.kind === "video" &&
-                clip.keyframes.some((frame) => frame.zoomPan) &&
-                !editor.project.tracks.find(
-                  (track) => track.id === clip.trackId,
-                )?.locked,
-            )
-          }
-          onClick={() => editor.apply(clearVideoZoomPan)}
+          disabled={!editor.project.camera}
+          onClick={() => editor.apply(project => ({ ...project, camera: undefined }))}
         >
           清除运镜
         </button>
@@ -193,7 +180,7 @@ export default function ZoomPanPanel({ editor }: { editor: Editor }) {
           step={1}
           value={Math.round(camera.scale * 100)}
           onChange={(event) =>
-            editor.updateVideoZoomPan({
+            editor.updateCanvasZoomPan({
               scale: Number(event.target.value) / 100,
             })
           }
@@ -206,7 +193,7 @@ export default function ZoomPanPanel({ editor }: { editor: Editor }) {
           step={1}
           value={Number((camera.scale * 100).toFixed(1))}
           onValueChange={(value) =>
-            editor.updateVideoZoomPan({ scale: value / 100 })
+            editor.updateCanvasZoomPan({ scale: value / 100 })
           }
         />
         <span>%</span>

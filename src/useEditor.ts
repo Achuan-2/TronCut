@@ -80,7 +80,10 @@ import {
   type Transition,
   type TransitionType,
 } from "../shared/transitions";
-import { setVideoZoomPan } from "../shared/video-zoom-pan";
+import {
+  updateCanvasCamera,
+  addCanvasCameraAnimation,
+} from "../shared/canvas-camera";
 import { type ContentTransform } from "../shared/crop";
 import { animateContent, animateCrop } from "../shared/crop-animation";
 import type { Crop } from "../shared/crop";
@@ -1800,11 +1803,12 @@ export function useEditor(
   const endTextEdit = useCallback((id: string) => {
     setEditingTextId((current) => (current === id ? null : current));
   }, []);
-  const updateVideoZoomPan = useCallback(
+  const updateCanvasZoomPan = useCallback(
     (patch: Partial<Transform>, time = playback.getSnapshot()) => {
+      if (scopeRef.current) return;
       setPlaying(false);
       apply((project) =>
-        setVideoZoomPan(
+        updateCanvasCamera(
           project,
           patch,
           time,
@@ -1814,6 +1818,18 @@ export function useEditor(
     },
     [apply, playback],
   );
+  const addCanvasZoomPan = useCallback(() => {
+    if (scopeRef.current || !current.current.clips.length) return;
+    const added = addCanvasCameraAnimation(
+      current.current,
+      playback.getSnapshot(),
+      defaults.current.timing.animation,
+    );
+    if (!added) return;
+    setPlaying(false);
+    apply(() => added.project);
+    seek(added.time);
+  }, [apply, playback, seek]);
   const stepFrame = useCallback(
     (direction: PlaybackDirection) => {
       setPlaying(false);
@@ -2122,7 +2138,8 @@ export function useEditor(
     endTextEdit,
     zoomPanDraft,
     setZoomPanDraft,
-    updateVideoZoomPan,
+    updateCanvasZoomPan,
+    addCanvasZoomPan,
     stepFrame,
     jumpMedia,
     autoAnimate,

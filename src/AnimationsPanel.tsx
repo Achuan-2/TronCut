@@ -63,18 +63,20 @@ export default function AnimationsPanel({
           </button>
         ))}
       </div>
-      <div className="animation-auto-control">
-        <label title={autoAnimateHelp}>
-          <input
-            type="checkbox"
-            aria-label="开启自动动画"
-            title={autoAnimateHelp}
-            checked={editor.autoAnimate}
-            onChange={(event) => editor.setAutoAnimate(event.target.checked)}
-          />
-          <span>开启自动动画</span>
-        </label>
-      </div>
+      {category === "presets" && (
+        <div className="animation-auto-control">
+          <label title={autoAnimateHelp}>
+            <input
+              type="checkbox"
+              aria-label="开启自动动画"
+              title={autoAnimateHelp}
+              checked={editor.autoAnimate}
+              onChange={(event) => editor.setAutoAnimate(event.target.checked)}
+            />
+            <span>开启自动动画</span>
+          </label>
+        </div>
+      )}
       <div
         role="tabpanel"
         id={`animation-panel-${category}`}
