@@ -9,6 +9,7 @@ import {
   displayTrackName,
   insertTrack,
   moveTrack,
+  reorderTrack,
   removeTrack,
   removeEmptyTracks,
   renameTrack,
@@ -18,6 +19,23 @@ import {
 import { frameSnapshot } from "../shared/frame-snapshot";
 
 describe("轨道右键操作", () => {
+  it("拖动可插入指定轨道上下方，不改动片段、名称和轨道状态，原位放下不产生变更", () => {
+    const project = createProject();
+    project.clips = [newText("video", 2)];
+    project.tracks[1] = { ...project.tracks[1], name: "画面", customName: true, locked: true, height: 120 };
+    const below = reorderTrack(project, "titles", "audio", "below");
+    expect(below.tracks.map((track) => track.id)).toEqual(["video", "audio", "titles"]);
+    expect(below.clips).toBe(project.clips);
+    expect(below.tracks[0]).toEqual(project.tracks[1]);
+    const above = reorderTrack(below, "titles", "video", "above");
+    expect(above.tracks.map((track) => track.id)).toEqual(project.tracks.map((track) => track.id));
+    expect(reorderTrack(project, "titles", "video", "above")).toBe(project);
+    expect(reorderTrack(project, "video", "titles", "below")).toBe(project);
+    expect(reorderTrack(project, "video", "video", "below")).toBe(project);
+    expect(reorderTrack(project, "missing", "video", "above")).toBe(project);
+    expect(reorderTrack(project, "video", "missing", "above")).toBe(project);
+    expect(() => validateProject(below)).not.toThrow();
+  });
   it("上下插入和四向移动保留片段所属轨道、时间与自定义名称", () => {
     let project = createProject();
     project.clips = [newText("video", 2)];

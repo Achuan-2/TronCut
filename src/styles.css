@@ -3844,12 +3844,39 @@ fieldset:disabled {
 }
 .track-header {
   position: relative;
+  cursor: grab;
+  touch-action: none;
   height: 70px;
   padding: 11px 12px 8px 17px;
   border-bottom: 1px solid #333e36;
   display: flex;
   justify-content: space-between;
   flex-direction: column;
+}
+.track-header.track-reorder-source {
+  background: #76e5b51a;
+  opacity: 0.7;
+}
+.timeline-body.track-reordering,
+.timeline-body.track-reordering * {
+  cursor: grabbing;
+}
+:is(.track-header, .track-lane).track-drop-above::before,
+:is(.track-header, .track-lane).track-drop-below::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: #76e5b5;
+  pointer-events: none;
+  z-index: 20;
+}
+:is(.track-header, .track-lane).track-drop-above::before {
+  top: 0;
+}
+:is(.track-header, .track-lane).track-drop-below::after {
+  bottom: 0;
 }
 .track-header > div:first-child {
   display: flex;

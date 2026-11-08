@@ -31,7 +31,7 @@ import { probeMedia } from "../electron/media";
 import { runProcess, findBinary } from "../electron/process";
 import fs from "node:fs/promises";
 import path from "node:path";
-import { toggleTrack, removeTrack, moveTrack, canMoveTrack } from "../shared/tracks";
+import { toggleTrack, removeTrack, moveTrack, canMoveTrack, reorderTrack } from "../shared/tracks";
 
 const screen: Asset = {
   id: "screen",
@@ -118,6 +118,26 @@ it("拆分录屏共用内部轨道时仍整体移动，并修复旧项目已颠�
   const repaired = moveTrack(inverted, screen.trackId, "bottom");
   expect(repaired.tracks.findIndex((track) => track.id === screen.trackId)).toBeLessThan(repaired.tracks.findIndex((track) => track.id === bg.trackId));
   expect(repaired.clips).toBe(inverted.clips);
+});
+
+it("拖动录屏到指定轨道旁边，或拖动其他轨道跨过录屏，都不分离内部图层", () => {
+  const project = recording();
+  const screen = project.clips[0];
+  const members = project.clips.filter((clip) => clip.groupId === screen.groupId);
+  const tracks = members.map((clip) => clip.trackId);
+  const moved = reorderTrack(project, screen.trackId, "audio", "below");
+  expect(moved.tracks.slice(-tracks.length).map((track) => track.id)).toEqual(tracks);
+  expect(moved.clips).toBe(project.clips);
+  const crossing = reorderTrack(project, "audio", screen.trackId, "below");
+  const first = crossing.tracks.findIndex((track) => track.id === screen.trackId);
+  expect(crossing.tracks.slice(first, first + tracks.length).map((track) => track.id)).toEqual(tracks);
+  expect(crossing.tracks[first + tracks.length].id).toBe("audio");
+  expect(reorderTrack(project, screen.trackId, members.at(-1)!.trackId, "below")).toBe(project);
+  const split = splitSelection(project, [screen.id], 5);
+  expect(recordingGroups(split).size).toBe(2);
+  const splitMoved = reorderTrack(split, screen.trackId, "audio", "below");
+  expect(splitMoved.tracks.slice(-tracks.length).map((track) => track.id)).toEqual(tracks);
+  expect(() => validateProject(splitMoved)).not.toThrow();
 });
 
 it("录屏、声音和背景组成对象，摄像头始终作为独立图层处理", () => {

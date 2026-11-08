@@ -73,12 +73,7 @@ export function insertTrack(
 }
 
 /** Recording masters and their hidden tracks form one movable layer block. */
-function trackMovePlan(
-  project: Project,
-  id: string,
-  direction: "up" | "down" | "top" | "bottom",
-) {
-  if (!project.tracks.some((track) => track.id === id)) return null;
+function trackBlocks(project: Project) {
   const owners = new Map(project.tracks.map((track) => [track.id, track.id]));
   const root = (id: string): string => {
     const parent = owners.get(id)!;
@@ -113,7 +108,29 @@ function trackMovePlan(
     block.push(track);
     grouped.set(owner, block);
   }
-  const blocks = [...grouped.values()];
+  return { blocks: [...grouped.values()], ranks };
+}
+
+function placeTrackBlock(
+  blocks: Track[][],
+  from: number,
+  to: number,
+  ranks: Map<string, number>,
+) {
+  // Repair older inverted screen/background order within a moved block too.
+  const [block] = blocks.splice(from, 1);
+  block.sort((a, b) => (ranks.get(a.id) ?? 0) - (ranks.get(b.id) ?? 0));
+  blocks.splice(to, 0, block);
+  return blocks.flat();
+}
+
+function trackMovePlan(
+  project: Project,
+  id: string,
+  direction: "up" | "down" | "top" | "bottom",
+) {
+  if (!project.tracks.some((track) => track.id === id)) return null;
+  const { blocks, ranks } = trackBlocks(project);
   const index = blocks.findIndex((block) =>
     block.some((track) => track.id === id),
   );
@@ -127,11 +144,7 @@ function trackMovePlan(
             Math.min(blocks.length - 1, index + (direction === "up" ? -1 : 1)),
           );
   if (destination === index) return null;
-  // Repair older inverted screen/background order within a moved block too.
-  const [block] = blocks.splice(index, 1);
-  block.sort((a, b) => (ranks.get(a.id) ?? 0) - (ranks.get(b.id) ?? 0));
-  blocks.splice(destination, 0, block);
-  return blocks.flat();
+  return placeTrackBlock(blocks, index, destination, ranks);
 }
 
 export function canMoveTrack(
@@ -149,6 +162,27 @@ export function moveTrack(
 ): Project {
   const tracks = trackMovePlan(project, id, direction);
   if (!tracks) return project;
+  return { ...project, tracks: numberTracks(tracks) };
+}
+
+/** Drop a track above or below another track without separating recording layers. */
+export function reorderTrack(
+  project: Project,
+  id: string,
+  targetId: string,
+  side: "above" | "below",
+): Project {
+  const { blocks, ranks } = trackBlocks(project);
+  const from = blocks.findIndex((block) =>
+    block.some((track) => track.id === id),
+  );
+  const target = blocks.findIndex((block) =>
+    block.some((track) => track.id === targetId),
+  );
+  if (from < 0 || target < 0 || from === target) return project;
+  const to = target + Number(side === "below") - Number(from < target);
+  if (from === to) return project;
+  const tracks = placeTrackBlock(blocks, from, to, ranks);
   return { ...project, tracks: numberTracks(tracks) };
 }
 

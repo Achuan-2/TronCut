@@ -121,6 +121,7 @@ import {
   toggleTrack,
 } from "../shared/tracks";
 import TrackResizeHandle from "./TrackResizeHandle";
+import { useTrackReorder } from "./useTrackReorder";
 import TrackContextMenu, { type TrackMenuPosition } from "./TrackContextMenu";
 import ClipContextMenu, { type ClipCommand } from "./ClipContextMenu";
 import ClipRenameDialog from "./ClipRenameDialog";
@@ -601,6 +602,10 @@ export default function Timeline({
       }));
   }, [editor.selectedBehavior?.clipId, editor.selectedBehavior?.behaviorId]);
   const headers = useRef<HTMLDivElement>(null);
+  const trackReorder = useTrackReorder(editor, headers, () => {
+    setContext(null);
+    setTrackMenu(null);
+  });
   const deleteControl = useRef<HTMLDivElement>(null);
   const deletePopup = useRef<HTMLDivElement>(null);
   const [deleteMenu, setDeleteMenu] = useState(false);
@@ -1019,7 +1024,7 @@ export default function Timeline({
         </div>
       </div>
       <GroupTimelineNavigation editor={editor} />
-      <div className="timeline-body">
+      <div className={`timeline-body ${trackReorder.active ? "track-reordering" : ""}`}>
         <div className="timeline-ruler-overlay">
           <div className="timeline-range-handle-scroll" ref={setRangeHandleContainer} />
         </div>
@@ -1103,12 +1108,15 @@ export default function Timeline({
           </div>
           {timelineTracks.map((track, index) => (
             <div
-              className={`track-header ${trackLayouts[index].compact ? "compact-track" : ""} ${track.locked ? "locked" : ""} ${track.captionTrack ? "caption-track" : ""} ${track.solo ? "solo-track" : ""} ${project.tracks.some((item) => item.solo) && !track.solo ? "inactive-solo-track" : ""}`}
+              className={`track-header ${trackReorder.className(track.id)} ${trackLayouts[index].compact ? "compact-track" : ""} ${track.locked ? "locked" : ""} ${track.captionTrack ? "caption-track" : ""} ${track.solo ? "solo-track" : ""} ${project.tracks.some((item) => item.solo) && !track.solo ? "inactive-solo-track" : ""}`}
               key={`${project.id}-${track.id}`}
               data-track-id={track.id}
               style={{ height: trackHeights[index] }}
+              {...trackReorder.headerProps(track.id)}
+              title="按住拖动调整轨道顺序"
               onContextMenu={(event) => {
                 event.preventDefault();
+                trackReorder.cancel();
                 setContext(null);
                 setTrackMenu({
                   trackId: track.id,
@@ -1127,7 +1135,7 @@ export default function Timeline({
               <div>
                 <span
                   className="track-name"
-                  title={displayTrackName(timelineTracks, track.id)}
+                  title={`${displayTrackName(timelineTracks, track.id)}；按住拖动调整轨道顺序`}
                 >
                   {displayTrackName(timelineTracks, track.id)}
                 </span>
@@ -1447,7 +1455,7 @@ export default function Timeline({
             {timelineTracks.map((track, trackIndex) => (
               <div
                 key={track.id}
-                className={`track-lane ${trackLayouts[trackIndex].compact ? "compact-track" : ""} ${!isTrackActive(project.tracks, track.id) ? "hidden-track" : ""} ${fileDrop?.trackId === track.id ? "external-drop-target" : ""}`}
+                className={`track-lane ${trackReorder.className(track.id)} ${trackLayouts[trackIndex].compact ? "compact-track" : ""} ${!isTrackActive(project.tracks, track.id) ? "hidden-track" : ""} ${fileDrop?.trackId === track.id ? "external-drop-target" : ""}`}
                 data-track={track.id}
                 onContextMenu={(event) => {
                   if (event.target !== event.currentTarget) return;
