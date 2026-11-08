@@ -45,6 +45,23 @@ export function recordingMaster(
   return clip?.groupId ? recordingGroups(project).get(clip.groupId) : undefined;
 }
 
+/** Hidden recording layers count as one selected timeline object. */
+export function selectedRecordingObject(
+  project: Pick<Project, "clips">,
+  ids: readonly string[],
+): Clip | undefined {
+  const master = ids.length ? recordingMaster(project, ids[0]) : undefined;
+  if (!master) return undefined;
+  const selected = new Set(ids);
+  const members = project.clips.filter(
+    (clip) => clip.groupId === master.groupId,
+  );
+  return selected.size === members.length &&
+    members.every((clip) => selected.has(clip.id))
+    ? master
+    : undefined;
+}
+
 /** Repair older recording groups on release, without moving unrelated tracks. */
 export function releasedRecordingTracks(
   project: Project,

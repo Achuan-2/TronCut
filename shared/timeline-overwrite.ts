@@ -1,6 +1,7 @@
 import type { Clip, Project } from "./model";
 import { groupMembers, groupedTimeline, rootGroupId } from "./clip-groups";
 import { editableIds, moveClipGroup, selectionWithGroups } from "./timeline";
+import { selectedRecordingObject } from "./recording-objects";
 import { exciseTimelineRange, type TimelineRange } from "./timeline-range";
 import {
   hasProjectTimelineOverlap,
@@ -94,6 +95,16 @@ export function moveTimelineClips(
   const requested = selectionWithGroups(project, ids);
   const selected = editableIds(project, requested);
   if (!selected.size || selected.size !== requested.length) return project;
+  const recording = targetTrackId
+    ? selectedRecordingObject(project, requested)
+    : undefined;
+  if (recording?.groupId)
+    return moveTimelineGroup(
+      project,
+      recording.groupId,
+      wanted,
+      targetTrackId!,
+    );
   const members = project.clips.filter((clip) => selected.has(clip.id));
   const delta = Math.max(
     -Math.min(...members.map((clip) => clip.start)),

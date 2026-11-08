@@ -19,6 +19,12 @@ import { hasProjectTimelineOverlap } from "../shared/timeline-collision";
 import { sourceTimeAt } from "../shared/media-segments";
 import { transformAt } from "../shared/editor";
 import { fadeOpacity } from "../shared/effects";
+import {
+  addRecordedAssets,
+  defaultRecordingSettings,
+} from "../shared/recording";
+import { selectedRecordingObject } from "../shared/recording-objects";
+import { selectionWithGroups, splitSelection } from "../shared/timeline";
 
 function clip(
   id: string,
@@ -65,6 +71,83 @@ function valid(project: Project) {
 }
 
 describe("时间线拖动覆盖", () => {
+  function recordingFixture() {
+    const project = fixture([]);
+    const screen = project.assets[0];
+    project.assets = [];
+    return addRecordedAssets(
+      project,
+      [
+        { asset: screen, kind: "screen" },
+        { asset: { ...screen, id: "mic", kind: "audio" }, kind: "microphone" },
+      ],
+      { ...defaultRecordingSettings, autoZoom: false },
+      2,
+      { ...screen, id: "backdrop", kind: "image", hasAudio: false },
+    );
+  }
+
+  it("录屏作为单个对象跨轨移动，隐藏声音与背景保持顺序和同步", () => {
+    const project = recordingFixture();
+    const master = project.clips[0];
+    const ids = selectionWithGroups(project, [master.id]);
+    expect(selectedRecordingObject(project, ids)?.id).toBe(master.id);
+    const moved = moveTimelineClips(project, ids, 1, "video");
+    const targetIndex = moved.tracks.findIndex((track) => track.id === "video");
+    for (const before of project.clips) {
+      const after = moved.clips.find((clip) => clip.id === before.id)!;
+      expect(after.start).toBe(before.start + 1);
+      expect(after.sourceIn).toBe(before.sourceIn);
+      expect(after.keyframes).toEqual(before.keyframes);
+      expect(after.groupId).toBe(before.groupId);
+      const layer = project.tracks.findIndex(
+        (track) => track.id === before.trackId,
+      );
+      expect(
+        moved.tracks.findIndex((track) => track.id === after.trackId),
+      ).toBe(targetIndex + layer);
+    }
+    expect(groupedTimeline(moved).clips).toHaveLength(1);
+    expect(moved.clips[0].trackId).toBe("video");
+    valid(moved);
+    const split = splitSelection(project, [master.id], 4);
+    const splitMoved = moveTimelineClips(split, [master.id], 0, "video");
+    expect(
+      splitMoved.clips.find((clip) => clip.id === master.id)?.trackId,
+    ).toBe("video");
+    expect(groupedTimeline(splitMoved).clips).toHaveLength(2);
+    valid(splitMoved);
+  });
+
+  it("录屏换轨覆盖目标片段，锁定内部来源或目标轨道时拒绝整组移动", () => {
+    const project = recordingFixture();
+    const master = project.clips[0];
+    project.clips.push(clip("under", 0, 70));
+    const moved = moveTimelineClips(project, [master.id], 0, "video");
+    expect(spans(moved, "under")).toEqual([
+      [0, 2],
+      [62, 8],
+    ]);
+    valid(moved);
+    for (const trackId of [project.clips[1].trackId, "video", "audio"]) {
+      const locked = {
+        ...project,
+        tracks: project.tracks.map((track) => ({
+          ...track,
+          locked: track.id === trackId,
+        })),
+      };
+      expect(moveTimelineClips(locked, [master.id], 0, "video")).toBe(locked);
+    }
+    expect(
+      selectedRecordingObject(project, [master.id, "under"]),
+    ).toBeUndefined();
+    const multi = moveTimelineClips(project, [master.id, "under"], 1, "titles");
+    expect(multi.clips.find((clip) => clip.id === master.id)?.trackId).toBe(
+      master.trackId,
+    );
+  });
+
   it("拖到前一素材尾部时截开原片段并直接衔接新素材", () => {
     const project = fixture([clip("A", 0, 10), clip("B", 12, 6)]);
     const result = moveTimelineClips(project, ["B"], -7);

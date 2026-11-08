@@ -141,6 +141,7 @@ import {
 import { projectIndex } from "../shared/project-index";
 import {
   recordingGroups,
+  selectedRecordingObject,
   trimRecordingObject,
 } from "../shared/recording-objects";
 import { groupName, groupedTimeline, rootGroupId } from "../shared/clip-groups";
@@ -166,6 +167,7 @@ interface Drag {
   delta: number;
   trackId: string;
   ids: string[];
+  recordingObject: boolean;
 }
 interface Marquee {
   pointerId: number;
@@ -1869,6 +1871,9 @@ export default function Timeline({
                               delta: 0,
                               trackId: c.trackId,
                               ids,
+                              recordingObject: !!selectedRecordingObject(
+                                project, ids,
+                              ),
                             };
                             latestDrag.current = gesture;
                             setDrag(gesture);
@@ -1898,7 +1903,8 @@ export default function Timeline({
                               delta: (event.clientX - gesture.x) / zoom,
                               trackId:
                                 gesture.mode === "move" &&
-                                gesture.ids.length === 1 &&
+                                (gesture.ids.length === 1 ||
+                                  gesture.recordingObject) &&
                                 target &&
                                 !target.locked &&
                                 (c.caption
@@ -1926,7 +1932,7 @@ export default function Timeline({
                                     drag.ids,
                                     Math.round(next.start * project.canvas.fps) /
                                       project.canvas.fps - drag.original.start,
-                                    drag.ids.length === 1
+                                    drag.ids.length === 1 || drag.recordingObject
                                       ? next.trackId
                                       : undefined,
                                   ),
