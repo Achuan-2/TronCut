@@ -154,6 +154,13 @@ fieldset:disabled {
   min-height: 0;
   background: #1c2125;
 }
+.startup-screen {
+  display: grid;
+  flex: 1;
+  min-height: 0;
+  place-items: center;
+  color: var(--muted);
+}
 .home-content {
   flex: 1;
   min-width: 0;

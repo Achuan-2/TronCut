@@ -110,6 +110,7 @@ export default function App() {
   const editor = useEditor(editorPreferences),
     [screen, setScreen] = useState<"home" | "editor">("home"),
     [hasSession, setHasSession] = useState(false),
+    [starting, setStarting] = useState(true),
     [recent, setRecent] = useState<RecentProject[]>([]),
     [recovery, setRecovery] = useState<RecoveryInfo | null>(null),
     [homeLoading, setHomeLoading] = useState(true),
@@ -314,11 +315,12 @@ export default function App() {
     return desktop?.onWindowState(setWindowState);
   }, [toast]);
   useEffect(() => {
-    document.title =
-      screen === "home"
+    document.title = starting
+      ? "TronCut"
+      : screen === "home"
         ? "首页 — TronCut"
         : `${editor.project.name}${editor.dirty ? " *" : ""} — TronCut`;
-  }, [screen, editor.project.name, editor.dirty]);
+  }, [starting, screen, editor.project.name, editor.dirty]);
   const refreshHome = useCallback(async () => {
     setHomeLoading(true);
     try {
@@ -871,9 +873,11 @@ export default function App() {
     editorPreferences.program.recoveryDelay,
   ]);
   useEffect(() => {
+    // Guard outside the async task: StrictMode's second effect must not finish
+    // the startup state while the first initial-project request is still pending.
+    if (initialized.current) return;
+    initialized.current = true;
     void (async () => {
-      if (initialized.current) return;
-      initialized.current = true;
       const initial = await window.framecraft?.initialProject();
       if (initial) {
         editor.replace(initial.project);
@@ -882,10 +886,12 @@ export default function App() {
         return;
       }
       await refreshHome();
-    })().catch((error) => {
-      setHomeLoading(false);
-      toast(String(error));
-    });
+    })()
+      .catch((error) => {
+        setHomeLoading(false);
+        toast(String(error));
+      })
+      .finally(() => setStarting(false));
   }, []);
   const recover = () =>
     run(async () => {
@@ -1051,7 +1057,9 @@ export default function App() {
           setMenu(false);
           setProjectMenu({ x: event.clientX, y: event.clientY });
         }}>
-          {screen === "home" ? (
+          {starting ? (
+            <span>TronCut</span>
+          ) : screen === "home" ? (
             <span>首页</span>
           ) : (
             <>
@@ -1080,7 +1088,7 @@ export default function App() {
             </span>
           </span>
         )}
-        <div className="header-actions" hidden={screen === "home"}>
+        <div className="header-actions" hidden={starting || screen === "home"}>
           <button
             className="record-button"
             disabled={recording ? !recordingActive : actionsBlocked}
@@ -1156,7 +1164,11 @@ export default function App() {
           </div>
         )}
       </header>
-      {screen === "home" ? (
+      {starting ? (
+        <div className="startup-screen" role="status">
+          正在启动…
+        </div>
+      ) : screen === "home" ? (
         <Home
           recent={recent}
           recovery={hasSession ? null : recovery}
