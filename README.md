@@ -119,9 +119,10 @@ pnpm dev
 开发时可从 PATH 查找 FFmpeg/FFprobe，安装包使用随包提供的引擎。独立二进制不提交到 Git，打包前的引擎准备方式见 [构建与发布](docs/BUILDING.md)。单独运行 Vite 只有界面预览；文件、录屏和导出需要 Electron。
 
 ```sh
-pnpm build          # 类型检查 + 编辑器与 Electron 构建
-pnpm test           # 核心逻辑与真实 FFmpeg 测试，需媒体引擎
-pnpm test:smoke     # Electron 桌面回归，先执行 build 和 test
+
+pnpm dist:win
+pnpm dist:mac
+pnpm dist:linux
 ```
 
 ## 文档与参与
