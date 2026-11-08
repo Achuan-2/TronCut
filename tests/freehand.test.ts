@@ -31,6 +31,8 @@ import {
   validateProject,
 } from "../shared/model";
 import { changeSpeed, splitClip, transformAt } from "../shared/editor";
+import { trimClip } from "../shared/clip-trim";
+import { frameSnapshot } from "../shared/frame-snapshot";
 
 const settings: PenSettings = {
   color: "#ff2020",
@@ -75,6 +77,86 @@ function fixture() {
 }
 
 describe("多笔涂鸦与绘制动画", () => {
+  it("裁短片段时绘制在新末尾完成，时间线、截帧和保存进度一致", () => {
+    const clip = fixture();
+    const trimmed = trimClip(clip, undefined, "right", 1, 30);
+    expect(trimmed.drawing?.duration).toBe(1);
+    expect(drawingProgress(trimmed, 0.5)).toBe(0.5);
+    expect(drawingProgress(trimmed, trimmed.duration)).toBe(1);
+    expect(drawingAnimationRanges(trimmed)[0]).toMatchObject({
+      start: 0,
+      end: 1,
+      hasStart: true,
+      hasEnd: true,
+    });
+    const project = { ...createProject(), clips: [trimmed] };
+    expect(drawingProgress(frameSnapshot(project, 0.5).clips[0], 0)).toBe(0.5);
+    const restored = validateProject(JSON.parse(JSON.stringify(project)))
+      .clips[0];
+    expect(drawingProgress(restored, restored.duration)).toBe(1);
+    expect(clip.drawing?.duration).toBe(2);
+  });
+
+  it("裁短保留可用的绘制延迟，裁到延迟内仍完整播放绘制", () => {
+    const clip = fixture();
+    clip.drawing = { ...clip.drawing!, delay: 0.5 };
+    const trimmed = trimClip(clip, undefined, "right", 1, 30);
+    expect(trimmed.drawing).toMatchObject({ delay: 0.5, duration: 0.5 });
+    expect(drawingProgress(trimmed, 0.75)).toBe(0.5);
+    const shorter = trimClip(clip, undefined, "right", 0.25, 30);
+    expect(shorter.drawing).toMatchObject({ delay: 0.05, duration: 0.2 });
+    expect(drawingProgress(shorter, shorter.duration)).toBe(1);
+  });
+
+  it("拆分后裁短保留开头的笔迹进度，延长和左裁不改写绘制时钟", () => {
+    const clip = fixture();
+    const right = splitClip({ ...createProject(), clips: [clip] }, clip.id, 0.5)
+      .clips[1];
+    const trimmed = trimClip(right, undefined, "right", 0.75, 30);
+    expect(drawingProgress(trimmed, 0)).toBe(drawingProgress(right, 0));
+    expect(drawingProgress(trimmed, 0.75)).toBe(1);
+    expect(drawingAnimationRanges(trimmed)[0]).toMatchObject({
+      hasStart: false,
+      hasEnd: true,
+      end: 0.75,
+    });
+    expect(trimClip(clip, undefined, "right", 6, 30).drawing).toBe(
+      clip.drawing,
+    );
+    expect(trimClip(clip, undefined, "right", 3, 30).drawing).toBe(
+      clip.drawing,
+    );
+    const left = trimClip(clip, undefined, "left", 0.5, 30);
+    expect(left.drawing).toBe(clip.drawing);
+    expect(drawingProgress(left, 0)).toBe(0.25);
+    for (const drawing of [
+      undefined,
+      { ...clip.drawing!, enabled: false },
+      { ...clip.drawing!, frozenProgress: 0.4 },
+    ]) {
+      expect(
+        trimClip({ ...clip, drawing }, undefined, "right", 1, 30).drawing,
+      ).toBe(drawing);
+    }
+  });
+
+  it("高帧率的一帧片段和末尾附近的延迟裁剪仍可保存", () => {
+    for (const [fps, duration, delay] of [
+      [120, 1 / 120, 0],
+      [30, 1, 0.999],
+    ]) {
+      const clip = fixture();
+      clip.drawing = { ...clip.drawing!, delay };
+      const trimmed = trimClip(clip, undefined, "right", duration, fps);
+      const project = { ...createProject(), clips: [trimmed] };
+      const restored = validateProject(JSON.parse(JSON.stringify(project)))
+        .clips[0];
+      expect(drawingProgress(restored, restored.duration)).toBeCloseTo(1);
+      expect(restored.drawing!.duration).toBeGreaterThan(0);
+      expect(restored.drawing!.duration).toBeLessThan(0.01);
+    }
+  });
+
   it("一次绘制只创建一个对象，保留抬笔、各笔颜色和笔刷，并按笔画依次播放", () => {
     const clip = fixture();
     expect(annotationPaths(clip)).toHaveLength(2);

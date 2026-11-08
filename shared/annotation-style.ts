@@ -62,7 +62,8 @@ const drawingPointsSchema = z
   .max(20000);
 export const drawingSchema = z.object({
   enabled: z.boolean().default(true),
-  duration: finite.min(0.01).max(86400).default(1),
+  // A one-frame clip at 120 fps, or a late delay, can leave less than 10 ms.
+  duration: finite.positive().max(86400).default(1),
   delay: finite.min(0).max(86400).default(0),
   frozenProgress: finite.min(0).max(1).optional(),
   easing: z.enum(animationEasings).optional(),
