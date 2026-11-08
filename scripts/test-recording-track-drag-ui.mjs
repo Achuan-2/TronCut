@@ -21,7 +21,7 @@ await fs.writeFile(
 );
 const bundle = await build({
   stdin: {
-    contents: `export { createProject, validateProject } from "./shared/model";
+    contents: `export { createProject, newText, validateProject } from "./shared/model";
       export { addRecordedAssets, defaultRecordingSettings } from "./shared/recording";
       export { hasProjectTimelineOverlap } from "./shared/timeline-collision";`,
     resolveDir: process.cwd(),
@@ -33,6 +33,7 @@ const bundle = await build({
 });
 const {
   createProject,
+  newText,
   validateProject,
   addRecordedAssets,
   defaultRecordingSettings,
@@ -86,7 +87,7 @@ const project = addRecordedAssets(
   { ...asset, id: "background", hasAudio: false },
 );
 project.tracks.forEach((track) => {
-  track.height = 70;
+  track.height = 48;
 });
 const master = project.clips[0];
 const backdrop = project.clips.find(
@@ -139,9 +140,13 @@ async function drag(page, trackId, cancel = false) {
   const lane = await page
     .locator(`.track-lane[data-track="${trackId}"]`)
     .boundingBox();
-  await page.mouse.move(bounds.x + 35, bounds.y + 20);
+  // Keep both ends inside the window: native mouse moves outside the viewport
+  // may be clipped by the OS and never reach the intended destination lane.
+  expect(lane.y + 20).toBeLessThan(await page.evaluate(() => innerHeight));
+  const grab = cancel ? 35 : 65;
+  await page.mouse.move(bounds.x + grab, bounds.y + 20);
   await page.mouse.down();
-  await page.mouse.move(bounds.x + 35, lane.y + 20, { steps: 12 });
+  await page.mouse.move(bounds.x + grab, lane.y + 20, { steps: 12 });
   if (cancel) {
     await item(page).dispatchEvent("pointercancel");
   } else {
@@ -194,6 +199,15 @@ try {
   }
   await page.screenshot({ path: path.join(root, "moved.png") });
   await app.close();
+  // Reproduce an older project's speed edit that left hidden layers too long.
+  saved.clips[0] = {
+    ...saved.clips[0],
+    speed: 2,
+    duration: 2,
+    speedEffect: true,
+  };
+  saved.clips.push({ ...newText("titles", 4), duration: 0.5 });
+  await fs.writeFile(file, JSON.stringify(saved));
   page = await launch();
   await onTrack(page, "video");
   const layers = await page
@@ -203,8 +217,58 @@ try {
   expect(layers.indexOf(master.id)).toBeGreaterThan(
     layers.indexOf(backdrop.id),
   );
+  await item(page)
+    .getByRole("button", { name: "效果 剪辑速度", exact: true })
+    .click();
+  const speed = page.getByLabel("剪辑速度（倍）", { exact: true });
+  await expect(speed).toHaveValue("2");
+  const seek = async (time) => {
+    const ruler = await page.locator(".ruler").boundingBox();
+    const zoom =
+      (await item(page).evaluate((node) => parseFloat(node.style.width))) /
+      (4 / Number(await speed.inputValue()));
+    await page.mouse.click(ruler.x + time * zoom, ruler.y + 25);
+  };
+  await seek(3);
+  await expect(
+    page.locator(`.canvas .preview-layer[data-clip-id="${backdrop.id}"]`),
+  ).toHaveCount(0);
+  await speed.fill("4");
+  await speed.blur();
+  await seek(1.5);
+  await expect(
+    page.locator(`.canvas .preview-layer[data-clip-id="${backdrop.id}"]`),
+  ).toHaveCount(0);
+  await expect(
+    page.locator(`.canvas .preview-layer[data-clip-id="${master.id}"]`),
+  ).toHaveCount(0);
+  await page.screenshot({ path: path.join(root, "after-recording.png") });
+  await seek(0.5);
+  await expect(
+    page.locator(`.canvas .preview-layer[data-clip-id="${backdrop.id}"]`),
+  ).toHaveCount(1);
+  await page.getByRole("button", { name: "保存", exact: true }).click();
+  await expect
+    .poll(async () =>
+      JSON.parse(await fs.readFile(file, "utf8"))
+        .clips.filter((clip) => clip.groupId === master.groupId)
+        .every((clip) => clip.duration === 1 && clip.speed === 4),
+    )
+    .toBe(true);
+  await page.getByTitle("撤销 Ctrl+Z", { exact: true }).click();
+  await expect(speed).toHaveValue("2");
+  await seek(1.5);
+  await expect(
+    page.locator(`.canvas .preview-layer[data-clip-id="${backdrop.id}"]`),
+  ).toHaveCount(1);
   expect(errors).toEqual([]);
-  console.log(`录屏跨轨拖动、取消、撤销重做、保存重开和图层顺序通过：${root}`);
+  console.log(
+    `录屏跨轨拖动、取消、撤销重做、保存重开、背景范围与旧项目修正通过：${root}`,
+  );
 } finally {
+  if (app) {
+    const page = await app.firstWindow();
+    await page.screenshot({ path: path.join(root, "final.png") });
+  }
   if (app) await app.close();
 }

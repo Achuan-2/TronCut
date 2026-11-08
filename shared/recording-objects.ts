@@ -11,6 +11,7 @@ import {
   sceneRecordingFrames,
 } from "./recording-camera";
 import type { RecordingSettings } from "./recording-settings";
+import { changeSpeed } from "./editor";
 
 const groupsCache = new WeakMap<readonly Clip[], Map<string, Clip>>();
 
@@ -60,6 +61,29 @@ export function selectedRecordingObject(
     members.every((clip) => selected.has(clip.id))
     ? master
     : undefined;
+}
+
+/** The screen owns the recording object's time window, including after speed edits. */
+export function syncRecordingTiming(project: Project): Project {
+  const groups = recordingGroups(project);
+  if (!groups.size) return project;
+  let changed = false;
+  const clips = project.clips.map((clip) => {
+    const screen = clip.groupId ? groups.get(clip.groupId) : undefined;
+    if (
+      !screen ||
+      clip.id === screen.id ||
+      (clip.start === screen.start &&
+        clip.duration === screen.duration &&
+        clip.speed === screen.speed)
+    )
+      return clip;
+    changed = true;
+    const retimed =
+      clip.speed === screen.speed ? clip : changeSpeed(clip, screen.speed);
+    return { ...retimed, start: screen.start, duration: screen.duration };
+  });
+  return changed ? { ...project, clips } : project;
 }
 
 /** Repair older recording groups on release, without moving unrelated tracks. */
@@ -189,6 +213,7 @@ export function updateRecordingObject(
   patch: Partial<RecordingSettings>,
   background?: Asset,
 ): Project {
+  project = syncRecordingTiming(project);
   const screen = recordingMaster(project, id);
   if (!screen?.recording || !screen.groupId) return project;
   const members = project.clips.filter(
@@ -303,7 +328,7 @@ export function updateRecordingObject(
       };
       if (background) {
         backdrop.sourceIn = 0;
-        backdrop.speed = 1;
+        backdrop.speed = screen.speed;
       }
     } else {
       const owner = project.tracks.find((track) => track.id === screen.trackId);
@@ -337,7 +362,7 @@ export function updateRecordingObject(
         start: screen.start,
         duration: screen.duration,
         sourceIn: 0,
-        speed: 1,
+        speed: screen.speed,
         volume: 0,
         podcast: false,
         loop: backdropAsset.kind === "video",

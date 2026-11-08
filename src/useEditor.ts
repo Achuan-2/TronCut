@@ -54,7 +54,10 @@ import {
   selectionWithGroups,
   editableIds,
 } from "../shared/timeline";
-import { recordingMaster } from "../shared/recording-objects";
+import {
+  recordingMaster,
+  syncRecordingTiming,
+} from "../shared/recording-objects";
 import { detachVideoAudio } from "../shared/detach-audio";
 import {
   deleteTimelineRange,
@@ -431,7 +434,9 @@ export function useEditor(
   const apply = useCallback(
     (next: Project | ((project: Project) => Project)) => {
       const before = current.current,
-        result = typeof next === "function" ? next(before) : next;
+        result = syncRecordingTiming(
+          typeof next === "function" ? next(before) : next,
+        );
       const tracks = numberTracks(result.tracks);
       const previousClips = new Set(before.clips);
       const fittedClips = result.clips.map((clip) =>
@@ -635,7 +640,7 @@ export function useEditor(
     [apply, selectedIds, select, setPlaying],
   );
   const replace = useCallback((next: Project, unsaved = false) => {
-    const migrated = groupExistingTimelineOverlaps(next);
+    const migrated = groupExistingTimelineOverlaps(syncRecordingTiming(next));
     unsaved ||= migrated !== next;
     next = migrated;
     next = { ...next, tracks: numberTracks(next.tracks) };
