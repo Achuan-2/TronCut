@@ -18,6 +18,29 @@ const secrets = {
     value.toString().split("").reverse().join(""),
 };
 
+it("录制来源随首选项保存重启恢复，其他设置保存不会覆盖选择", async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "troncut-recording-source-"));
+  try {
+    const file = path.join(root, "preferences.json");
+    const store = new PreferencesStore(file, secrets);
+    expect((await store.get()).recordingSource).toBeNull();
+    const source = { id: "window:123:0", name: "笔记窗口" };
+    await Promise.all([
+      store.save({ recording: { ...defaultRecordingSettings, radius: 12 }, recordingSource: source }),
+      store.save({ timing: { image: 8 } }),
+    ]);
+    const reopened = new PreferencesStore(file, secrets);
+    expect((await reopened.get()).recordingSource).toEqual(source);
+    expect((await reopened.get()).recording.radius).toBe(12);
+    await reopened.save({ recording: defaultRecordingSettings });
+    expect((await reopened.get()).recordingSource).toEqual(source);
+    await reopened.save({ recordingSource: null });
+    expect((await reopened.get()).recordingSource).toBeNull();
+  } finally {
+    await fs.rm(root, { recursive: true, force: true });
+  }
+});
+
 it("已移除壁纸的旧设置迁移为透视网格，保留其他录屏样式", () => {
   for (const preset of retiredRecordingBackgrounds) {
     expect(

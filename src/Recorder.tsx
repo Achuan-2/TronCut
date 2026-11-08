@@ -24,6 +24,7 @@ import CursorStyleSelect from "./CursorStyleSelect";
 import NumberInput from "./NumberInput";
 import RecordingCameraSettings from "./RecordingCameraSettings";
 import { useCameraPreview, useCameraFrames } from "./useCameraPreview";
+import { resolveRecordingSource } from "../shared/recording-source";
 
 interface Session {
   id: string;
@@ -86,6 +87,14 @@ export default function Recorder({
   const recordingCapabilities = useRef<Promise<Capabilities> | null>(null);
   const changeSettings = (patch: Partial<RecordingSettings>) =>
     setSettings((s) => ({ ...s, ...patch }));
+  const selectedSource = sources.find((source) => source.id === sourceId);
+  const rememberedSource = selectedSource
+    ? {
+        id: selectedSource.id,
+        name: selectedSource.name,
+        ...(selectedSource.displayId ? { displayId: selectedSource.displayId } : {}),
+      }
+    : undefined;
   async function closeSettings() {
     if (!settingsReady || !window.framecraft) {
       onClose();
@@ -93,7 +102,7 @@ export default function Recorder({
     }
     setSavingSettings(true);
     try {
-      await window.framecraft.saveRecordingSettings(settings);
+      await window.framecraft.saveRecordingSettings(settings, rememberedSource);
       onClose();
     } catch (error) {
       if (mounted.current) setError(`保存录屏设置失败：${String(error)}`);
@@ -126,14 +135,16 @@ export default function Recorder({
         setSettingsReady(true);
       })
       .catch((e) => setError(String(e)));
-    window.framecraft
-      ?.captureSources()
-      .then((s) => {
-        if (!mounted.current) return;
-        setSources(s);
-        setSourceId(s[0]?.id ?? "");
-      })
-      .catch((e) => setError(String(e)));
+    const bridge = window.framecraft;
+    if (bridge) {
+      void Promise.all([bridge.captureSources(), bridge.preferences()])
+        .then(([s, preferences]) => {
+          if (!mounted.current) return;
+          setSources(s);
+          setSourceId(resolveRecordingSource(s, preferences.recordingSource)?.id ?? "");
+        })
+        .catch((e) => setError(String(e)));
+    }
     window.framecraft
       ?.nativeCaptureAvailable()
       .then(setNativeAvailable)
@@ -245,7 +256,7 @@ export default function Recorder({
     try {
       const native = nativeAvailable;
       const [savedSettings, info] = await Promise.all([
-        bridge.saveRecordingSettings(settings),
+        bridge.saveRecordingSettings(settings, rememberedSource),
         recordingCapabilities.current ?? bridge.capabilities(),
         // Native capture validates the target when it actually starts. Only
         // getDisplayMedia needs a prior selection in the Electron handler.
@@ -693,7 +704,7 @@ export default function Recorder({
           </fieldset>
         </fieldset>
         <p className="small-note">
-          开始录制或关闭窗口时会记住麦克风与美化设置，下次录制继续使用。录制后仍可在时间线和属性中调整。
+          开始录制或关闭窗口时会记住录制来源、麦克风与美化设置，下次录制继续使用。录制后仍可在时间线和属性中调整。
         </p>
         <p className="small-note">
           麦克风与摄像头保存为独立素材。Windows

@@ -4,6 +4,10 @@ import { recordingSettingsSchema } from "./recording";
 import { shortcutOverridesSchema, type ShortcutMap } from "./shortcuts";
 import { storagePreferencesSchema, type StoragePreferences } from "./storage";
 import {
+  recordingSourceSchema,
+  type RecordingSource,
+} from "./recording-source";
+import {
   programPreferencesSchema,
   timingPreferencesSchema,
   projectPreferencesSchema,
@@ -69,6 +73,7 @@ export interface AiModelProfile {
   hasApiKey: boolean;
 }
 export interface Preferences extends EditorPreferences {
+  recordingSource: RecordingSource | null;
   shortcuts: ShortcutMap;
   storage: StoragePreferences;
   storageDefaults: StoragePreferences;
@@ -110,6 +115,7 @@ export const preferencesUpdateSchema = z
     timing: timingPreferencesSchema.optional(),
     project: projectPreferencesSchema.optional(),
     recording: recordingSettingsSchema.optional(),
+    recordingSource: recordingSourceSchema.nullable().optional(),
     storage: storagePreferencesSchema.optional(),
     shortcuts: shortcutOverridesSchema.optional(),
   })

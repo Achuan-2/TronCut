@@ -6,6 +6,7 @@ import {
   displayTrackName,
   insertTrack,
   moveTrack,
+  canMoveTrack,
   removeTrack,
   removeEmptyTracks,
   renameTrack,
@@ -41,9 +42,8 @@ export default function TrackContextMenu({
   const track = editor.project.tracks.find(
     (track) => track.id === menu?.trackId,
   );
-  const index = editor.project.tracks.findIndex(
-    (item) => item.id === track?.id,
-  );
+  const canMoveUp = !!track && canMoveTrack(editor.project, track.id, "up");
+  const canMoveDown = !!track && canMoveTrack(editor.project, track.id, "down");
   const count = editor.project.tracks.length;
   const media = editor.project.clips.filter(
     (clip) => clip.trackId === track?.id,
@@ -270,7 +270,7 @@ export default function TrackContextMenu({
                 <>
                   <button
                     role="menuitem"
-                    disabled={index === 0}
+                    disabled={!canMoveUp}
                     onClick={() =>
                       apply((project) => moveTrack(project, track.id, "up"))
                     }
@@ -279,7 +279,7 @@ export default function TrackContextMenu({
                   </button>
                   <button
                     role="menuitem"
-                    disabled={index === count - 1}
+                    disabled={!canMoveDown}
                     onClick={() =>
                       apply((project) => moveTrack(project, track.id, "down"))
                     }
@@ -288,7 +288,7 @@ export default function TrackContextMenu({
                   </button>
                   <button
                     role="menuitem"
-                    disabled={index === 0}
+                    disabled={!canMoveUp}
                     onClick={() =>
                       apply((project) => moveTrack(project, track.id, "top"))
                     }
@@ -297,7 +297,7 @@ export default function TrackContextMenu({
                   </button>
                   <button
                     role="menuitem"
-                    disabled={index === count - 1}
+                    disabled={!canMoveDown}
                     onClick={() =>
                       apply((project) => moveTrack(project, track.id, "bottom"))
                     }

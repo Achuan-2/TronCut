@@ -14,6 +14,7 @@ import {
 } from "../shared/preferences";
 import { editorPreferencesSchema } from "../shared/editor-preferences";
 import { recordingSettingsSchema } from "../shared/recording";
+import { recordingSourceSchema } from "../shared/recording-source";
 import { resolveShortcuts, shortcutOverridesSchema } from "../shared/shortcuts";
 import {
   storagePreferencesSchema,
@@ -44,6 +45,7 @@ const storedProviderSchema = z.object({
   encryptedKey: z.string().default(""),
 });
 const storedSchema = z.object({
+  recordingSource: recordingSourceSchema.nullable().default(null),
   shortcuts: shortcutOverridesSchema.default({}),
   storage: storagePreferencesSchema.default({}),
   ...editorPreferencesSchema.shape,
@@ -164,6 +166,7 @@ export class PreferencesStore {
       timing: data.timing,
       project: data.project,
       recording: data.recording,
+      recordingSource: data.recordingSource,
       aiProviders: data.aiProviders!.map(({ encryptedKey, ...provider }) => ({
         ...provider,
         hasApiKey: Boolean(encryptedKey),
@@ -383,6 +386,10 @@ export class PreferencesStore {
       timing: update.timing ?? stored.timing,
       project: update.project ?? stored.project,
       recording: update.recording ?? stored.recording,
+      recordingSource:
+        update.recordingSource === undefined
+          ? stored.recordingSource
+          : update.recordingSource,
     };
     if (update.storage) {
       const userData = path.dirname(this.file);

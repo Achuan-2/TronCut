@@ -31,7 +31,7 @@ import { probeMedia } from "../electron/media";
 import { runProcess, findBinary } from "../electron/process";
 import fs from "node:fs/promises";
 import path from "node:path";
-import { toggleTrack, removeTrack } from "../shared/tracks";
+import { toggleTrack, removeTrack, moveTrack, canMoveTrack } from "../shared/tracks";
 
 const screen: Asset = {
   id: "screen",
@@ -77,6 +77,48 @@ function recording(backgroundEnabled = true) {
     background,
   );
 }
+
+it("移动录屏主轨或相邻轨道时隐藏音轨和背景整体移动，四向操作保留画面层级", () => {
+  const project = recording();
+  const screen = project.clips[0];
+  const members = project.clips.filter((clip) => clip.groupId === screen.groupId);
+  const memberTracks = members.map((clip) => clip.trackId);
+  const camera = project.clips.find((clip) => clip.assetId === "camera")!;
+  const original = structuredClone(project);
+  for (const direction of ["down", "bottom"] as const) {
+    const moved = moveTrack(project, screen.trackId, direction);
+    const order = moved.tracks.map((track) => track.id);
+    const start = order.indexOf(screen.trackId);
+    expect(order.slice(start, start + members.length)).toEqual(memberTracks);
+    expect(moved.clips).toBe(project.clips);
+    const visible = recordingTimeline(moved).tracks.map((track) => track.id);
+    expect(visible.indexOf(screen.trackId)).toBeGreaterThan(recordingTimeline(project).tracks.findIndex((track) => track.id === screen.trackId));
+    expect(canMoveTrack(moved, screen.trackId, "up")).toBe(true);
+    const restored = moveTrack(moved, screen.trackId, "top");
+    expect(restored.tracks.slice(0, members.length).map((track) => track.id)).toEqual(memberTracks);
+    expect(canMoveTrack(restored, screen.trackId, "up")).toBe(false);
+    expect(() => validateProject(restored)).not.toThrow();
+  }
+  const cameraMoved = moveTrack(project, camera.trackId, "down");
+  expect(cameraMoved.tracks.slice(0, members.length).map((track) => track.id)).toEqual(memberTracks);
+  expect(cameraMoved.tracks[members.length].id).toBe(camera.trackId);
+  expect(project).toEqual(original);
+});
+
+it("拆分录屏共用内部轨道时仍整体移动，并修复旧项目已颠倒的背景顺序", () => {
+  const project = recording();
+  const screen = project.clips[0];
+  const split = splitSelection(project, [screen.id], 5);
+  expect(recordingGroups(split).size).toBe(2);
+  const moved = moveTrack(split, screen.trackId, "bottom");
+  const bg = moved.clips.find((clip) => clip.recordingRole === "background")!;
+  expect(moved.tracks.findIndex((track) => track.id === screen.trackId)).toBeLessThan(moved.tracks.findIndex((track) => track.id === bg.trackId));
+  expect(moved.clips).toBe(split.clips);
+  const inverted = { ...project, tracks: [...project.tracks].sort((a, b) => Number(b.id === bg.trackId) - Number(a.id === bg.trackId)) };
+  const repaired = moveTrack(inverted, screen.trackId, "bottom");
+  expect(repaired.tracks.findIndex((track) => track.id === screen.trackId)).toBeLessThan(repaired.tracks.findIndex((track) => track.id === bg.trackId));
+  expect(repaired.clips).toBe(inverted.clips);
+});
 
 it("录屏、声音和背景组成对象，摄像头始终作为独立图层处理", () => {
   const project = recording();

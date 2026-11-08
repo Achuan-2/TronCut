@@ -228,6 +228,7 @@ try {
   console.log(JSON.stringify({ duration: asset.duration, firstPixel: Array.from(data.subarray(center, center + 3)), cursorSamples: asset.cursor.samples.length }));
   await mockNativeCaptureAvailability(app, false);
   await page.getByRole("button", { name: "录制", exact: true }).click();
+  await expect(page.locator(`.capture-sources > button[data-source-id="${fixture}"]`)).toHaveAttribute("aria-pressed", "true");
   await page.getByLabel("麦克风", { exact: true }).check();
   await expect(page.getByLabel("录屏鼠标样式", { exact: true })).toBeDisabled();
   // A device that opens late must still be released if another request fails.

@@ -72,29 +72,83 @@ export function insertTrack(
   return { ...project, tracks: numberTracks(tracks) };
 }
 
+/** Recording masters and their hidden tracks form one movable layer block. */
+function trackMovePlan(
+  project: Project,
+  id: string,
+  direction: "up" | "down" | "top" | "bottom",
+) {
+  if (!project.tracks.some((track) => track.id === id)) return null;
+  const owners = new Map(project.tracks.map((track) => [track.id, track.id]));
+  const root = (id: string): string => {
+    const parent = owners.get(id)!;
+    if (parent === id) return id;
+    const owner = root(parent);
+    owners.set(id, owner);
+    return owner;
+  };
+  const recordings = recordingGroups(project);
+  const ranks = new Map<string, number>();
+  for (const clip of project.clips) {
+    const master = clip.groupId ? recordings.get(clip.groupId) : undefined;
+    if (!master) continue;
+    owners.set(root(clip.trackId), root(master.trackId));
+    const rank =
+      clip.recordingRole === "camera"
+        ? 0
+        : clip.recordingRole === "screen"
+          ? 1
+          : clip.recordingRole === "microphone"
+            ? 2
+            : 3;
+    ranks.set(
+      clip.trackId,
+      Math.min(ranks.get(clip.trackId) ?? Infinity, rank),
+    );
+  }
+  const grouped = new Map<string, Track[]>();
+  for (const track of project.tracks) {
+    const owner = root(track.id);
+    const block = grouped.get(owner) ?? [];
+    block.push(track);
+    grouped.set(owner, block);
+  }
+  const blocks = [...grouped.values()];
+  const index = blocks.findIndex((block) =>
+    block.some((track) => track.id === id),
+  );
+  const destination =
+    direction === "top"
+      ? 0
+      : direction === "bottom"
+        ? blocks.length - 1
+        : Math.max(
+            0,
+            Math.min(blocks.length - 1, index + (direction === "up" ? -1 : 1)),
+          );
+  if (destination === index) return null;
+  // Repair older inverted screen/background order within a moved block too.
+  const [block] = blocks.splice(index, 1);
+  block.sort((a, b) => (ranks.get(a.id) ?? 0) - (ranks.get(b.id) ?? 0));
+  blocks.splice(destination, 0, block);
+  return blocks.flat();
+}
+
+export function canMoveTrack(
+  project: Project,
+  id: string,
+  direction: "up" | "down" | "top" | "bottom",
+): boolean {
+  return trackMovePlan(project, id, direction) !== null;
+}
+
 export function moveTrack(
   project: Project,
   id: string,
   direction: "up" | "down" | "top" | "bottom",
 ): Project {
-  const index = project.tracks.findIndex((track) => track.id === id);
-  if (index < 0) return project;
-  const destination =
-    direction === "top"
-      ? 0
-      : direction === "bottom"
-        ? project.tracks.length - 1
-        : Math.max(
-            0,
-            Math.min(
-              project.tracks.length - 1,
-              index + (direction === "up" ? -1 : 1),
-            ),
-          );
-  if (destination === index) return project;
-  const tracks = [...project.tracks];
-  const [track] = tracks.splice(index, 1);
-  tracks.splice(destination, 0, track);
+  const tracks = trackMovePlan(project, id, direction);
+  if (!tracks) return project;
   return { ...project, tracks: numberTracks(tracks) };
 }
 

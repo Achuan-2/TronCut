@@ -10,6 +10,9 @@ const root = path.resolve(
 );
 const profile = path.join(root, "profile");
 await fs.mkdir(profile, { recursive: true });
+await fs.writeFile(path.join(profile, "preferences.json"), JSON.stringify({
+  storage: { projectDirectory: root },
+}));
 const helper = path.join(root, "helper.cjs");
 await build({
   stdin: {
@@ -91,13 +94,8 @@ try {
       .getByRole("img", { name: "录屏组合", exact: true }),
   ).toBeVisible();
   await page.locator(".recording-object").click({ position: { x: 30, y: 10 } });
-  await expect(
-    page
-      .locator(
-        ".inspector-selection .selection-icon.recording-object-selection",
-      )
-      .getByRole("img", { name: "录屏组合", exact: true }),
-  ).toBeVisible();
+  await expect(page.locator(".inspector-selection b")).toHaveText("录屏对象");
+  await expect(page.getByRole("button", { name: "编辑所有动画", exact: true })).toBeVisible();
   await expect(
     page
       .getByRole("tab", { name: "录屏", exact: true })
@@ -108,6 +106,23 @@ try {
     "rgb(41, 63, 77)",
   );
   await page.screenshot({ path: path.join(root, "recording-object-icon.png") });
+  const master = grouped.clips[0];
+  const backdrop = grouped.clips.find((clip) => clip.recordingRole === "background");
+  const header = page.locator(`.track-header[data-track-id="${master.trackId}"]`);
+  for (const [name, index] of [["下移轨道", 1], ["移到底部", 3], ["上移轨道", 2], ["移到顶部", 0]]) {
+    await header.scrollIntoViewIfNeeded();
+    await header.click({ button: "right" });
+    await page.getByRole("menuitem", { name: "移动轨道", exact: true }).hover();
+    await page.getByRole("menuitem", { name, exact: true }).click();
+    const order = await page.locator(".track-header").evaluateAll((items) => items.map((item) => item.dataset.trackId));
+    expect(order.indexOf(master.trackId)).toBe(index);
+    const layers = await page.locator(".canvas .preview-layer").evaluateAll((items) => items.map((item) => item.dataset.clipId));
+    expect(layers.indexOf(backdrop.id)).toBeGreaterThanOrEqual(0);
+    expect(layers.indexOf(master.id)).toBeGreaterThan(layers.indexOf(backdrop.id));
+  }
+  await page.getByTitle("撤销 Ctrl+Z", { exact: true }).click();
+  await page.getByTitle("重做 Ctrl+Shift+Z", { exact: true }).click();
+  await page.screenshot({ path: path.join(root, "recording-track-order.png") });
   await expect(
     page.getByRole("tab", { name: "录屏", exact: true }),
   ).toHaveAttribute("aria-selected", "true");

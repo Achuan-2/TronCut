@@ -25,8 +25,8 @@ const project = appendCaptionCues(createProject("轨道菜单测试"), [
   { start: 2, end: 4, text: "字幕乙" },
 ]).project;
 project.clips.push(
-  newText("titles", 0, 0, "主标题甲"),
-  newText("titles", 3, 0, "主标题乙"),
+  { ...newText("titles", 0, 0, "主标题甲"), duration: 2 },
+  { ...newText("titles", 3, 0, "主标题乙"), duration: 2 },
   newText("video", 0, 0, "其他轨内容"),
 );
 project.clips.find((clip) => clip.trackId === "video").transform.y = 0.3;

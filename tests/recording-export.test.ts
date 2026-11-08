@@ -13,6 +13,7 @@ import { probeMedia } from "../electron/media";
 import { findBinary, runProcess } from "../electron/process";
 import { saveProject, openProject } from "../electron/project-store";
 import { recordingBackgrounds } from "../shared/recording-settings";
+import { moveTrack } from "../shared/tracks";
 
 it("蓝色渐变按画布生成参考图的浅蓝到浅青色", async () => {
   const root = path.resolve(`test-output/blue-background-${Date.now()}`);
@@ -203,7 +204,7 @@ it.each(["image", "video"] as const)(
   60000,
 );
 
-it.each([0, 18])("真实导出和归档重开保留背景、圆角 %i 与自动缩放，放大画面时背景像素不变", async (radius) => {
+it.each([0, 18])("录屏主轨移到底部后导出和归档重开保留背景、圆角 %i 与自动缩放", async (radius) => {
   const root = path.resolve(`test-output/recording-style-${radius}-${Date.now()}`);
   await fs.mkdir(root, { recursive: true });
   const store = new RecordingStyleStore(root);
@@ -245,13 +246,14 @@ it.each([0, 18])("真实导出和归档重开保留背景、圆角 %i 与自动�
   project.canvas = { width: 320, height: 180, fps: 10, background: "#000000" };
   project.exportSettings = { encoder: "software" };
   const background = await store.background(320, 180, settings.preset);
-  const styled = addRecordedAssets(
+  const recorded = addRecordedAssets(
     project,
     [{ asset, kind: "screen" }],
     settings,
     0,
     background,
   );
+  const styled = moveTrack(recorded, recorded.clips[0].trackId, "bottom");
   const archive = path.join(root, "录屏.troncut");
   await saveProject(styled, archive);
   const reopened = await openProject(archive);

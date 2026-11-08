@@ -17,6 +17,7 @@ import type { RecordingBackground, RecordingSettings } from "./recording";
 import type { RecordingControlsState } from "./recording-controls";
 import type { CustomRecordingBackground } from "./recording-settings";
 import type { CaptureRegion } from "./capture-region";
+import type { RecordingSource } from "./recording-source";
 import type { VideoExportRequest } from "./export-settings";
 import type { EditMenuState } from "./edit-menu";
 import type { z } from "zod";
@@ -25,9 +26,7 @@ import type {
   CaptionProcessingOptions,
   CaptionProcessingResult,
 } from "./caption-processing";
-export interface CaptureSource {
-  id: string;
-  name: string;
+export interface CaptureSource extends RecordingSource {
   thumbnail: string;
 }
 export interface Capabilities {
@@ -52,6 +51,7 @@ export interface FrameCraftBridge {
   recordingSettings(): Promise<RecordingSettings>;
   saveRecordingSettings(
     settings: RecordingSettings,
+    source?: RecordingSource,
   ): Promise<RecordingSettings>;
   selectRecordingBackground(): Promise<CustomRecordingBackground | null>;
   createRecordingBackground(

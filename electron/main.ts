@@ -78,6 +78,7 @@ import { RecordingCountdown } from "./recording-countdown";
 import { RecordingControls } from "./recording-controls";
 import { recordingControlsStateSchema } from "../shared/recording-controls";
 import { findCaptureSource } from "./capture-source";
+import { recordingSourceSchema } from "../shared/recording-source";
 import { videoExportRequestSchema } from "../shared/export-settings";
 import { assertExportTarget, videoExportTarget } from "./video-export-target";
 import { editCommands, editCommandEnabled, editMenuStateSchema, textEditSchema } from "../shared/edit-menu";
@@ -485,8 +486,11 @@ function installHandlers() {
       throw new Error("摄像头预览帧无效");
     recordingControls.cameraFrame(frame);
   });
-  handle("recording:settings:save", async (input: unknown) =>
-    (await preferences.save({ recording: recordingSettingsSchema.parse(input) })).recording,
+  handle("recording:settings:save", async (input: unknown, source: unknown) =>
+    (await preferences.save({
+      recording: recordingSettingsSchema.parse(input),
+      recordingSource: recordingSourceSchema.optional().parse(source),
+    })).recording,
   );
   handle("recording:background:select", async () => {
     const file = await chooseFile("选择自定义录屏背景", [
@@ -1362,6 +1366,7 @@ function installHandlers() {
     return sources.map((s) => ({
       id: s.id,
       name: s.name,
+      ...(s.display_id ? { displayId: s.display_id } : {}),
       thumbnail: s.thumbnail.toDataURL(),
     }));
   });
