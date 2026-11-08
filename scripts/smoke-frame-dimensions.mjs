@@ -3,6 +3,7 @@ import { build } from "esbuild";
 import fs from "node:fs/promises";
 import path from "node:path";
 import sharp from "sharp";
+import { execFileSync } from "node:child_process";
 
 const root = path.resolve(`test-output/frame-dimensions-ui-${Date.now()}`);
 await fs.mkdir(root, { recursive: true });
@@ -11,9 +12,27 @@ await sharp({
 })
   .png()
   .toFile(path.join(root, "image.png"));
+execFileSync(
+  path.resolve("resources/bin/ffmpeg.exe"),
+  [
+    "-v",
+    "error",
+    "-f",
+    "lavfi",
+    "-i",
+    "color=c=green:s=200x100:r=10:d=5",
+    "-c:v",
+    "libx264",
+    "-preset",
+    "ultrafast",
+    path.join(root, "video.mp4"),
+  ],
+  { windowsHide: true },
+);
 const bundle = await build({
   stdin: {
-    contents: 'export { createProject, newText } from "./shared/model";',
+    contents:
+      'export { createProject, newText } from "./shared/model"; export { annotationClip, sketchPresets } from "./shared/annotations";',
     resolveDir: process.cwd(),
   },
   bundle: true,
@@ -21,7 +40,7 @@ const bundle = await build({
   format: "esm",
   write: false,
 });
-const { createProject, newText } = await import(
+const { createProject, newText, annotationClip, sketchPresets } = await import(
   `data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text).toString("base64")}`
 );
 const project = createProject("宽高比例锁定");
@@ -46,6 +65,27 @@ project.clips = [
     transform: { x: 0.5, y: 0.5, scale: 0.5, opacity: 1 },
   },
 ];
+project.assets.push({
+  ...project.assets[0],
+  id: "video",
+  name: "视频",
+  path: "video.mp4",
+  kind: "video",
+  duration: 5,
+});
+const video = {
+  ...newText("video", 6),
+  kind: "video",
+  assetId: "video",
+  transform: { x: 0.5, y: 0.5, scale: 0.5, opacity: 1 },
+};
+const sketch = annotationClip(
+  sketchPresets.find((preset) => preset.id === "rectangle").template,
+  "video",
+  12,
+);
+sketch.transform.scale = 0.35;
+project.clips.push(video, sketch);
 const file = path.join(root, "dimensions.troncut");
 await fs.writeFile(file, JSON.stringify(project));
 const env = {
@@ -80,6 +120,54 @@ const ratio = () =>
   });
 const seek = (time) =>
   page.locator(".ruler").click({ position: { x: time * 65, y: 10 } });
+// Exercise the modifier through real pointer events; it must not toggle selection
+// or persistently unlock the object. Check both preview and the saved transform.
+const shiftResize = async (clip, handleName = "e") => {
+  const layer = page.locator(
+    `.canvas-holder .preview-layer[data-clip-id="${clip.id}"]`,
+  );
+  await page.locator(`.timeline-clip[data-clip-id="${clip.id}"]`).click();
+  const before = await layer.boundingBox();
+  const handle = layer.getByRole("button", {
+    name: `调整尺寸 ${handleName}`,
+    exact: true,
+  });
+  const bounds = await handle.boundingBox();
+  const point = {
+    x: bounds.x + bounds.width / 2,
+    y: bounds.y + bounds.height / 2,
+  };
+  await page.mouse.move(point.x, point.y);
+  await page.mouse.down();
+  await page.keyboard.down("Shift");
+  const dy = handleName === "se" ? 10 : 0;
+  await page.mouse.move(point.x + 40, point.y + dy, { steps: 6 });
+  await expect
+    .poll(async () => (await layer.boundingBox()).width)
+    .toBeCloseTo(before.width + 40, 0);
+  await page.mouse.up();
+  await page.keyboard.up("Shift");
+  const after = await layer.boundingBox();
+  expect(after.height).toBeCloseTo(before.height + dy, 0);
+  expect(after.x).toBeCloseTo(before.x, 0);
+  expect(after.y).toBeCloseTo(before.y, 0);
+  await page.getByTitle("保存项目 Ctrl+S", { exact: true }).click();
+  await expect
+    .poll(async () => {
+      const saved = JSON.parse(await fs.readFile(file, "utf8"));
+      const value = saved.clips.find((item) => item.id === clip.id);
+      return (value.transform.scaleX ?? 1) / (value.transform.scaleY ?? 1);
+    })
+    .toBeGreaterThan(1);
+  const saved = JSON.parse(await fs.readFile(file, "utf8"));
+  expect(
+    saved.clips.find((item) => item.id === clip.id).lockAspectRatio,
+  ).not.toBe(false);
+  await page.getByTitle("撤销 Ctrl+Z", { exact: true }).click();
+  await expect
+    .poll(async () => (await layer.boundingBox()).width)
+    .toBeCloseTo(before.width, 0);
+};
 try {
   await open();
   const lock = page.getByRole("button", { name: "锁定宽高比例", exact: true });
@@ -88,6 +176,8 @@ try {
     .poll(() => lock.evaluate((node) => getComputedStyle(node).borderLeftWidth))
     .toBe("0px");
   await dimensions(200, 100);
+  await shiftResize(project.clips[0]);
+  await expect(lock).toHaveAttribute("aria-pressed", "true");
   await field("width").fill("300");
   await dimensions(300, 150);
   await lock.click();
@@ -164,19 +254,24 @@ try {
   await expect(
     page.getByRole("button", { name: "锁定宽高比例", exact: true }),
   ).toBeDisabled();
+  await page.getByRole("button", { name: "选择模式", exact: true }).click();
+  await seek(6);
+  await shiftResize(video);
+  await seek(14);
+  await shiftResize(sketch, "se");
   expect(errors).toEqual([]);
   console.log(
     JSON.stringify({
       root,
       checks:
-        "去除竖线、锁定联动、解锁独立宽高、画布单轴拖动、撤销、重新锁定、独立轴关键帧、保存重开和裁剪模式保护",
+        "图片/视频/草图 Shift 拉伸与锚点、比例锁保留、撤销、锁定联动、解锁独立宽高、独立轴关键帧、保存重开和裁剪模式保护",
       rendererErrors: errors,
     }),
   );
 } catch (error) {
   await page
     ?.screenshot({ path: path.join(root, "failure.png") })
-    .catch(() => { });
+    .catch(() => {});
   console.error(root);
   throw error;
 } finally {

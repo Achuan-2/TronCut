@@ -694,7 +694,7 @@ function PreviewLayerImpl({
                 },
                 project.canvas,
                 gesture.original.rotation ?? clip.rotation,
-                clip.lockAspectRatio !== false,
+                clip.lockAspectRatio !== false && !event.shiftKey,
               )
             : {
                 ...gesture.original,
@@ -1118,7 +1118,7 @@ function PreviewLayerImpl({
                   ? "拖动调整文本框尺寸"
                   : clip.lockAspectRatio === false
                     ? "拖动独立调整宽高"
-                    : "拖动调整尺寸（保持比例）"
+                    : "拖动调整尺寸，按住 Shift 独立调整宽高"
             }
             style={{
               left: `${(handle.x + 1) * 50}%`,
