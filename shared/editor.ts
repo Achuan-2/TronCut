@@ -465,6 +465,7 @@ export function snapTime(
   project: Project,
   excludeId?: string,
   tolerance = 0.12,
+  bounds = { start: 0, end: Infinity },
 ): number {
   const points = [
     0,
@@ -473,10 +474,12 @@ export function snapTime(
       .filter((c) => c.id !== excludeId)
       .flatMap((c) => [c.start, c.start + c.duration]),
   ];
-  const nearest = points.reduce(
-    (best, point) =>
-      Math.abs(point - time) < Math.abs(best - time) ? point : best,
-    Infinity,
-  );
+  const nearest = points
+    .filter((point) => point >= bounds.start && point <= bounds.end)
+    .reduce(
+      (best, point) =>
+        Math.abs(point - time) < Math.abs(best - time) ? point : best,
+      Infinity,
+    );
   return Math.max(0, Math.abs(nearest - time) <= tolerance ? nearest : time);
 }

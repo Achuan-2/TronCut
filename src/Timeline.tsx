@@ -1,4 +1,4 @@
-import { trimClip } from "../shared/clip-trim";
+import { trimTimelineClip } from "../shared/timeline-trim";
 import { displayShortcut, type ShortcutMap } from "../shared/shortcuts";
 import {
   TimelineRangeHandles,
@@ -149,7 +149,6 @@ import { groupName, groupedTimeline, rootGroupId } from "../shared/clip-groups";
 import GroupTimelineNavigation from "./GroupTimelineNavigation";
 import GroupTimelineMask from "./GroupTimelineMask";
 import TimelineGroupClip from "./TimelineGroupClip";
-import { timelineTrimBounds } from "../shared/timeline-collision";
 import {
   timelineZoomMax,
   timelineFitZoom,
@@ -795,9 +794,7 @@ export default function Timeline({
     if (result.selectedId) select(result.selectedId);
   }
   function dragClip(d: Drag): Clip {
-    const c = d.original,
-      asset = c.assetId ? assetsById.get(c.assetId) : undefined,
-      minimum = 1 / project.canvas.fps;
+    const c = d.original;
     if (d.mode === "move") {
       const earliest = Math.min(
         ...project.clips
@@ -823,24 +820,13 @@ export default function Timeline({
         start: wanted,
       };
     }
-    if (d.mode === "left") {
-      const wanted = snap
-        ? snapTime(c.start + d.delta, project, c.id, 8 / zoom) - c.start
-        : d.delta;
-      return trimClip(
-        c, asset, "left",
-        Math.max(wanted, timelineTrimBounds(project, c.id).start - c.start),
-        project.canvas.fps,
-      );
-    }
-    const wanted = snap
-      ? snapTime(c.start + c.duration + d.delta, project, c.id, 8 / zoom) -
-        c.start
-      : c.duration + d.delta;
-    return trimClip(
-      c, asset, "right",
-      Math.min(wanted, timelineTrimBounds(project, c.id).end - c.start),
-      project.canvas.fps,
+    return trimTimelineClip(
+      project,
+      c,
+      c.assetId ? assetsById.get(c.assetId) : undefined,
+      d.mode,
+      d.delta,
+      snap ? 8 / zoom : undefined,
     );
   }
   const timeFromEvent = (
