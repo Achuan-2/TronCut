@@ -9,6 +9,7 @@ import {
 import type { RecordingSettings } from "./recording-settings";
 import { cameraMask } from "./camera-style";
 import { defaultEffects } from "./effects";
+import { mediaTrackInsertionIndex } from "./track-placement";
 import {
   recordingCameraFrames,
   sceneRecordingFrames,
@@ -208,9 +209,14 @@ export function addRecordedAssets(
         backdrop.transform,
       );
   }
+  const index = mediaTrackInsertionIndex(project.tracks);
   return {
     ...project,
-    tracks: [...tracks, ...project.tracks],
+    tracks: [
+      ...project.tracks.slice(0, index),
+      ...tracks,
+      ...project.tracks.slice(index),
+    ],
     clips: [...project.clips, ...clips],
     assets: [...project.assets, ...assets],
   };

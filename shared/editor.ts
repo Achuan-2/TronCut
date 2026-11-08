@@ -28,6 +28,7 @@ import { fitBehaviorDuration, shiftBehaviors } from "./behaviors";
 import { markerEnd } from "./markers";
 import { normalizeStitch } from "./media-segments";
 import { timelineTrackIsFree } from "./timeline-collision";
+import { mediaTrackInsertionIndex } from "./track-placement";
 
 export function availableTrack(
   project: Pick<Project, "tracks" | "clips" | "groups">,
@@ -65,7 +66,7 @@ export function addMediaAssets(
           ? (options.imageDuration ?? (asset.duration || 5))
           : asset.duration || 5;
       const pasteVisual = options.pasteToTop && asset.kind !== "audio";
-      const top = tracks[0];
+      const top = tracks[mediaTrackInsertionIndex(tracks)];
       let track = pasteVisual
         ? top &&
           !top.locked &&
@@ -95,7 +96,7 @@ export function addMediaAssets(
       if (!track) {
         if (tracks.length >= 128) throw new Error("轨道数量已达上限");
         track = newTrack(tracks.length);
-        tracks.unshift(track);
+        tracks.splice(mediaTrackInsertionIndex(tracks), 0, track);
       }
       clips.push({
         id: uid(),
