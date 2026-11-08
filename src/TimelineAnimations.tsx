@@ -42,6 +42,7 @@ export const TimelineAnimations = memo(function TimelineAnimations({
   viewportStart,
   viewportEnd,
   channel = "transform",
+  select,
 }: {
   clip: Clip;
   zoom: number;
@@ -57,6 +58,7 @@ export const TimelineAnimations = memo(function TimelineAnimations({
   viewportStart: number;
   viewportEnd: number;
   channel?: "transform" | "drawing";
+  select?: (range: AnimationRange) => void;
 }) {
   const playhead = useEditorPlayhead(editor, selected);
   const editFrame = editor.editAllAnimations ? null : selectedFrame ?? (
@@ -297,7 +299,8 @@ export const TimelineAnimations = memo(function TimelineAnimations({
                 event.preventDefault();
                 event.stopPropagation();
                 editor.setPlaying(false);
-                editor.select(clip.id);
+                if (select) select(range);
+                else editor.select(clip.id);
                 setContext({ x: event.clientX, y: event.clientY, range });
               }}
               data-start={start}

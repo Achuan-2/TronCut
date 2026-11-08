@@ -8,7 +8,12 @@ import {
   updateCanvasCamera,
 } from "../shared/canvas-camera";
 import { animationRanges, retimeAnimation } from "../shared/animation-ranges";
-import { removeAnimation } from "../shared/animation-edit";
+import {
+  removeAnimation,
+  setAnimationEasing,
+  snapshotAnimation,
+  pasteAnimation,
+} from "../shared/animation-edit";
 
 it("全局运镜不修改对象，独立调整时间、时长、删除并保存重开", () => {
   const project = createProject();
@@ -55,4 +60,36 @@ it("起始位置添加可编辑的运镜动画，无需选择视频", () => {
   expect(
     updateCanvasCamera(result.project, { scale: 3 }, result.time).clips,
   ).toBe(project.clips);
+});
+
+it("画布运镜复用普通动画的缓动与复制粘贴，保存后仍保留缓动", () => {
+  const project = createProject();
+  project.clips = [
+    {
+      ...cameraAnimationClip(project),
+      id: "shape",
+      trackId: project.tracks[0].id,
+      duration: 10,
+    },
+  ];
+  const added = addCanvasCameraAnimation(project, 0)!;
+  const changed = updateCanvasCamera(added.project, { scale: 2 }, 1);
+  const clip = cameraAnimationClip(changed);
+  const eased = setAnimationEasing(clip, animationRanges(clip)[0], "linear");
+  const pasted = pasteAnimation(
+    eased,
+    snapshotAnimation(eased, animationRanges(eased)[0])!,
+    5,
+  );
+  const saved = validateProject(
+    JSON.parse(JSON.stringify(commitCameraAnimation(changed, pasted))),
+  );
+  expect(
+    saved
+      .camera!.keyframes.filter((frame) => frame.animation)
+      .map((frame) => frame.easing),
+  ).toEqual(["linear", "linear"]);
+  expect(cameraAt(saved, 0.25).scale).toBeCloseTo(1.25);
+  expect(cameraAt(saved, 5.25).scale).toBeCloseTo(2.25);
+  expect(saved.clips).toEqual(project.clips);
 });

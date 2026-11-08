@@ -261,6 +261,7 @@ export default function App() {
       selected: selected.length,
       editable: editable.length > 0,
       hasTimeRange: !!editor.timelineRange,
+      hasAnimation: !!editor.selectedCameraAnimation,
       canGroup: editable.length > 1,
       canUngroup: editable.some((clip) => !!clip.groupId),
       canSplit: editable.some(
@@ -276,6 +277,7 @@ export default function App() {
     editor.canUndo,
     editor.canRedo,
     editor.timelineRange,
+    !!editor.selectedCameraAnimation,
     busy,
     mediaImporting,
     recordingModalOpen,
@@ -663,6 +665,12 @@ export default function App() {
     if (screen === "home" && !["new", "open", "camtasia"].includes(command))
       return;
     if (["cut", "copy"].includes(command)) {
+      if (editor.selectedCameraAnimation) {
+        copyAnimation(
+          "canvas-camera", editor.selectedCameraAnimation, command === "cut",
+        );
+        return;
+      }
       const selected = editor.selected;
       const locked = editor.project.tracks.find(
         (track) => track.id === selected?.trackId,
@@ -722,6 +730,10 @@ export default function App() {
       return;
     }
     if (["delete", "rippleDelete"].includes(command)) {
+      if (editor.selectedCameraAnimation) {
+        editor.deleteAnimation("canvas-camera", editor.selectedCameraAnimation);
+        return;
+      }
       if (editor.selectedVisualEffect) {
         const { clipId, id } = editor.selectedVisualEffect;
         editor.removeTimelineEffect(clipId, id);

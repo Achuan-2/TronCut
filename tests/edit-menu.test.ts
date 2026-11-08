@@ -26,6 +26,11 @@ it("菜单按首页、文本编辑、锁定轨道及撤销状态启用编辑命�
   expect(editCommandEnabled("deselect", range)).toBe(true);
   expect(editCommandEnabled("cut", range)).toBe(false);
   expect(editCommandEnabled("duplicate", range)).toBe(false);
+  const camera = { ...state, session: true, hasAnimation: true };
+  for (const command of ["copy", "cut", "delete", "deselect"] as const)
+    expect(editCommandEnabled(command, camera)).toBe(true);
+  expect(editCommandEnabled("duplicate", camera)).toBe(false);
+  expect(editCommandEnabled("split", camera)).toBe(false);
   expect(editCommandEnabled("undo", { ...locked, canUndo: true })).toBe(true);
   expect(
     editCommandEnabled("split", { ...locked, editable: true, canSplit: true }),

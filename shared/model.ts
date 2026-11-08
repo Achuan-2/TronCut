@@ -71,6 +71,7 @@ export const cameraSchema = z.object({
       z.object({
         time: finite.nonnegative(),
         value: cameraTransformSchema,
+        easing: z.enum(animationEasings).optional(),
         animation: z.literal(true).optional(),
       }),
     )

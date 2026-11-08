@@ -86,6 +86,8 @@ import {
 import {
   updateCanvasCamera,
   addCanvasCameraAnimation,
+  cameraAnimationClip,
+  commitCameraAnimation,
 } from "../shared/canvas-camera";
 import { type ContentTransform } from "../shared/crop";
 import { animateContent, animateCrop } from "../shared/crop-animation";
@@ -277,6 +279,9 @@ export function useEditor(
     useState<KeyframeSelection | null>(null);
   const [drawingSelection, setDrawingSelection] =
     useState<KeyframeSelection | null>(null);
+  const [cameraFrameSelection, setCameraFrameSelection] =
+    useState<{ time: number; side: "start" | "end" } | null>(null);
+  const [cameraSelected, setCameraSelected] = useState(false);
   const keyframeRef = useRef<KeyframeSelection | null>(null);
   const animationClipboard = useRef<{
     token: string;
@@ -286,6 +291,7 @@ export function useEditor(
     keyframeRef.current = null;
     setKeyframeSelection(null);
     setDrawingSelection(null);
+    setCameraFrameSelection(null);
   }, []);
   const [selection, selectMany] = useState<string[]>([]);
   const [editAllCaptions, setEditAllCaptionsState] = useState(true);
@@ -332,6 +338,7 @@ export function useEditor(
   );
   const select = useCallback(
     (id: string | null, additive = false) => {
+      setCameraSelected(false);
       setSelectedVisualEffect(null);
       setTextSelection((selection) => selection?.clipId === id ? selection : null);
       setBehaviorSelection(null);
@@ -1823,6 +1830,16 @@ export function useEditor(
     },
     [apply, playback],
   );
+  const editCameraFrame = useCallback(
+    (time: number, side: "start" | "end") => {
+      setPlaying(false);
+      select(null);
+      seek(time);
+      setCameraFrameSelection({ time, side });
+      setCameraSelected(true);
+    },
+    [select, seek, setPlaying],
+  );
   const addCanvasZoomPan = useCallback(() => {
     if (scopeRef.current || !current.current.clips.length) return;
     const added = addCanvasCameraAnimation(
@@ -1833,8 +1850,8 @@ export function useEditor(
     if (!added) return;
     setPlaying(false);
     apply(() => added.project);
-    seek(added.time);
-  }, [apply, playback, seek]);
+    editCameraFrame(added.time, "end");
+  }, [apply, playback, editCameraFrame]);
   const stepFrame = useCallback(
     (direction: PlaybackDirection) => {
       setPlaying(false);
@@ -1858,14 +1875,24 @@ export function useEditor(
   );
   const deleteAnimation = useCallback(
     (clipId: string, range: AnimationRange) => {
-      updateClip(clipId, (clip) => removeAnimation(clip, range));
+      if (clipId === "canvas-camera")
+        apply((project) =>
+          commitCameraAnimation(
+            project,
+            removeAnimation(cameraAnimationClip(project), range),
+          ),
+        );
+      else updateClip(clipId, (clip) => removeAnimation(clip, range));
       clearKeyframeEdit();
     },
-    [updateClip, clearKeyframeEdit],
+    [apply, updateClip, clearKeyframeEdit],
   );
   const copyAnimation = useCallback(
     (clipId: string, range: AnimationRange, cut = false) => {
-      const clip = current.current.clips.find((clip) => clip.id === clipId);
+      const clip =
+        clipId === "canvas-camera"
+          ? cameraAnimationClip(current.current)
+          : current.current.clips.find((clip) => clip.id === clipId);
       if (
         !clip ||
         (cut &&
@@ -1883,6 +1910,21 @@ export function useEditor(
     [deleteAnimation],
   );
   const pasteCopiedAnimation = useCallback(() => {
+    if (cameraSelected && animationClipboard.current) {
+      const clip = cameraAnimationClip(current.current);
+      const next = pasteAnimation(
+        clip,
+        animationClipboard.current.value,
+        playback.getSnapshot(),
+      );
+      if (next === clip) return false;
+      apply((project) => commitCameraAnimation(project, next));
+      editCameraFrame(
+        playback.getSnapshot() + animationClipboard.current.value.duration,
+        "end",
+      );
+      return true;
+    }
     const clip = current.current.clips.find((clip) => clip.id === selectedId);
     if (
       !clip ||
@@ -1915,7 +1957,17 @@ export function useEditor(
       "end",
     );
     return true;
-  }, [selectedId, playback, updateClip, editKeyframe, editDrawing]);
+  }, [
+    selectedId, playback, updateClip, editKeyframe, editDrawing,
+    cameraSelected, apply, editCameraFrame,
+  ]);
+  const selectedCameraAnimation = cameraFrameSelection
+    ? animationRanges(cameraAnimationClip(project)).find((range) =>
+      Math.abs(
+        (cameraFrameSelection.side === "start" ? range.start : range.end) -
+        cameraFrameSelection.time,
+      ) < 1e-6)
+    : undefined;
   const selected = selectedId ? clipsById.get(selectedId) : undefined;
   const selectedVisualEffect =
     visualEffectSelection &&
@@ -2145,6 +2197,10 @@ export function useEditor(
     setZoomPanDraft,
     updateCanvasZoomPan,
     addCanvasZoomPan,
+    editCameraFrame,
+    selectedCameraFrame: selectedCameraAnimation ? cameraFrameSelection : null,
+    selectedCameraAnimation,
+    cameraSelected,
     stepFrame,
     jumpMedia,
     autoAnimate,

@@ -39,7 +39,7 @@ export default function ZoomPanPanel({ editor }: { editor: Editor }) {
   return (
     <>
       <p className="panel-intro">
-        在时间轴添加全局运镜，移动播放头后拖动取景框或调整缩放。效果作用于整个画布，可在独立运镜行拖动动画和端点。
+        缩放和平移当前合成画面，画布的显示比例和位置保持不变。
       </p>
       <button disabled={!available} onClick={editor.addCanvasZoomPan}>添加画布缩放与平移</button>
       <div
