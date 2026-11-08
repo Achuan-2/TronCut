@@ -1968,7 +1968,8 @@ fieldset:disabled {
 }
 .canvas {
   position: relative;
-  overflow: visible;
+  /* Animated scene bounds must not resize or scroll the preview viewport. */
+  overflow: clip;
   outline: 1px solid #9caaa66b;
   box-shadow: 0 8px 40px #0005;
   flex-shrink: 0;
