@@ -9,154 +9,226 @@ import { saveProject, openProject } from "../electron/project-store";
 import { renderTimelineAudio } from "../electron/timeline-audio";
 import { probeMedia } from "../electron/media";
 import { findBinary, runProcess } from "../electron/process";
+import {
+  addRecordedAssets,
+  defaultRecordingSettings,
+} from "../shared/recording";
 
-it("实际导出在扩展区间保持同一视频帧并静音，结束后恢复原画面和音频", async () => {
-  const root = path.resolve(
-    `test-output/frame-extension-export/run-${Date.now()}`,
-  );
-  await fs.mkdir(root, { recursive: true });
-  const source = path.join(root, "source.mp4");
-  const ffmpeg = findBinary("ffmpeg");
-  const signal = new AbortController().signal;
-  await runProcess(ffmpeg, [
-    "-y",
-    "-f",
-    "lavfi",
-    "-i",
-    "testsrc2=s=160x90:r=20:d=3",
-    "-f",
-    "lavfi",
-    "-i",
-    "sine=frequency=440:sample_rate=48000:duration=3",
-    "-c:v",
-    "libx264",
-    "-pix_fmt",
-    "yuv420p",
-    "-c:a",
-    "aac",
-    source,
-  ]);
-  const project = createProject("帧定格导出");
-  project.canvas = { width: 160, height: 90, fps: 20, background: "#000000" };
-  project.exportSettings = { encoder: "software" };
-  const asset = await probeMedia(source);
-  project.assets = [asset];
-  project.clips = [
-    {
-      ...newText("video", 0),
-      id: "video",
-      kind: "video",
-      assetId: asset.id,
-      duration: 3,
-    },
-  ];
-  const extended = setFrameExtension(project, "video", 1, 1.5);
-  const file = path.join(root, "project", "extension.troncut");
-  await saveProject(extended, file);
-  const reopened = await openProject(file);
-  expect(reopened.clips[0].stitch).toEqual(extended.clips[0].stitch);
-  const target = path.join(root, "extended.mp4");
-  await exportVideo(
-    reopened,
-    target,
-    path.join(root, "work"),
-    false,
-    signal,
-    () => {},
-  );
-  expect((await probeMedia(target)).duration).toBeCloseTo(4.5, 1);
-  const frame = async (input: string, time: number, name: string) => {
-    const image = path.join(root, `${name}.png`);
+it.each([false, true])(
+  "实际导出在扩展区间保持同一视频帧并静音，结束后恢复原画面和音频（录屏对象：%s）",
+  async (recording) => {
+    const root = path.resolve(
+      `test-output/frame-extension-export/run-${Date.now()}-${recording ? "recording" : "video"}`,
+    );
+    await fs.mkdir(root, { recursive: true });
+    const source = path.join(root, "source.mp4");
+    const ffmpeg = findBinary("ffmpeg");
+    const signal = new AbortController().signal;
     await runProcess(ffmpeg, [
       "-y",
-      "-ss",
-      String(time),
+      "-f",
+      "lavfi",
       "-i",
-      input,
-      "-frames:v",
-      "1",
-      image,
+      "testsrc2=s=160x90:r=20:d=3",
+      "-f",
+      "lavfi",
+      "-i",
+      "sine=frequency=440:sample_rate=48000:duration=3",
+      "-c:v",
+      "libx264",
+      "-pix_fmt",
+      "yuv420p",
+      "-c:a",
+      "aac",
+      source,
     ]);
-    return sharp(image).removeAlpha().raw().toBuffer();
-  };
-  const first = await frame(target, 1.2, "frozen-first");
-  const last = await frame(target, 2.3, "frozen-last");
-  const difference = (a: Buffer, b: Buffer) =>
-    a.reduce((sum, value, i) => sum + Math.abs(value - b[i]), 0) / a.length;
-  expect(difference(first, last)).toBeLessThan(1);
-  const original = await frame(source, 1, "source-freeze");
-  expect(difference(first, original)).toBeLessThan(7);
-  const resumed = await frame(target, 3, "resumed");
-  const expected = await frame(source, 1.5, "source-resumed");
-  expect(difference(resumed, expected)).toBeLessThan(7);
-  expect(difference(first, resumed)).toBeGreaterThan(8);
-  for (const position of ["start", "end"] as const) {
-    const endpoint = setFrameExtension(project, "video", 99, 1, position);
-    const output = path.join(root, `${position}.mp4`);
+    let project = createProject("帧定格导出");
+    project.canvas = { width: 160, height: 90, fps: 20, background: "#000000" };
+    project.exportSettings = { encoder: "software" };
+    const asset = await probeMedia(source);
+    project.assets = [asset];
+    project.clips = [
+      {
+        ...newText("video", 0),
+        id: "video",
+        kind: "video",
+        assetId: asset.id,
+        duration: 3,
+      },
+    ];
+    if (recording) {
+      project.clips = [];
+      project.assets = [];
+      project = addRecordedAssets(
+        project,
+        [
+          { asset, kind: "screen" },
+          {
+            asset: { ...asset, id: "microphone", kind: "audio" },
+            kind: "microphone",
+          },
+        ],
+        { ...defaultRecordingSettings, background: false, autoZoom: false },
+        0,
+      );
+      const screen = project.clips[0];
+      screen.id = "video";
+      // Test the separate microphone, since the screen may not contain audio.
+      screen.audioDetached = true;
+      screen.keyframes = [0, 1, 2, 3].map((time) => ({
+        time,
+        value: { ...screen.transform, contentScale: 1 + time / 3 },
+        easing: "linear" as const,
+        recordingZoom: true as const,
+      }));
+    }
+    const extended = setFrameExtension(project, "video", 1, 1.5);
+    const originalVideo = path.join(root, "original.mp4");
+    if (recording)
+      await exportVideo(
+        project,
+        originalVideo,
+        path.join(root, "original-work"),
+        false,
+        signal,
+        () => {},
+      );
+    const file = path.join(root, "project", "extension.troncut");
+    await saveProject(extended, file);
+    const reopened = await openProject(file);
+    expect(reopened.clips[0].stitch).toEqual(extended.clips[0].stitch);
+    const target = path.join(root, "extended.mp4");
     await exportVideo(
-      endpoint,
-      output,
-      path.join(root, position),
+      reopened,
+      target,
+      path.join(root, "work"),
       false,
       signal,
       () => {},
     );
-    expect((await probeMedia(output)).duration).toBeCloseTo(4, 1);
-    const from = position === "start" ? 0 : 3;
-    const heldFirst = await frame(output, from + 0.2, `${position}-held-first`);
-    const heldLast = await frame(output, from + 0.8, `${position}-held-last`);
-    const originalFrame = await frame(
-      source,
-      position === "start" ? 0 : 2.95,
-      `${position}-source`,
-    );
-    expect(difference(heldFirst, heldLast)).toBeLessThan(1);
-    expect(difference(heldFirst, originalFrame)).toBeLessThan(7);
-  }
-  const capture = path.join(root, "snapshot.png");
-  await exportFrame(reopened, 2, capture, path.join(root, "capture"), signal);
-  expect(
-    difference(await sharp(capture).removeAlpha().raw().toBuffer(), original),
-  ).toBeLessThan(5);
-  const audio = path.join(root, "timeline.wav");
-  await renderTimelineAudio(
-    reopened,
-    audio,
-    path.join(root, "audio-work"),
-    signal,
-  );
-  for (const input of [target, audio]) {
-    for (const [time, silent] of [
-      [0.3, false],
-      [1.2, true],
-      [2.2, true],
-      [2.8, false],
-    ] as const) {
-      const raw = path.join(root, `${path.basename(input)}-${time}.f32`);
+    expect((await probeMedia(target)).duration).toBeCloseTo(4.5, 1);
+    const frame = async (input: string, time: number, name: string) => {
+      const image = path.join(root, `${name}.png`);
       await runProcess(ffmpeg, [
         "-y",
         "-ss",
         String(time),
         "-i",
         input,
-        "-t",
-        "0.15",
-        "-vn",
-        "-ac",
+        "-frames:v",
         "1",
-        "-ar",
-        "48000",
-        "-f",
-        "f32le",
-        raw,
+        image,
       ]);
-      const samples = await fs.readFile(raw);
-      let square = 0;
-      for (let i = 0; i < samples.length; i += 4)
-        square += samples.readFloatLE(i) ** 2;
-      const rms = Math.sqrt(square / (samples.length / 4));
-      if (silent) expect(rms).toBeLessThan(0.002);
-      else expect(rms).toBeGreaterThan(0.04);
+      return sharp(image).removeAlpha().raw().toBuffer();
+    };
+    const first = await frame(target, 1.2, "frozen-first");
+    const last = await frame(target, 2.3, "frozen-last");
+    const difference = (a: Buffer, b: Buffer) =>
+      a.reduce((sum, value, i) => sum + Math.abs(value - b[i]), 0) / a.length;
+    expect(difference(first, last)).toBeLessThan(1);
+    const originalCapture = path.join(root, "original-capture.png");
+    if (recording)
+      await exportFrame(
+        project,
+        1,
+        originalCapture,
+        path.join(root, "original-capture"),
+        signal,
+      );
+    const original = recording
+      ? await frame(originalVideo, 1, "original-video-frame")
+      : await frame(source, 1, "source-freeze");
+    expect(difference(first, original)).toBeLessThan(7);
+    const resumed = await frame(target, 3, "resumed");
+    const expected = recording
+      ? await frame(originalVideo, 1.5, "original-video-resumed")
+      : await frame(source, 1.5, "source-resumed");
+    expect(difference(resumed, expected)).toBeLessThan(7);
+    expect(difference(first, resumed)).toBeGreaterThan(8);
+    for (const position of ["start", "end"] as const) {
+      const endpoint = setFrameExtension(project, "video", 99, 1, position);
+      const output = path.join(root, `${position}.mp4`);
+      await exportVideo(
+        endpoint,
+        output,
+        path.join(root, position),
+        false,
+        signal,
+        () => {},
+      );
+      expect((await probeMedia(output)).duration).toBeCloseTo(4, 1);
+      const from = position === "start" ? 0 : 3;
+      const heldFirst = await frame(
+        output,
+        from + 0.2,
+        `${position}-held-first`,
+      );
+      const heldLast = await frame(output, from + 0.8, `${position}-held-last`);
+      const originalFrame = recording
+        ? await frame(
+            originalVideo,
+            position === "start" ? 0 : 2.95,
+            `${position}-original-video`,
+          )
+        : await frame(
+            source,
+            position === "start" ? 0 : 2.95,
+            `${position}-source`,
+          );
+      expect(difference(heldFirst, heldLast)).toBeLessThan(1);
+      expect(difference(heldFirst, originalFrame)).toBeLessThan(7);
     }
-  }
-}, 120000);
+    const capture = path.join(root, "snapshot.png");
+    await exportFrame(reopened, 2, capture, path.join(root, "capture"), signal);
+    expect(
+      difference(
+        await sharp(capture).removeAlpha().raw().toBuffer(),
+        recording
+          ? await sharp(originalCapture).removeAlpha().raw().toBuffer()
+          : original,
+      ),
+    ).toBeLessThan(5);
+    const audio = path.join(root, "timeline.wav");
+    await renderTimelineAudio(
+      reopened,
+      audio,
+      path.join(root, "audio-work"),
+      signal,
+    );
+    for (const input of [target, audio]) {
+      for (const [time, silent] of [
+        [0.3, false],
+        [1.2, true],
+        [2.2, true],
+        [2.8, false],
+      ] as const) {
+        const raw = path.join(root, `${path.basename(input)}-${time}.f32`);
+        await runProcess(ffmpeg, [
+          "-y",
+          "-ss",
+          String(time),
+          "-i",
+          input,
+          "-t",
+          "0.15",
+          "-vn",
+          "-ac",
+          "1",
+          "-ar",
+          "48000",
+          "-f",
+          "f32le",
+          raw,
+        ]);
+        const samples = await fs.readFile(raw);
+        let square = 0;
+        for (let i = 0; i < samples.length; i += 4)
+          square += samples.readFloatLE(i) ** 2;
+        const rms = Math.sqrt(square / (samples.length / 4));
+        if (silent) expect(rms).toBeLessThan(0.002);
+        else expect(rms).toBeGreaterThan(0.04);
+      }
+    }
+  },
+  120000,
+);

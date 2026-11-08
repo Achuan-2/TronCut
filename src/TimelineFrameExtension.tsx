@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import type { Clip } from "../shared/model";
 import {
   frameExtensionError,
+  frameExtensionTargetError,
   setFrameExtension,
 } from "../shared/frame-extension";
 import type { Editor } from "./useEditor";
@@ -26,9 +27,8 @@ export default function TimelineFrameExtension({
   const drag = useRef<{ x: number; duration: number } | null>(null);
   const [preview, setPreview] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const locked = !!editor.project.tracks.find(
-    (track) => track.id === clip.trackId,
-  )?.locked;
+  const targetError = frameExtensionTargetError(editor.project, clip.id);
+  const disabled = !!targetError;
   return (
     <div
       className="frame-extension-region"
@@ -40,11 +40,12 @@ export default function TimelineFrameExtension({
       }}
       title={
         error ??
+        targetError ??
         `帧定格 · ${Number(duration.toFixed(3))} 秒；拖动移动视频，双击修改，拖动右边缘调整时长`
       }
       onDoubleClick={(event) => {
         event.stopPropagation();
-        if (!locked) onEdit(event.clientX, event.clientY);
+        if (!disabled) onEdit(event.clientX, event.clientY);
       }}
       onContextMenu={(event) => {
         event.preventDefault();
@@ -57,9 +58,9 @@ export default function TimelineFrameExtension({
         type="button"
         className="frame-extension-handle"
         aria-label="调整帧定格时长"
-        disabled={locked}
+        disabled={disabled}
         onPointerDown={(event) => {
-          if (event.button !== 0 || locked) return;
+          if (event.button !== 0 || disabled) return;
           event.preventDefault();
           event.stopPropagation();
           editor.setPlaying(false);
