@@ -26,6 +26,7 @@ import {
 import { useEditor } from "./useEditor";
 import Preview from "./Preview";
 import Timeline from "./Timeline";
+import EditorLayout from "./EditorLayout";
 import { GroupRenameDialog } from "./GroupTimelineNavigation";
 import type { AnimationRange } from "../shared/animation-ranges";
 import Panels, { Inspector, type Tab } from "./Panels";
@@ -1172,42 +1173,46 @@ export default function App() {
           onContinue={hasSession ? enterEditor : undefined}
         />
       ) : (
-        <>
-          <div className="editor-workspace">
-            <Panels
+        <EditorLayout
+          workspace={
+            <div className="editor-workspace">
+              <Panels
+                editor={editor}
+                tab={tab}
+                setTab={setTab}
+                importMedia={importMedia}
+                importDroppedMedia={importDroppedMedia}
+                run={(fn) => void run(fn)}
+                toast={toast}
+                busy={busy || mediaImporting}
+                onPreferences={() => {
+                  setPreferencesTab("ai");
+                  setPreferencesOpen(true);
+                }}
+              />
+              <Preview
+                editor={editor}
+                onPreviewQualityChange={changePreviewQuality}
+                onCommand={(command) => commands.current(command)}
+              />
+              <Inspector editor={editor} />
+            </div>
+          }
+          timeline={
+            <Timeline
+              key={`${editor.documentProject.id}:${editor.activeGroupId ?? "main"}`}
               editor={editor}
-              tab={tab}
-              setTab={setTab}
-              importMedia={importMedia}
-              importDroppedMedia={importDroppedMedia}
-              run={(fn) => void run(fn)}
-              toast={toast}
-              busy={busy || mediaImporting}
-              onPreferences={() => {
-                setPreferencesTab("ai");
-                setPreferencesOpen(true);
-              }}
-            />
-            <Preview
-              editor={editor}
-              onPreviewQualityChange={changePreviewQuality}
+              shortcuts={shortcuts}
               onCommand={(command) => commands.current(command)}
+              onCopyAnimation={copyAnimation}
+              onDropFiles={dropFiles}
+              onDropLibraryAsset={dropLibraryAsset}
+              onCaptureFrame={() => void captureFrame()}
+              capturingFrame={capturingFrame}
+              dropDisabled={busy || recordingModalOpen || mediaImporting}
             />
-            <Inspector editor={editor} />
-          </div>
-          <Timeline
-            key={`${editor.documentProject.id}:${editor.activeGroupId ?? "main"}`}
-            editor={editor}
-            shortcuts={shortcuts}
-            onCommand={(command) => commands.current(command)}
-            onCopyAnimation={copyAnimation}
-            onDropFiles={dropFiles}
-            onDropLibraryAsset={dropLibraryAsset}
-            onCaptureFrame={() => void captureFrame()}
-            capturingFrame={capturingFrame}
-            dropDisabled={busy || recordingModalOpen || mediaImporting}
-          />
-        </>
+          }
+        />
       )}
       {projectMenu && screen === "editor" && !actionsBlocked && (
         <ProjectContextMenu
