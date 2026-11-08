@@ -25,7 +25,7 @@ pnpm test:smoke
 pnpm dist:win
 ```
 
-The installer is written to `release/TronCut Setup 0.6.2.exe`; the unpacked app is under `release/win-unpacked/`. Test the packaged app before uploading. Release asset names use hyphens for stable direct-download URLs.
+The installer is written to `release/TronCut Setup 0.6.3.exe`; the unpacked app is under `release/win-unpacked/`. Test the packaged app before uploading. Release asset names use hyphens for stable direct-download URLs.
 
 ```powershell
 $env:FRAMECRAFT_PACKAGED_SMOKE='1'
@@ -45,7 +45,15 @@ Mac 安装包不要求先完成本地验收。工作流直接构建并发布 arm
 
 ## Publishing / 发布
 
-请求发布但未指定版本号时，默认将当前版本的末位（patch）加 1，例如 v0.4.1 → v0.4.2；明确指定版本号时按指定版本执行。
+默认发布只更新版本和发布说明，完成本地 Git commit 并在该提交上创建对应标签；不自动推送，不创建 GitHub Release，不触发、查询、等待或重试 GitHub Actions，也不以云端构建或附件上传作为完成条件。GitHub Actions 暂时不可用；需要推送、构建安装包或上传附件时，按当次明确要求执行。
+
+The default release consists of version/release-note updates, a local Git commit, and a matching annotated tag. Do not automatically push, create a GitHub Release, or trigger, inspect, wait for, or retry GitHub Actions. Build or upload installers only when explicitly requested.
+
+请求发布但未指定版本号时，默认在最近已发布版本上递增 patch；如果工作区已经准备了下一版本且尚无对应标签，就完成该版本，不再重复递增。明确指定版本号时按指定版本执行。
+
+发布前核对版本、说明和已完成的本地验证，仅暂存发布相关文件；保留用户其他修改。提交格式为 `🔖 v<version> / <yyyyMMdd>`，随后执行 `git tag -a v<version> -m "TronCut v<version>"`，最后核对标签指向该发布提交。
+
+### Optional GitHub Actions / 可选工作流（当前不使用）
 
 Release 标题填写在 GitHub 的标题栏；`docs/releases/v<version>.md` 正文直接从简介开始，不再添加 `# TronCut v<version>`，避免页面重复显示标题。
 
