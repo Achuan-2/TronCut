@@ -4,7 +4,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { recordingControls } from "./recording-controls.mjs";
+import { recordingControls, mockNativeCaptureAvailability } from "./recording-controls.mjs";
 
 const root = path.resolve(
   "test-output/recording-camera-ui",
@@ -63,6 +63,7 @@ const previewDetails = () =>
     };
   });
 try {
+  await mockNativeCaptureAvailability(app, false);
   const page = await app.firstWindow(),
     errors = [];
   page.on("pageerror", (error) => errors.push(error.message));
@@ -161,7 +162,7 @@ try {
     .locator(`.capture-sources > button[data-source-id="${target}"]`)
     .click();
   await page.getByLabel("麦克风", { exact: true }).uncheck();
-  await page.getByLabel("原生录制与可编辑鼠标", { exact: true }).uncheck();
+  await expect(page.getByLabel("原生录制与可编辑鼠标", { exact: true })).toHaveCount(0);
   await page.getByLabel("录制帧率", { exact: true }).selectOption("15");
   await expect
     .poll(() => preview.evaluate((video) => video.videoWidth))

@@ -4,7 +4,7 @@ import path from "node:path";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import sharp from "sharp";
-import { recordingControls } from "./recording-controls.mjs";
+import { recordingControls, mockNativeCaptureAvailability } from "./recording-controls.mjs";
 import { selectPreview } from "./preview-select.mjs";
 
 const run = promisify(execFile);
@@ -95,6 +95,7 @@ try {
 
   for (const native of [true, false]) {
     if (!native) {
+      await mockNativeCaptureAvailability(app, false);
       await page.getByRole("button", { name: "录制", exact: true }).click();
       await expect(page.getByLabel("麦克风", { exact: true })).not.toBeChecked();
       await expect(page.locator(".capture-sources")).toBeVisible();
@@ -108,7 +109,7 @@ try {
       await picker.getByRole("button", { name: "使用此范围", exact: true }).click();
       await expect(page.locator(".capture-sources")).toHaveCount(0);
     }
-    await page.getByLabel("原生录制与可编辑鼠标", { exact: true }).setChecked(native);
+    await expect(page.getByLabel("原生录制与可编辑鼠标", { exact: true })).toHaveCount(0);
     await app.evaluate(() => {
       globalThis.regionFixture.setAlwaysOnTop(true, "screen-saver");
       globalThis.regionFixture.show();

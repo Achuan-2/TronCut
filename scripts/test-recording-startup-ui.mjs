@@ -4,7 +4,7 @@ import path from "node:path";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import sharp from "sharp";
-import { recordingControls } from "./recording-controls.mjs";
+import { recordingControls, mockNativeCaptureAvailability } from "./recording-controls.mjs";
 
 const root = path.resolve(
   "test-output/recording-startup-ui",
@@ -88,7 +88,9 @@ try {
   ).toBeEnabled();
   await expect(
     page.getByLabel("原生录制与可编辑鼠标", { exact: true }),
-  ).toBeChecked();
+  ).toHaveCount(0);
+  await expect(page.getByLabel("录屏鼠标样式", { exact: true })).toBeEnabled();
+  await page.locator(".recorder-modal").screenshot({ path: path.join(root, "recorder-default.png") });
   await page.locator(`.capture-sources > button[data-source-id="${fixture}"]`).click();
   await page.getByLabel("录制帧率", { exact: true }).selectOption("30");
   for (const microphone of [false, true]) {
@@ -224,9 +226,10 @@ try {
   expect(Math.abs(asset.duration - recordingWallSeconds)).toBeLessThan(0.8);
   expect(asset.cursor.samples.length).toBeGreaterThan(0);
   console.log(JSON.stringify({ duration: asset.duration, firstPixel: Array.from(data.subarray(center, center + 3)), cursorSamples: asset.cursor.samples.length }));
+  await mockNativeCaptureAvailability(app, false);
   await page.getByRole("button", { name: "录制", exact: true }).click();
   await page.getByLabel("麦克风", { exact: true }).check();
-  await page.getByLabel("原生录制与可编辑鼠标", { exact: true }).uncheck();
+  await expect(page.getByLabel("录屏鼠标样式", { exact: true })).toBeDisabled();
   // A device that opens late must still be released if another request fails.
   await page.evaluate(() => {
     globalThis.deviceEvents = [];

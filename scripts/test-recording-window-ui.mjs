@@ -2,7 +2,7 @@ import { _electron as electron, expect } from "@playwright/test";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { selectPreview } from "./preview-select.mjs";
-import { recordingControls } from "./recording-controls.mjs";
+import { recordingControls, mockNativeCaptureAvailability } from "./recording-controls.mjs";
 
 if (process.platform !== "win32")
   throw new Error("Windows recording window test");
@@ -82,6 +82,7 @@ try {
   await expect(modal).toHaveCount(0);
 
   async function configure(native, source = target) {
+    await mockNativeCaptureAvailability(app, native);
     await page.getByRole("button", { name: "录制", exact: true }).click();
     await page
       .locator(
@@ -94,9 +95,7 @@ try {
     await page.getByLabel("麦克风", { exact: true }).uncheck();
     await page.getByLabel("录制帧率", { exact: true }).selectOption("15");
     await selectPreview(page, "录屏背景", "none");
-    await page
-      .getByLabel("原生录制与可编辑鼠标", { exact: true })
-      .setChecked(native);
+    await expect(page.getByLabel("原生录制与可编辑鼠标", { exact: true })).toHaveCount(0);
   }
   async function begin() {
     const opened = app.waitForEvent("window");

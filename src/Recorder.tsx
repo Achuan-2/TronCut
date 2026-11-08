@@ -60,7 +60,6 @@ export default function Recorder({
     [elapsed, setElapsed] = useState(0),
     [error, setError] = useState("");
   const [nativeAvailable, setNativeAvailable] = useState(false),
-    [useNative, setUseNative] = useState(true),
     [fps, setFps] = useState(30);
   const nativeActive = useRef(false);
   const [countingDown, setCountingDown] = useState(false);
@@ -244,7 +243,7 @@ export default function Recorder({
     setPhase("starting");
     const streams: { kind: Session["kind"]; stream: MediaStream }[] = [];
     try {
-      const native = nativeAvailable && useNative;
+      const native = nativeAvailable;
       const [savedSettings, info] = await Promise.all([
         bridge.saveRecordingSettings(settings),
         recordingCapabilities.current ?? bridge.capabilities(),
@@ -553,17 +552,6 @@ export default function Recorder({
             ))}
           </select>
         </label>
-        {nativeAvailable && (
-          <label className="check-field">
-            <input
-              type="checkbox"
-              disabled={phase === "starting" || savingSettings}
-              checked={useNative}
-              onChange={(e) => setUseNative(e.target.checked)}
-            />
-            原生录制与可编辑鼠标
-          </label>
-        )}
         <fieldset
           className="recording-style"
           disabled={phase === "starting" || savingSettings || !settingsReady}
@@ -590,7 +578,6 @@ export default function Recorder({
             >
               <span>录屏画面</span>
               {nativeAvailable &&
-                useNative &&
                 settings.cursor.style !== "hidden" && (
                   <img
                     alt="鼠标预览"
@@ -631,7 +618,7 @@ export default function Recorder({
               />
             </label>
           </div>
-          <fieldset disabled={!nativeAvailable || !useNative}>
+          <fieldset disabled={!nativeAvailable}>
             <div className="recording-style-fields">
               <label className="field">
                 鼠标样式

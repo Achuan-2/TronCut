@@ -3,6 +3,14 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import path from "node:path";
 
+/** Exercise platform fallback without exposing an engine switch in the UI. */
+export async function mockNativeCaptureAvailability(app, available) {
+  await app.evaluate(({ ipcMain }, available) => {
+    ipcMain.removeHandler("capture:native:available");
+    ipcMain.handle("capture:native:available", () => available);
+  }, available);
+}
+
 /** Find the independent controller without confusing it with the countdown. */
 export async function recordingControls(app) {
   const title = encodeURIComponent("<title>TronCut 录制控制</title>");

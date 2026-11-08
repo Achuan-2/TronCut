@@ -63,15 +63,12 @@ try {
   );
   await expect(ownWindow).toHaveCount(1, { timeout: 20000 });
   await ownWindow.click();
-  const native = page.getByLabel("原生录制与可编辑鼠标", { exact: true });
-  await expect(native).toBeChecked();
-  await native.uncheck();
-  await expect(page.getByLabel("录屏鼠标样式", { exact: true })).toBeDisabled();
+  await expect(page.getByLabel("原生录制与可编辑鼠标", { exact: true })).toHaveCount(0);
+  await expect(page.getByLabel("录屏鼠标样式", { exact: true })).toBeEnabled();
   await expect(
     page.getByLabel("根据鼠标点击自动缩放并跟随移动", { exact: true }),
-  ).toBeDisabled();
+  ).toBeEnabled();
   await expect(page.getByLabel("录屏背景", { exact: true })).toBeEnabled();
-  await native.check();
   await page.getByLabel("麦克风", { exact: true }).uncheck();
   await page.getByLabel("录制帧率", { exact: true }).selectOption("15");
   await selectPreview(page, "录屏背景", "sunset");
