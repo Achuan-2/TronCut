@@ -1,8 +1,6 @@
 name: Build release
 
 on:
-  release:
-    types: [published]
   workflow_dispatch:
     inputs:
       tag:
@@ -11,14 +9,14 @@ on:
         type: string
       upload:
         description: Upload packages to the existing Release (disable for build only)
-        default: true
+        default: false
         type: boolean
 
 permissions:
   contents: read
 
 concurrency:
-  group: release-${{ github.event.release.tag_name || inputs.tag }}
+  group: release-${{ inputs.tag }}
   cancel-in-progress: false
 
 jobs:
@@ -33,7 +31,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-          RELEASE_TAG: ${{ github.event.release.tag_name || inputs.tag }}
+          RELEASE_TAG: ${{ inputs.tag }}
         shell: bash
         run: |
           set -euo pipefail
@@ -223,7 +221,7 @@ jobs:
 
   upload:
     needs: [resolve, windows, macos]
-    if: github.event_name == 'release' || inputs.upload
+    if: inputs.upload
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
