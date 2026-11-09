@@ -38,11 +38,11 @@ TronCut 集成录屏、剪辑、文字、字幕和声音处理，大大提升教
 
 ## 下载与开始使用
 
-已有安装包可前往 **[GitHub Releases](https://github.com/Achuan-2/TronCut/releases)** 下载；新版本标签不自动生成安装包。
+已有安装包可前往 **[GitHub Releases](https://github.com/Achuan-2/TronCut/releases)** 下载
 
-当前源码版本为 **[v0.6.3](https://github.com/Achuan-2/TronCut/tree/v0.6.3)**，新增钢笔工具、全局画布运镜、时间轴整体高度调整和 Shift 自由拉伸，改进裁边吸附、字幕轨道层级、录屏与项目启动。本次发布仅提交源码并创建 Git 标签，安装包按需本地构建。详见[发布说明](docs/releases/v0.6.3.md)。
+由于本账号的GitHub Action被禁用，新版本将不自动生成安装包，需要自行构建。
 
-使用方法按功能模块整理在 [使用文档](docs/README.md) 中，包括素材与录屏鼠标、时间线、文本、画布动画和项目管理。首次使用可阅读 [开始使用](docs/GETTING-STARTED.md)。
+
 
 ## 功能截图
 
