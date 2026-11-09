@@ -38,10 +38,10 @@ TronCut 集成录屏、剪辑、文字、字幕和声音处理，大大提升教
 
 ## 下载与开始使用
 
-已有安装包可前往 **[GitHub Releases](https://github.com/Achuan-2/TronCut/releases)** 下载
 
 由于本账号的GitHub Action被禁用，新版本将不自动生成安装包，需要自行构建。
 
+之前版本的安装包可前往 **[GitHub Releases](https://github.com/Achuan-2/TronCut/releases)** 下载
 
 
 ## 功能截图
